@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: tracing.c,v 1.15 2002/03/23 00:42:48 mark Exp $";
+static char *RCSid = "$Id: tracing.c,v 1.17 2002/12/16 07:06:35 mark Exp $";
 #endif
 
 /*
@@ -240,7 +240,7 @@ int intertrace( tsd_t *TSD )
    tt->traceflag = 1 ;
    retvalue1 = (-1) ;
 
-   for (; retvalue1<0; ) 
+   for (; retvalue1<0; )
    {
       rc = HOOK_GO_ON ;
       if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_TRCIN))
@@ -344,7 +344,10 @@ void tracevalue( const tsd_t *TSD, const streng *str, char type )
       return ;
 
    tmpch = TSD->currlevel->tracestat ;
-   if ((tmpch=='I')||((tmpch=='R')&&(type!='.')))
+   /*
+    * ANSI 8.3.17 requires placeholders in PARSE to be traced with TRACE R
+    */
+   if ( ( tmpch == 'I' ) || ( tmpch == 'R' ) )
    {
       message = Str_makeTSD( str->len + 30 + tt->ctrlcounter ) ;
       sprintf(tt->tracestr,"       >%%c> %%%ds  \"%%.%ds\"",tt->ctrlcounter, str->len) ; /* bja */
@@ -484,7 +487,7 @@ void flush_trace_chars( tsd_t *TSD )
 
 void set_trace_char( tsd_t *TSD, char ch2 )
 {
-   switch (ch2=(char)toupper(ch2)) 
+   switch (ch2=(char)toupper(ch2))
    {
       case '?':
          ch2 = (char) (TSD->systeminfo->interactive = !TSD->systeminfo->interactive) ;
@@ -519,43 +522,41 @@ void set_trace_char( tsd_t *TSD, char ch2 )
 
 void set_trace( tsd_t *TSD, const streng *setting )
 {
-   int cptr=0 ;
+   int cptr,error;
    tra_tsd_t *tt;
 
    if (myisnumber(setting))
    {
-      if ( myiswnumber(TSD, setting) )
+      cptr = streng_to_int( TSD, setting, &error );
+      if (error)
+         exiterror( ERR_INVALID_INTEGER, 7, tmpstr_of( TSD, setting ) );
+
+      /*
+       * If the number is positive, interactive tracing continues
+       * for the supplied number of clauses, but no pausing is done.
+       * If the number is negative, no trace output is inhibited
+       * (as is the pauses) for the supplied number of clauses.
+       * If the number is zero, this is the same as TRACE OFF
+       */
+      tt = TSD->tra_tsd;
+      if ( cptr == 0 )
       {
-         cptr = myatol( TSD, setting );
-         /*
-          * If the number is positive, interactive tracing continues
-          * for the supplied number of clauses, but no pausing is done.
-          * If the number is negative, no trace output is inhibited
-          * (as is the pauses) for the supplied number of clauses.
-          * If the number is zero, this is the same as TRACE OFF
-          */
-         tt = TSD->tra_tsd;
-         if ( cptr == 0 )
-         {
-            TSD->systeminfo->interactive = TSD->currlevel->traceint = 0 ; /* MDW 30012002 */
-            /* MDW 30012002 - above line replaces this one TSD->currlevel->tracestat = 'O' ; */
-            TSD->systeminfo->interactive = 0 ;
-            TSD->trace_stat = TSD->currlevel->tracestat ;
-         }
-         else if ( cptr > 0 )
-         {
-            tt->quiet = 0;
-            tt->intercount = cptr+1;
-         }
-         else
-         {
-            tt->quiet = 1;
-            tt->intercount = (-cptr)+1;
-         }
-         return ;  /* need to do something else ... */
+         TSD->systeminfo->interactive = TSD->currlevel->traceint = 0 ; /* MDW 30012002 */
+         /* MDW 30012002 - above line replaces this one TSD->currlevel->tracestat = 'O' ; */
+         TSD->systeminfo->interactive = 0 ;
+         TSD->trace_stat = TSD->currlevel->tracestat ;
+      }
+      else if ( cptr > 0 )
+      {
+         tt->quiet = 0;
+         tt->intercount = cptr+1;
       }
       else
-         exiterror( ERR_INVALID_INTEGER, 7, tmpstr_of( TSD, setting ) )  ;
+      {
+         tt->quiet = 1;
+         tt->intercount = (-cptr)+1;
+      }
+      return ;  /* need to do something else ... */
    }
    for (cptr=0; cptr<Str_len(setting); cptr++)
    {

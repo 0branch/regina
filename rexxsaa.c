@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexxsaa.c,v 1.19 2002/03/23 00:48:14 mark Exp $";
+static char *RCSid = "$Id: rexxsaa.c,v 1.31 2003/04/03 11:01:18 mark Exp $";
 #endif
 /*
  *  The Regina Rexx Interpreter
@@ -58,8 +58,11 @@ static char *RCSid = "$Id: rexxsaa.c,v 1.19 2002/03/23 00:48:14 mark Exp $";
  *    RexxQueryMacro()          --- find a macro's search order
  *    RexxReorderMacro()        --- change the search order for a macro
  *    RexxSaveMacroSpace()      --- save macrospace to file
+ *
+ * These functions are Regina extensions
  *    RexxFreeMemory()          --- free memory allocated by Rexx API
  *    RexxAllocateMemory()      --- allocate memory to be freed by Rexx API
+ *    RexxCallBack()            --- execute an internal procedure within the running script
  *
  * These functions are all defined in the doc for SAA API. In addition,
  * a number of calls in Regina are called, as well as a number of calls
@@ -76,6 +79,7 @@ static char *RCSid = "$Id: rexxsaa.c,v 1.19 2002/03/23 00:48:14 mark Exp $";
  * by this source code:
  *
  *    IfcExecScript()           --- start to execute Rexx code
+ *    IfcExecCallBack()         --- start to execute Rexx procedure
  *    IfcVarPool()              --- handle a variable manipulation request
  *    IfcRegFunc()              --- register an external function name
  *    IfcDelFunc()              --- deregister an external function name
@@ -152,6 +156,25 @@ static char *RCSid = "$Id: rexxsaa.c,v 1.19 2002/03/23 00:48:14 mark Exp $";
 #else
 # define EXPORT_C
 #endif
+
+typedef union {
+   RXFNCCAL_PARM fnccal ;
+   RXCMDHST_PARM cmdhst ;
+   RXMSQPLL_PARM msqpll ;
+   RXMSQPSH_PARM msqpsh ;
+   RXMSQSIZ_PARM msqsiz ;
+   RXMSQNAM_PARM msqnam ;
+   RXSIOSAY_PARM siosay ;
+   RXSIOTRC_PARM siotrc ;
+   RXSIOTRD_PARM siotrd ;
+   RXSIODTR_PARM siodtr ;
+   RXHLTTST_PARM hlttst ;
+   RXTRCTST_PARM trctst ;
+   RXENVGET_PARM envget ;
+   RXENVSET_PARM envset ;
+   RXCWDGET_PARM cwdget ;
+   RXCWDSET_PARM cwdset ;
+} EXIT ;
 
 struct funcbox2 {
    struct funcbox2 *next, *prev ;
@@ -327,7 +350,12 @@ static void FillReq( PSHVBLOCK Req, ULONG Length, const char *String, int type )
     */
    if (string->strptr)
    {
-      if (*strlen<Length)
+      /*
+       * We need a terminator, therefore we need one byte more for allocation.
+       * We may come to the funny situation indicating a truncation but have
+       * copied all bytes from the string.
+       */
+      if ( *strlen <= Length )
       {
           Req->shvret |= RXSHV_TRUNC ;
           SaveLength = Length;
@@ -335,7 +363,10 @@ static void FillReq( PSHVBLOCK Req, ULONG Length, const char *String, int type )
           *strlen = SaveLength;
       }
       else
+      {
          *strlen = Length ;
+         string->strptr[Length] = '\0';
+      }
       memcpy(string->strptr, String, Length ) ;
       string->strlength = Length ;
    }
@@ -351,10 +382,14 @@ static void FillReq( PSHVBLOCK Req, ULONG Length, const char *String, int type )
        */
       if (Length)
       {
-         string->strptr = (char *)IfcAllocateMemory( Length ) ;
+         /*
+          * We have to ASCII0-terminate the string silently
+          */
+         string->strptr = (char *)IfcAllocateMemory( Length + 1 );
          if (string->strptr)
          {
             memcpy( string->strptr, String, Length ) ;
+            string->strptr[Length] = '\0';
             string->strlength = Length ;
             *strlen = Length ;
          }
@@ -363,16 +398,18 @@ static void FillReq( PSHVBLOCK Req, ULONG Length, const char *String, int type )
       }
       else
       {
-       /* allocate at least 1 byte */
-       string->strptr = (char *)IfcAllocateMemory( 1 ) ;
-       if (string->strptr)
-       {
-          /* no copy needed                    */
-          string->strlength = Length ;
-          *strlen = Length ;
-       }
-       else
-          Req->shvret |= RXSHV_MEMFL ;
+         /*
+          * We have to ASCII0-terminate the string silently
+          */
+         string->strptr = (char *)IfcAllocateMemory( 1 );
+         if (string->strptr)
+         {
+            string->strptr[0] = '\0';
+            string->strlength = Length ;
+            *strlen = Length ;
+         }
+         else
+            Req->shvret |= RXSHV_MEMFL ;
       }
    }
 }
@@ -535,7 +572,7 @@ int IfcSubCmd( const tsd_t *TSD, int EnvLen, const char *EnvStr,
       cmdhst.rxcmd_flags.rxfcfail = 0;
       cmdhst.rxcmd_flags.rxfcerr = 0;
       cmdhst.rxcmd_command = Cmd ;
-      cmdhst.rxcmd_address = EnvNam ;
+      cmdhst.rxcmd_address = (unsigned char *)EnvNam ;
       cmdhst.rxcmd_addressl = (USHORT) EnvLen ;
       cmdhst.rxcmd_retc = Ret;
       cmdhst.rxcmd_dll = NULL;
@@ -639,6 +676,8 @@ int IfcDoExit( const tsd_t *TSD, int Code,
    RXSIODTR_PARM siodtr;
    RXENVSET_PARM envset;
    RXENVGET_PARM envget;
+   RXCWDSET_PARM cwdset;
+   RXCWDGET_PARM cwdget;
    PEXIT parm=NULL;
    rex_tsd_t *rt;
 
@@ -719,8 +758,8 @@ int IfcDoExit( const tsd_t *TSD, int Code,
       case RX_EXIT_SETENV:
          assert(InputLength == NULL &&
                 InputString == NULL &&
-                OutputLength2 != 0 &&
-                OutputString2 != NULL &&
+                OutputLength1 != 0 &&
+                OutputString1 != NULL &&
                 OutputLength2 != 0 &&
                 OutputString2 != NULL);
          envset.rxenv_name.strptr = OutputString1 ;
@@ -730,7 +769,6 @@ int IfcDoExit( const tsd_t *TSD, int Code,
          parm = (PEXIT)&envset;
          MainCode = RXENV ;
          SubCode = RXENVSET ;
-
          break ;
 
       case RX_EXIT_GETENV:
@@ -746,6 +784,32 @@ int IfcDoExit( const tsd_t *TSD, int Code,
          envget.rxenv_name.strlength = OutputLength1 ;
          parm = (PEXIT)&envget;
          SubCode = RXENVGET ;
+         MainCode = RXENV ;
+         break ;
+
+      case RX_EXIT_SETCWD:
+         assert(InputLength == NULL &&
+                InputString == NULL &&
+                OutputLength1 != 0 &&
+                OutputString1 != NULL);
+         cwdset.rxcwd_value.strptr = OutputString1 ;
+         cwdset.rxcwd_value.strlength = OutputLength1 ;
+         parm = (PEXIT)&cwdset;
+         MainCode = RXENV ;
+         SubCode = RXCWDSET ;
+         break ;
+
+      case RX_EXIT_GETCWD:
+         assert(OutputLength1 == 0 &&
+                OutputString1 == NULL &&
+                InputLength != NULL &&
+                InputString != NULL &&
+                OutputLength2 == 0 &&
+                OutputString2 == NULL);
+         cwdget.rxcwd_value.strlength = *InputLength ;
+         cwdget.rxcwd_value.strptr = *InputString ;
+         parm = (PEXIT)&cwdget;
+         SubCode = RXCWDGET ;
          MainCode = RXENV ;
          break ;
 
@@ -767,6 +831,7 @@ int IfcDoExit( const tsd_t *TSD, int Code,
       case RX_EXIT_INIT:
       case RX_EXIT_TERMIN:
       case RX_EXIT_SETENV:
+      case RX_EXIT_SETCWD:
          break ;
 
      case RX_EXIT_TRCIN:
@@ -782,6 +847,11 @@ int IfcDoExit( const tsd_t *TSD, int Code,
      case RX_EXIT_GETENV:
          retlen = envget.rxenv_value.strlength ;
          retstr = envget.rxenv_value.strptr ;
+         break ;
+
+     case RX_EXIT_GETCWD:
+         retlen = cwdget.rxcwd_value.strlength ;
+         retstr = cwdget.rxcwd_value.strptr ;
          break ;
 
       default:
@@ -845,8 +915,8 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
 {
    int cnt=0, RLength=0 ;
    char *RString=NULL ;
-   int ParLengths[32] ;
-   const char *ParStrings[32] ;
+   int ParLengths[MAX_ARGS_TO_REXXSTART] ;
+   const char *ParStrings[MAX_ARGS_TO_REXXSTART] ;
    int ExitFlags=0 ;
    int EnvNamLen=0 ;
    const char *EnvNamStr ;
@@ -955,7 +1025,8 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
             break ;
 
          case RXENV:
-            ExitFlags |= (1<<RX_EXIT_GETENV) | (1<<RX_EXIT_SETENV) ;
+            ExitFlags |= (1<<RX_EXIT_GETENV) | (1<<RX_EXIT_SETENV) |
+                         (1<<RX_EXIT_GETCWD) | (1<<RX_EXIT_SETCWD) ;
             rt->CurrentHandlers->Handlers[RXENV] = handler ;
             break ;
 
@@ -999,7 +1070,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
       WhereCode = RX_TYPE_EXTERNAL ;
    starttrace(TSD) ;
 
-   rc = IfcExecScript( strlen(ProgramName), ProgramName,
+   rc = IfcExecScript( TSD, strlen(ProgramName), ProgramName,
           ArgCount, ParLengths, (const char **) ParStrings, MAP_TYPE(CallType),
           ExitFlags, EnvNamLen, EnvNamStr,  WhereCode, restricted,
           SourcePtr, SourceLen, TinPtr, TinLen,
@@ -1040,21 +1111,93 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
       IfcFreeMemory( RString ) ;
 
    /*
-    * Remove any internal queues and any connection to
-    * rxstack
+    * Close all open files.
     */
-   purge_stacks( TSD );
-   /*
-    * Close all open files and reset Regina's internal file table
-    */
-   purge_filetable( TSD );
+   CloseOpenFiles( TSD ) ;
+
+   return rc ;
+}
+
+EXPORT_C APIRET APIENTRY RexxCallBack( PCSZ       ProcedureName,
+                                       LONG       ArgCount,
+                                       PRXSTRING  ArgList,
+                                       PSHORT     ReturnCode,
+                                       PRXSTRING  Result )
+{
+   int cnt=0, RLength=0 ;
+   char *RString=NULL ;
+   int ParLengths[MAX_ARGS_TO_REXXSTART] ;
+   const char *ParStrings[MAX_ARGS_TO_REXXSTART] ;
+   int rc=0 ;
+   LONG ResValue=0L ;
+   PCSZ ProcName=ProcedureName;
+   tsd_t *TSD;
 
    /*
-    * Free internal memory allocations
+    * This can only be called with an active Rexx session running
     */
-#if defined(FLISTS) && defined(SINGLE_THREADED)
-   purge_flists( TSD );
-#endif
+   TSD = __regina_get_tsd();
+
+   if ( TSD->systeminfo == NULL )
+      return(RX_CB_NOTSTARTED);
+
+   if ((ArgCount < 0) || ((ArgCount > 0) && (ArgList == NULL)))
+      return(RX_CB_BADP);
+   if ( !ProcName )
+      return(RX_CB_BADP);
+
+   if (ArgCount > sizeof(ParLengths) / sizeof(ParLengths[0]) )
+      return(RX_CB_TOOMANYP);
+
+   if (ArgCount > sizeof(ParLengths) / sizeof(ParLengths[0]) )
+      ArgCount = sizeof(ParLengths) / sizeof(ParLengths[0]) ;
+   for (cnt=0; cnt<ArgCount; cnt++)
+   {
+      ParLengths[cnt] = ArgList[cnt].strlength ;
+      ParStrings[cnt] = ArgList[cnt].strptr ;
+      if (ParStrings[cnt]==NULL)
+         ParLengths[cnt] = RX_NO_STRING ;
+   }
+
+   rc = IfcExecCallBack( TSD, strlen(ProcName), ProcName,
+          ArgCount, ParLengths, (const char **) ParStrings,
+          &RLength, &RString );
+   if ( rc == RX_CODE_NOSUCH )
+      rc = RX_CB_BADN;
+
+   /*
+    * Determine numeric return code and pass it back
+    */
+   if (RLength!=RX_NO_STRING)
+      ResValue = atoi( RString ) ;
+   else
+      ResValue = 0 ;
+
+   if (ReturnCode)
+      *ReturnCode = (SHORT) ResValue ;   /* FGC */
+
+   /*
+    * Determine text return code and pass it back
+    */
+   if ( rc == RX_CB_OK )
+   {
+      if (Result)
+      {
+         if (!Result->strptr || (int)Result->strlength>=RLength+1)
+         {
+            Result->strlength = RLength ;
+            Result->strptr = RString ;
+         }
+         else
+         {
+            Result->strlength = RLength ;
+            memcpy( Result->strptr, RString, RLength+1 ) ;
+            IfcFreeMemory( RString ) ;
+         }
+      }
+      else if (RString)
+         IfcFreeMemory( RString ) ;
+   }
 
    return rc ;
 }
@@ -1193,7 +1336,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
 {
    int Code=0, RetCode=0, IVPcode;
    int Lengths[2] ;
-   int rc=0 ;
+   int rc=0, allocated ;
    char *Strings[2] ;
    PSHVBLOCK Req=RequestBlockList ;
    tsd_t *TSD;
@@ -1214,6 +1357,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
    for (;Req;Req=Req->shvnext)
    {
       IVPcode = 0; /* Needed for a correct IVPcode on a second request */
+      allocated = 0;
       switch (Req->shvcode)
       {
          case RXSHV_SYDRO:
@@ -1234,7 +1378,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
             else
                Lengths[1] = RX_NO_STRING ;
 
-            Code = IfcVarPool( TSD, IVPcode, Lengths, Strings ) ; /* JH 20-10-99 */
+            Code = IfcVarPool( TSD, IVPcode, Lengths, Strings, &allocated );
 
             Req->shvret = RXSHV_OK ;
             if (Code==RX_CODE_NOVALUE)
@@ -1253,10 +1397,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
             IVPcode = IVPcode ? IVPcode : RX_GETVAR;    /* JH 20-10-99 */
             Lengths[0] = Req->shvname.strlength ;
             Strings[0] = Req->shvname.strptr ;
-            /* FIXME, FGC: This two lines are unnecessary
-            Lengths[1] = Req->shvvalue.strlength ;
-            Strings[1] = Req->shvvalue.strptr ; */
-            Code = IfcVarPool( TSD, IVPcode, Lengths, Strings ) ; /* JH 20-10-99 */
+            Code = IfcVarPool( TSD, IVPcode, Lengths, Strings, &allocated );
 
             Req->shvret = RXSHV_OK ;
             if (Code==RX_CODE_NOVALUE)
@@ -1276,7 +1417,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
             if (Req->shvname.strlength==4 && Req->shvname.strptr &&
                 !strncmp(Req->shvname.strptr, "PARM", 4 ))
             {
-               rc = IfcVarPool( TSD, RX_CODE_PARAMS, Lengths, Strings ) ;
+               rc = IfcVarPool( TSD, RX_CODE_PARAMS, Lengths, Strings, &allocated );
                FillReqValue( Req, Lengths[0], Strings[0] ) ;
             }
 
@@ -1286,7 +1427,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
                Lengths[0] = Req->shvname.strlength - 5 ;
                Strings[0] = Req->shvname.strptr + 5 ;
 
-               rc = IfcVarPool( TSD, RX_CODE_PARAM, Lengths, Strings ) ;
+               rc = IfcVarPool( TSD, RX_CODE_PARAM, Lengths, Strings, &allocated );
                if (rc == RX_CODE_OK)
                   FillReqValue( Req, Lengths[1], Strings[1] ) ;
                else
@@ -1318,7 +1459,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
 
                   if (!Req->shvret | RXSHV_BADN)
                   {
-                     rc=IfcVarPool( TSD, Code, Lengths, Strings ) ;
+                     rc=IfcVarPool( TSD, Code, Lengths, Strings, &allocated );
                      FillReqValue( Req, Lengths[0], Strings[0] ) ;
                   }
                }
@@ -1333,7 +1474,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
             int Items ;
 
             Req->shvret = RXSHV_OK ;
-            Items = IfcVarPool( TSD, RX_NEXTVAR, Lengths, Strings ) ;
+            Items = IfcVarPool( TSD, RX_NEXTVAR, Lengths, Strings, &allocated );
             assert( Items==0 || Items==2 ) ;
 
             if (Items==2)
@@ -1350,7 +1491,10 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
          default:
             Req->shvret = RXSHV_BADF ;
       }
-
+      if (allocated & 1) /* fixes bug 596686 */
+         FreeTSD( Strings[0] );
+      if (allocated & 2)
+         FreeTSD( Strings[1] );
       RetCode |= ( Req->shvret & 0x007f ) ;
    }
 
@@ -1616,7 +1760,7 @@ EXPORT_C APIRET APIENTRY RexxDeregisterFunction( PCSZ Name )
    StartupInterface(TSD);
    if (!Name)
       return(RXFUNC_BADTYPE);
-   if ((rc = delfunc2(TSD, Name)) != RXFUNC_OK)
+   if ((rc = delfunc2(TSD, Name)) == RXFUNC_OK)
       return rc;
    return (IfcDelFunc(TSD, Name)) ? RXFUNC_NOTREG : RXFUNC_OK ;
 }
@@ -1653,7 +1797,7 @@ static int IfcFunctionExit(const tsd_t *TSD,
       fnccal.rxfnc_flags.rxffsub = (called) ? 1 : 0;
       fnccal.rxfnc_name = (unsigned char *)Name;
       fnccal.rxfnc_namel = (USHORT) strlen(Name);
-      fnccal.rxfnc_que = qname;
+      fnccal.rxfnc_que = (unsigned char *)qname;
       fnccal.rxfnc_quel = (USHORT) len;
       fnccal.rxfnc_argc = (USHORT) Params;
       fnccal.rxfnc_argv = params;
@@ -1849,7 +1993,7 @@ EXPORT_C APIRET APIENTRY RexxDeleteQueue( PSZ QueueName )
    return code;
 }
 
-EXPORT_C APIRET APIENTRY RexxQueryQueue( PSZ QueueName, 
+EXPORT_C APIRET APIENTRY RexxQueryQueue( PSZ QueueName,
                                 ULONG* Count)
 {
    int code;
@@ -1867,8 +2011,8 @@ EXPORT_C APIRET APIENTRY RexxQueryQueue( PSZ QueueName,
    return code;
 }
 
-EXPORT_C APIRET APIENTRY RexxAddQueue( PSZ QueueName, 
-                              PRXSTRING EntryData, 
+EXPORT_C APIRET APIENTRY RexxAddQueue( PSZ QueueName,
+                              PRXSTRING EntryData,
                               ULONG AddFlag)
 {
    int code;
@@ -1886,8 +2030,8 @@ EXPORT_C APIRET APIENTRY RexxAddQueue( PSZ QueueName,
    return code;
 }
 
-EXPORT_C APIRET APIENTRY RexxPullQueue( PSZ QueueName, 
-                               PRXSTRING DataBuf,   
+EXPORT_C APIRET APIENTRY RexxPullQueue( PSZ QueueName,
+                               PRXSTRING DataBuf,
                                PDATETIME TimeStamp,
                                ULONG WaitFlag)
 {
@@ -1897,14 +2041,18 @@ EXPORT_C APIRET APIENTRY RexxPullQueue( PSZ QueueName,
    char *buf;
 
    TSD = GLOBAL_ENTRY_POINT();
-   StartupInterface(TSD);
+   StartupInterface( TSD );
 
    if ( WaitFlag != RXQUEUE_WAIT && WaitFlag != RXQUEUE_NOWAIT )
       return RXQUEUE_BADWAITFLAG;
 
-   DataBuf = NULL;
+   if ( DataBuf == NULL )
+      return RXQUEUE_MEMFAIL;
+
+   DataBuf->strptr = NULL;
+   DataBuf->strlength = 0;
    TSD->called_from_saa = 1;
-   if (!QueueName || !strlen(QueueName))
+   if ( !QueueName || !strlen( QueueName ) )
       code = RXQUEUE_BADQNAME;
    else
    {
@@ -1921,10 +2069,10 @@ EXPORT_C APIRET APIENTRY RexxPullQueue( PSZ QueueName,
          else
          {
             DataBuf->strlength = buflen ;
-            DataBuf->strptr=(char *)IfcAllocateMemory(buflen+1);
+            DataBuf->strptr=(char *)IfcAllocateMemory( buflen + 1 );
             if ( DataBuf->strptr )
             {
-               memcpy(DataBuf->strptr,(void *) buf,buflen);
+               memcpy( DataBuf->strptr, (void *) buf, buflen );
                *(DataBuf->strptr+(buflen)) = '\0';
             }
             else

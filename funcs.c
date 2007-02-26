@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: funcs.c,v 1.16 2002/03/23 01:42:54 mark Exp $";
+static char *RCSid = "$Id: funcs.c,v 1.24 2003/03/14 11:42:05 mark Exp $";
 #endif
 
 /*
@@ -29,6 +29,10 @@ static char *RCSid = "$Id: funcs.c,v 1.16 2002/03/23 01:42:54 mark Exp $";
 #include <assert.h>
 #include <time.h>
 
+static streng *conflict_close( tsd_t *TSD, cparamboxptr parms );
+static streng *conflict_eof( tsd_t *TSD, cparamboxptr parms );
+static streng *conflict_open( tsd_t *TSD, cparamboxptr parms );
+
 struct function_type
 {
    int compat ;
@@ -36,6 +40,10 @@ struct function_type
    const char *funcname ;
 } ;
 
+/*
+ * A 0 in the first column of this table indicates that this BIF is ANSI.
+ * Any other value
+ */
 static const struct function_type functions[] = {
   { 0,              std_abbrev,            "ABBREV" },
   { 0,              std_abs,               "ABS" },
@@ -44,12 +52,19 @@ static const struct function_type functions[] = {
   { EXT_REGINA_BIFS,dbg_allocated,         "ALLOCATED" },
 #endif
   { 0,              std_arg,               "ARG" },
+  { EXT_AREXX_BIFS, arexx_b2c,             "B2C" },
   { 0,              std_b2x,               "B2X" },
   { EXT_REGINA_BIFS,os2_beep,              "BEEP" },
   { 0,              std_bitand,            "BITAND" },
+  { EXT_AREXX_BIFS, arexx_bitchg,          "BITCHG" },
+  { EXT_AREXX_BIFS, arexx_bitclr,          "BITCLR" },
+  { EXT_AREXX_BIFS, arexx_bitcomp,         "BITCOMP" },
   { 0,              std_bitor,             "BITOR" },
+  { EXT_AREXX_BIFS, arexx_bitset,          "BITSET" },
+  { EXT_AREXX_BIFS, arexx_bittst,          "BITTST" },
   { 0,              std_bitxor,            "BITXOR" },
   { EXT_BUFTYPE_BIF,cms_buftype,           "BUFTYPE" },
+  { EXT_AREXX_BIFS, arexx_c2b,             "C2B" },
   { 0,              std_c2d,               "C2D" },
   { 0,              std_c2x,               "C2X" },
   { EXT_REGINA_BIFS,unx_chdir,             "CD" },
@@ -60,10 +75,9 @@ static const struct function_type functions[] = {
   { 0,              std_charout,           "CHAROUT" },
   { 0,              std_chars,             "CHARS" },
   { EXT_REGINA_BIFS,unx_chdir,             "CHDIR" },
-#ifdef OLD_REGINA_FEATURES
-  { EXT_REGINA_BIFS,unx_close,             "CLOSE" },
-#endif
+  { EXT_REGINA_BIFS,conflict_close,        "CLOSE" },
   { 0,              std_compare,           "COMPARE" },
+  { EXT_AREXX_BIFS, arexx_compress,        "COMPRESS" },
   { 0,              std_condition,         "CONDITION" },
   { 0,              std_copies,            "COPIES" },
   { 0,              std_countstr,          "COUNTSTR" },   /* ANSI Std 1996 - MH 10-06-96 */
@@ -83,8 +97,10 @@ static const struct function_type functions[] = {
   { EXT_REGINA_BIFS,dbg_dumptree,          "DUMPTREE" },
   { EXT_REGINA_BIFS,dbg_dumpvars,          "DUMPVARS" },
 #endif
-  { EXT_REGINA_BIFS,unx_eof,               "EOF" },
+  { EXT_REGINA_BIFS,conflict_eof,          "EOF" },
   { 0,              std_errortext,         "ERRORTEXT" },
+  { EXT_AREXX_BIFS, arexx_exists,          "EXISTS" },
+  { EXT_AREXX_BIFS, arexx_export,          "EXPORT" },
 #ifdef VMS
   { EXT_REGINA_BIFS,vms_f_cvsi,            "F$CVSI" },
   { EXT_REGINA_BIFS,vms_f_cvtime,          "F$CVTIME" },
@@ -119,7 +135,7 @@ static const struct function_type functions[] = {
 /*{ EXT_REGINA_BIFS,vms_f_verify,          "F$VERIFY" }, */
 #endif
   { EXT_REGINA_BIFS,os2_filespec,          "FILESPEC" },
-  { EXT_FIND_BIF,   cms_find,              "FIND" },
+  { EXT_REGINA_BIFS,cms_find,              "FIND" },
 #ifdef OLD_REGINA_FEATURES
   { EXT_REGINA_BIFS,unx_close,             "FINIS" },
 #endif /* OLD_REGINA_FEATURES */
@@ -129,11 +145,15 @@ static const struct function_type functions[] = {
 #if defined(REGINA_DEBUG_MEMORY)
   { EXT_REGINA_BIFS,dbg_freelists,         "FREELISTS" },
 #endif
+  { EXT_AREXX_BIFS, arexx_freespace,       "FREESPACE" },
   { 0,              std_fuzz,              "FUZZ" },
   { EXT_REGINA_BIFS,unx_getenv,            "GETENV" },
   { EXT_REGINA_BIFS,unx_getpath,           "GETPATH" },
   { EXT_REGINA_BIFS,unx_getpid,            "GETPID" },
+  { EXT_AREXX_BIFS, arexx_getspace,        "GETSPACE" },
   { EXT_REGINA_BIFS,unx_gettid,            "GETTID" },
+  { EXT_AREXX_BIFS, arexx_hash,            "HASH" },
+  { EXT_AREXX_BIFS, arexx_import,          "IMPORT" },
   { EXT_REGINA_BIFS,cms_index,             "INDEX" },
   { 0,              std_insert,            "INSERT" },
   { EXT_REGINA_BIFS,cms_justify,           "JUSTIFY" },
@@ -152,29 +172,33 @@ static const struct function_type functions[] = {
   { EXT_REGINA_BIFS,dbg_memorystats,       "MEMORYSTATS" },
 #endif
   { 0,              std_min,               "MIN" },
-#ifdef OLD_REGINA_FEATURES
-  { EXT_OPEN_BIF,   unx_open,              "OPEN" },
-#endif /* OLD_REGINA_FEATURES */
+  { EXT_REGINA_BIFS,conflict_open,         "OPEN" },
   { 0,              std_overlay,           "OVERLAY" },
   { EXT_REGINA_BIFS,unx_popen,             "POPEN" },
   { 0,              std_pos,               "POS" },
   { 0,              std_qualify,           "QUALIFY" },
   { 0,              std_queued,            "QUEUED" },
   { 0,              std_random,            "RANDOM" },
+  { EXT_AREXX_BIFS, arexx_randu,           "RANDU" },
+  { EXT_AREXX_BIFS, arexx_readch,          "READCH" },
+  { EXT_AREXX_BIFS, arexx_readln,          "READLN" },
   { 0,              std_reverse,           "REVERSE" },
   { 0,              std_right,             "RIGHT" },
 
   { 0,              rex_rxfuncadd,         "RXFUNCADD" },
   { 0,              rex_rxfuncdrop,        "RXFUNCDROP" },
-  { 0,              rex_rxfuncerrmsg,      "RXFUNCERRMSG" },
+  { EXT_REGINA_BIFS,rex_rxfuncerrmsg,      "RXFUNCERRMSG" },
   { 0,              rex_rxfuncquery,       "RXFUNCQUERY" },
   { 0,              rex_rxqueue,           "RXQUEUE" },
 
+  { EXT_AREXX_BIFS, arexx_seek,            "SEEK" },
+  { EXT_AREXX_BIFS, arexx_show,            "SHOW" },
   { 0,              std_sign,              "SIGN" },
   { EXT_REGINA_BIFS,cms_sleep,             "SLEEP" },
   { 0,              std_sourceline,        "SOURCELINE" },
   { 0,              std_space,             "SPACE" },
   { EXT_REGINA_BIFS,cms_state,             "STATE" },
+  { EXT_AREXX_BIFS, arexx_storage,         "STORAGE" },
   { 0,              std_stream,            "STREAM" },
   { 0,              std_strip,             "STRIP" },
   { 0,              std_substr,            "SUBSTR" },
@@ -186,9 +210,11 @@ static const struct function_type functions[] = {
   { EXT_REGINA_BIFS,dbg_traceback,         "TRACEBACK" },
 
   { 0,              std_translate,         "TRANSLATE" },
+  { EXT_AREXX_BIFS, arexx_trim,            "TRIM" },
   { 0,              std_trunc,             "TRUNC" },
   { EXT_REGINA_BIFS,unx_uname,             "UNAME" },
   { EXT_REGINA_BIFS,unx_unixerror,         "UNIXERROR" },
+  { EXT_AREXX_BIFS, arexx_upper,           "UPPER" },
   { EXT_REGINA_BIFS,rex_userid,            "USERID" },
   { 0,              std_value,             "VALUE" },
   { 0,              std_verify,            "VERIFY" },
@@ -197,6 +223,8 @@ static const struct function_type functions[] = {
   { 0,              std_wordlength,        "WORDLENGTH" },
   { 0,              std_wordpos,           "WORDPOS" },
   { 0,              std_words,             "WORDS" },
+  { EXT_AREXX_BIFS, arexx_writech,         "WRITECH" },
+  { EXT_AREXX_BIFS, arexx_writeln,         "WRITELN" },
   { 0,              std_x2b,               "X2B" },
   { 0,              std_x2c,               "X2C" },
   { 0,              std_x2d,               "X2D" },
@@ -234,6 +262,8 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
    void *vptr=NULL ;
    streng *(*func)(tsd_t *,cparamboxptr)=NULL ;
    streng *upper_name;
+   int strict_ansi_option=get_options_flag( TSD->currlevel, EXT_STRICT_ANSI );
+   int cacheext_option=get_options_flag( TSD->currlevel, EXT_CACHEEXT );
 
    upper_name=Str_upper(Str_dupTSD(this->name));
    /*
@@ -295,14 +325,14 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
              */
             if (functions[mid].compat)
             {
-               if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+               if ( strict_ansi_option )
                   exiterror( ERR_NON_ANSI_FEATURE, 1, functions[mid].funcname );
                if ( ! get_options_flag( TSD->currlevel, functions[mid].compat ) )
                   func = NULL ;
                else
                {
                   func = functions[mid].function ;
-                  if ( get_options_flag( TSD->currlevel, EXT_CACHEEXT ) )
+                  if ( cacheext_option )
                      this->u.func = func ;
                }
             }
@@ -324,9 +354,9 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
 
       TSD->bif_first = initplist( TSD, this ) ;
       if (ext)
-         ptr = do_an_external_exe( TSD, this->name, TSD->bif_first, 0, (char) this->called) ;
+         ptr = do_an_external_exe( TSD, this->name, TSD->bif_first, 0, (char) this->o.called) ;
       else if (vptr)
-         ptr = do_an_external_dll( TSD, vptr, TSD->bif_first, (char) this->called ) ;
+         ptr = do_an_external_dll( TSD, vptr, TSD->bif_first, (char) this->o.called ) ;
       else
          ptr = (*func)(TSD, TSD->bif_first /* ->next */ ) ;
 
@@ -348,7 +378,7 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
 
 
          TSD->bif_first = initplist( TSD, this ) ;
-         ptr = do_an_external_exe( TSD, this->name, TSD->bif_first, 1, (char) this->called ) ;
+         ptr = do_an_external_exe( TSD, this->name, TSD->bif_first, 1, (char) this->o.called ) ;
          deallocplink( TSD, TSD->bif_first ) ;
          TSD->bif_first = NULL ;
       }
@@ -361,9 +391,7 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
 
 paramboxptr initplist( tsd_t *TSD, cnodeptr this )
 {
-   paramboxptr first=NULL, new=NULL, currnt=NULL ;
-   streng *pptr=NULL ;
-   streng *junk=NULL ;
+   paramboxptr first,new,currnt;
 
    first = currnt = NULL ;
    for (this=this->p[0]; this; this=this->p[1])
@@ -387,97 +415,45 @@ paramboxptr initplist( tsd_t *TSD, cnodeptr this )
       if (this->type==X_CEXPRLIST && TSD->trace_stat!='I')
       {
          if (this->u.strng)
-            pptr = this->u.strng ;
+            currnt->value = this->u.strng ;
          else
-            pptr = NULL ;
+            currnt->value  = NULL ;
 
          currnt->dealloc = 0 ;
       }
+      else if ( !this->p[0] )
+      {
+         currnt->dealloc = 1;
+         currnt->value = NULL;
+      }
       else
       {
-         currnt->dealloc = 1 ;
-         if (this->p[0])
-            pptr = evaluate( TSD, this->p[0], &junk ) ;
-         else
-            pptr = NULL ;
-
-         if ( get_options_flag( TSD->currlevel, EXT_PGB_PATCH1 ) ) /* pgb */
-         {
-            /*
-            * This code "removed" 16/04/99 byMH, based on suggestion from
-            * Patrick McPhee.  The case that FGC states as a potential
-            * error, does not cause a problem by removing this code.
-            */
-           /*
-            * Reinstated by FGC 25/11/99 to fix bug 35
-            */
-           /*
-            * FGC: HELP! I really don't know if this will work. The problem
-            * is:
-            * a) is pptr a "new" tree with "new" values ? In this case the
-            *    Str_dupTSD() is wrong. What happens in this case if we don't
-            *    delete it later (dealloc=0) ?
-            * b) junk SEEMS to me as the same as pptr if newly allocated
-            * (see expr.c/evaluate). Why, in this case does it crash ?
-            */
-            if (!junk)
-            {
-               if ( pptr != NULL )
-                  pptr = Str_dupTSD( pptr );
-            }
-            /*
-             * Currently only used in dealloc_plink() some lines below.
-             * I think:
-             *  !junk -->no newly allocated
-             *  values --> not allowed to delete them
-             * BUT, WHAT HAPPENS IN CASE OF junk==NULL? SHALL WE Str_dupTSD pptr ?
-             * THERE ARE GOOD REASONS TO DO IT.  TRY THIS FIRST IN CASE OF
-             * STRANGE RESULTS/CRASHES WITH ARGUMENTS.
-             */
-            else
-            {
-            /*
-             * MH - 3-May-2000
-             * added:
-                  if ( pptr )
-                     currnt->dealloc = 1 ;
-                  else
-             * to remove memory leak as reported by PJM - bug 20000502-55023
-             * seems to be stable
-             */
-               if ( pptr )
-                  currnt->dealloc = 1 ;
-               else
-                  currnt->dealloc = 0 ;
-            }
-         }
-         else
-         {
-            /*
-             * FGC: Following code will cause a crash if a variable x is
-             * passed to a function which uses both arg(1) and x: arg(1)
-             * is a reference to x. Modifying x causes a deletion of arg(1)
-             */
-            if (!junk)
-   /*            pptr = Str_dupTSD( pptr ) ; */
-               currnt->dealloc = 0 ;
-         }
-
+         /*
+          * This fixes bug 590589 and others.
+          * Always force a fresh new return value of evaluate.
+          * Imagine this code, it will produce a crash otherwise:
+          * call func x
+          * return
+          * func:
+          *    x = "new" || "value"
+          *    say arg(1)
+          */
+         currnt->dealloc = 1;
+         currnt->value = evaluate( TSD, this->p[0], NULL );
       }
-
-      currnt->value = pptr ;
    }
 #ifdef TRACEMEM
    TSD->listleaked_params = first ;
 #endif
-   currnt->next = NULL ;
+   if ( currnt )
+      currnt->next = NULL ;
    return first ;
 }
 
 
 void deallocplink( tsd_t *TSD, paramboxptr first )
 {
-   paramboxptr this=NULL ;
+   paramboxptr this;
 
    for (;first;)
    {
@@ -721,6 +697,17 @@ int convert_date(const streng *suppdate, char suppformat, struct tm *indate)
          else
             base2date(num1+basedays(indate->tm_year)-1,indate);
          break;
+      case 'I':
+         if (suppdate->len > 19)
+            return(1);
+         memcpy(buf,ptr,suppdate->len);
+         buf[suppdate->len] = '\0';
+         if ((num1 = atol(buf)) == 0)
+            for (i=0;i<suppdate->len;i++)
+         if (buf[i] != '0')
+            return(1);
+         base2date(num1+basedays(1978)-1,indate);
+         break;
       case 'E':
       case 'O':
       case 'U':
@@ -824,7 +811,7 @@ int convert_date(const streng *suppdate, char suppformat, struct tm *indate)
          break;
       case 'T':
          num1 = atol( ptr );
-         tmpTime = localtime( &num1 );
+         tmpTime = localtime( (time_t *)&num1 );
          memcpy( indate, tmpTime, sizeof(struct tm) );
          indate->tm_year += 1900;
          break;
@@ -1032,7 +1019,7 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
          break;
       case 'T':
          num1 = atol( ptr );
-         tmpTime = localtime( &num1 );
+         tmpTime = localtime( (time_t *)&num1 );
          memcpy( intime, tmpTime, sizeof(struct tm) );
          *unow = 0;
          break;
@@ -1042,4 +1029,32 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
    }
 
    return(rc);
+}
+/*
+ * The following functions are wrappers for BIFs that are syntactically different
+ * depending on the OPTONS used.
+ */
+
+static streng *conflict_close( tsd_t *TSD, cparamboxptr parms )
+{
+   if ( get_options_flag( TSD->currlevel, EXT_AREXX_SEMANTICS ) )
+      return( arexx_close( TSD, parms ) );
+   else
+      return( unx_close( TSD, parms ) );
+}
+
+static streng *conflict_eof( tsd_t *TSD, cparamboxptr parms )
+{
+   if ( get_options_flag( TSD->currlevel, EXT_AREXX_SEMANTICS ) )
+      return( arexx_eof( TSD, parms ) );
+   else
+      return( unx_eof( TSD, parms ) );
+}
+
+static streng *conflict_open( tsd_t *TSD, cparamboxptr parms )
+{
+   if ( get_options_flag( TSD->currlevel, EXT_AREXX_SEMANTICS ) )
+      return( arexx_open( TSD, parms ) );
+   else
+      return( unx_open( TSD, parms ) );
 }

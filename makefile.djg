@@ -29,13 +29,13 @@ else
 USEFLISTS =
 endif
 
-CEXTRA = -DPOSIX_SOURCE -DDOS -Ic:/wattcp/inc
+CEXTRA = -DPOSIX_SOURCE -DDOS -I$(WATT_ROOT)/inc
 EEXTRA =
 EXTQUEUE_OBJS = extstack.$(OBJ) rexxbif.$(OBJ)
 EXTQUEUE_SHOBJS = #extstack.sho rexxbif.sho
 DYN_COMP =
 LIBS =
-TCPLIBS = -Lc:/wattcp/lib -lwatt #-lwatt1 -lwatt2 -lwatt3 -lwatt2 -lwatt1 -lwatt2 -lwatt3 -lwatt2 -lwatt1
+TCPLIBS = -L$(WATT_ROOT)/lib -lwatt #-lwatt1 -lwatt2 -lwatt3 -lwatt2 -lwatt1 -lwatt2 -lwatt3 -lwatt2 -lwatt1
 SHLIBS =
 SHL =
 LD_RXLIB1=

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: library.c,v 1.8 2002/03/09 01:19:53 mark Exp $";
+static char *RCSid = "$Id: library.c,v 1.9 2002/07/28 02:27:06 mark Exp $";
 #endif
 
 /*
@@ -204,18 +204,14 @@ void set_err_message( const tsd_t *TSD, const char *message1, const char *messag
    if (lt->err_message)
       Free_stringTSD( lt->err_message ) ;
 
-#if 0
-   lt->err_message = Str_creTSD( message ) ;
-#else
    size = strlen(message1)+strlen(message2);
-   lt->err_message = MallocTSD(size+1);
+   lt->err_message = Str_makeTSD(size+1);
    if ( lt->err_message )
    {
       strcpy( lt->err_message->value, message1 );
       strcat( lt->err_message->value, message2 );
       lt->err_message->len = size;
    }
-#endif
 }
 
 int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, const streng *objnam )

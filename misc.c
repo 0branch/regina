@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: misc.c,v 1.5 2001/09/04 11:25:55 mark Exp $";
+static char *RCSid = "$Id: misc.c,v 1.6 2002/09/07 13:25:15 florian Exp $";
 #endif
 
 /*
@@ -84,8 +84,6 @@ const unsigned char u_to_l[256] =
    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
    0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
 } ;
-
-
 
 /* FIXME, FGC: Nice idea but what happens in case of EBCDIC, etc? */
 streng *upcase( streng *source )

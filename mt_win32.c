@@ -208,6 +208,7 @@ tsd_t *ReginaInitializeThread(void)
    OK &= init_vms(retval);              /* Initialize the vmscmd module      */
    OK &= init_vmf(retval);              /* Initialize the vmsfuncs module    */
 #endif
+   OK &= init_arexxf(retval);           /* Initialize the arxfuncs modules */
    retval->loopcnt = 1;                 /* stupid r2perl-module              */
    retval->traceparse = -1;
    retval->thread_id = (unsigned long)GetCurrentThreadId();

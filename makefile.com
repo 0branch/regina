@@ -15,8 +15,8 @@ BINDIR = $(TOPDIR)/bin
 LIBDIR = $(TOPDIR)/lib
 MANEXT = l
 MANDIR = $(TOPDIR)/man/man$(MANEXT)
-VER=30
-VERDOT=3.0
+VER=31
+VERDOT=3.1
 
 MISCDEFS = -I$(SRCDIR) #-DR2PERL
 #DEBUG	  = #-g	-DNDEBUG #-Dlint
@@ -50,7 +50,7 @@ CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/va
 
 OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	interprt.$(OBJ)	debug.$(OBJ) dbgfuncs.$(OBJ) memory.$(OBJ) parsing.$(OBJ) files.$(OBJ) \
-	misc.$(OBJ) unxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ)	stack.$(OBJ) \
+	misc.$(OBJ) unxfuncs.$(OBJ) arxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ)	stack.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ)	library.$(OBJ) \
 	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) $(MT_FILE).$(OBJ) instore.$(OBJ) \
 	extlib.$(OBJ) yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) doscmd.$(OBJ)	wrappers.$(OBJ) \
@@ -58,7 +58,7 @@ OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 
 SHOFILES = funcs.sho builtin.sho error.sho variable.sho	\
 	interprt.sho debug.sho dbgfuncs.sho memory.sho parsing.sho files.sho \
-	misc.sho unxfuncs.sho cmsfuncs.sho shell.sho os2funcs.sho rexxext.sho stack.sho	\
+	misc.sho unxfuncs.sho arxfuncs.sho cmsfuncs.sho shell.sho os2funcs.sho rexxext.sho stack.sho	\
 	tracing.sho interp.sho cmath.sho convert.sho strings.sho library.sho \
 	strmath.sho signals.sho	macros.sho envir.sho expr.sho $(MT_FILE).sho \
 	extlib.sho yaccsrc.sho lexsrc.sho wrappers.sho options.sho doscmd.sho \
@@ -89,7 +89,7 @@ MTSSRC = $(SRCDIR)/en.mts $(SRCDIR)/pt.mts $(SRCDIR)/no.mts \
 #
 .SUFFIXES:
 
-all : rexx$(EXE) execiser$(EXE) trexx$(EXE) $(SHL_TARGETS) mtb_files
+all : rexx$(EXE) execiser$(EXE) $(SHL_TARGETS) mtb_files
 
 $(CSRCFILES) : $(SRCDIR)/rexx.h
 
@@ -105,11 +105,6 @@ rexx$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 regina$(EXE) : $(LIBPRE)$(SHLFILE).$(SHL) regina.$(OBJ)	$(SHLIMPLIB) $(OS2LIBA)
 	$(PURIFY) $(CC)	$(LINKOPT) $(DYNAMIC_LDFLAGS) -o regina$(EXE) regina.$(OBJ) $(LINKSHL) $(LIBS) $(SHLIBS) $(OS2LIBA)
 	$(LDEXTRA)
-
-trexx$(EXE) : trexx.$(OBJ) $(LIBPRE)$(LIBFILE).$(LIBPST)
-	$(PURIFY) $(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o trexx$(EXE) trexx.$(OBJ) $(LIBPRE)$(LIBFILE).$(LIBPST) $(LIBS) $(TCPLIBS)
-	$(LDEXTRA)
-	$(LDEXTRA1)
 
 execiser$(EXE) : execiser.$(OBJ) $(LIBPRE)$(LIBFILE).$(LIBPST) $(OS2LIBA)
 	$(PURIFY) $(CC)	$(LINKOPT) -o execiser$(EXE) execiser.$(OBJ) $(LIBLINK) $(OS2LIBA) $(TCPLIBS)
@@ -208,6 +203,9 @@ misc.$(OBJ) :	 $(SRCDIR)/misc.c	 $(SRCDIR)/rexx.h
 
 unxfuncs.$(OBJ)	:$(SRCDIR)/unxfuncs.c	 $(SRCDIR)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/unxfuncs.c
+
+arxfuncs.$(OBJ)	:$(SRCDIR)/arxfuncs.c	 $(SRCDIR)/rexx.h
+	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/arxfuncs.c
 
 os2funcs.$(OBJ)	:$(SRCDIR)/os2funcs.c	 $(SRCDIR)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/os2funcs.c
@@ -404,6 +402,12 @@ unxfuncs.sho :$(SRCDIR)/unxfuncs.c	 $(SRCDIR)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
+arxfuncs.sho :$(SRCDIR)/arxfuncs.c	 $(SRCDIR)/rexx.h
+	$(O2SAVE)
+	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/arxfuncs.c
+	$(O2SHO)
+	$(SAVE2O)
+
 os2funcs.sho :$(SRCDIR)/os2funcs.c	 $(SRCDIR)/rexx.h
 	$(O2SAVE)
 	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/os2funcs.c
@@ -588,12 +592,6 @@ yaccsrc.sho : $(SRCDIR)/yaccsrc.c $(SRCDIR)/defs.h $(SRCDIR)/rexx.h
 	$(SAVE2O)
 
 #
-# Rules for Regina tokeniser targets
-#
-trexx.$(OBJ) : $(SRCDIR)/tregina.c
-	$(CC) $(COPT) -c $(CC2O) $(SRCDIR)/tregina.c
-
-#
 # Rules for sample programs
 #
 test1.$(OBJ): $(SRCDIR)/test1.c
@@ -628,7 +626,7 @@ zip:
 
 install: rexx $(LIBPRE)$(LIBFILE).a
 	cp rexx$(PROGEXT) $(BINDIR)/$(PROGNAME)$(PROGEXT)
-	cp ../rexx.1 $(MANDIR)/rexx.$(MANEXT)
+	cp ../regina.1 $(MANDIR)/regina.$(MANEXT)
 	cp $(LIBPRE)$(LIBFILE).a $(LIBDIR)/$(LIBPRE)$(LIBFILE).a
 	ranlib $(LIBDIR)/$(LIBPRE)$(LIBFILE).a
 

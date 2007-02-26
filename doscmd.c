@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: doscmd.c,v 1.26 2002/04/27 06:37:58 mark Exp $";
+static char *RCSid = "$Id: doscmd.c,v 1.49 2003/04/04 21:52:59 mark Exp $";
 #endif
 
 /*
@@ -72,7 +72,7 @@ static char *RCSid = "$Id: doscmd.c,v 1.26 2002/04/27 06:37:58 mark Exp $";
 
 #if defined(WIN32)
 # include <share.h>
-# if defined(__BORLANDC__)
+# if defined(__BORLANDC__) || defined(__LCC__)
 #  include <time.h>
 #  include <process.h>
 # endif
@@ -90,7 +90,7 @@ static char *RCSid = "$Id: doscmd.c,v 1.26 2002/04/27 06:37:58 mark Exp $";
 # endif
 #endif
 
-#if defined(MAC) || (defined(__WATCOMC__) && !defined(__QNX__)) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__) || defined(__WINS__)
+#if defined(MAC) || (defined(__WATCOMC__) && !defined(__QNX__)) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__) || defined(__WINS__) || defined(__LCC__)
 # include "utsname.h"                                   /* MH 10-06-96 */
 # define NEED_UNAME
 # if !defined(__WINS__) && !defined(__EPOC32__)
@@ -103,7 +103,9 @@ static char *RCSid = "$Id: doscmd.c,v 1.26 2002/04/27 06:37:58 mark Exp $";
 #  define MAXPATHLEN (8192)
 #  include <io.h>
 # else
-#  include <sys/param.h>                                 /* MH 10-06-96 */
+#  ifndef VMS
+#   include <sys/param.h>                                 /* MH 10-06-96 */
+#  endif
 #  include <sys/utsname.h>                               /* MH 10-06-96 */
 #  include <sys/wait.h>
 # endif
@@ -132,6 +134,12 @@ static char *RCSid = "$Id: doscmd.c,v 1.26 2002/04/27 06:37:58 mark Exp $";
 # include <time.h>
 #endif
 
+#if defined(__LCC__)
+# if !defined(HasOverlappedIoCompleted)
+#  define HasOverlappedIoCompleted(lpOverlapped) ((lpOverlapped)->Internal != STATUS_PENDING)
+# endif
+#endif
+
 static char **makeargs(const char *string, char escape);
 static char **makesimpleargs(const char *string);
 static char *splitoffarg(const char *string, const char **trailer, char escape);
@@ -139,6 +147,14 @@ static void destroyargs(char **args);
 static int local_mkstemp(const tsd_t *TSD, char *base);
 
 #if defined(WIN32)
+/*
+ * The following; WIN9X_VER is used to determine if we are running under
+ * a DOS-based Win32 platform; ie 95/98/Me
+ * It can be changed to ( 1 ) for example to force the code through the
+ * Win9X code if running on a different Win32 platform like NT.
+#define WIN9X_VER ( 1 )
+ */
+#define WIN9X_VER ( _osver & 0x8000 )
 /*****************************************************************************
  *****************************************************************************
  ** Win32 ********************************************************************
@@ -159,13 +175,52 @@ typedef struct {
    } h[3];
 } AsyncInfo;
 
+int open_subprocess_connection_dos(const tsd_t *TSD, environpart *ep);
+void unblock_handle_dos(int *handle, void *async_info);
+void restart_file_dos(int hdl);
+int __regina_close_dos(int handle, void *async_info);
+int __regina_read_dos(int handle, void *buf, unsigned size, void *async_info);
+int __regina_write_dos(int handle, const void *buf, unsigned size,
+                                                             void *async_info);
+void *create_async_info_dos(const tsd_t *TSD);
+void delete_async_info_dos(void *async_info);
+void reset_async_info_dos(void *async_info);
+void add_async_waiter_dos(void *async_info, int handle, int add_as_read_handle);
+void wait_async_info_dos(void *async_info);
+
+static BOOL MyCancelIo(HANDLE handle)
+{
+   static BOOL (WINAPI *DoCancelIo)(HANDLE handle) = NULL;
+   static BOOL first = TRUE;
+   HMODULE mod;
+
+   if ( first )
+   {
+      first = FALSE;
+
+      /*
+       * The kernel is always mapped, a LoadLibrary is useless
+       */
+      if ((mod = GetModuleHandle( "kernel32" )) != NULL)
+      {
+         DoCancelIo = (BOOL (WINAPI*)(HANDLE)) GetProcAddress( mod, "CancelIo" );
+      }
+   }
+
+   if ( DoCancelIo == NULL )
+      return FALSE;
+
+   return DoCancelIo( handle );
+}
+
 int my_win32_setenv( const char *name, const char *value )
 {
    return (SetEnvironmentVariable( name, value ) );
 }
 
 /* fork_exec spawns a new process with the given commandline.
- * it returns -1 on error (errno set), a process descriptor otherwise.
+ * it returns -1 on error (errno set), 0 on process start error (rcode set),
+ * a process descriptor otherwise.
  * Basically this is a child process and we run in the child's environment
  * after the first few lines. The setup hasn't been done and the command needs
  * to be started.
@@ -176,7 +231,7 @@ int my_win32_setenv( const char *name, const char *value )
  * Never use TSD after the fork() since this is not only a different thread,
  * it's a different process!
  */
-int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
+int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
 {
    static const char *interpreter[] = { "regina.exe", /* preferable even if */
                                                       /* not dynamic        */
@@ -188,6 +243,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
    const char         *commandline = NULL;
    char               *argline = NULL;
    BOOL                rc;
+   int                broken_address_command = get_options_flag( TSD->currlevel, EXT_BROKEN_ADDRESS_COMMAND );
+   int                subtype;
 
    if (env->subtype == SUBENVIR_REXX) /*special situation caused by recursion*/
    {
@@ -199,11 +256,11 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
       if (argv0 == NULL)
          len = 11; /* max("rexx.exe", "regina.exe") */
       else
-         {
-            len = strlen(argv0) + 2;
-            if (len < 11)
-               len = 11; /* max("rexx.exe", "regina.exe") */
-         }
+      {
+         len = strlen(argv0) + 2;
+         if (len < 11)
+            len = 11; /* max("rexx.exe", "regina.exe") */
+      }
       len += strlen(cmdline) + 2; /* Blank + term ASCII0 */
 
       if ((new_cmdline = malloc(len)) == NULL)
@@ -216,7 +273,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          strcat(new_cmdline, "\" ");
          strcat(new_cmdline, cmdline);
          e.subtype = SUBENVIR_COMMAND;
-         if ((rc = fork_exec(TSD, &e, new_cmdline)) != -1)
+         rc = fork_exec(TSD, &e, new_cmdline, &rc);
+         if ( ( rc != 0 ) && ( rc != -1 ) )
          {
             free(new_cmdline);
             return(rc);
@@ -230,113 +288,205 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          strcat(new_cmdline, " ");
          strcat(new_cmdline, cmdline);
          e.subtype = SUBENVIR_COMMAND;
-         if ((rc = fork_exec(TSD, &e, new_cmdline)) != -1)
+         rc = fork_exec(TSD, &e, new_cmdline, &rc);
+         if ( ( rc != 0 ) && ( rc != -1 ) )
          {
             free(new_cmdline);
             return(rc);
          }
       }
 
-      i = errno;
+      *rcode = -errno; /* assume a load error */
       free(new_cmdline);
-      errno = i;
-      return(-1);
+      return(0);
    }
 
    memset(&sinfo, 0, sizeof(sinfo));
    sinfo.cb = sizeof(sinfo);
 
-   sinfo.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-   sinfo.wShowWindow = SW_HIDE;
+   sinfo.dwFlags = STARTF_USESTDHANDLES;
 
    /* The following three handles have been created inheritable */
    if (env->input.hdls[0] != -1)
-      sinfo.hStdInput  = (HANDLE) env->input.hdls[0];
+   {
+      if ( WIN9X_VER )
+      {
+         sinfo.hStdInput  = (HANDLE) _get_osfhandle(env->input.hdls[0]);
+         /*
+          * fixes Bug 587687
+          * We must ensure the called process already *uses* the handles;
+          * they are closed by the OS in the other case. One chance is to
+          * delay the execution until this happens, the other chance is to
+          * wait with the closing until the called process works or
+          * terminates. We use the latter one. For more info see MSDN.
+          * Topics: Q190351, *Q150956*
+          * I think, Q150956 is a workaround for the bug they didn't solve.
+          * M$ just close the handles too early.
+          */
+         DuplicateHandle( GetCurrentProcess(),
+                          sinfo.hStdInput,
+                          GetCurrentProcess(),
+                          &sinfo.hStdInput,
+                          0,
+                          TRUE,
+                          DUPLICATE_SAME_ACCESS );
+         /*
+          * fixes bug 700405
+          */
+         env->input.hdls[2] = (int) sinfo.hStdInput;
+      }
+      else
+         sinfo.hStdInput  = (HANDLE) env->input.hdls[0];
+   }
    else
       sinfo.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
    if (env->output.hdls[1] != -1)
-      sinfo.hStdOutput = (HANDLE) env->output.hdls[1];
+   {
+      if ( WIN9X_VER )
+      {
+         sinfo.hStdOutput = (HANDLE) _get_osfhandle(env->output.hdls[1]);
+         DuplicateHandle( GetCurrentProcess(),
+                          sinfo.hStdOutput,
+                          GetCurrentProcess(),
+                          &sinfo.hStdOutput,
+                          0,
+                          TRUE,
+                          DUPLICATE_SAME_ACCESS );
+         /*
+          * fixes bug 700405
+          */
+         env->output.hdls[2] = (int) sinfo.hStdOutput;
+      }
+      else
+         sinfo.hStdOutput = (HANDLE) env->output.hdls[1];
+   }
    else
       sinfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
    if (env->error.SameAsOutput)
-      sinfo.hStdError  = (HANDLE) env->output.hdls[1];
+      sinfo.hStdError  = (HANDLE) sinfo.hStdOutput;
    else if (env->error.hdls[1] != -1)
-      sinfo.hStdError  = (HANDLE) env->error.hdls[1];
+   {
+      if ( WIN9X_VER )
+      {
+         sinfo.hStdError  = (HANDLE) _get_osfhandle(env->error.hdls[1]);
+         DuplicateHandle( GetCurrentProcess(),
+                          sinfo.hStdError,
+                          GetCurrentProcess(),
+                          &sinfo.hStdError,
+                          0,
+                          TRUE,
+                          DUPLICATE_SAME_ACCESS );
+         /*
+          * fixes bug 700405
+          */
+         env->error.hdls[2] = (int) sinfo.hStdError;
+      }
+      else
+         sinfo.hStdError  = (HANDLE) env->error.hdls[1];
+   }
    else
       sinfo.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
 
-   switch (env->subtype)
+   /*
+    * If the BROKEN_ADDRESS_COMMAND OPTION is in place,
+    * and our environment is COMMAND, change it to SYSTEM
+    */
+   if ( env->subtype == SUBENVIR_PATH /* was SUBENVIR_COMMAND */
+   &&   broken_address_command )
+      subtype = SUBENVIR_SYSTEM;
+   else
+      subtype = env->subtype;
+
+   switch ( subtype )
    {
       case SUBENVIR_PATH:
-      execname = NULL;
-      commandline = cmdline;
+         execname = NULL;
+         commandline = cmdline;
          break;
 
       case SUBENVIR_COMMAND:
-      execname = NULL;
-      commandline = cmdline;
+         execname = NULL;
+         commandline = cmdline;
 #define NEED_SPLITOFFARG
-      execname = splitoffarg(cmdline, NULL, '^');
-      commandline = cmdline;
+         execname = splitoffarg(cmdline, NULL, '^');
+         commandline = cmdline;
          break;
 
       case SUBENVIR_SYSTEM:
       /* insert "%COMSPEC% /c " or "%SHELL% -c " in front */
-      if ((done = GetEnvironmentVariable("COMSPEC","",0)) != 0)
-      {
-         argline = MallocTSD(done + strlen(cmdline) + 5);
-         GetEnvironmentVariable("COMSPEC",argline,done + 5);
-         strcat(argline," /c ");
-      }
-      else if ((done = GetEnvironmentVariable("SHELL","",0)) != 0)
-      {
-         argline = MallocTSD(done + strlen(cmdline) + 5);
-         GetEnvironmentVariable("SHELL",argline,done + 5);
-         strcat(argline," -c ");
-      }
-      else
-      {
-         argline = MallocTSD(11 + strlen(cmdline) + 5);
-         if (GetVersion() & 0x80000000) /* not NT ? */
-            strcpy(argline,"COMMAND.COM /c ");
+         if ((done = GetEnvironmentVariable("COMSPEC","",0)) != 0)
+         {
+            argline = MallocTSD(done + strlen(cmdline) + 5);
+            GetEnvironmentVariable("COMSPEC",argline,done + 5);
+            strcat(argline," /c ");
+         }
+         else if ((done = GetEnvironmentVariable("SHELL","",0)) != 0)
+         {
+            argline = MallocTSD(done + strlen(cmdline) + 5);
+            GetEnvironmentVariable("SHELL",argline,done + 5);
+            strcat(argline," -c ");
+         }
          else
-            strcpy(argline,"CMD.EXE /c ");
-      }
-      strcat(argline, cmdline);
-      execname = NULL;
-      commandline = argline;
+         {
+            argline = MallocTSD(11 + strlen(cmdline) + 5);
+            if (GetVersion() & 0x80000000) /* not NT ? */
+               strcpy(argline,"COMMAND.COM /c ");
+            else
+               strcpy(argline,"CMD.EXE /c ");
+         }
+         strcat(argline, cmdline);
+         execname = NULL;
+         commandline = argline;
          break;
 
       case SUBENVIR_REXX:
          /* fall through */
 
       default: /* illegal subtype */
-      errno = EINVAL;
-      return( -1 ) ;
+         errno = EINVAL;
+         return -1;
    }
 
+   /*
+    * FGC: I checked different configurations.
+    * 1) Never use DETACHED_PROCESS, the communication gets lost in NT
+    *    kernels to a text program invoked using shells.
+    * 2) Never use STARTF_USESHOWWINDOW/SW_HIDE in Win9x, this gives problems
+    *    under Win9x or you have to know which combination fits to COMSPEC and
+    *    your called program's type.
+    * --> We can fiddle with CREATE_NEW_CONSOLE, CREATE_NEW_PROCESS_GROUP,
+    *     CREATE_DEFAULT_ERROR_MODE. Select your choice!
+    */
+   if ( !WIN9X_VER )
+   {
+      sinfo.dwFlags |= STARTF_USESHOWWINDOW;
+      sinfo.wShowWindow = SW_HIDE;
+   }
    rc = CreateProcess(execname,
                       (char *) commandline,
                       NULL,        /* pointer to process security attributes */
                       NULL,        /* pointer to thread security attributes  */
                       TRUE,        /* no inheritance except sinfo.hStd...    */
-                      CREATE_DEFAULT_ERROR_MODE,
+                      CREATE_NEW_PROCESS_GROUP | CREATE_DEFAULT_ERROR_MODE,
                       NULL,        /* pointer to new environment block       */
                       NULL,        /* pointer to current directory name      */
                       &sinfo,
                       &pinfo);
+   *rcode = (int) GetLastError();
    if (argline)
       FreeTSD(argline);
    if (execname)
       free(execname);
-   if (!rc)
-   {
-      errno = ENOENT; /* guess */
-      return(-1);
-   }
+   if ( !rc )
+      return 0;
 
    CloseHandle(pinfo.hThread); /* We don't need it */
-   return((int) pinfo.hProcess);
+   return (int) pinfo.hProcess;
+
+   /* NT and W9x share the same functionality but we want to compile the */
+   /* DOS-part below. Don't set this code to top */
+# undef fork_exec
+# define fork_exec fork_exec_dos
 }
 
 /* __regina_wait waits for a process started by fork_exec.
@@ -344,19 +494,23 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
  * it isn't guaranteed. Never call if you don't expect a sudden death of the
  * subprocess.
  * Returns the exit status of the subprocess under normal circumstances. If
- * the subprocess has died by a signal, the return value is -(100+signalnumber)
+ * the subprocess has died by a signal, the return value is -signalnumber.
  */
 int __regina_wait(int process)
 {
    DWORD code = (DWORD) -1; /* in case something goes wrong */
+
+   /* NT and W9x share the same functionality but we want to compile*/
+# undef __regina_wait
+# define __regina_wait __regina_wait_dos
 
    WaitForSingleObject((HANDLE) process, INFINITE);
    GetExitCodeProcess((HANDLE) process, &code);
    CloseHandle((HANDLE) process);
 
    if ((code & 0xC0000000) == 0xC0000000) /* assume signal */
-      return(-((int)(code & ~0xC0000000) + 100));
-   return((int) code);
+      return -(int)(code & ~0xC0000000);
+   return (int) code;
 }
 
 /* open_subprocess_connection acts like the unix-known function pipe and sets
@@ -373,12 +527,20 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
    unsigned i;
    unsigned start,run;
    DWORD openmode, err;
-   HANDLE in = INVALID_HANDLE_VALUE, out;
+   HANDLE in, out;
    OVERLAPPED ol;
    SECURITY_ATTRIBUTES sa;
 
+# define NEED_STUPID_DOSCMD
+# undef open_subprocess_connection
+# define open_subprocess_connection open_subprocess_connection_dos
+   if ( WIN9X_VER )
+      return(open_subprocess_connection(TSD, ep));
+
+   in = INVALID_HANDLE_VALUE;
+
    /* Anonymous pipes can't be run in overlapped mode. Therefore we use
-    * named pipes.
+    * named pipes (and files for W9x).
     */
    sa.nLength = sizeof(sa);
    sa.lpSecurityDescriptor = NULL;
@@ -467,7 +629,7 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
                     NULL); /* hTemplateFile */
    if (out == INVALID_HANDLE_VALUE)
    {
-      CancelIo(in);
+      MyCancelIo(in);
       CloseHandle(ol.hEvent);
       CloseHandle(in);
       errno = EPIPE; /* guess */
@@ -478,7 +640,7 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
    if (!GetOverlappedResult(in, &ol, &openmode /* dummy */, FALSE))
    {
       CloseHandle(out);
-      CancelIo(in);
+      MyCancelIo(in);
       CloseHandle(ol.hEvent);
       CloseHandle(in);
       errno = EPIPE; /* guess */
@@ -507,9 +669,21 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
  */
 void unblock_handle( int *handle, void *async_info )
 {
-   AsyncInfo *ai = async_info;
-   HANDLE hdl = (HANDLE) *handle;
+   AsyncInfo *ai;
+   HANDLE hdl;
    unsigned i;
+
+# define NEED_STUPID_DOSCMD
+# undef unblock_handle
+# define unblock_handle unblock_handle_dos
+   if ( WIN9X_VER )
+   {
+      unblock_handle(handle, async_info);
+      return;
+   }
+
+   ai = async_info;
+   hdl = (HANDLE) *handle;
 
    assert(async_info != NULL);
    for (i = 0; i < 3;i++)
@@ -524,7 +698,15 @@ void unblock_handle( int *handle, void *async_info )
  */
 void restart_file(int hdl)
 {
-   /* We only have pipes! */
+# define NEED_STUPID_DOSCMD
+# undef restart_file
+# define restart_file restart_file_dos
+   if ( WIN9X_VER )
+   {
+      restart_file(hdl);
+      return;
+   }
+
    assert((HANDLE) hdl == INVALID_HANDLE_VALUE);
 }
 
@@ -535,9 +717,17 @@ void restart_file(int hdl)
  */
 int __regina_close(int handle, void *async_info)
 {
-   AsyncInfo *ai = async_info;
-   HANDLE hdl = (HANDLE) handle;
+   AsyncInfo *ai;
+   HANDLE hdl;
    unsigned i;
+
+# define NEED_STUPID_DOSCMD
+# define __regina_close __regina_close_dos
+   if ( WIN9X_VER )
+      return(__regina_close_dos(handle, async_info));
+
+   ai = async_info;
+   hdl = (HANDLE) handle;
 
    if (hdl == INVALID_HANDLE_VALUE)
    {
@@ -564,7 +754,7 @@ int __regina_close(int handle, void *async_info)
       return(-1);
    }
 
-   CancelIo(hdl);
+   MyCancelIo(hdl);
    CloseHandle(ai->h[i].ol.hEvent);
    ai->h[i].hdl = INVALID_HANDLE_VALUE;
    if (ai->h[i].buf)
@@ -575,6 +765,21 @@ int __regina_close(int handle, void *async_info)
    return(-1);
 }
 
+/*
+ * __regina_close_special acts like close() but closes any OS specific handle.
+ * The close happens if the handle is not -1. A specific operation may be
+ * associated with this. Have a look for occurances of "hdls[2]".
+ */
+void __regina_close_special( int handle )
+{
+   /*
+    * DOS part not needed but we will get it. Rename the function.
+    */
+#define __regina_close_special __regina_close_special_dos
+   if ( handle )
+      CloseHandle( (HANDLE) handle );
+}
+
 /* __regina_read acts like read() but returns either an error (return code
  * == -errno) or the number of bytes read. EINTR and friends leads to a
  * re-read.
@@ -583,12 +788,21 @@ int __regina_close(int handle, void *async_info)
  */
 int __regina_read(int handle, void *buf, unsigned size, void *async_info)
 {
-   AsyncInfo *ai = async_info;
-   HANDLE hdl = (HANDLE) handle;
+   AsyncInfo *ai;
+   HANDLE hdl;
    unsigned i;
    OVERLAPPED *ol;
    DWORD done;
-   int retval = 0;
+   int retval;
+
+# define NEED_STUPID_DOSCMD
+# define __regina_read __regina_read_dos
+   if ( WIN9X_VER )
+      return(__regina_read(handle, buf, size, async_info));
+
+   ai = async_info;
+   hdl = (HANDLE) handle;
+   retval = 0;
 
    if (ai == NULL)
    {
@@ -722,12 +936,21 @@ int __regina_read(int handle, void *buf, unsigned size, void *async_info)
  */
 int __regina_write(int handle, const void *buf, unsigned size, void *async_info)
 {
-   AsyncInfo *ai = async_info;
-   HANDLE hdl = (HANDLE) handle;
+   AsyncInfo *ai;
+   HANDLE hdl;
    unsigned i;
    OVERLAPPED *ol;
    DWORD done;
-   int retval = 0;
+   int retval;
+
+# define NEED_STUPID_DOSCMD
+# define __regina_write __regina_write_dos
+   if ( WIN9X_VER )
+      return(__regina_write(handle, buf, size, async_info));
+
+   ai = async_info;
+   hdl = (HANDLE) handle;
+   retval = 0;
 
    if (!ai)
    {
@@ -838,6 +1061,12 @@ void *create_async_info(const tsd_t *TSD)
 {
    AsyncInfo *retval;
 
+# define NEED_STUPID_DOSCMD
+# undef create_async_info
+# define create_async_info create_async_info_dos
+   if ( WIN9X_VER )
+      return(create_async_info(TSD));
+
    retval = MallocTSD(sizeof(AsyncInfo));
    memset(retval, 0, sizeof(AsyncInfo));
 
@@ -854,9 +1083,19 @@ void *create_async_info(const tsd_t *TSD)
  */
 void delete_async_info(void *async_info)
 {
-   AsyncInfo *ai = async_info;
+   AsyncInfo *ai;
    unsigned i;
 
+# define NEED_STUPID_DOSCMD
+# undef delete_async_info
+# define delete_async_info delete_async_info_dos
+   if ( WIN9X_VER )
+   {
+      delete_async_info(async_info);
+      return;
+   }
+
+   ai = async_info;
    if (ai == NULL)
       return;
 
@@ -870,6 +1109,14 @@ void delete_async_info(void *async_info)
  */
 void reset_async_info(void *async_info)
 {
+# define NEED_STUPID_DOSCMD
+# undef reset_async_info
+# define reset_async_info reset_async_info_dos
+   if ( WIN9X_VER )
+   {
+      reset_async_info(async_info);
+      return;
+   }
 }
 
 /* add_async_waiter adds a further handle to the asyncronous IO structure.
@@ -880,10 +1127,21 @@ void reset_async_info(void *async_info)
  */
 void add_async_waiter(void *async_info, int handle, int add_as_read_handle)
 {
-   AsyncInfo *ai = async_info;
-   HANDLE hdl = (HANDLE) handle;
+   AsyncInfo *ai;
+   HANDLE hdl;
    unsigned i;
 
+# define NEED_STUPID_DOSCMD
+# undef add_async_waiter
+# define add_async_waiter add_async_waiter_dos
+   if ( WIN9X_VER )
+   {
+      add_async_waiter(async_info, handle, add_as_read_handle);
+      return;
+   }
+
+   ai = async_info;
+   hdl = (HANDLE) handle;
    if (ai)
    {
       for (i = 0;i < 3;i++)
@@ -906,10 +1164,20 @@ void add_async_waiter(void *async_info, int handle, int add_as_read_handle)
  */
 void wait_async_info(void *async_info)
 {
-   AsyncInfo *ai = async_info;
+   AsyncInfo *ai;
    unsigned i, used;
    HANDLE list[3];
 
+# define NEED_STUPID_DOSCMD
+# undef wait_async_info
+# define wait_async_info wait_async_info_dos
+   if ( WIN9X_VER )
+   {
+      wait_async_info(async_info);
+      return;
+   }
+
+   ai = async_info;
    for (i = 0, used = 0; i < 3; i++)
    {
       if (ai->h[i].hdl == INVALID_HANDLE_VALUE)
@@ -951,7 +1219,8 @@ void wait_async_info(void *async_info)
   } AsyncInfo;
 
 /* fork_exec spawns a new process with the given commandline.
- * it returns -1 on error (errno set), a process descriptor otherwise.
+ * it returns -1 on error (errno set), 0 on process start error (rcode set),
+ * a process descriptor otherwise.
  * Basically this is a child process and we run in the child's environment
  * after the first few lines. The setup hasn't been done and the command needs
  * to be started.
@@ -967,7 +1236,7 @@ void wait_async_info(void *async_info)
  * use the "wrong" escape character. Note the difference between EMX and OS/2.
  * Maybe, I'm wrong. Drop me an email in this case. FGC
  */
-int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
+int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
 {
    static const char *interpreter[] = { "regina.exe", /* preferable even if */
                                                       /* not dynamic        */
@@ -977,6 +1246,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
    int rc, eno ;
    const char *ipret;
    char *argline;
+   int broken_address_command = get_options_flag( TSD->currlevel, EXT_BROKEN_ADDRESS_COMMAND );
+   int subtype;
 
    if (env->subtype == SUBENVIR_REXX) /*special situation caused by recursion*/
    {
@@ -1004,7 +1275,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          strcat(new_cmdline, " ");
          strcat(new_cmdline, cmdline);
          e.subtype = SUBENVIR_COMMAND;
-         if ((rc = fork_exec(TSD, &e, new_cmdline)) != -1)
+         rc = fork_exec(TSD, &e, new_cmdline, &rc);
+         if ( ( rc != 0 ) && ( rc != -1 ) )
          {
             free(new_cmdline);
             return(rc);
@@ -1018,7 +1290,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          strcat(new_cmdline, " ");
          strcat(new_cmdline, cmdline);
          e.subtype = SUBENVIR_COMMAND;
-         if ((rc = fork_exec(TSD, &e, new_cmdline)) != -1)
+         rc = fork_exec(TSD, &e, new_cmdline, &rc);
+         if ( ( rc != 0 ) && ( rc != -1 ) )
          {
             free(new_cmdline);
             return(rc);
@@ -1026,13 +1299,12 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
       }
 
 #ifndef __EMX__
-      eno = errno;
-      free(new_cmdline);
-      errno = eno;
-      return(-1);
+      *rcode = -errno; /* assume a load error */
+      free( new_cmdline );
+      return 0;
 #else
-      if ((rc = fork()) != 0) /* EMX is fork-capable */
-         return(rc);
+      if ( ( rc = fork() ) != 0 ) /* EMX is fork-capable */
+         return rc;
 #endif
    }
 #ifdef __EMX__ /* redirect this call to the non-OS/2-code if DOS is running */
@@ -1067,19 +1339,29 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
       STD_REDIR(env->error.hdls[1], 2, saved_err);
    }
 
+   /*
+    * If the BROKEN_ADDRESS_COMMAND OPTION is in place,
+    * and our environment is COMMAND, change it to SYSTEM
+    */
+   if ( env->subtype == SUBENVIR_PATH /* was SUBENVIR_COMMAND */
+   &&   broken_address_command )
+      subtype = SUBENVIR_SYSTEM;
+   else
+      subtype = env->subtype;
+
    rc = -1;
-   switch (env->subtype)
+   switch ( subtype )
    {
       case SUBENVIR_PATH:
          args = makeargs(cmdline, '^');
 #define NEED_MAKEARGS
          rc = spawnvp(P_NOWAIT, *args, args);
-            break;
+         break;
 
       case SUBENVIR_COMMAND:
          args = makeargs(cmdline, '^');
          rc = spawnv(P_NOWAIT, *args, args);
-            break;
+         break;
 
       case SUBENVIR_SYSTEM:
          /* insert "%COMSPEC% /c " or "%SHELL% -c " in front */
@@ -1125,20 +1407,22 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          }
 
       default: /* illegal subtype */
+         STD_RESTORE(saved_in, 0);
+         STD_RESTORE(saved_out, 1);
+         STD_RESTORE(saved_err, 2);
          errno = EINVAL;
-         rc = -1;
+         return -1;
    }
 
-   eno = errno;
+   *rcode = errno;
    STD_RESTORE(saved_in, 0);
    STD_RESTORE(saved_out, 1);
    STD_RESTORE(saved_err, 2);
    if (args != NULL)
       destroyargs(args);
 #define NEED_DESTROYARGS
-   errno = eno;
 
-   return(rc);
+   return ( rc == -1 ) ? 0 : rc;
 #undef SET_MAXHDLS
 #undef SET_MAXHDL
 #undef STD_RESTORE
@@ -1150,7 +1434,7 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
  * it isn't guaranteed. Never call if you don't expect a sudden death of the
  * subprocess.
  * Returns the exit status of the subprocess under normal circumstances. If
- * the subprocess has died by a signal, the return value is -(100+signalnumber)
+ * the subprocess has died by a signal, the return value is -signalnumber.
  */
 int __regina_wait(int process)
 {
@@ -1169,11 +1453,27 @@ int __regina_wait(int process)
    } while ((rc == -1) && (errno == EINTR));
 
    if (WIFEXITED(status))
+   {
       retval = (int) WEXITSTATUS(status);
+      if ( retval < 0 )
+         retval = -retval;
+   }
    else if (WIFSIGNALED(status))
-      retval = -100 - WTERMSIG(status);
+   {
+      retval = -WTERMSIG(status);
+      if ( retval > 0 )
+         retval = -retval;
+      else if ( retval == 0 )
+         retval = -1;
+   }
    else
-      retval = -1; /* ?? */
+   {
+      retval = -WSTOPSIG(status);
+      if ( retval > 0 )
+         retval = -retval;
+      else if ( retval == 0 )
+         retval = -1;
+   }
 
    return(retval);
 }
@@ -1397,6 +1697,17 @@ int __regina_close(int handle, void *async_info)
    return(DosClose((HFILE) handle));
 }
 
+/*
+ * __regina_close_special acts like close() but closes any OS specific handle.
+ * The close happens if the handle is not -1. A specific operation may be
+ * associated with this. Have a look for occurances of "hdls[2]".
+ */
+void __regina_close_special( int handle )
+{
+#define __regina_close_special __regina_close_special_dos
+   assert( handle == -1 );
+}
+
 /* __regina_read acts like read() but returns either an error (return code
  * == -errno) or the number of bytes read. EINTR and friends leads to a
  * re-read.
@@ -1617,6 +1928,7 @@ void wait_async_info(void *async_info)
 
 #include <fcntl.h>
 #include <errno.h>
+#include <signal.h>
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
@@ -1663,23 +1975,23 @@ void wait_async_info(void *async_info)
  * single process. We guess the result if we can't determine it.
  */
 #if defined(__QNX__) && !defined(__QNXNTO__)
-#include <sys/osinfo.h> 
-static int MaxFiles(void) 
-/* 
+#include <sys/osinfo.h>
+static int MaxFiles(void)
+/*
  * returns the maximum number of files which can be addressed by a single
- * process. We guess the result if we can't determine it. 
- */ 
-{ 
-   struct _osinfo osdata; 
-   if ( qnx_osinfo( 0, &osdata ) != -1 ) 
-   { 
-      return osdata.num_fds[1]; 
-   } 
-   else 
-   { 
-      return 256; 
-   } 
-} 
+ * process. We guess the result if we can't determine it.
+ */
+{
+   struct _osinfo osdata;
+   if ( qnx_osinfo( 0, &osdata ) != -1 )
+   {
+      return osdata.num_fds[1];
+   }
+   else
+   {
+      return 256;
+   }
+}
 #else
 static int MaxFiles(void)
 {
@@ -1717,7 +2029,8 @@ static int MaxFiles(void)
 #endif
 
 /* fork_exec spawns a new process with the given commandline.
- * it returns -1 on error (errno set), a process descriptor otherwise.
+ * it returns -1 on error (errno set), 0 on process start error (rcode set),
+ * a process descriptor otherwise.
  * Basically this is a child process and we run in the child's environment
  * after the first few lines. The setup hasn't been done and the command needs
  * to be started.
@@ -1728,16 +2041,18 @@ static int MaxFiles(void)
  * Never use TSD after the fork() since this is not only a different thread,
  * it's a different process!
  */
-int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
+int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
 {
    static const char *interpreter[] = { "regina", /* preferable even if not */
                                                   /* dynamic                */
                                         "rexx" };
    char **args ;
    int i, rc, max_hdls = MaxFiles() ;
+   int broken_address_command = get_options_flag( TSD->currlevel, EXT_BROKEN_ADDRESS_COMMAND );
+   int subtype;
 
-   if ((rc = fork()) != 0)
-      return(rc);
+   if ( ( rc = fork() ) != 0 )
+      return( rc );
 
    /* Now we are the child */
 
@@ -1766,34 +2081,47 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
    for (i=3; i <= max_hdls; i++)
       close( i ) ;
 
-   switch (env->subtype)
+   /*
+    * If the BROKEN_ADDRESS_COMMAND OPTION is in place,
+    * and our environment is COMMAND, change it to SYSTEM
+    */
+   if ( env->subtype == SUBENVIR_PATH /* was SUBENVIR_COMMAND */
+   &&   broken_address_command )
+      subtype = SUBENVIR_SYSTEM;
+   else
+      subtype = env->subtype;
+
+   switch ( subtype )
    {
       case SUBENVIR_PATH:
-      args = makeargs(cmdline, '\\');
+         args = makeargs(cmdline, '\\');
 #define NEED_MAKEARGS
-      execvp(*args, args);
+         execvp(*args, args);
          break;
 
       case SUBENVIR_COMMAND:
-      args = makeargs(cmdline, '\\');
-      execv(*args, args);
+         args = makeargs(cmdline, '\\');
+         execv(*args, args);
          break;
 
       case SUBENVIR_SYSTEM:
 #if defined(HAVE_WIN32GUI)
-      rc = mysystem( cmdline ) ;
+         rc = mysystem( cmdline ) ;
 #else
-      rc = system( cmdline ) ;
+         rc = system( cmdline ) ;
 #endif
 #ifdef VMS
-      exit (rc) ; /* This is a separate process, exit() is allowed */
+         exit (rc); /* This is a separate process, exit() is allowed */
 #else
-      if (WIFEXITED(rc))
-         exit( ( int )WEXITSTATUS(rc) ) ; /* This is a separate process, exit() is allowed */
-      else if (WIFSIGNALED(rc))
-         exit( -100 - WTERMSIG(rc) ); /* This is a separate process, exit() is allowed */
-      else
-         exit( 0 ) ; /* This is a separate process, exit() is allowed */
+         if ( WIFEXITED( rc ) )
+         {
+            fflush( stdout );
+            _exit( (int) WEXITSTATUS(rc) ); /* This is a separate process, exit() is allowed */
+         }
+         else if ( WIFSIGNALED( rc ) )
+            raise( WTERMSIG( rc ) ); /* This is a separate process, raise() is allowed */
+         else
+            raise( WSTOPSIG( rc ) ); /* This is a separate process, raise() is allowed */
 #endif
          break;
       case SUBENVIR_REXX:
@@ -1814,7 +2142,7 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
             len += strlen(cmdline) + 2; /* Blank + term ASCII0 */
 
             if ((new_cmdline = malloc(len)) == NULL)
-               exit(2); /* This is a separate process, exit() is allowed */
+               raise( SIGKILL ); /* This is a separate process, raise() is allowed */
 
             if (argv0 != NULL) /* always the best choice */
             {
@@ -1846,18 +2174,20 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
 
             for (i = 0, run = args; *run; run++)
                i++;
-            exit(__regina_reexecute_main(i, args));
+            fflush( stdout );
+            _exit(__regina_reexecute_main(i, args));
    }
 
       default: /* illegal subtype */
-      exit( -1 ) ; /* This is a separate process, exit() is allowed */
+         raise( SIGKILL ) ; /* This is a separate process, raise() is allowed */
    }
 
    /* exec() failed */
-   exit( -2 ) ; /* This is a separate process, exit() is allowed */
+   raise( SIGKILL ); /* This is a separate process, raise() is allowed */
 #undef SET_MAXHDLS
 #undef SET_MAXHDL
 #undef STD_REDIR
+   return -1; /* keep the compiler happy */
 }
 
 /* __regina_wait waits for a process started by fork_exec.
@@ -1871,7 +2201,8 @@ int __regina_wait(int process)
 {
    int rc, retval, status;
 #ifdef VMS
-   for (;;) {
+   for ( ; ; )
+   {
       rc = wait( &status ) ;
       if (rc != -1)
          break;
@@ -1882,13 +2213,14 @@ int __regina_wait(int process)
    }
    retval = status & 0xff ;
 #else
-   for (;;) {
+   for ( ; ; )
+   {
 # ifdef NEXT
-   /*
-    * According to Paul F. Kunz, NeXTSTEP 3.1 Prerelease doesn't have
-    * the waitpid() function, so wait() must be used instead. The
-    * following klugde will remain until NeXTSTEP gets waitpid().
-    */
+      /*
+       * According to Paul F. Kunz, NeXTSTEP 3.1 Prerelease doesn't have
+       * the waitpid() function, so wait() must be used instead. The
+       * following klugde will remain until NeXTSTEP gets waitpid().
+       */
       wait( &status ) ;
 # else /* ndef NEXT */
 #  ifdef DOS
@@ -1906,11 +2238,27 @@ int __regina_wait(int process)
    }
    /* still ndef VMS */
    if (WIFEXITED(status))
-      retval = ( int ) WEXITSTATUS(status) ;
+   {
+      retval = (int) WEXITSTATUS(status);
+      if ( retval < 0 )
+         retval = -retval;
+   }
    else if (WIFSIGNALED(status))
-      retval = -100 - WTERMSIG(status) ;
+   {
+      retval = -WTERMSIG(status);
+      if ( retval > 0 )
+         retval = -retval;
+      else if ( retval == 0 )
+         retval = -1;
+   }
    else
-      retval = -1 ; /* ?? */
+   {
+      retval = -WSTOPSIG(status);
+      if ( retval > 0 )
+         retval = -retval;
+      else if ( retval == 0 )
+         retval = -1;
+   }
 #endif /* def VMS */
    return(retval);
 }
@@ -1958,6 +2306,16 @@ void restart_file(int hdl)
 int __regina_close(int handle, void *async_info)
 {
    return(close(handle));
+}
+
+/*
+ * __regina_close_special acts like close() but closes any OS specific handle.
+ * The close happens if the handle is not -1. A specific operation may be
+ * associated with this. Have a look for occurances of "hdls[2]".
+ */
+void __regina_close_special( int handle )
+{
+   assert( handle == -1 );
 }
 
 /* __regina_read acts like read() but returns either an error (return code
@@ -2176,7 +2534,8 @@ void wait_async_info(void *async_info)
  */
 
 /* fork_exec spawns a new process with the given commandline.
- * it returns -1 on error (errno set), a process descriptor otherwise.
+ * it returns -1 on error (errno set), 0 on process start error (rcode set),
+ * a process descriptor otherwise.
  * Basically this is a child process and we run in the child's environment
  * after the first few lines. The setup hasn't been done and the command needs
  * to be started.
@@ -2187,7 +2546,7 @@ void wait_async_info(void *async_info)
  * Never use TSD after the fork() since this is not only a different thread,
  * it's a different process!
  */
-int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
+int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
 {
    static const char *interpreter[] = { "regina", /* preferable even if not */
                                                   /* dynamic                */
@@ -2195,7 +2554,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
    char **args = NULL;
    int saved_in = -1, saved_out = -1, saved_err = -1;
    int rc, eno ;
-   int subtype = env->subtype;
+   int broken_address_command = get_options_flag( TSD->currlevel, EXT_BROKEN_ADDRESS_COMMAND );
+   int subtype;
 
    if (env->subtype == SUBENVIR_REXX) /*special situation caused by recursion*/
    {
@@ -2215,7 +2575,7 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
       len += strlen(cmdline) + 2; /* Blank + term ASCII0 */
 
       if ((new_cmdline = malloc(len)) == NULL)
-         return(-1); /* ENOMEM is set */
+         return -1; /* ENOMEM is set */
 
       if (argv0 != NULL) /* always the best choice */
       {
@@ -2223,7 +2583,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          strcat(new_cmdline, " ");
          strcat(new_cmdline, cmdline);
          e.subtype = SUBENVIR_COMMAND;
-         if ((rc = fork_exec(TSD, &e, new_cmdline)) != -1)
+         rc = fork_exec(TSD, &e, new_cmdline, &rc);
+         if ( ( rc != 0 ) && ( rc != -1 ) )
          {
             free(new_cmdline);
             return(rc);
@@ -2237,17 +2598,17 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          strcat(new_cmdline, " ");
          strcat(new_cmdline, cmdline);
          e.subtype = SUBENVIR_SYSTEM;
-         if ((rc = fork_exec(TSD, &e, new_cmdline)) != -1)
+         rc = fork_exec(TSD, &e, new_cmdline, &rc);
+         if ( ( rc != 0 ) && ( rc != -1 ) )
          {
             free(new_cmdline);
             return(rc);
          }
       }
 
-      eno = errno;
+      *rcode = -errno; /* assume a load error */
       free(new_cmdline);
-      errno = eno;
-      return(-1);
+      return 0;
    }
 
 #define STD_REDIR(hdl,dest,save) if ((hdl != -1) && (hdl != dest)) \
@@ -2270,8 +2631,17 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
       STD_REDIR(env->error.hdls[1], 2, saved_err);
    }
 
+   /*
+    * If the BROKEN_ADDRESS_COMMAND OPTION is in place,
+    * and our environment is COMMAND, change it to SYSTEM
+    */
+   if ( env->subtype == SUBENVIR_PATH /* was SUBENVIR_COMMAND */
+   &&   broken_address_command )
+      subtype = SUBENVIR_SYSTEM;
+   else
+      subtype = env->subtype;
    rc = -1;
-   subtype = env->subtype;
+
    switch (env->subtype)
    {
       case SUBENVIR_PATH:
@@ -2313,6 +2683,14 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
          /* fall through */
 
       default: /* illegal subtype */
+         STD_RESTORE(saved_in, 0);
+         STD_RESTORE(saved_out, 1);
+         STD_RESTORE(saved_err, 2);
+#ifdef NEED_MAKEARGS
+         if (args != NULL)
+            destroyargs(args);
+#define NEED_DESTROYARGS
+#endif
          errno = EINVAL;
          rc = -1;
          break;
@@ -2325,17 +2703,16 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
 #ifdef NEED_MAKEARGS
    if (args != NULL)
       destroyargs(args);
-#define NEED_DESTROYARGS
 #endif
    errno = eno;
 
-   if (rc == -1)
-      return(rc);
+   if ( rc == -1 )
+      return(0);
 
    rc -= 0x4000; /* do a remap */
-   if (rc == -1)
-      rc = -2;
-   return(rc);
+   if ( (rc == -1) || ( rc == 0 ) )
+      rc = -0x4000 + 127;
+   return rc;
 #undef SET_MAXHDLS
 #undef SET_MAXHDL
 #undef STD_RESTORE
@@ -2347,7 +2724,7 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline)
  * it isn't guaranteed. Never call if you don't expect a sudden death of the
  * subprocess.
  * Returns the exit status of the subprocess under normal circumstances. If
- * the subprocess has died by a signal, the return value is -(100+signalnumber)
+ * the subprocess has died by a signal, the return value is -signalnumber.
  */
 int __regina_wait(int process)
 {
@@ -2369,7 +2746,12 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
    /* Remember to create two handles to be "pipe()"-conform. */
 #define NEED_LOCAL_MKSTEMP
    if ((ep->hdls[0] = local_mkstemp(TSD, name)) == -1)
+   {
+      eno = errno;
+      free( name );
+      errno = eno;
       return(-1);
+   }
 
    if ((ep->hdls[1] = dup(ep->hdls[0])) == -1)
    {
@@ -2413,6 +2795,16 @@ int __regina_close(int handle, void *async_info)
 {
    (async_info = async_info);
    return(close(handle));
+}
+
+/*
+ * __regina_close_special acts like close() but closes any OS specific handle.
+ * The close happens if the handle is not -1. A specific operation may be
+ * associated with this. Have a look for occurances of "hdls[2]".
+ */
+void __regina_close_special( int handle )
+{
+   assert( handle == -1 );
 }
 
 /* __regina_read acts like read() but returns either an error (return code
@@ -2892,11 +3284,16 @@ static int local_mkstemp(const tsd_t *TSD, char *base)
    start *= BaseIndex;
    start %= 1000000;
 
+   strcat( buf, slash );
+   slash = buf + strlen( buf );
    run = start;
    for (i = 0;i <= 1000000;i++)
    {
       /* form a name like "c:\temp\345302._rx" or "/tmp/345302._rx" */
-      sprintf(buf,"%s%s%06u._rx", buf, slash, run );
+      /*
+       * fixes Bug 587687
+       */
+      sprintf( slash, "%06u._rx", run );
 #if defined(WIN32) /* currently not used but what's about CE ? */
       retval = _sopen(buf,
                       _O_RDWR|_O_CREAT|_O_BINARY|_O_SHORT_LIVED|_O_EXCL|

@@ -116,14 +116,14 @@ CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/va
 
 OFILES = funcs.obj builtin.obj error.obj variable.obj \
 	interprt.obj debug.obj dbgfuncs.obj memory.obj parsing.obj files.obj \
-	misc.obj unxfuncs.obj cmsfuncs.obj os2funcs.obj shell.obj rexxext.obj stack.obj extstack.obj \
+	misc.obj unxfuncs.obj arxfuncs.obj cmsfuncs.obj os2funcs.obj shell.obj rexxext.obj stack.obj extstack.obj \
 	tracing.obj interp.obj cmath.obj convert.obj strings.obj library.obj \
 	strmath.obj signals.obj macros.obj envir.obj expr.obj instore.obj rexxbif.obj \
 	extlib.obj yaccsrc.obj lexsrc.obj options.obj doscmd.obj wrappers.obj $(MT_FILE).obj #r2perl.obj
 
 SHOFILES = $(DLLDIR)\funcs.obj $(DLLDIR)\builtin.obj $(DLLDIR)\error.obj $(DLLDIR)\variable.obj $(DLLDIR)\extstack.obj $(DLLDIR)\rexxbif.obj \
 	$(DLLDIR)\interprt.obj $(DLLDIR)\debug.obj $(DLLDIR)\dbgfuncs.obj $(DLLDIR)\memory.obj $(DLLDIR)\parsing.obj $(DLLDIR)\files.obj \
-	$(DLLDIR)\misc.obj $(DLLDIR)\unxfuncs.obj $(DLLDIR)\cmsfuncs.obj $(DLLDIR)\os2funcs.obj $(DLLDIR)\shell.obj $(DLLDIR)\rexxext.obj $(DLLDIR)\stack.obj \
+	$(DLLDIR)\misc.obj $(DLLDIR)\unxfuncs.obj $(DLLDIR)\arxfuncs.obj $(DLLDIR)\cmsfuncs.obj $(DLLDIR)\os2funcs.obj $(DLLDIR)\shell.obj $(DLLDIR)\rexxext.obj $(DLLDIR)\stack.obj \
 	$(DLLDIR)\tracing.obj $(DLLDIR)\interp.obj $(DLLDIR)\cmath.obj $(DLLDIR)\convert.obj $(DLLDIR)\strings.obj $(DLLDIR)\library.obj \
 	$(DLLDIR)\strmath.obj $(DLLDIR)\signals.obj $(DLLDIR)\macros.obj $(DLLDIR)\envir.obj $(DLLDIR)\expr.obj $(DLLDIR)\instore.obj \
 	$(DLLDIR)\extlib.obj $(DLLDIR)\yaccsrc.obj $(DLLDIR)\lexsrc.obj $(DLLDIR)\wrappers.obj $(DLLDIR)\options.obj $(DLLDIR)\doscmd.obj \
@@ -238,6 +238,9 @@ misc.obj :    $(SRCDIR)/misc.c
 
 unxfuncs.obj :$(SRCDIR)/unxfuncs.c
 	$(CC) $(COPT) $(CC2O) $(STAT_COMP) $(SRCDIR)/unxfuncs.c
+
+arxfuncs.obj :$(SRCDIR)/arxfuncs.c
+	$(CC) $(COPT) $(CC2O) $(STAT_COMP) $(SRCDIR)/arxfuncs.c
 
 os2funcs.obj :$(SRCDIR)/os2funcs.c
 	$(CC) $(COPT) $(CC2O) $(STAT_COMP) $(SRCDIR)/os2funcs.c
@@ -397,6 +400,9 @@ $(DLLDIR)\misc.obj :    $(SRCDIR)/misc.c
 
 $(DLLDIR)\unxfuncs.obj :$(SRCDIR)/unxfuncs.c
 	$(CC) $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/unxfuncs.c
+
+$(DLLDIR)\arxfuncs.obj :$(SRCDIR)/arxfuncs.c
+	$(CC) $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/arxfuncs.c
 
 $(DLLDIR)\os2funcs.obj :$(SRCDIR)/os2funcs.c
 	$(CC) $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/os2funcs.c

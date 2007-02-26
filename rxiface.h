@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rxiface.h,v 1.7 2002/03/09 01:21:00 mark Exp $
+ * $Id: rxiface.h,v 1.12 2003/02/25 08:31:35 mark Exp $
  */
 
 #include "wrappers.h"
@@ -133,6 +133,8 @@
 #define RX_EXIT_FUNC    7
 #define RX_EXIT_GETENV  8
 #define RX_EXIT_SETENV  9
+#define RX_EXIT_GETCWD 10
+#define RX_EXIT_SETCWD 11
 
 #define RX_LASTHOOK    32
 
@@ -146,7 +148,7 @@
 #define RXFLAG_NOTREG  30
 
 int IfcStartUp( tsd_t *TSD, char *name, int *Major, int *Minor ) ;
-int IfcExecScript( int NameLen, const char *Name,
+int IfcExecScript( tsd_t * volatile TSD, int NameLen, const char *Name,
                    int ArgCount, const int *ParLengths, const char **ParStrings,
                    int CallType, int ExitFlags, int EnvLen, const char *EnvName,
                    int SourceCode, int restricted,
@@ -154,8 +156,12 @@ int IfcExecScript( int NameLen, const char *Name,
                    const void *TinnedTree, unsigned long TinnedTreeLen,
                    int *RetLen, char **RetString, void **instore_buf,
                    unsigned long *instore_length ) ;
+int IfcExecCallBack( tsd_t * volatile TSD, int NameLen, const char *Name,
+                     int ArgCount, const int *ParLengths, const char **ParStrings,
+                     int *RetLen, char **RetString );
 
-int IfcVarPool( tsd_t *TSD, int Code, int *Lengths, char *Strings[] ) ;
+int IfcVarPool( tsd_t *TSD, int Code, int *Lengths, char *Strings[],
+                int *allocated );
 int IfcRegFunc( tsd_t *TSD, const char *Name ) ;
 int IfcDelFunc( tsd_t *TSD, const char *Name ) ;
 int IfcQueryFunc( tsd_t *TSD, const char *Name ) ;

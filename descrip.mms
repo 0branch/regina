@@ -2,7 +2,7 @@
 ! regina on OpenVMS
 ! MMS/MMK-makefile
 !
-.IGNORE         ! ignore errors, continue processing, like "make -k"
+!.IGNORE         ! ignore errors, continue processing, like "make -k"
 !
 .FIRST
         @ write sys$output f$fao("!/==!AS !%D==", -
@@ -14,12 +14,12 @@
 .IFDEF DEBUGGING
 CC=CC/DECC
 CFLAGS=/NOOPTIMIZE/STANDARD=RELAXED_ANSI89/WARNINGS=DISABLE=(IMPLICITFUNC) -
-        /DEFINE=VMS/DEBUG/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
+        /INCLUDE_DIRECTORY=[]/NAMES=SHORTENED/DEFINE=VMS/DEBUG/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
 LINK=LINK/DEBUG
 .ELSE
 CC=CC/DECC
 CFLAGS=/OPTIMIZE/STANDARD=RELAXED_ANSI89/WARNINGS=DISABLE=(IMPLICITFUNC) -
-        /DEFINE=VMS/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
+        /INCLUDE_DIRECTORY=[]/NAMES=SHORTENED/DEFINE=VMS/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
 .ENDIF
 !
 ! platform dependant, ...
@@ -34,7 +34,7 @@ OBJ1=builtin.obj,cmath.obj,cmsfuncs.obj,convert.obj,
 !OBJ1=builtin.obj,client.obj,cmath.obj,cmsfuncs.obj,convert.obj,
 OBJ2=dbgfuncs.obj,debug.obj,doscmd.obj,envir.obj,error.obj,expr.obj,
 OBJ3=extlib.obj,files.obj,funcs.obj,
-OBJ4=
+OBJ4=mt_notmt.obj,rexxbif.obj,instore.obj,extstack.obj,os2funcs.obj,
 OBJ5=interp.obj,interprt.obj,lexsrc.obj,library.obj,macros.obj,memory.obj,
 !OBJ6=misc.obj,options.obj,parsing.obj,rexxext.obj,rexxsaa.obj,shell.obj,
 OBJ6=misc.obj,options.obj,parsing.obj,rexxext.obj,shell.obj,
@@ -149,12 +149,22 @@ extlib.obj :    extlib.c, rexx.h
         @ write sys$output "Compiling $(MMS$SOURCE) "
         $(CC) $(CFLAGS) $(MMS$SOURCE)
         @ write sys$output "Done (compiling)."
+extstack.obj :    extstack.c, rexx.h
+        @ write sys$output ""
+        @ write sys$output "Compiling $(MMS$SOURCE) "
+        $(CC) $(CFLAGS) $(MMS$SOURCE)
+        @ write sys$output "Done (compiling)."
 files.obj :     files.c, rexx.h
         @ write sys$output ""
         @ write sys$output "Compiling $(MMS$SOURCE) "
         $(CC) $(CFLAGS) $(MMS$SOURCE)
         @ write sys$output "Done (compiling)."
 funcs.obj :     funcs.c, rexx.h
+        @ write sys$output ""
+        @ write sys$output "Compiling $(MMS$SOURCE) "
+        $(CC) $(CFLAGS) $(MMS$SOURCE)
+        @ write sys$output "Done (compiling)."
+instore.obj :    instore.c, rexx.h
         @ write sys$output ""
         @ write sys$output "Compiling $(MMS$SOURCE) "
         $(CC) $(CFLAGS) $(MMS$SOURCE)
@@ -194,7 +204,17 @@ misc.obj :      misc.c, rexx.h
         @ write sys$output "Compiling $(MMS$SOURCE) "
         $(CC) $(CFLAGS) $(MMS$SOURCE)
         @ write sys$output "Done (compiling)."
+mt_notmt.obj :  mt_notmt.c, rexx.h mt.h
+        @ write sys$output ""
+        @ write sys$output "Compiling $(MMS$SOURCE) "
+        $(CC) $(CFLAGS) $(MMS$SOURCE)
+        @ write sys$output "Done (compiling)."
 options.obj :   options.c, rexx.h
+        @ write sys$output ""
+        @ write sys$output "Compiling $(MMS$SOURCE) "
+        $(CC) $(CFLAGS) $(MMS$SOURCE)
+        @ write sys$output "Done (compiling)."
+os2funcs.obj :   os2funcs.c, rexx.h
         @ write sys$output ""
         @ write sys$output "Compiling $(MMS$SOURCE) "
         $(CC) $(CFLAGS) $(MMS$SOURCE)
@@ -223,6 +243,11 @@ drexx.obj :     rexx.c, rexx.h
         @ write sys$output ""
         @ write sys$output "Compiling $(MMS$SOURCE) "
         $(CC) $(CFLAGS) /DEFINE=RXLIB $(MMS$SOURCE)
+        @ write sys$output "Done (compiling)."
+rexxbif.obj :   rexxbif.c, rexx.h
+        @ write sys$output ""
+        @ write sys$output "Compiling $(MMS$SOURCE) "
+        $(CC) $(CFLAGS) $(MMS$SOURCE)
         @ write sys$output "Done (compiling)."
 rexxext.obj :   rexxext.c, rexx.h
         @ write sys$output ""

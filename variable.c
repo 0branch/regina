@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: variable.c,v 1.14 2002/01/20 08:28:56 mark Exp $";
+static char *RCSid = "$Id: variable.c,v 1.22 2003/04/01 10:26:06 mark Exp $";
 #endif
 
 /*
@@ -99,12 +99,12 @@ typedef struct { /* var_tsd: static variables of this module (thread-safe) */
     * executes kill_variables). Imagine the following:
     * >call proc1
     * >exit 0
-    * > proc1 procedure
+    * >proc1: procedure
     * > locvar = 1
-    * > call proc 2
+    * > call proc2
     * > call proc1 (not endlessly, but at least one time)
     * > return
-    * > proc2 procedure expose locvar
+    * >proc2: procedure expose locvar
     * > return
     * In the first call to proc2 current_valid will be 3, proc2 returns, proc1
     * will be executed at least once more and current_valid is 3, too. This is
@@ -136,6 +136,10 @@ typedef struct { /* var_tsd: static variables of this module (thread-safe) */
    num_descr *   odescr;
    variableptr   pstem;
    variableptr   ptail;
+   variableptr   rstem;
+   variableptr   rtail;
+   int           stemidx;
+   int           tailidx;
    variableptr * var_table;
 } var_tsd_t;
 
@@ -264,7 +268,7 @@ static int Dfindlevel(const tsd_t *TSD,cvariableptr v)
 
    curr = TSD->currlevel ;
 
-   while (curr) 
+   while (curr)
    {
       if (curr->vars)
       {
@@ -279,7 +283,7 @@ static int Dfindlevel(const tsd_t *TSD,cvariableptr v)
    }
    return(-1);
 found:
-   while (curr->prev) 
+   while (curr->prev)
    {
       curr = curr->prev;
       lvl++;
@@ -349,6 +353,50 @@ static variableptr *make_hash_table( const tsd_t *TSD )
    return retval ;
 }
 
+/*
+ * known_reserved_variable returns 0 if the arguments don't be a known
+ * reserved variable as described in ANSI 6.2.3.1. The value is a
+ * POOL0_??? value otherwise.
+ *
+ * The argument don't has to be uppercased but must not contain whitespaces or
+ * garbage.
+ */
+int known_reserved_variable( const char *name, unsigned length )
+{
+   unsigned i;
+   char upper[20]; /* good maximum for predefined variable names */
+
+   /*
+    * a fast breakout switch
+    */
+   if ( ( length < 3 /* ".RC" */)
+     || ( length > 7 /* ".RESULT" */)
+     || ( *name != '.' ) )
+      return POOL0_NOT_RESERVED;
+   name++;
+   length--;
+
+   for( i = 0; i < length; i++ )
+   {
+      upper[i] = (char)toupper( name[i] );
+   }
+
+   /*
+    * some magic stuff to reduce further errors
+    */
+#define RET_IF(s)  if ( ( length == sizeof( #s ) - 1 )                   \
+                     && ( memcmp( upper, #s, sizeof( #s ) - 1 ) == 0 ) ) \
+                      return POOL0_##s
+   RET_IF( RC );
+   RET_IF( RESULT );
+   RET_IF( SIGL );
+   RET_IF( RS );
+   RET_IF( MN );
+#undef REF_IF
+
+   return POOL0_NOT_RESERVED;
+}
+
 void detach( const tsd_t *TSD, variableptr ptr )
 {
    TSD = TSD; /* keep compiler happy */
@@ -413,7 +461,7 @@ void markvariables( const tsd_t *TSD, cproclevel procptr )
          if (procptr->sig->descr)
             markmemory( procptr->sig->descr, TRC_VARBOX ) ;
       }
-      if (procptr->buf ) 
+      if (procptr->buf )
          markmemory( procptr->buf, TRC_VARBOX ) ;
       if (procptr->traps )
       {
@@ -468,7 +516,7 @@ void markvariables( const tsd_t *TSD, cproclevel procptr )
       markmemory((char*)procptr->vars,TRC_HASHTAB) ;
       if (procptr->args)
       {
-         for (pptr=procptr->args; pptr; pptr=pptr->next) 
+         for (pptr=procptr->args; pptr; pptr=pptr->next)
          {
             markmemory((char*) pptr, TRC_PROCARG) ;
             if (pptr->value)
@@ -528,124 +576,242 @@ static variableptr make_stem( const tsd_t *TSD, const streng *name,
    return ptr ;
 }
 
-#define RXISDIGIT(a) (char_types[(unsigned char)(a)]&0x01)
-#define RXISUPPER(a) (char_types[(unsigned char)(a)]&0x02)
-#define RXISLOWER(a) (char_types[(unsigned char)(a)]&0x04)
-#define RXISEXTRA(a) (char_types[(unsigned char)(a)]&0x08)
-#define RXISCOMMA(a) (char_types[(unsigned char)(a)]&0x10)
+#define RXDIGIT 0x01
+#define RXUPPER 0x02
+#define RXLOWER 0x04
+#define RXEXTRA 0x08
+#define RXDOT   0x10
+#define RXWHITE 0x20
+#define RXVAR   ( RXUPPER | RXLOWER | RXEXTRA )
+#define RXCONST ( RXUPPER | RXLOWER | RXEXTRA | RXDIGIT | RXDOT )
+#define RXMANT  ( RXDIGIT | RXDOT )
+#define CHAR_TYPE(c) char_types[(unsigned char) ( c )]
+#define RXISDIGIT(a) ( CHAR_TYPE( a ) & RXDIGIT )
+#define RXISUPPER(a) ( CHAR_TYPE( a ) & RXUPPER )
+#define RXISLOWER(a) ( CHAR_TYPE( a ) & RXLOWER )
+#define RXISEXTRA(a) ( CHAR_TYPE( a ) & RXEXTRA )
+#define RXISDOT(a)   ( CHAR_TYPE( a ) & RXDOT   )
+#define RXISWHITE(a) ( CHAR_TYPE( a ) & RXWHITE )
+#define RXISVAR(a)   ( CHAR_TYPE( a ) & RXVAR   )
+#define RXISCONST(a) ( CHAR_TYPE( a ) & RXCONST )
+#define RXISMANT(a)  ( CHAR_TYPE( a ) & RXMANT )
 
-static const unsigned char char_types[256] = 
+static const unsigned char char_types[256] =
 {
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   /* nul - bel */
-   0x00, 0x20, 0x20, 0x00, 0x20, 0x00, 0x00, 0x20,   /* bs  - si  */
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   /* dle - etb */
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   /* can - us  */
-   0x20, 0x08, 0x00, 0x08, 0x08, 0x00, 0x00, 0x00,   /* sp  -  '  */
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,   /*  (  -  /  */
-   0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,   /*  0  -  7  */
-   0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,   /*  8  -  ?  */
-   0x08, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,   /*  @  -  G  */
-   0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,   /*  H  -  O  */
-   0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,   /*  P  -  W  */
-   0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x08,   /*  X  -  _  */
-   0x00, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,   /*  `  -  g  */
-   0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,   /*  h  -  o  */
-   0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,   /*  p  -  w  */
-   0x04, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,   /*  x  - del */
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+   0,       0,       0,       0,       0,       0,       0,       0,         /* nul - bel */
+   0,       RXWHITE, RXWHITE, 0,       RXWHITE, 0,       0,       RXWHITE,   /* bs  - si  */
+   0,       0,       0,       0,       0,       0,       0,       0,         /* dle - etb */
+   0,       0,       0,       0,       0,       0,       0,       0,         /* can - us  */
+   RXWHITE, RXEXTRA, 0,       RXEXTRA, RXEXTRA, 0,       0,       0,         /* sp  -  '  */
+   0,       0,       0,       0,       0,       0,       RXDOT,   0,         /*  (  -  /  */
+   RXDIGIT, RXDIGIT, RXDIGIT, RXDIGIT, RXDIGIT, RXDIGIT, RXDIGIT, RXDIGIT,   /*  0  -  7  */
+   RXDIGIT, RXDIGIT, 0,       0,       0,       0,       0,       RXEXTRA,   /*  8  -  ?  */
+   RXEXTRA, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER,   /*  @  -  G  */
+   RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER,   /*  H  -  O  */
+   RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER, RXUPPER,   /*  P  -  W  */
+   RXUPPER, RXUPPER, RXUPPER, 0,       0,       0,       0,       RXEXTRA,   /*  X  -  _  */
+   0,       RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER,   /*  `  -  g  */
+   RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER,   /*  h  -  o  */
+   RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER, RXLOWER,   /*  p  -  w  */
+   RXLOWER, RXLOWER, RXLOWER, 0,       0,       0,       0,       0,         /*  x  - del */
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0,
+   0,       0,       0,       0,       0,       0,       0,       0
 } ;
 
 /*
- * Sigh ... this is kind of troublesome, in particular since '-' and '+'
- * can be embedded in a symbol name in certain conditions.
+ * valid_var_symbol matches a symbol, which can be either a number, a
+ * var_symbol, or a const_symbol in terms of ANSI 6.3.2.96.
+ * see also: ANSI 6.2.2.29, 6.2.2.31, 6.2.2.35
+ * Note that 6.2.2.32 means to parse an exponential character only if it
+ * it part of a number. Thus, we have to parse the following:
+ * var_symbol=RXVAR RXCONST*
+ * const_symbol=RXCONST+
+ * number=( '.' RXDIGIT+ | ( RXDIGIT+ ( '.' RXDIGIT* )? ) ) exp?
+ * exp=( 'e' | 'E' ) ( '-' | '+' )? RXDIGIT+
+ * We split var_symbol into simple, stem, compound and return all
+ * SYMBOL_??? values.
  */
 int valid_var_symbol( const streng *name )
 {
-   const unsigned char *cptr, *eptr, *start ;
+   const unsigned char *cptr,*eptr;
    unsigned char ch;
-   int stem, nums ;
+   int dots,sign;
 
-   start = cptr = (const unsigned char *) name->value ;
-   eptr = cptr + name->len ;
+   if ( name->len == 0 )
+      return SYMBOL_BAD;
 
-   if (cptr==eptr || (char_types[ch=*(cptr++)]==0))
-      return SYMBOL_BAD ;
+   cptr = (const unsigned char *) name->value;
+   eptr = cptr + name->len;
 
-   /* Lets check whether it is a constant symbol */
-   if (char_types[ch] & 0x11)
+   ch = *cptr++;
+   if ( RXISVAR( ch ) )
    {
-      for (;cptr<eptr && char_types[*cptr]; cptr++) ;
-      if (cptr<eptr)
+      /*
+       * valid begin of a variable name. Lets check it. This can't be
+       * a number, thus we don't care about sign characters.
+       */
+      dots = 0;
+      do {
+         if ( cptr == eptr )
+         {
+            /*
+             * the last character is properly loaded in ch
+             */
+            if ( RXISDOT( ch ) && ( dots == 1 ) )
+               return SYMBOL_STEM;
+            else if ( dots )
+               return SYMBOL_COMPOUND;
+            return SYMBOL_SIMPLE;
+         }
+         ch = *cptr++;
+         if ( RXISDOT( ch ) )
+            dots = 1;
+         /*
+          * characters after the first character are the same as of
+          * const_symbol. They don't share the sign behaviour, though.
+          */
+      } while ( RXISCONST( ch ) );
+
+      return SYMBOL_BAD;
+   }
+
+   /*
+    * Check for a reserved variable first.
+    * In all other cases we may have a number or a const_symbol.
+    */
+   if ( KNOWN_RESERVED( (char *)cptr - 1, name->len ) )
+      return SYMBOL_SIMPLE;
+
+   sign = 0;
+   /*
+    * Breaking/ending the following loops means to check for a const_symbol
+    * with respect to the absense of a sign character.
+    */
+   for (;;) {
+      /*
+       * A number is a const_symbol with the exception of the sign within
+       * an exponent. Try parsing a number first and fall back to a const
+       * detection on error but keep a seen sign in mind.
+       */
+      if ( RXISDOT( ch ) )
       {
-         if (*cptr!='-' && *cptr!='+')
-            return SYMBOL_BAD ;
+         /*
+          * Check for a plain dot, which isn't a number, and for a following
+          * digit.
+          */
+         if ( cptr == eptr )
+            return SYMBOL_CONSTANT;
+         ch = *cptr++;
+         if ( !RXISDIGIT( ch ) )
+            break;
 
-         /* the characters [-+] may occur in a constant symbol ... */
-         for (cptr=(const unsigned char *)name->value; cptr<eptr && RXISDIGIT(*cptr); cptr++) 
-            ;
-         nums = cptr - start ;
-         if (cptr<eptr && *cptr=='.')
-         {
-            for (cptr++; cptr<eptr && RXISDIGIT(*cptr); cptr++, nums++) 
-               ;
-         }
+         do {
+            if ( cptr == eptr )
+               return SYMBOL_NUMBER;
 
-         if (cptr<eptr && (*cptr=='e' || *cptr=='E'))
-         {
-            if (nums==0)
-               return SYMBOL_BAD ;
-
-            cptr++ ;
-            nums = 0 ;
-            if (cptr<eptr && (*cptr=='+' || *cptr=='-'))
-               for (;cptr<eptr && RXISDIGIT(*cptr); cptr++, nums++) ;
-
-            if (nums==0)
-               return SYMBOL_BAD ;
-         }
-         if (cptr<eptr)
-            return SYMBOL_BAD ;
-         else
-            return SYMBOL_CONSTANT ;
+            ch = *cptr++;
+            /*
+             * expect just RXDIGITs as the mantissa.
+             */
+         } while ( RXISDIGIT( ch ) );
       }
       else
-         return SYMBOL_CONSTANT ;
+      {
+         if ( !RXISDIGIT( ch ) )
+            break;
+         /*
+          * expect RXDIGITs [ '.' RXDIGITs ] as the mantissa.
+          */
+
+         do {
+            if ( cptr == eptr )
+               return SYMBOL_NUMBER;
+
+            ch = *cptr++;
+         } while ( RXISDIGIT( ch ) );
+         if ( RXISDOT( ch ) )
+         {
+            if ( cptr == eptr )
+               return SYMBOL_NUMBER;
+
+            ch = *cptr++;
+            if ( RXISDIGIT( ch ) )
+            {
+               do {
+                  if ( cptr == eptr )
+                     return SYMBOL_NUMBER;
+
+                  ch = *cptr++;
+               } while ( RXISDIGIT( ch ) );
+            }
+         }
+      }
+
+      /*
+       * We have to parse an exponent. ch has the current character.
+       */
+      if ( ( ch != 'e' ) && ( ch != 'E' ) )
+         break;
+
+      if ( cptr == eptr )
+         return SYMBOL_CONSTANT;
+
+      ch = *cptr++;
+      if ( ( ch == '+' ) || ( ch == '-' ) )
+      {
+         sign = 1;
+         if ( cptr == eptr )
+            return SYMBOL_BAD; /* something like "1.2E+" */
+         ch = *cptr++;
+      }
+      /*
+       * parse the exponent value
+       */
+      if ( !RXISDIGIT( ch ) )
+         break;
+      do {
+         if ( cptr == eptr )
+            return SYMBOL_NUMBER;
+
+         ch = *cptr++;
+      } while ( RXISDIGIT( ch ) );
+
+      break;
    }
 
-   /* OK, we know that the start was a valid symbol */
-   stem = 0 ;
-   for (; cptr<eptr; cptr++)
-   {
-      if (char_types[*cptr] & 0x0f)
-         continue ;
-      else if (*cptr=='.')
-         stem++ ;
-      else if (!stem)
-         return SYMBOL_BAD ;
-   }
+   /*
+    * We have to check for a const_symbol. If a sign has occured until now
+    * we have a bad symbol.
+    * ch is loaded with the current character.
+    */
+   if ( sign || !RXISCONST( ch ) )
+      return SYMBOL_BAD;
 
-   if (stem==0)
-      return SYMBOL_SIMPLE ;
+   do {
+      if ( cptr == eptr )
+         return SYMBOL_CONSTANT;
 
-   if (stem==1 && *(eptr-1))
-      return SYMBOL_STEM ;
+      ch = *cptr++;
+   } while ( RXISCONST( ch ) );
 
-   return SYMBOL_COMPOUND ;
+   /*
+    * garbage in ch
+    */
+   return SYMBOL_BAD;
 }
 
 
@@ -1026,7 +1192,7 @@ static void kill_index( const tsd_t *TSD, variableptr *array, int kill, int prop
             if (prop && ptr->realbox)
             {
                variableptr tttptr ;
-               for (tttptr=ptr; tttptr->realbox; tttptr=tttptr->realbox ) 
+               for (tttptr=ptr; tttptr->realbox; tttptr=tttptr->realbox )
                   ;
                if (val)
                {
@@ -1091,12 +1257,12 @@ static variableptr findsimple( const tsd_t *TSD, const streng *name )
    var_tsd_t *vt = TSD->var_tsd;
 
    ptr = TSD->currlevel->vars[hashfunc(vt,name,0,NULL)] ;
-   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next) 
+   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next)
       ;
    DSTART;DPRINT((TSD,"findsimple(1):     "));DNAME(TSD,"name",name);DVAR(TSD,", ptr",ptr);DEND;
    if ((vt->thespot=ptr)!=NULL)
    {
-      for (;ptr->realbox; ptr=ptr->realbox) 
+      for (;ptr->realbox; ptr=ptr->realbox)
          ;
    }
    vt->thespot=ptr;
@@ -1124,6 +1290,12 @@ static void setvalue_simple( const tsd_t *TSD, const streng *name, streng *value
       vt->thespot = newbox( TSD, name, value, &((TSD->currlevel->vars)[vt->hashval]) ) ;
       DSTART;DPRINT((TSD,"setvalue_simple:   "));DVAR(TSD,"new, vt->thespot",ptr);DEND;
    }
+}
+
+static void setvalue_reserved( const tsd_t *TSD, int ridx, const streng *name, streng *value )
+{
+   ridx = ridx;
+   setvalue_simple( TSD, name, value );
 }
 
 static const streng *getvalue_simple( tsd_t *TSD, const streng *name )
@@ -1155,6 +1327,12 @@ static const streng *getvalue_simple( tsd_t *TSD, const streng *name )
    DSTART;DPRINT((TSD,"getvalue_simple:   "));DNAME(TSD,"name",name);
           DVALUE(TSD," rc",value);DEND;
    return value ;
+}
+
+static const streng *getvalue_reserved( tsd_t *TSD, int ridx, const streng *name )
+{
+   ridx = ridx;
+   return getvalue_simple( TSD, name );
 }
 
 static void setvalue_stem( const tsd_t *TSD, const streng *name, streng *value )
@@ -1197,7 +1375,7 @@ static void setvalue_compound( const tsd_t *TSD, const streng *name, streng *val
    if (!ptr)
       ptr = make_stem( TSD, name, NULL, pptr, stop ) ;
 
-   for (;(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr->realbox);ptr=ptr->realbox)
       ;
    indexstr = subst_index( TSD, name, stop, TSD->currlevel->vars ) ;
 
@@ -1205,7 +1383,7 @@ static void setvalue_compound( const tsd_t *TSD, const streng *name, streng *val
       tracecompound(TSD,name,stop-1,indexstr,'C') ;
 
    nnptr = &((ptr->index)[hashfunc(vt,indexstr,0,NULL)]) ;
-   for (nptr=*nnptr;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next) 
+   for (nptr=*nnptr;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next)
       ;
 
    if (nptr)
@@ -1250,7 +1428,7 @@ void setdirvalue_compound( const tsd_t *TSD, const streng *name, streng *value )
    pptr = &(TSD->currlevel->vars[hashfunc(vt,name,0,&stop)]) ;
    stop++ ;
    /*  Find the stem in the variable pool.                              */
-   for (ptr=*pptr;(ptr)&&(Str_cncmp(ptr->name,name,stop));ptr=ptr->next) 
+   for (ptr=*pptr;(ptr)&&(Str_cncmp(ptr->name,name,stop));ptr=ptr->next)
       ;
 
    /*  If the stem does not exist, make one.                            */
@@ -1258,7 +1436,7 @@ void setdirvalue_compound( const tsd_t *TSD, const streng *name, streng *value )
       ptr = make_stem( TSD, name, NULL, pptr, stop ) ;
 
    /* Back up through the EXPOSE chain 'til get to the real variable.   */
-   for (;(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr->realbox);ptr=ptr->realbox)
       ;
    /* indexstr = subst_index( name, stop, vt->TSD->currlevel->vars ) ; */
    /*  Use the global that is defined and allocated by init_vars()      */
@@ -1271,12 +1449,12 @@ void setdirvalue_compound( const tsd_t *TSD, const streng *name, streng *value )
       tracecompound(TSD,name,stop-1,vt->tmpindex,'C') ;
 
    nnptr = &((ptr->index)[hashfunc(vt,vt->tmpindex,0,NULL)]) ;
-   for (nptr=*nnptr;(nptr)&&(Str_cmp(nptr->name,vt->tmpindex));nptr=nptr->next) 
+   for (nptr=*nnptr;(nptr)&&(Str_cmp(nptr->name,vt->tmpindex));nptr=nptr->next)
       ;
 
    if (nptr)
    {
-      for (;(nptr->realbox);nptr=nptr->realbox) 
+      for (;(nptr->realbox);nptr=nptr->realbox)
          ;
       vt->foundflag = ( nptr && (nptr->flag & VFLAG_BOTH)) ;
       REPLACE_VALUE(value,nptr) ;
@@ -1297,15 +1475,15 @@ static void expose_simple( const tsd_t *TSD, const streng *name )
    var_tsd_t *vt = TSD->var_tsd;
 
    ptr = vt->var_table[hashv=hashfunc(vt,name,0,NULL)] ;
-   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next) 
+   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next)
       ;
    if (ptr)  /* hey, you just exposed that one! */
       return ;
 
    ptr = TSD->currlevel->vars[hashv] ;
-   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next) 
+   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next)
       ;
-   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox)
       ;
 
    if (!ptr)
@@ -1321,6 +1499,12 @@ static void expose_simple( const tsd_t *TSD, const streng *name )
    DSTART;DPRINT((TSD,"expose_simple:     "));DNAME(TSD,"name",name);DEND;
 }
 
+static void expose_reserved( const tsd_t *TSD, int ridx, const streng *name )
+{
+   ridx = ridx;
+   expose_simple( TSD, name );
+}
+
 static void expose_stem( const tsd_t *TSD, const streng *name )
 {
    variableptr ptr=NULL, tptr=NULL ;
@@ -1329,15 +1513,15 @@ static void expose_stem( const tsd_t *TSD, const streng *name )
 
    DPRINTF((TSD,"expose_stem:       ?"));
    ptr = vt->var_table[hashv=hashfunc(vt,name,0,&junk)] ;
-   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next) 
+   for (;(ptr)&&(Str_ccmp(ptr->name,name));ptr=ptr->next)
       ;
    if ((ptr)&&(ptr->realbox))
       return ; /* once is enough !!! */
 
    tptr = TSD->currlevel->vars[hashv] ;
-   for (;(tptr)&&(Str_ccmp(tptr->name,name));tptr=tptr->next) 
+   for (;(tptr)&&(Str_ccmp(tptr->name,name));tptr=tptr->next)
       ;
-   for (; tptr && tptr->realbox; tptr=tptr->realbox ) 
+   for (; tptr && tptr->realbox; tptr=tptr->realbox )
       ;
 
    if (!tptr)
@@ -1375,7 +1559,7 @@ static void expose_compound( const tsd_t *TSD, const streng *name )
    DPRINTF((TSD,"expose_compound:   ?"));
    ptr = vt->var_table[hashv=hashfunc(vt,name,0,&cptr)] ;
    length = ++cptr ;
-   for (;(ptr)&&(Str_cncmp(ptr->name,name,length));ptr=ptr->next) 
+   for (;(ptr)&&(Str_cncmp(ptr->name,name,length));ptr=ptr->next)
       ;
    if ((ptr)&&(ptr->realbox))
       return ; /* whole array already exposed */
@@ -1393,20 +1577,20 @@ static void expose_compound( const tsd_t *TSD, const streng *name )
       tracecompound(TSD,name,cptr-1,indexstr,'C') ;
 
    nptr = (ptr->index)[hashval2=hashfunc(vt,indexstr,0,NULL)] ;
-   for (;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next) 
+   for (;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next)
       ;
    if ((nptr)&&(nptr->realbox))
       return ; /* can't your remember *anything* !!! */
-   else 
+   else
    {
       newbox(TSD,indexstr,NULL,&ptr->index[hashval2]) ;
-      nptr = ptr->index[hashval2] ; 
+      nptr = ptr->index[hashval2] ;
    }
 
    tptr = TSD->currlevel->vars[hashv] ;
-   for (;(tptr)&&(Str_cncmp(tptr->name,name,length));tptr=tptr->next) 
+   for (;(tptr)&&(Str_cncmp(tptr->name,name,length));tptr=tptr->next)
       ;
-   for (;(tptr)&&(tptr->realbox);tptr=tptr->realbox) 
+   for (;(tptr)&&(tptr->realbox);tptr=tptr->realbox)
       ;
    if (!tptr)
    {
@@ -1450,9 +1634,9 @@ static const streng *getvalue_compound( tsd_t *TSD, const streng *name )
    DPRINTF((TSD,"getvalue_compound: ?"));
    ptr = TSD->currlevel->vars[hashv=hashfunc(vt,name,0,&stop)] ;
    baselength = ++stop ;
-   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next) 
+   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next)
       ;
-   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox)
       ;
    indexstr = subst_index( TSD, name, stop, TSD->currlevel->vars ) ;
    hashv = hashfunc(vt,indexstr,0,NULL) ;
@@ -1463,9 +1647,9 @@ static const streng *getvalue_compound( tsd_t *TSD, const streng *name )
    if (ptr)
    {   /* find specific value */
       nptr = ((variableptr *)(ptr->index))[hashv] ;
-      for (;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next) 
+      for (;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next)
          ;
-      for (;(nptr)&&(nptr->realbox);nptr=nptr->realbox) 
+      for (;(nptr)&&(nptr->realbox);nptr=nptr->realbox)
          ;
    }
 
@@ -1523,10 +1707,10 @@ const streng *getdirvalue_compound( tsd_t *TSD, const streng *name )
    ptr = TSD->currlevel->vars[hashv=hashfunc(vt,name,0,&stop)] ;
    baselength = ++stop ;
    /*  Find the stem in the variable pool.                              */
-   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next) 
+   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next)
       ;
    /* Back up through the EXPOSE chain 'til get to the real variable.   */
-   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox)
       ;
    /* indexstr = subst_index( name, stop, TSD->currlevel->vars ) ;  */
    /*  Get the index name to use from the literal variable name.        */
@@ -1584,18 +1768,24 @@ const streng *getdirvalue_compound( tsd_t *TSD, const streng *name )
  */
 void setvalue( const tsd_t *TSD, const streng *name, streng *value )
 {
-   int i=0, len=Str_len(name) ;
+   int i, len=Str_len(name) ;
 
    assert( value->len <= value->max ) ;
-   for (i=0;(i<len)&&(name->value[i]!='.');i++) 
-      ;
 
-   if (i==len)
-      setvalue_simple(TSD,name,value) ;
-   else if ((i+1)==len)
-      setvalue_stem(TSD,name,value) ;
+   if ( ( i = KNOWN_RESERVED( name->value, len ) ) != 0 )
+      setvalue_reserved( TSD, i, name, value );
    else
-      setvalue_compound(TSD,name,value) ;
+   {
+      for (i=0;(i<len)&&(name->value[i]!='.');i++)
+         ;
+
+      if (i==len)
+         setvalue_simple(TSD,name,value) ;
+      else if ((i+1)==len)
+         setvalue_stem(TSD,name,value) ;
+      else
+         setvalue_compound(TSD,name,value) ;
+   }
 }
 
 /*
@@ -1618,57 +1808,83 @@ void setvalue( const tsd_t *TSD, const streng *name, streng *value )
  ****************************************************************************/
 void setdirvalue( const tsd_t *TSD, const streng *name, streng *value )
 {
-   int i=0, len=Str_len(name) ;
+   int i, len=Str_len(name) ;
 
    assert( value->len <= value->max ) ;
-   for (i=0;(i<len)&&(name->value[i]!='.');i++) 
-      ;
 
-   if (i==len)
-      setvalue_simple(TSD,name,value) ;
-   else if ((i+1)==len)
-      setvalue_stem(TSD,name,value) ;
+   if ( ( i = KNOWN_RESERVED( name->value, len ) ) != 0 )
+      setvalue_reserved( TSD, i, name, value );
    else
-      setdirvalue_compound(TSD,name,value) ;
+   {
+      for (i=0;(i<len)&&(name->value[i]!='.');i++)
+         ;
+
+      if (i==len)
+         setvalue_simple(TSD,name,value) ;
+      else if ((i+1)==len)
+         setvalue_stem(TSD,name,value) ;
+      else
+         setdirvalue_compound(TSD,name,value) ;
+   }
 }
 
 void expose_var( const tsd_t *TSD, const streng* name )
 {
-   int i=0 ;
+   int i;
    var_tsd_t *vt;
 
    vt = TSD->var_tsd;
    if (!vt->var_table)
-      vt->var_table = create_new_varpool( TSD ) ;
-
-   if (!name) 
    {
+      /*
+       * First call to expose_var of X_PROC in interpret().
+       * Open a new table.
+       */
+      vt->var_table = create_new_varpool( TSD );
+   }
+
+   if (!name)
+   {
+      /*
+       * Last call to expose_var of X_PROC in interpret().
+       * Use the new table as the current table.
+       */
       TSD->currlevel->vars = vt->var_table ;
       TSD->currlevel->varflag = 1 ;
       vt->var_table = NULL ;
 /*      vt->current_valid++ ; */
-      return ; 
+      return ;
    }
 
-   for (i=0;(Str_in(name,i))&&(name->value[i]!='.');i++) 
-      ;
-
-   if (i>=name->len)
-      expose_simple(TSD,name) ;
-   else if (i==name->len-1)
-      expose_stem(TSD,name) ;
+   if ( ( i = KNOWN_RESERVED( name->value, Str_len( name ) ) ) != 0 )
+      expose_reserved( TSD, i, name );
    else
-      expose_compound(TSD,name) ;
+   {
+      for (i=0;(Str_in(name,i))&&(name->value[i]!='.');i++)
+         ;
+
+      if (i>=name->len)
+         expose_simple(TSD,name) ;
+      else if (i==name->len-1)
+         expose_stem(TSD,name) ;
+      else
+         expose_compound(TSD,name) ;
+   }
 }
 
 const streng *getvalue( tsd_t *TSD, const streng *name, int dummy )
 {
+   int i;
    const char *cptr=NULL, *eptr=NULL ;
 
    dummy = dummy; /* keep compiler happy */
+
+   if ( ( i = KNOWN_RESERVED( name->value, Str_len( name ) ) ) != 0 )
+      return getvalue_reserved( TSD, i, name );
+
    cptr = name->value ;
    eptr = cptr + name->len ;
-   for (; cptr<eptr && *cptr!='.'; cptr++) 
+   for (; cptr<eptr && *cptr!='.'; cptr++)
       ;
 
    /*
@@ -1693,12 +1909,17 @@ const streng *getvalue( tsd_t *TSD, const streng *name, int dummy )
  ****************************************************************************/
 const streng *getdirvalue( tsd_t *TSD, const streng *name, int dummy )
 {
-   const char *cptr=NULL, *eptr=NULL ;
+   int i;
+   const char *cptr,*eptr;
 
    dummy = dummy; /* keep compiler happy */
+
+   if ( ( i = KNOWN_RESERVED( name->value, Str_len( name ) ) ) != 0 )
+      return getvalue_reserved( TSD, i, name );
+
    cptr = name->value ;
    eptr = cptr + name->len ;
-   for (; cptr<eptr && *cptr!='.'; cptr++) 
+   for (; cptr<eptr && *cptr!='.'; cptr++)
       ;
 
    if ((unsigned long) cptr+1 >= (unsigned long) eptr)
@@ -1733,6 +1954,12 @@ static void drop_var_simple( const tsd_t *TSD, const streng *name )
          ptr->num = NULL ;
       }
    }
+}
+
+static void drop_var_reserved( const tsd_t *TSD, int ridx, const streng *name )
+{
+   ridx = ridx;
+   drop_var_simple( TSD, name );
 }
 
 static void drop_var_stem( const tsd_t *TSD, const streng *name )
@@ -1777,9 +2004,9 @@ static void drop_var_compound( const tsd_t *TSD, const streng *name )
    DPRINTF((TSD,"drop_var_compound: ?"));
    ptr = TSD->currlevel->vars[hashv=hashfunc(vt,name,0,&stop)] ;
    baselength = ++stop ;
-   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next) 
+   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next)
       ;
-   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox)
       ;
    indexstr = subst_index( TSD, name, stop, TSD->currlevel->vars ) ;
    hashv = hashfunc(vt,indexstr,0,NULL) ;
@@ -1790,9 +2017,9 @@ static void drop_var_compound( const tsd_t *TSD, const streng *name )
    if (ptr)
    {   /* find specific value */
       nptr = ((variableptr *)(ptr->index))[hashv] ;
-      for (;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next) 
+      for (;(nptr)&&(Str_cmp(nptr->name,indexstr));nptr=nptr->next)
          ;
-      for (;(nptr)&&(nptr->realbox);nptr=nptr->realbox) 
+      for (;(nptr)&&(nptr->realbox);nptr=nptr->realbox)
          ;
    }
 
@@ -1858,9 +2085,9 @@ static void drop_dirvar_compound( const tsd_t *TSD, const streng *name )
    DPRINTF((TSD,"drop_dirvar_compound: ?"));
    ptr = TSD->currlevel->vars[hashv=hashfunc(vt,name,0,&stop)] ;
    baselength = ++stop ;
-   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next) 
+   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next)
       ;
-   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox)
       ;
    /* indexstr = subst_index( TSD, name, stop, TSD->currlevel->vars ) ;  */
    /*  Use the global that is defined and allocated by init_vars()      */
@@ -1876,9 +2103,9 @@ static void drop_dirvar_compound( const tsd_t *TSD, const streng *name )
    if (ptr)
    {   /* find specific value */
       nptr = ((variableptr *)(ptr->index))[hashv] ;
-      for (;(nptr)&&(Str_cmp(nptr->name,vt->tmpindex));nptr=nptr->next) 
+      for (;(nptr)&&(Str_cmp(nptr->name,vt->tmpindex));nptr=nptr->next)
          ;
-      for (;(nptr)&&(nptr->realbox);nptr=nptr->realbox) 
+      for (;(nptr)&&(nptr->realbox);nptr=nptr->realbox)
          ;
    }
 
@@ -1920,16 +2147,21 @@ static void drop_dirvar_compound( const tsd_t *TSD, const streng *name )
 
 void drop_var( const tsd_t *TSD, const streng *name )
 {
-   int i=0 ;
+   int i;
 
-   for (i=0; (i<Str_len(name))&&(name->value[i]!='.'); i++ ) 
-      ;
-   if (i==Str_len(name))
-      drop_var_simple( TSD, name ) ;
-   else if ((i+1)==Str_len(name))
-      drop_var_stem( TSD, name ) ;
+   if ( ( i = KNOWN_RESERVED( name->value, Str_len( name ) ) ) != 0 )
+      drop_var_reserved( TSD, i, name );
    else
-      drop_var_compound( TSD, name ) ;
+   {
+      for (i=0; (i<Str_len(name))&&(name->value[i]!='.'); i++ )
+         ;
+      if (i==Str_len(name))
+         drop_var_simple( TSD, name ) ;
+      else if ((i+1)==Str_len(name))
+         drop_var_stem( TSD, name ) ;
+      else
+         drop_var_compound( TSD, name ) ;
+   }
 }
 
 /* JH 20-10-99 */  /* To make Direct setting of stems Direct and not Symbolic. */
@@ -1944,16 +2176,21 @@ void drop_var( const tsd_t *TSD, const streng *name )
  ****************************************************************************/
 void drop_dirvar( const tsd_t *TSD, const streng *name )
 {
-   int i=0 ;
+   int i;
 
-   for (i=0; (i<Str_len(name))&&(name->value[i]!='.'); i++ ) 
-      ;
-   if (i==Str_len(name))
-      drop_var_simple( TSD, name ) ;
-   else if ((i+1)==Str_len(name))
-      drop_var_stem( TSD, name ) ;
+   if ( ( i = KNOWN_RESERVED( name->value, Str_len( name ) ) ) != 0 )
+      drop_var_reserved( TSD, i, name );
    else
-      drop_dirvar_compound( TSD, name ) ;
+   {
+      for (i=0; (i<Str_len(name))&&(name->value[i]!='.'); i++ )
+         ;
+      if (i==Str_len(name))
+         drop_var_simple( TSD, name ) ;
+      else if ((i+1)==Str_len(name))
+         drop_var_stem( TSD, name ) ;
+      else
+         drop_dirvar_compound( TSD, name ) ;
+   }
 }
 
 static void upper_var_simple( tsd_t *TSD, const streng *name )
@@ -1994,6 +2231,12 @@ static void upper_var_simple( tsd_t *TSD, const streng *name )
    return ;
 }
 
+static void upper_var_reserved( tsd_t *TSD, int ridx, const streng *name )
+{
+   ridx = ridx;
+   upper_var_simple( TSD, name );
+}
+
 static void upper_var_compound( tsd_t *TSD, const streng *name )
 {
    int hashv=0, baselength=0 ;
@@ -2007,10 +2250,10 @@ static void upper_var_compound( tsd_t *TSD, const streng *name )
    ptr = TSD->currlevel->vars[hashv=hashfunc(vt,name,0,&stop)] ;
    baselength = ++stop ;
    /*  Find the stem in the variable pool.                              */
-   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next) 
+   for (;(ptr)&&(Str_cncmp(ptr->name,name,baselength));ptr=ptr->next)
       ;
    /* Back up through the EXPOSE chain 'til get to the real variable.   */
-   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox) 
+   for (;(ptr)&&(ptr->realbox);ptr=ptr->realbox)
       ;
    /* indexstr = subst_index( name, stop, TSD->currlevel->vars ) ;  */
    /*  Get the index name to use from the literal variable name.        */
@@ -2061,7 +2304,7 @@ static void upper_var_compound( tsd_t *TSD, const streng *name )
 
       if (vt->ovalue)
          Free_stringTSD( vt->ovalue ) ;
-      /*  
+      /*
        * If we are not trapping NOVALUE, and the variable doesn't exist
        * then we don't have to do anything; the variable will be uppercase
        * by default.
@@ -2074,21 +2317,26 @@ static void upper_var_compound( tsd_t *TSD, const streng *name )
 
 void upper_var( tsd_t *TSD, const streng *name )
 {
-   int i=0 ;
+   int i;
 
-   for (i=0; (i<Str_len(name))&&(name->value[i]!='.'); i++ ) 
-      ;
-   if (i==Str_len(name))
-   {
-      upper_var_simple( TSD, name ) ;
-   }
-   else if ((i+1)==Str_len(name))
-   {
-      exiterror( ERR_INVALID_STEM, 0 )  ;
-   }
+   if ( ( i = KNOWN_RESERVED( name->value, Str_len( name ) ) ) != 0 )
+      upper_var_reserved( TSD, i, name );
    else
    {
-      upper_var_compound( TSD, name ) ;
+      for (i=0; (i<Str_len(name))&&(name->value[i]!='.'); i++ )
+         ;
+      if (i==Str_len(name))
+      {
+         upper_var_simple( TSD, name ) ;
+      }
+      else if ((i+1)==Str_len(name))
+      {
+         exiterror( ERR_INVALID_STEM, 0 )  ;
+      }
+      else
+      {
+         upper_var_compound( TSD, name ) ;
+      }
    }
 }
 
@@ -2361,7 +2609,14 @@ void setshortcut( const tsd_t *TSD, nodeptr this, streng *value )
    return ;
 }
 
-void setshortcutnum( const tsd_t *TSD, nodeptr this, num_descr *value )
+/*
+ * sets the varbox in this to the given value, creating it if it doesn't
+ * exists. this->name is set to the string-representation of value; if
+ * string_val is non-NULL, string_val is used instead. string_val must not
+ * be used later.
+ */
+void setshortcutnum( const tsd_t *TSD, nodeptr this, num_descr *value,
+                     streng *string_val )
 {
    variableptr vptr=NULL ;
    var_tsd_t *vt;
@@ -2415,7 +2670,9 @@ void setshortcutnum( const tsd_t *TSD, nodeptr this, num_descr *value )
       }
    }
 
-   setvalue( TSD, this->name, str_norm(TSD, value, NULL)) ;
+   if ( string_val == NULL )
+      string_val = str_norm( TSD, value, NULL );
+   setvalue( TSD, this->name, string_val );
    if (vt->thespot)
    {
       vt->thespot->hwired++ ;
@@ -2580,18 +2837,28 @@ the_default:
    return value ;
 }
 
-num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new )
+/*
+ * queries or sets the varbox in this depending on the presence of new. If
+ * new is set, varbox in this is set to the given value, creating it if it
+ * doesn't exists. this->name is set in this case to the string-representation
+ * of value; if string_val is non-NULL, string_val is used instead.
+ * string_val must not be used later.
+ * The current or new value of the variable is returned in all cases, it may
+ * be NULL.
+ */
+num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
+                            streng *string_val )
 {
-   variableptr iptr=NULL, ptr=NULL ;
-   num_descr *value=NULL ;
-   streng *indeks=NULL ;
-   int hhash=0, thash=0 ;
+   variableptr iptr, ptr;
+   num_descr *value;
+   streng *indeks;
+   int hhash, thash;
    var_tsd_t *vt;
 
    vt = TSD->var_tsd;
    DPRINTF((TSD,"fix_compoundnum:   ?"));
    value = NULL ;
-   hhash = -400000 ;   /* Intentionally erroneous */
+   thash = hhash = -400000 ;   /* Intentionally erroneous */
 
    iptr = this->u.varbx ;
    if (iptr)
@@ -2628,7 +2895,7 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new )
       }
       if (!iptr && new && this->p[0])
       {
-         setvalue_simple( TSD, this->name, NULL ) ;
+         setvalue_simple( TSD, this->name, NULL );
          iptr = vt->thespot ;
          iptr->index = make_hash_table( TSD ) ;
          DPRINTF((TSD,"make_hash_table:   rc=%p",iptr->index));
@@ -2655,10 +2922,19 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new )
          else
          {
             newbox( TSD, indeks, NULL, &iptr->index[thash]) ;
-            iptr->index[thash]->stem = iptr ;
-            iptr->index[thash]->num = new ;
-            iptr->index[thash]->flag = VFLAG_NUM ;
+            ptr = iptr->index[thash];
+            ptr->stem = iptr ;
+            ptr->num = new ;
+            ptr->flag = VFLAG_NUM;
          }
+         if ( ptr->value != NULL )
+            Free_stringTSD( ptr->value );
+
+         if ( string_val != NULL )
+            ptr->flag |= VFLAG_STR;
+         else
+            ptr->flag &= ~VFLAG_STR;
+         ptr->value = string_val;
       }
       else
       {
@@ -2715,16 +2991,41 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new )
    {
       if (new)
       {
+         /*
+          * Happens on:
+          * a) first access
+          * b) left part of X_NASSIGN
+          * c) this->p[0] is NULL
+          * according to this function, interprt.c and yaccsrc.y.
+          *
+          * We have to be a X_HEAD_SYMBOL. X_HEAD_SYMBOL are created by
+          * create_head in yaccsrc.y only if this->p[0] != NULL.
+          *
+          * --> This code will never be executed!
+          * Reenable this only if you check the presence of stringval and
+          * know what you do.
+          */
+#if 1
+         fprintf( stderr, "Regina internal error detected in %s, line %u.\n"
+                          "Please, send an email to M.Hessling@qut.edu.au.\n",
+                          __FILE__, __LINE__ );
+      }
+#else
          iptr = newbox( TSD, this->name, NULL, &(TSD->currlevel->vars[hhash])) ;
          iptr->index = make_hash_table( TSD ) ;
          DPRINTF((TSD,"make_hash_table:   rc=%p",iptr->index));
          thash = hashfunc(vt,indeks,0,NULL) ;
          newbox( TSD, indeks, NULL, &(iptr->index[thash])) ;
-         iptr->index[thash]->stem = iptr ;
-         iptr->index[thash]->num = new ;
-         iptr->index[thash]->flag = VFLAG_NUM ;
+         ptr = iptr->index[thash];
+         ptr->stem = iptr ;
+         ptr->num = new ;
+         ptr->flag = VFLAG_NUM ;
+         if ( string_val != NULL )
+            ptr->flag |= VFLAG_STR;
+         ptr->value = string_val;
       }
       else
+#endif
       {
 the_default:
          tracecompound( TSD, this->name, this->name->len-1, indeks, 'L' ) ;
@@ -2735,58 +3036,108 @@ the_default:
 }
 
 /*
- * Yes, it does look kind of strange, basically it is sort of four for(;;)
- * loops having been reversed.
+ * get_realbox returns either p or the realbox associated with p if it exists.
+ * This function is NULL-pointer safe.
+ */
+static variableptr get_realbox( variableptr p )
+{
+   if ( p == NULL )
+      return p;
+   if ( p->realbox == NULL )
+      return p;
+   for ( p = p->realbox; p->realbox; p = p->realbox )
+      ;
+   return p;
+}
+
+/*
+ * get_next_variable either initializes the iteration system (reset != 0) or
+ * it returns the next variable of the variable's array. We have to do some
+ * extra housekeeping to become reentrant in each call.
+ *
+ * NULL is returned in initializing or after all variables are processed.
+ *
+ * This function returns the variables of the current PROCEDURE frame only
+ * and has a similar function dumpvars in debug.c.
  */
 variableptr get_next_variable( tsd_t *TSD, int reset )
 {
-   variableptr retval=NULL ;
+   variableptr retval;
    var_tsd_t *vt;
 
    vt = TSD->var_tsd;
 
    DPRINTF((TSD,"get_next_variable: ?"));
-   if (reset)
+   if ( reset )
    {
-      vt->pstem = vt->ptail = NULL ;
-      TSD->stemidx = TSD->tailidx = 0 ;
-      return NULL ;
+      /*
+       * Initializes the 4 loop variables and returns NULL.
+       * rstem and rtail are the corresponding "realbox" shadows of pstem
+       * and ptail. This fixes bug 681991.
+       */
+      vt->pstem = vt->ptail = NULL;
+      vt->stemidx = vt->tailidx = 0;
+      vt->rstem = vt->rtail = NULL;
+      return NULL;
    }
 
-   do {
-      if (vt->pstem)
+   /*
+    * We have to do some tricks to change the four nested loops (see dumpvars)
+    * into a reentrant loop system. The loop itself is identical to that one
+    * of dumpvars.
+    */
+   for ( ; ; )
+   {
+      /*
+       * While the masterindex stemidx isn't out of range.
+       */
+      if ( vt->rstem )
       {
-         if (vt->pstem->index)
+         /*
+          * Something's left in the masterindex's iterator pstem.
+          */
+         if ( vt->rstem->index )
          {
-            do {
-               if (vt->ptail)
+            /*
+             * This works as the outer loop pair, but for stem variables.
+             */
+            for ( ; ; )
+            {
+               if ( vt->rtail )
                {
-                  vt->ptail = (retval=vt->ptail)->next ;
-                  return retval ;
+                  retval = vt->rtail;
+                  vt->ptail = vt->ptail->next;
+                  vt->rtail = get_realbox( vt->ptail );
+                  return retval;
                }
-               if (TSD->tailidx<HASHTABLENGTH)
-               {
-                  vt->ptail = vt->pstem->index[TSD->tailidx] ;
-               }
-             } while (TSD->tailidx++ < HASHTABLENGTH) ;
+
+               if ( vt->tailidx >= HASHTABLENGTH )
+                  break;
+
+               vt->ptail = vt->rstem->index[vt->tailidx++];
+               vt->rtail = get_realbox( vt->ptail );
+            }
          }
 
-         vt->ptail = NULL ;
-         TSD->tailidx = 0 ;
+         vt->ptail = vt->rtail = NULL;
+         vt->tailidx = 0;
 
-         vt->pstem = (retval=vt->pstem)->next ;
-         return retval ;
+         retval = vt->rstem;
+         vt->pstem = vt->pstem->next;
+         vt->rstem = get_realbox( vt->pstem );
+         return retval;
       }
 
-      if (TSD->stemidx<HASHTABLENGTH)
-      {
-         vt->pstem = TSD->currlevel->vars[TSD->stemidx] ;
-         vt->ptail = NULL ;
-         TSD->tailidx = 0 ;
-      }
-   } while (TSD->stemidx++ < HASHTABLENGTH) ;
+      if ( vt->stemidx >= HASHTABLENGTH )
+         break;
 
-   return NULL ;
+      vt->pstem = TSD->currlevel->vars[vt->stemidx++];
+      vt->rstem = get_realbox( vt->pstem );
+      vt->ptail = NULL;
+      vt->tailidx = 0;
+   }
+
+   return NULL;
 }
 
 #if 0

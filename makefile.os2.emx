@@ -3,8 +3,8 @@
 #
 # Using gcc/emx on OS/2 with GNU make
 #
-VER=30
-VERDOT=3.0
+VER=31
+VERDOT=3.1
 
 SRCDIR=$(REGINA_SRCDIR)
 SRCDIRN=$(REGINA_SRCDIRN)
@@ -20,15 +20,8 @@ OPTIMIZE_DLL = -O -Wall -DNDEBUG
 STRIP_FLAG = -s
 endif
 
-ifeq ($(MULTI),Y)
 THREADING = -Zmt -DREGINA_MULTI
-MT_FILE = mt_os2
 DYN_COMP = -DDYNAMIC -Zdll $(DYN_CRT)
-else
-THREADING =
-MT_FILE = mt_notmt
-DYN_COMP = -DDYNAMIC -Zdll $(DYN_CRT)
-endif
 
 ifeq ($(TRACEMEM),Y)
 MEMTRACE = -DTRACEMEM
@@ -49,12 +42,17 @@ DYN_COMP = -DDYNAMIC -Zdll $(DYN_CRT)
 LIBS = #-ll -lm
 SOCKET = -lsocket
 SHLIBS = $(SHLLIB).$(SHLPST)
+TSLIBS = $(SHLLIB)ts.$(SHLPST)
 SHLIMPLIB = $(SHLLIB).$(SHLPST)
 SHLLIB = $(SHLFILE)
 DYNAMIC_LDFLAGS = -lwrap $(STRIP_FLAG) -Zcrtdll -Zomf -mprobe -Zstack 8192 -Zlinker /PM:VIO
+DYNAMIC_TSLDFLAGS = -Zmt -lwrap $(STRIP_FLAG) -Zcrtdll -Zomf -mprobe -Zstack 8192 -Zlinker /PM:VIO
 SHLDEF = $(SRCDIR)/$(SHLLIB)_os2_dll.def
+SHLDEF_TS = $(SRCDIR)/$(SHLLIB)ts_os2_dll.def
 SHL1 = emximp -o $(SHLLIB).$(LIBPST) $(SHLDEF)
 SHL2 = emximp -o $(SHLLIB).lib $(SHLDEF)
+SHL1_TS = emximp -o $(SHLLIB)ts.$(LIBPST) $(SHLDEF_TS)
+SHL2_TS = emximp -o $(SHLLIB)ts.lib $(SHLDEF_TS)
 SHL = dll
 SHLPST = lib
 RXLIB = dll
@@ -64,7 +62,8 @@ LD_RXLIB_PRE = $(CC) -Zdll -Zomf -Zcrtdll #-Zso -Zsys
 LD_RXLIB1 = -Zmap=test1.map -o test1.dll $(SRCDIR)/test1_os2_dll.def $(SHLLIB).lib
 LD_RXLIB2 = -Zmap=test2.map -o test2.dll $(SRCDIR)/test2_os2_dll.def $(SHLLIB).lib
 SHL_LD=gcc -Zdll -Zcrtdll -Zomf -Zmap=regina.map -o $(SHLFILE).$(SHL) $(SHOFILES) $(SHLDEF) $(SOCKET)
-SHL_TARGETS = $(SHLFILE).$(SHL) $(SHLFILE)$(EXE) test1.$(SHL) test2.$(SHL)  #$(SHLIMPLIB)
+SHL_TSLD=gcc -Zmt -Zdll -Zcrtdll -Zomf -Zmap=reginats.map -o $(SHLFILE)ts.$(SHL) $(TSFILES) $(SHLDEF_TS) $(SOCKET)
+SHL_TARGETS = $(SHLFILE).$(SHL) $(SHLFILE)$(EXE) test1.$(SHL) test2.$(SHL) $(SHLFILE)ts.$(SHL)
 LDEXTRA=emxbind
 LIBPRE =
 LIBFILE = rexx
@@ -87,12 +86,14 @@ MISCDEFS = -I$(SRCDIR) #-DR2PERL
 PROF     = #-p #g
 #OPTIMIZE = -O -DNDEBUG
 
-COPT = $(DEBUGFLAG) $(CEXTRA) $(OPTIMIZE) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
-COPT_DLL = $(DEBUGFLAG) $(CEXTRA) $(OPTIMIZE_DLL) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
+COPT = $(DEBUGFLAG) $(CEXTRA) $(OPTIMIZE) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS)
+COPT_DLL = $(DEBUGFLAG) $(CEXTRA) $(OPTIMIZE_DLL) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS)
+COPT_TSDLL = $(DEBUGFLAG) $(CEXTRA) $(OPTIMIZE_DLL) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
 LINKOPT = $(DEBUGFLAG) $(OPTIMIZE) $(PROF) $(EEXTRA)
 LINKOPT_DLL = $(DEBUGFLAG) $(OPTIMIZE_DLL) $(PROF) $(EEXTRA)
 OTHERCOPT = $(DEBUGFLAG) $(OPTIMIZE) $(PROF) $(CEXTRA) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS)
 OTHERCOPT_DLL = $(DEBUGFLAG) $(OPTIMIZE_DLL) $(PROF) $(CEXTRA) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS)
+OTHERCOPT_TSDLL = $(DEBUGFLAG) $(OPTIMIZE_DLL) $(PROF) $(CEXTRA) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
 
 YACC = yacc
 #YACC = bison -ly #-d #-lyt
@@ -104,33 +105,42 @@ LEX = lex
 README = $(SRCDIR)/README.* COPYING-LIB
 
 FILES = funcs builtin error variable interprt debug dbgfuncs \
-	memory parsing files misc os2funcs unxfuncs cmsfuncs shell rexxext stack \
+	memory parsing files misc os2funcs unxfuncs arxfuncs cmsfuncs shell rexxext stack \
 	tracing interp cmath convert strings library strmath signals \
 	macros envir extlib wrappers options doscmd #r2perl
 
 CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/variable.c \
 	$(SRCDIR)/interprt.c $(SRCDIR)/debug.c $(SRCDIR)/dbgfuncs.c $(SRCDIR)/memory.c $(SRCDIR)/parsing.c $(SRCDIR)/files.c \
-	$(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/os2funcs.c $(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c \
+	$(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/arxfuncs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/os2funcs.c $(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c \
 	$(SRCDIR)/tracing.c $(SRCDIR)/interp.c $(SRCDIR)/cmath.c $(SRCDIR)/convert.c $(SRCDIR)/strings.c $(SRCDIR)/library.c \
 	$(SRCDIR)/strmath.c $(SRCDIR)/signals.c $(SRCDIR)/macros.c $(SRCDIR)/envir.c $(SRCDIR)/expr.c \
 	$(SRCDIR)/extlib.c $(SRCDIR)/wrappers.c $(SRCDIR)/options.c $(SRCDIR)/doscmd.c #$(SRCDIR)/r2perl.c
 
 OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	interprt.$(OBJ) debug.$(OBJ) dbgfuncs.$(OBJ) memory.$(OBJ) parsing.$(OBJ) files.$(OBJ) \
-	misc.$(OBJ) unxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ) stack.$(OBJ) \
+	misc.$(OBJ) unxfuncs.$(OBJ) arxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ) stack.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ) library.$(OBJ) \
-	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) $(MT_FILE).$(OBJ) instore.$(OBJ) \
+	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) mt_notmt.$(OBJ) instore.$(OBJ) \
 	extlib.$(OBJ) yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) doscmd.$(OBJ) wrappers.$(OBJ) \
 	extstack.$(OBJ) rexxbif.$(OBJ)
 
 SHOFILES = funcs.obj builtin.obj error.obj variable.obj \
 	interprt.obj debug.obj dbgfuncs.obj memory.obj parsing.obj files.obj \
-	misc.obj unxfuncs.obj cmsfuncs.obj shell.obj os2funcs.obj rexxext.obj stack.obj \
+	misc.obj unxfuncs.obj arxfuncs.obj cmsfuncs.obj shell.obj os2funcs.obj rexxext.obj stack.obj \
 	tracing.obj interp.obj cmath.obj convert.obj strings.obj library.obj \
-	strmath.obj signals.obj macros.obj envir.obj expr.obj $(MT_FILE).obj \
+	strmath.obj signals.obj macros.obj envir.obj expr.obj mt_notmt.obj \
 	extlib.obj yaccsrc.obj lexsrc.obj wrappers.obj options.obj doscmd.obj \
 	drexx.obj client.obj rexxsaa.obj instore.obj \
 	extstack.obj rexxbif.obj
+
+TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj \
+	interprt.ts.obj debug.ts.obj dbgfuncs.ts.obj memory.ts.obj parsing.ts.obj files.ts.obj \
+	misc.ts.obj unxfuncs.ts.obj arxfuncs.ts.obj cmsfuncs.ts.obj shell.ts.obj os2funcs.ts.obj rexxext.ts.obj stack.ts.obj \
+	tracing.ts.obj interp.ts.obj cmath.ts.obj convert.ts.obj strings.ts.obj library.ts.obj \
+	strmath.ts.obj signals.ts.obj macros.ts.obj envir.ts.obj expr.ts.obj mt_os2.ts.obj \
+	extlib.ts.obj yaccsrc.ts.obj lexsrc.ts.obj wrappers.ts.obj options.ts.obj doscmd.ts.obj \
+	drexx.ts.obj client.ts.obj rexxsaa.ts.obj instore.ts.obj \
+	extstack.ts.obj rexxbif.ts.obj
 
 DEMODIR = $(SRCDIR)/demo
 DEMOFILES = $(DEMODIR)/*
@@ -156,13 +166,11 @@ MTSSRC = $(SRCDIR)/en.mts $(SRCDIR)/pt.mts $(SRCDIR)/no.mts \
 #
 .SUFFIXES:
 
-all : rexx$(EXE) $(LIBFILE).$(LIBPST) trexx$(EXE) tregina$(EXE) execiser$(EXE) rxstack$(EXE) rxqueue$(EXE) $(SHL_TARGETS) mtb_files
+all : rexx$(EXE) $(LIBFILE).$(LIBPST) execiser$(EXE) rxstack$(EXE) rxqueue$(EXE) $(SHL_TARGETS) mtb_files # threader$(EXE)
 
 $(CSRCFILES) : $(SRCDIR)/rexx.h
 
 $(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRCDIR)/types.h $(SRCDIR)/mt.h
-
-$(SRCDIR)/mt.h : $(SRCDIR)/$(MT_FILE).h
 
 rexx$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rexx$(EXE) $(OBJECTS) rexx.$(OBJ) nosaa.$(OBJ) $(LIBS) $(SOCKET)
@@ -178,25 +186,17 @@ regina$(EXE) : regina
 	$(RC)
 	-lxlite regina$(EXE)
 
-trexx$(EXE) : trexx.$(OBJ) $(LIBFILE).$(LIBPST)
-	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o trexx$(EXE) trexx.$(OBJ) $(LIBFILE).$(LIBPST) $(LIBS) $(SOCKET)
-	-copy $(SRCDIRN)\reginaos2.ico
-	$(RC)
-	-lxlite trexx$(EXE)
-
-tregina : tregina.obj $(SHLFILE).$(SHL)
-	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_LDFLAGS) -o tregina tregina.obj $(LIBS) $(SHLIBS) $(SOCKET)
-
-tregina$(EXE) : tregina
-	-copy $(SRCDIRN)\reginaos2.ico
-	$(RC)
-	-lxlite tregina$(EXE)
-
 execiser : execiser.obj $(SHLFILE).$(SHL)
 	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_LDFLAGS) -o execiser execiser.obj $(LIBS) $(SHLIBS) $(SOCKET)
 
+threader : threader.obj reginats.dll
+	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_TSLDFLAGS) -o threader threader.obj $(LIBS) $(TSLIBS) $(SOCKET)
+
 execiser$(EXE) : execiser
 	-lxlite execiser$(EXE)
+
+threader$(EXE) : threader
+	-lxlite threader$(EXE)
 
 rxqueue$(EXE) : $(OFILES) rxqueue.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ)
 	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxqueue$(EXE) rxqueue.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) $(SOCKET)
@@ -220,6 +220,16 @@ $(SHLFILE).$(SHL): $(SHOFILES) $(SHLDEF)
 	-copy $(SRCDIRN)\reginaos2.ico
 	$(RC)
 	-lxlite $(SHLFILE).$(SHL)
+
+$(SHLFILE)ts.$(SHL): $(TSFILES) $(SHLDEF_TS)
+	$(SHL_TSLD)
+	$(SHL1_TS)
+	$(SHL2_TS)
+	$(SHL3)
+	$(SHL4)
+	-copy $(SRCDIRN)\reginaos2.ico
+	$(RC)
+	-lxlite $(SHLFILE)ts.$(SHL)
 
 #
 # Convert .mts to .mtb
@@ -277,6 +287,9 @@ misc.$(OBJ) :    $(SRCDIR)/misc.c        $(SRCDIR)/rexx.h
 
 unxfuncs.$(OBJ) :$(SRCDIR)/unxfuncs.c    $(SRCDIR)/rexx.h
 	       $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/unxfuncs.c
+
+arxfuncs.$(OBJ) :$(SRCDIR)/arxfuncs.c    $(SRCDIR)/rexx.h
+	       $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/arxfuncs.c
 
 os2funcs.$(OBJ) :$(SRCDIR)/os2funcs.c    $(SRCDIR)/rexx.h
 	       $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/os2funcs.c
@@ -470,6 +483,12 @@ unxfuncs.obj :$(SRCDIR)/unxfuncs.c       $(SRCDIR)/rexx.h
 	       $(O2SHO)
 	       $(SAVE2O)
 
+arxfuncs.obj :$(SRCDIR)/arxfuncs.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_DLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/arxfuncs.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
 os2funcs.obj :$(SRCDIR)/os2funcs.c       $(SRCDIR)/rexx.h
 	       $(O2SAVE)
 	       $(CC) $(COPT_DLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/os2funcs.c
@@ -639,13 +658,253 @@ yaccsrc.obj : $(SRCDIR)/yaccsrc.c $(SRCDIR)/defs.h $(SRCDIR)/rexx.h
 	       $(SAVE2O)
 
 #
-# Rules for Regina tokeniser targets
+# Rules for thread-safe objects
 #
-trexx.$(OBJ) : $(SRCDIR)/tregina.c
-	$(CC) $(COPT) -c -o trexx.$(OBJ) $(SRCDIR)/tregina.c
+funcs.ts.obj :   $(SRCDIR)/funcs.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/funcs.c
+	       $(O2SHO)
+	       $(SAVE2O)
 
-tregina.obj : $(SRCDIR)/tregina.c
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/tregina.c
+builtin.ts.obj : $(SRCDIR)/builtin.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/builtin.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+error.ts.obj :   $(SRCDIR)/error.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/error.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+variable.ts.obj :$(SRCDIR)/variable.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/variable.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+interprt.ts.obj :$(SRCDIR)/interprt.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/interprt.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+debug.ts.obj :   $(SRCDIR)/debug.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/debug.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+dbgfuncs.ts.obj :$(SRCDIR)/dbgfuncs.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/dbgfuncs.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+memory.ts.obj :  $(SRCDIR)/memory.c         $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/memory.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+parsing.ts.obj : $(SRCDIR)/parsing.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/parsing.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+files.ts.obj :   $(SRCDIR)/files.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/files.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+misc.ts.obj :    $(SRCDIR)/misc.c           $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/misc.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+unxfuncs.ts.obj :$(SRCDIR)/unxfuncs.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/unxfuncs.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+arxfuncs.ts.obj :$(SRCDIR)/arxfuncs.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/arxfuncs.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+os2funcs.ts.obj :$(SRCDIR)/os2funcs.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/os2funcs.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+cmsfuncs.ts.obj :$(SRCDIR)/cmsfuncs.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/cmsfuncs.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+shell.ts.obj :   $(SRCDIR)/shell.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/shell.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+rexxext.ts.obj : $(SRCDIR)/rexxext.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/rexxext.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+stack.ts.obj :   $(SRCDIR)/stack.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/stack.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+tracing.ts.obj : $(SRCDIR)/tracing.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/tracing.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+interp.ts.obj :  $(SRCDIR)/interp.c         $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/interp.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+cmath.ts.obj :   $(SRCDIR)/cmath.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/cmath.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+convert.ts.obj : $(SRCDIR)/convert.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/convert.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+strings.ts.obj : $(SRCDIR)/strings.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/strings.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+library.ts.obj : $(SRCDIR)/library.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/library.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+strmath.ts.obj : $(SRCDIR)/strmath.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/strmath.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+signals.ts.obj : $(SRCDIR)/signals.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/signals.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+macros.ts.obj :  $(SRCDIR)/macros.c         $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/macros.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+envir.ts.obj :   $(SRCDIR)/envir.c          $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/envir.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+expr.ts.obj :    $(SRCDIR)/expr.c           $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/expr.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+extlib.ts.obj :  $(SRCDIR)/extlib.c         $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/extlib.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+wrappers.ts.obj :$(SRCDIR)/wrappers.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/wrappers.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+options.ts.obj : $(SRCDIR)/options.c        $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/options.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+doscmd.ts.obj :  $(SRCDIR)/doscmd.c         $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/doscmd.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+rexx.ts.obj :  $(SRCDIR)/rexx.c             $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/rexx.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+client.ts.obj :  $(SRCDIR)/client.c         $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/client.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+rexxsaa.ts.obj :  $(SRCDIR)/rexxsaa.c       $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/rexxsaa.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+extstack.ts.obj : $(SRCDIR)/extstack.c $(SRCDIR)/extstack.h $(SRCDIR)/rexxbif.h
+	        $(CC) $(COPT_TSDLL) $(DYN_COMP) -c -o extstack.ts.obj $(SRCDIR)/extstack.c
+
+rexxbif.ts.obj : $(SRCDIR)/rexxbif.c $(SRCDIR)/rexxbif.h
+	        $(CC) $(COPT_TSDLL) $(DYN_COMP) -c -o rexxbif.ts.obj $(SRCDIR)/rexxbif.c
+
+drexx.ts.obj : $(SRCDIR)/rexx.c             $(SRCDIR)/rexx.h
+	       $(CC) $(COPT_TSDLL) $(DYN_COMP) -c -o drexx.ts.obj -DRXLIB $(SRCDIR)/rexx.c
+
+instore.ts.obj : $(SRCDIR)/instore.c
+	        $(CC) $(COPT_TSDLL) $(DYN_COMP) -c -o instore.ts.obj $(SRCDIR)/instore.c
+
+mt_os2.ts.obj : $(SRCDIR)/mt_os2.c
+	        $(CC) $(COPT_TSDLL) $(DYN_COMP) -c -o mt_os2.ts.obj $(SRCDIR)/mt_os2.c
+
+lexsrc.ts.obj : $(SRCDIR)/lexsrc.c $(SRCDIR)/rexx.h $(SRCDIR)/yaccsrc.h
+	       $(O2SAVE)
+	       $(CC) $(OTHERCOPT_TSDLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/lexsrc.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+yaccsrc.ts.obj : $(SRCDIR)/yaccsrc.c $(SRCDIR)/defs.h $(SRCDIR)/rexx.h
+	       $(O2SAVE)
+	       $(CC) $(OTHERCOPT_TSDLL) $(CC2O) $(DYN_COMP) -c -DYYMAXDEPTH=10000 $(SRCDIR)/yaccsrc.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+threader.obj : $(SRCDIR)/threader.c $(SRCDIR)/rexx.h
+	       $(CC) $(COPT_TSDLL) $(CC2O) $(DYN_CRT) -c $(SRCDIR)/threader.c
 
 #
 # Rules for sample programs
@@ -682,7 +941,7 @@ zip:
 
 install: rexx $(LIBFILE).a
 	        cp rexx$(PROGEXT) $(BINDIR)/$(PROGNAME)$(PROGEXT)
-	        cp ../rexx.1 $(MANDIR)/rexx.$(MANEXT)
+	        cp ../regina.1 $(MANDIR)/regina.$(MANEXT)
 	        cp $(LIBFILE).a $(LIBDIR)/$(LIBFILE).a
 	        ranlib $(LIBDIR)/$(LIBFILE).a
 

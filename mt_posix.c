@@ -7,7 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pwd.h>
-#include <grp.h>
+#ifdef HAVE_NETDB_H
+# include <netdb.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+# include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+# include <arpa/inet.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+#ifdef HAVE_GRP_H
+# include <grp.h>
+#endif
 #include <time.h>
 #include <errno.h>
 
@@ -22,6 +36,9 @@ typedef struct { /* mt_tsd: static variables of this module (thread-safe) */
    char               getgrgid_buf[2048]; /* AT LEAST 1K, better 2K or 4K */
    struct passwd      getpwuid_retval;
    char               getpwuid_buf[2048]; /* AT LEAST 1K, better 2K or 4K */
+   struct hostent     gethbyn_retval;
+   char               gethbyn_buf[8192];  /* sign, size copied from glibc */
+   char               inetntoa_buf[16];
    struct tm          gmtime_retval;
    struct tm          localtime_retval;
 #ifdef HAVE_RANDOM_DATA
@@ -192,6 +209,7 @@ tsd_t *ReginaInitializeThread(void)
    OK &= init_vms(retval);              /* Initialize the vmscmd module      */
    OK &= init_vmf(retval);              /* Initialize the vmsfuncs module    */
 #endif
+   OK &= init_arexxf(retval);           /* Initialize the arxfuncs modules */
    retval->loopcnt = 1;                 /* stupid r2perl-module              */
    retval->traceparse = -1;
    retval->thread_id = (unsigned long)pthread_self();
@@ -287,8 +305,11 @@ struct passwd *getpwuid(uid_t uid)
 struct tm *gmtime(const time_t *time)
 {
    mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
-
+#ifdef HAVE_GMTIME_R
    return(gmtime_r(time,&mt->gmtime_retval));
+#else
+   return NULL;
+#endif
 }
 
 /* see documentation of localtime and localtime_r */
@@ -296,7 +317,52 @@ struct tm *localtime(const time_t *time)
 {
    mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
 
+#ifdef HAVE_LOCALTIME_R
    return(localtime_r(time,&mt->localtime_retval));
+#else
+   return NULL;
+#endif
+}
+
+/* see documentation of gethostbyname and gethostbyname_r */
+struct hostent *gethostbyname(const char *name)
+{
+   int herr;
+   struct hostent *he=NULL;
+   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+
+#ifdef HAVE_GETHOSTBYNAME_R_RETURNS_INT_6_PARAMS
+   if (gethostbyname_r(name,
+                       &mt->gethbyn_retval,
+                       mt->gethbyn_buf,
+                       sizeof(mt->gethbyn_buf),
+                       &he,
+                       &herr) != 0)
+      return(NULL);
+#endif
+#ifdef HAVE_GETHOSTBYNAME_R_RETURNS_STRUCT_5_PARAMS
+   he = gethostbyname_r(name,
+                        &mt->gethbyn_retval,
+                        mt->gethbyn_buf,
+                        sizeof(mt->gethbyn_buf),
+                        &herr);
+#endif
+   return(he);
+}
+
+/* see documentation of inet_ntoa and inet_ntop */
+char *inet_ntoa(struct in_addr in)
+{
+   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+
+#ifdef HAVE_INET_NTOP
+   return((char *) inet_ntop(AF_INET,
+                             &in,
+                             mt->inetntoa_buf,
+                             sizeof(mt->inetntoa_buf)));
+#else
+   return NULL;
+#endif
 }
 
 #if defined( HAVE_RANDOM_DATA ) && !defined( HAVE_RANDOM )

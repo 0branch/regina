@@ -17,7 +17,7 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * $Id: rexxsaa.h,v 1.13 2002/03/09 01:20:38 mark Exp $
+ * $Id: rexxsaa.h,v 1.19 2003/03/23 10:37:15 mark Exp $
  */
 
 #ifndef __REXXSAA_H_INCLUDED
@@ -68,9 +68,15 @@ typedef CONST char *PCSZ ;
 #endif
 
 #if !defined(_OS2EMX_H) && !defined(__RSXNT__) && !defined(__MINGW32__)
-typedef char CHAR ;
-typedef short SHORT ;
-typedef long LONG ;
+# ifndef CHAR_TYPEDEFED
+typedef char CHAR;
+# endif
+# ifndef SHORT_TYPEDEFED
+typedef short SHORT;
+# endif
+# ifndef LONG_TYPEDEFED
+typedef long LONG;
+# endif
 typedef char *PSZ ;
 typedef CONST char *PCSZ ;
 # ifndef VOID
@@ -209,9 +215,11 @@ typedef RXSYSEXIT *PRXSYSEXIT ;
 #define RXENV       12  /* System Environment interface */
 # define RXENVGET    1  /* Get System Environment Variable */
 # define RXENVSET    2  /* Set System Environment Variable */
+# define RXCWDGET    3  /* Get Current Working Directory */
+# define RXCWDSET    4  /* Set Current Working Directory */
 
 #define RXENDLST     0
-#define RXNOOFEXITS 12
+#define RXNOOFEXITS 13  /* MUST be 1 more than last exit number */
 
 /* Symbolic return codes for System Exit Handlers */
 #define RXEXIT_HANDLED       0
@@ -323,46 +331,13 @@ typedef struct {
    RXSTRING rxenv_value ;
 } RXENVSET_PARM ;
 
-/*
- #define rxfnc_flags    rxfnccal.u_rxfnc_flags
- #define rxfnc_name     rxfnccal.u_rxfnc_name
- #define rxfnc_namel    rxfnccal.u_rxfnc_namel
- #define rxfnc_que      rxfnccal.u_rxfnc_que
- #define rxfnc_quel     rxfnccal.u_rxfnc_quel
- #define rxfnc_argc     rxfnccal.u_rxfnc_argc
- #define rxfnc_argv     rxfnccal.u_rxfnc_argv
- #define rxfnc_retc     rxfnccal.u_rxfnc_retc
- #define rxcmd_flags    rxcmdhst.u_rxcmd_flags
- #define rxcmd_address  rxcmdhst.u_rxcmd_address
- #define rxcmd_addressl rxcmdhst.u_rxcmd_addressl
- #define rxcmd_dll      rxcmdhst.u_rxcmd_dll
- #define rxcmd_dll_len  rxcmdhst.u_rxcmd_dll_len
- #define rxcmd_command  rxcmdhst.u_rxcmd_command
- #define rxcmd_retc     rxcmdhst.u_rxcmd_retc
- #define rxmsq_retc     rxmsqpll.u_rxmsq_retc
- #define rxsio_string   rxsiosay.u_rxsio_string
- #define rxsiotrd_retc  rxsiotrd.u_rxsiotrd_retc
- #define rxsiodtr_retc  rxsiodtr.u_rxsiodtr_retc
- #define rxhlt_flags    rxhlttst.u_rxhlt_flags
- #define rxtrc_flags    rxtrctst.u_rxtrc_flags
- */
+typedef struct {
+   RXSTRING rxcwd_value ;
+} RXCWDGET_PARM ;
 
-typedef union {
-   RXFNCCAL_PARM fnccal ;
-   RXCMDHST_PARM cmdhst ;
-   RXMSQPLL_PARM msqpll ;
-   RXMSQPSH_PARM msqpsh ;
-   RXMSQSIZ_PARM msqsiz ;
-   RXMSQNAM_PARM msqnam ;
-   RXSIOSAY_PARM siosay ;
-   RXSIOTRC_PARM siotrc ;
-   RXSIOTRD_PARM siotrd ;
-   RXSIODTR_PARM siodtr ;
-   RXHLTTST_PARM hlttst ;
-   RXTRCTST_PARM trctst ;
-   RXENVGET_PARM envget ;
-   RXENVSET_PARM envset ;
-} EXIT ;
+typedef struct {
+   RXSTRING rxcwd_value ;
+} RXCWDSET_PARM ;
 
 typedef PUCHAR PEXIT ;
 
@@ -518,6 +493,23 @@ EXTNAME("RexxStart");
 #define RX_START_TOOMANYP   3  /* To many parameters */
 #define RX_DIDNT_START      4  /* Unable to start interpreter */
 
+APIRET APIENTRY RexxCallBack( 
+                PCSZ       ProcedureName,
+                LONG       ArgCount,
+                PRXSTRING  ArgList,
+                PSHORT     ReturnCode,
+                PRXSTRING  Result )
+EXTNAME("RexxCallBack");
+#define REXXCALLBACK RexxCallBack
+
+/*
+ * Return codes for RexxCallBack
+ */
+#define RX_CB_OK         0
+#define RX_CB_BADP       1  /* Bad parameters */
+#define RX_CB_NOTSTARTED 2  /* Interface not running */
+#define RX_CB_TOOMANYP   3  /* Too many parameters */
+#define RX_CB_BADN       8  /* Procedure not found */
 /*
  * -------------------------------------------------------------------
  * Sub-command Interface

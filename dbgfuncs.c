@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: dbgfuncs.c,v 1.5 2001/09/17 11:42:54 mark Exp $";
+static char *RCSid = "$Id: dbgfuncs.c,v 1.7 2003/03/05 08:06:51 florian Exp $";
 #endif
 
 /*
@@ -47,7 +47,7 @@ streng *dbg_traceback( tsd_t *TSD, cparamboxptr dummy )
 
 streng *dbg_dumpvars( tsd_t *TSD, cparamboxptr dummy )
 {
-   dumpvars(TSD, (cvariableptr *) TSD->currlevel->vars) ;
+   dumpvars(TSD);
    dummy = dummy; /* keep compiler happy */
    return nullstringptr() ;
 }
@@ -68,7 +68,7 @@ streng *dbg_allocated( tsd_t *TSD, cparamboxptr parms )
 
    checkparam(  parms,  0,  1 , "ALLOCATED" ) ;
    if (!parms->value)
-      ch = 'A' ;
+      ch = 'S' ;
    else
       ch = getonechar( TSD, parms->value, "ALLOCATED", 1 ) ;
 

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexx.c,v 1.22 2002/04/22 11:27:36 mark Exp $";
+static char *RCSid = "$Id: rexx.c,v 1.31 2003/03/05 08:05:14 florian Exp $";
 #endif
 
 /*
@@ -30,7 +30,7 @@ static char *RCSid = "$Id: rexx.c,v 1.22 2002/04/22 11:27:36 mark Exp $";
 #   undef APIENTRY
 #   include <windows.h>
 #  endif
-#  if defined(__MINGW32__)
+#  if defined(__MINGW32__) || defined(__LCC__)
 #   undef APIENTRY
 #   include <windows.h>
 #  endif
@@ -54,7 +54,7 @@ static char *RCSid = "$Id: rexx.c,v 1.22 2002/04/22 11:27:36 mark Exp $";
 #  if defined(__WATCOMC__) && defined(__NT__)
 #   include <windows.h>
 # endif
-#  if defined(__MINGW32__)
+#  if defined(__MINGW32__) || defined(__LCC__)
 #   include <windows.h>
 #  endif
 #  if defined(WIN32) && defined(__BORLANDC__)
@@ -131,6 +131,8 @@ const char *numeric_forms[] = { "SCIENTIFIC", "ENGINEERING" } ;
 const char *invo_strings[] = { "COMMAND", "FUNCTION", "SUBROUTINE" } ;
 
 const char *argv0 = NULL;
+
+static void usage( char * );
 
 #ifdef TRACEMEM
 void marksubtree( nodeptr ptr )
@@ -236,6 +238,21 @@ static const char *GetArgv0(const char *argv0)
 # endif
 #endif
 
+#ifdef HAVE_READLINK
+   {
+      /*
+       * will work on Linux 2.1+
+       */
+      char buf[1024];
+      int result;
+      result = readlink("/proc/self/exe", buf, sizeof( buf ) );
+      if ( ( result > 0 ) && ( result < sizeof( buf ) ) && ( buf[0] != '[' ) )
+      {
+         buf[result] = '\0';
+         return strdup( buf );
+      }
+   }
+#endif
    /* No specific code has found the right file name. Maybe, it's coded
     * in argv0. Check it, if it is an absolute path. Be absolutely sure
     * to detect it safely!
@@ -256,11 +273,15 @@ static const char *GetArgv0(const char *argv0)
 }
 
 #ifdef RXLIB
+# if defined(__LCC__)
+int __regina_faked_main(int argc,char *argv[])
+# else
 int APIENTRY __regina_faked_main(int argc,char *argv[])
-#define CALL_MAIN __regina_faked_main
+# endif
+# define CALL_MAIN __regina_faked_main
 #else
 int main(int argc,char *argv[])
-#define CALL_MAIN main
+# define CALL_MAIN main
 #endif
 {
    FILE *fptr = NULL ;
@@ -268,27 +289,20 @@ int main(int argc,char *argv[])
    int i=0, j=0, stdinput=1, state=0, rcode=0, oldi=0, trace_override=0 ;
    paramboxptr args=NULL, prev ;
    char *arg=NULL ;
-   int make_perl=0 ;
    int do_yydebug=0;
    char name[1024];
    internal_parser_type parsing;
    tsd_t *TSD;
+   int compiling_to_tokens = 0;
+   int executing_from_tokens = 0;
 
 #ifdef MAC
    InitCursorCtl(nil);
 #endif
-    /*
-     * For WIN32, set an atexit() function to allow the user to see the output
-     * from the program if run from Explorer or the Start menu.
-     * Only do this if we are running Regina, and not from another process
-     * that uses the API.
-     */
-#if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
-   set_pause_at_exit();
-#endif
 
    if (argv0 == NULL)
       argv0 = GetArgv0(argv[0]);
+
 
    TSD = GLOBAL_ENTRY_POINT();
 
@@ -304,9 +318,9 @@ int main(int argc,char *argv[])
    for (i=1; i<argc; i++)
    {
       arg = argv[i] ;
-      if (state==0)
+      if ( state == 0 )
       {
-         if (*arg=='-')
+         if ( *arg == '-' )
          {
             switch (*(++arg))
             {
@@ -321,14 +335,13 @@ int main(int argc,char *argv[])
                   if (*(arg+1)=='i')
                   {
                      TSD->isclient = 1 ; /* Other than the default value of 0 */
-#if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
-                     dont_pause_at_exit();
-#endif
                   }
                   break ;
 
                case 'p':
-                  make_perl = 1 ;
+#if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
+                  set_pause_at_exit();
+#endif
                   break ;
 
                case 'v':
@@ -354,9 +367,22 @@ int main(int argc,char *argv[])
                      TSD->listleakedmemory = 1 ;
                   break ;
 
-               case 'a':
+               case 'a': /* multiple args */
                   TSD->systeminfo->invoked = INVO_SUBROUTINE;
                   break ;
+
+               case 'c': /* compile to tokenised file */
+                  compiling_to_tokens = 1;
+                  break ;
+
+               case 'e': /* execute from tokenised file */
+                  executing_from_tokens = 1;
+                  break ;
+
+               case 'h': /* usage */
+               case '?': /* usage */
+                  usage( argv[0] );
+                  return 0;
             }
          }
          else
@@ -387,58 +413,112 @@ int main(int argc,char *argv[])
     setmode( fileno( stderr ), O_BINARY );
 #endif
 
-   if (stdinput)
+   if ( stdinput )
    {
-      TSD->systeminfo->input_file = Str_crestrTSD("<stdin>") ;
+      TSD->systeminfo->input_file = Str_crestrTSD( "<stdin>" ) ;
       TSD->systeminfo->input_fp = NULL;
    }
 
-   if (TSD->isclient)
+   if ( TSD->isclient )
       return 0 ;
+
+   /*
+    * -c switch specified - tokenise the input file before mucking around
+    * with parameters etc.
+    */
+   if ( compiling_to_tokens )
+   {
+      internal_parser_type ipt;
+      streng *SrcStr;
+      char *SourceString;
+      void *instore_buf=NULL;
+      unsigned long SourceStringLen, instore_length=0L;
+      streng * volatile command=NULL ;
+      FILE *outfp;
+
+      /* must have only one more arg, output file name */
+      if ( argc > 4 )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Too many arguments when tokenising. Usage: -c inputfile outputfile" ) ;
+      if ( argc < 4 )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Too few arguments when tokenising. Usage: -c inputfile outputfile" ) ;
+      /*
+       * Read the file into SourceString
+       */
+      fseek( TSD->systeminfo->input_fp, 0, SEEK_END );
+      SourceStringLen = ftell( TSD->systeminfo->input_fp );
+      rewind( TSD->systeminfo->input_fp );
+      SourceString = malloc( SourceStringLen );
+      if ( SourceString == NULL )
+         exiterror( ERR_STORAGE_EXHAUSTED, 0 );
+      /* set program file name */
+      command = Str_dup_TSD( TSD, TSD->systeminfo->input_file ) ;
+
+      if ( fread( SourceString, SourceStringLen, 1, TSD->systeminfo->input_fp ) != 1 )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Unable to read input file" ) ;
+      /* why copy ??? */
+      SrcStr = Str_makeTSD( SourceStringLen ) ;
+      memcpy( SrcStr->value, SourceString, SourceStringLen ) ;
+      SrcStr->len = SourceStringLen ;
+      /*
+       * enter_macro() actually does the tokenising...
+       */
+      ipt = enter_macro( TSD, SrcStr, command, &instore_buf, &instore_length ) ;
+      free( SourceString );
+      fclose( TSD->systeminfo->input_fp );
+      outfp = fopen( argv[3], "wb" );
+      if ( outfp == NULL )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Unable to open output file for writing" ) ;
+      if ( instore_buf == NULL )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Error tokenising input file" ) ;
+      if ( fwrite( instore_buf, instore_length, 1, outfp ) != 1 )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Unable to write contents of output file" ) ;
+      fclose( outfp );
+      return 0;
+   }
 
    oldi = ++i ;
 
    if ( TSD->systeminfo->invoked == INVO_SUBROUTINE )
    {
       prev = NULL;
-      for (i=oldi;i<argc;i++)
+      for ( i = oldi; i < argc; i++ )
       {
-         args = MallocTSD(sizeof(parambox)) ;
+         args = MallocTSD( sizeof(parambox) ) ;
          if ( i == oldi )
             TSD->currlevel->args = args;
          else
             prev->next = args;
-         memset(args,0,sizeof(parambox)); /* especially ->value */
+         memset( args, 0, sizeof(parambox) ); /* especially ->value */
          args->value = Str_cre_TSD( TSD, argv[i] ) ;
          prev = args;
       }
    }
    else
    {
-      for (j=1;i<argc;i++)
-         j += strlen(argv[i]) + 1 ;
-   
-      TSD->currlevel->args = args = MallocTSD(sizeof(parambox)) ;
-      memset(args,0,sizeof(parambox)); /* especially ->value */
+      for ( j = 1; i < argc; i++ )
+         j += strlen( argv[i] ) + 1 ;
+
+      TSD->currlevel->args = args = MallocTSD( sizeof(parambox) ) ;
+      memset( args, 0, sizeof(parambox) ); /* especially ->value */
    /*
       args->value = Str_dupTSD(TSD->systeminfo->input_file) ;
       args = args->next = MallocTSD(sizeof(parambox)) ;
     */
       args->next = NULL ;
-      if (oldi>=argc)
+      if ( oldi >= argc )
          args->value = string = NULL ;
       else
       {
          args->value = string = Str_makeTSD( j ) ;
          string->len = 0 ;
       }
-   
-      for (i=oldi;i<argc;i++)
+
+      for ( i = oldi ; i < argc; i++ )
       {
-         string = Str_catstrTSD(string,argv[i]) ;
+         string = Str_catstrTSD( string, argv[i] ) ;
          string->value[string->len++] = ' ' ;
       }
-      if (string && string->len)
+      if ( string && string->len )
         string->len-- ;
    }
 
@@ -447,6 +527,64 @@ int main(int argc,char *argv[])
 #ifndef NDEBUG
    __reginadebug = do_yydebug ;   /* 1 == yacc-debugging */
 #endif
+
+   /*
+    * -e switch specified - execute from tokenised code
+    */
+   if ( executing_from_tokens )
+   {
+      void *TinnedTree;
+      unsigned long TinnedTreeLen;
+      streng * volatile command=NULL ;
+      volatile streng * volatile result=NULL ;
+      volatile streng * volatile environment=NULL ;
+      volatile int ctype = TSD->systeminfo->invoked;
+      volatile int hooks=0;
+      int RetCode=0 ;
+
+      /* cannot run tokenised code from stdin */
+      if ( stdinput )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Cannot run tokenised code from stdin." ) ;
+      /*
+       * Read the file into SourceString
+       */
+      fseek( TSD->systeminfo->input_fp, 0, SEEK_END );
+      TinnedTreeLen = ftell( TSD->systeminfo->input_fp );
+      rewind( TSD->systeminfo->input_fp );
+      TinnedTree = MallocTSD( TinnedTreeLen );
+      if ( TinnedTree == NULL )
+         exiterror( ERR_STORAGE_EXHAUSTED, 0 );
+      if ( fread( TinnedTree, TinnedTreeLen, 1, TSD->systeminfo->input_fp ) != 1 )
+         exiterror( ERR_PROG_UNREADABLE, 1, "Unable to read input file" ) ;
+      fclose( TSD->systeminfo->input_fp );
+      /* check if the file being read is a valid tokenised file */
+      if ( !IsValidTin( TinnedTree, TinnedTreeLen ) )
+         exiterror( ERR_PROG_UNREADABLE, 1, "The supplied file is not a valid Regina tokenised file" ) ;
+      /* set program file name, environment and arguments */
+      command = Str_dupTSD( TSD->systeminfo->input_file ) ;
+      environment = Str_creTSD( "DEFAULT" ) ;
+      if ( !envir_exists( TSD, (streng *)environment ) )
+         add_envir( TSD, Str_dupTSD( (streng *)environment), ENVIR_PIPE, 0 ) ;
+      args = TSD->currlevel->args;
+      /*
+       * do_instore() actually does the execution...
+       */
+      result = do_instore( TSD, command, args, (streng *)environment,
+                           &RetCode,
+                           hooks,
+                           TinnedTree, TinnedTreeLen,
+                           NULL, 0, /* source file contents */
+                           NULL,
+                           ctype);
+      FreeTSD( TinnedTree );
+      Free_stringTSD( command );
+      Free_stringTSD( (streng *) environment );
+      return RetCode;
+   }
+
+   /*
+    * From here we are interpreting...
+    */
    fetch_file( TSD, fptr ? fptr : stdin, &parsing );
 
    if (parsing.result != 0)
@@ -493,15 +631,6 @@ int main(int argc,char *argv[])
 
    treadit( TSD->systeminfo->tree.root ) ;
 
-#ifdef R2PERL
-   if (make_perl)
-   {
-      preamble() ;
-      translate( TSD, TSD->systeminfo->tree.root ) ;
-      return( 0 ) ;
-   }
-#endif
-
    flush_trace_chars(TSD) ;
    {
       nodeptr savecurrentnode = TSD->currentnode; /* pgb */
@@ -509,9 +638,15 @@ int main(int argc,char *argv[])
       TSD->currentnode = savecurrentnode; /* pgb */
    }
    rcode = EXIT_SUCCESS ;
-   if ( string
-   &&   myisinteger( string ) )
-      rcode = myatol( TSD, string ) ;
+   if ( string )
+   {
+      int error;
+      /* fixes bug 657345 */
+
+      rcode = streng_to_int( TSD, string, &error );
+      if ( error )
+         rcode = EXIT_SUCCESS;
+   }
 
    purge_stacks( TSD );
 #if defined(FLISTS) && defined(NEW_FLISTS)
@@ -754,3 +889,23 @@ int IfcHaveFunctionExit(const tsd_t *TSD)
 
 #endif
 
+static void usage( char *argv0 )
+{
+   fprintf( stdout, "\nRegina %s. All rights reserved.\n", PARSE_VERSION_STRING );
+   fprintf( stdout,"Regina is distributed under the terms of the GNU Library Public License \n" );
+   fprintf( stdout,"and comes with NO WARRANTY. See the file COPYING-LIB for details.\n" );
+   fprintf( stdout,"\nTo run a Rexx program:\n" );
+   fprintf( stdout,"%s [-h?vrt[ir]ap] program [arguments...]\n", argv0 );
+   fprintf( stdout,"where:\n\n" );
+   fprintf( stdout,"-h,-?                  show this message\n" );
+   fprintf( stdout,"-v                     display Regina version and exit\n" );
+   fprintf( stdout,"-r                     run Regina in \"safe\" mode\n" );
+   fprintf( stdout,"-t[trace_char]         set TRACE any valid TRACE character - default A\n" );
+   fprintf( stdout,"-a                     pass command line to Rexx program as separate arguments\n");
+   fprintf( stdout,"-p                     pause after execution (Win32 only)\n");
+   fprintf( stdout,"\nTo tokenise a Rexx program:\n" );
+   fprintf( stdout,"%s -c program(input) tokenisedfile(output)\n", argv0 );
+   fprintf( stdout,"\nTo execute a tokenised file:\n" );
+   fprintf( stdout,"%s -e tokenisedfile [arguments...]\n", argv0 );
+   fflush( stdout );
+}

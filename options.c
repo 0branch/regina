@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: options.c,v 1.5 2002/04/29 10:48:05 mark Exp $";
+static char *RCSid = "$Id: options.c,v 1.10 2003/04/02 07:44:51 mark Exp $";
 #endif
 
 /*
@@ -33,25 +33,25 @@ static char *RCSid = "$Id: options.c,v 1.5 2002/04/29 10:48:05 mark Exp $";
 
 
 static const struct __regina_option all_options[] = {  /* Must be alphabetically sorted! */
+   OPTION( AREXX_BIFS ),
+   OPTION( AREXX_SEMANTICS ),
+   OPTION( BROKEN_ADDRESS_COMMAND ),
    METAOP( BUFFERS, "BUFTYPE_BIF DESBUF_BIF DROPBUF_BIF MAKEBUF_BIF" ),
    OPTION( BUFTYPE_BIF ),
    OPTION( CACHEEXT ),
-   OPTION( CLOSE_BIF ),
    OPTION( DESBUF_BIF ),
    OPTION( DROPBUF_BIF ),
    OPTION( EXT_COMMANDS_AS_FUNCS ),
    OPTION( FAST_LINES_BIF_DEFAULT ),
-   METAOP( FILEIO, "OPEN_BIF CLOSE_BIF" ),
-   OPTION( FIND_BIF ),
    OPTION( FLUSHSTACK ),
    OPTION( INTERNAL_QUEUES ),
    OPTION( LINEOUTTRUNC ),
    OPTION( MAKEBUF_BIF ),
-   OPTION( OPEN_BIF ),
    OPTION( PRUNE_TRACE ),
    OPTION( REGINA_BIFS ),
    OPTION( STDOUT_FOR_STDERR ),
    OPTION( STRICT_ANSI ),
+   OPTION( STRICT_WHITE_SPACE_COMPARISONS ),
    OPTION( TRACE_HTML ),
    { NULL, 0 }
 } ;

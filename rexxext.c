@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexxext.c,v 1.13 2002/01/16 10:36:53 mark Exp $";
+static char *RCSid = "$Id: rexxext.c,v 1.22 2002/11/26 09:38:41 mark Exp $";
 #endif
 
 /*
@@ -20,6 +20,11 @@ static char *RCSid = "$Id: rexxext.c,v 1.13 2002/01/16 10:36:53 mark Exp $";
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
+#if defined( __EMX__ ) && !defined(DOS)
+# include <os2.h>
+# define DONT_TYPEDEF_PFN
+#endif
 
 #include "rexx.h"
 #include <stdio.h>
@@ -48,8 +53,6 @@ static char *RCSid = "$Id: rexxext.c,v 1.13 2002/01/16 10:36:53 mark Exp $";
 # endif
 #endif
 
-static int actually_pause = 1;
-
 streng *rex_userid( tsd_t *TSD, cparamboxptr parms )
 {
 #if defined(WIN32)
@@ -57,7 +60,7 @@ streng *rex_userid( tsd_t *TSD, cparamboxptr parms )
    DWORD bufsize=sizeof( buf );
 #endif
    checkparam(  parms,  0,  0 , "USERID" ) ;
-#if defined(VMS) || defined(MAC) || defined(__WATCOMC__) || defined(_MSC_VER) || defined(_AMIGA) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__)
+#if defined(VMS) || defined(MAC) || ( defined(__WATCOMC__) && !defined(__QNX__) ) || defined(_MSC_VER) || defined(_AMIGA) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__) || defined(__LCC__)
 # if defined(WIN32) && !defined(WDOSX)
    if ( GetUserName( buf, &bufsize ) )
    {
@@ -182,7 +185,7 @@ char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize )
       return NULL;
    if (!buf)
    {
-      ptr1 = MallocTSD(strlen(ptr)+1);
+      ptr1 = MallocTSD((int)strlen(ptr)+1);
       if (!ptr1)
          return NULL;
       strcpy(ptr1, ptr);
@@ -199,6 +202,8 @@ char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize )
 }
 
 #if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
+static int actually_pause = 1;
+
 /*
  * These functions are used to allow Regina to display "Press ENTER key to exit..."
  * in the console if it is NOT started from a console.
@@ -220,36 +225,62 @@ void flush_stdout( void )
    return;
 }
 
-void dont_pause_at_exit( void )
-{
-   actually_pause = 0;
-}
-
 void set_pause_at_exit( void )
 {
-   CONSOLE_SCREEN_BUFFER_INFO csbi;
-   HANDLE hStdOutput;
-
-   hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-   if ( GetConsoleScreenBufferInfo( hStdOutput, &csbi ) )
-   {
-      /* 
-       * if cursor position is (0,0) then use pause
-       */
-      if ( csbi.dwCursorPosition.X == 0 
-      &&   csbi.dwCursorPosition.Y == 0 )
-      {
-         atexit( do_pause_at_exit );
-      }
-      else
-      {
-         atexit( flush_stdout );
-      }
-   }
-   else
-   {
-      atexit( flush_stdout );
-   }
-   return;
+   atexit( do_pause_at_exit );
 }
 #endif
+
+/* You are not allowed to use TSD or __regina_get_tsd() here! */
+void *IfcAllocateMemory( unsigned long size )
+{
+   void *ret;
+#if defined( WIN32 )
+   /* We now use the Virtual-functions instead of Global... */
+   ret = VirtualAlloc( NULL, size, MEM_COMMIT, PAGE_READWRITE ) ;
+   return ret;
+#elif defined( __EMX__ ) && !defined(DOS)
+   if (_osmode == OS2_MODE)
+   {
+      if ( (BOOL)DosAllocMem( &ret, size, fPERM|PAG_COMMIT ) )
+         return NULL;
+      else
+         return ret;
+   }
+   else /* DOS or something else */
+   {
+      ret = (void *)malloc( size );
+      return ret;
+   }
+#elif defined( OS2 )
+   if ( (BOOL)DosAllocMem( &ret, size, fPERM|PAG_COMMIT ) )
+      return NULL;
+   else
+      return ret;
+#else
+   ret = (void *)malloc( size );
+   return ret;
+#endif
+}
+
+/* You are not allowed to use TSD or __regina_get_tsd() here! */
+unsigned long IfcFreeMemory( void *ptr )
+{
+#if defined( WIN32 )
+   /* In opposite to most(!) of the documentation from Microsoft we shouldn't
+    * decommit and release together. This won't work at least under NT4SP6a.
+    * We can first decommit and then release or release at once. FGC.
+    */
+   VirtualFree( ptr, 0, MEM_RELEASE ) ;
+#elif defined( __EMX__ ) && !defined(DOS)
+   if (_osmode == OS2_MODE)
+      DosFreeMem( ptr );
+   else /* DOS or something else */
+      free( ptr );
+#elif defined( OS2 )
+   DosFreeMem( ptr );
+#else
+   free( ptr );
+#endif
+   return 0;
+}

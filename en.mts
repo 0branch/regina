@@ -10,12 +10,27 @@
 # russian - Oleg Kulikov <kulikov@xanadu.ru>
 # spanish - Pablo Garcia-Abia <Pablo.Garcia@cern.ch>
 #
-# 15.4 is %c NOT %s
-#
-# 40.922, 40.923, 49.0, 49.1
-# remove 93.2
-#
-# 25.17
+# Guidelines for Translators
+# --------------------------
+# - Lines beginning with # are comments
+# - Any word in UPPER CASE should not be translated
+# - On some error message lines, there are tokens following the
+#   | character. Again these should not be translated.
+# - Please ensure that the order of the substitutions; ie the %s, %d
+#   placemarkers are maintained. If this is gramatically impossible,
+#   please let me know.
+# - There are some comments at the end of this file under the heading:
+#   "Extra general phrases requiring translation:"
+#   Please translate these phrases also.
+# - Return the translated error messages in a complete file, the same as this
+#   file, with the name XX.mts where XX is the ISO language abbreviation. 
+#   Important: Please zip the file up to ensure that the file arrives in
+#              its original form
+#   Add a comment at the top of the file indicating the language, and your name and email address.
+#   If you do not want your email address published in the Regina documentation
+#   please indicate this. I will retain your address as a contact for future
+#   individual message translations, but will only publish your name.
+# - And last but by no means least; thanks!
 #
   0,  1,Error %s running %s, line %d:|<value>,<source>,<linenumber>
   0,  2,Error %s in interactive trace:|<value>
@@ -195,6 +210,7 @@
  40,922,[%s argument %d, too few sub-commands; minimum expected is %d; found %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[%s argument %d, too many sub-commands; maximum expected is %d; found %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s argument %d, invalid positional specification; expecting one of "%s"; found "%s"]|<bif>,<argnumber>,<value>,<value>
+ 40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>
  41,  0,Bad arithmetic conversion
  41,  1,Non-numeric value ("%s") to left of arithmetic operation "%s"|<value>,<operator>
  41,  2,Non-numeric value ("%s") to right of arithmetic operation "%s"|<value>,<operator>
@@ -261,6 +277,9 @@
  94,106,[Maximum number of external queues exceeded: %d]|<maxqueues>
  94,107,[Error occured reading socket: %s]|<systemerror>
  94,108,[Invalid switch passed. Must be one of "%s"]|<switch>
+ 94,109,[Queue \"%s\" not found]|<queuename>
+ 94,110,[%s invalid for external queues]|<bif>
+ 94,111,[RXQUEUE function %s invalid for internal queues]|<functionname>
  95,  0,[Restricted feature used in "safe" mode]
  95,  1,[%s invalid in "safe" mode]|<token>
  95,  2,[%s argument %d invalid in "safe" mode]|<bif>,<argnumber>

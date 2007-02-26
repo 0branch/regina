@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.13 2002/03/09 01:07:44 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.22 2003/03/16 04:20:03 mark Exp $";
 #endif
 
 /*
@@ -54,7 +54,13 @@ static nodeptr *narray=NULL ;
 static int narptr=0, narmax=0 ;
 #endif
 
-static int gettypeof( nodeptr this ) ;
+typedef enum { IS_UNKNOWN,
+               IS_A_NUMBER,
+               IS_NO_NUMBER,
+               IS_SIM_SYMBOL,
+               IS_COMP_SYMBOL } node_type;
+
+static node_type gettypeof( nodeptr this ) ;
 static void checkconst( nodeptr this ) ;
 static void transform( nodeptr this ) ;
 static nodeptr create_head( const char *name ) ;
@@ -104,15 +110,26 @@ void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this ) ;
 
 %%
 
-prog         : nseps stats { EndProg( $2 ) ; }
+prog         : nseps stats { $2->o.last = NULL ; EndProg( $2 ) ; }
              | nseps       { EndProg( NULL ) ; }
              ;
 
-stats        : ystatement stats         { $$->next = $2 ; }
-             | ystatement               { $$->next = NULL ; }
+stats        : stats ystatement         { $$ = $1 ; /* fixes bug 579711 */
+                                          if ( $$->o.last == NULL )
+                                             $$->next = $2 ;
+                                          else
+                                             $$->o.last->next = $2 ;
+                                          $$->o.last = $2 ; }
+             | ystatement               { $$ = $1 ;
+                                          assert( $$->next == NULL ) ; }
              ;
 
-xstats       : statement xstats         { $$->next = $2 ; }
+xstats       : xstats statement         { $$ = $1 ; /* fixes bug 579711 */
+                                          if ( $$->o.last == NULL )
+                                             $$->next = $2 ;
+                                          else
+                                             $$->o.last->next = $2 ;
+                                          $$->o.last = $2 ; }
              | statement gruff          { $$->next = NULL ; }
              ;
 
@@ -123,7 +140,7 @@ ystatement   : statement               { $$ = $1 ; }
 lonely_end   : gruff end seps
              ;
 
-nxstats      : xstats                  { $$ = $1 ; }
+nxstats      : xstats                  { $$ = $1 ; $$->o.last = NULL ; }
              | gruff                   { $$ = NULL ; }
              ;
 
@@ -131,7 +148,7 @@ nseps        : seps
              |
              ;
 
-seps         : STATSEP seps
+seps         : seps STATSEP            { /* fixes bugs like bug 579711 */ }
              | STATSEP
              ;
 
@@ -220,7 +237,7 @@ label        : LABEL                   { $$ = makenode(X_LABEL,0) ;
                                          $$->charnr = parser_data.tstart ; } ;
 nop          : NOP                     { $$ = makenode(X_NULL,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; }
+                                         $$->charnr = parser_data.tstart ; } ;
 numeric      : NUMERIC                 { $$ = makenode(0,0) ;
                                          $$->lineno = parser_data.tline ;
                                          $$->charnr = parser_data.tstart ; } ;
@@ -285,17 +302,15 @@ arg_stat     : arg templs seps         { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-call_stat    : call asymbol exprs seps { $$ = $1 ;
-                                         $$->p[0] = $3 ;
-                                         $$->name = (streng *) $2 ; }
-             | call string exprs seps  { $$ = $1 ;
-                                         $$->type = X_EX_FUNC ;
-                                         $$->p[0] = $3 ;
-                                         $$->name = (streng *) $2 ; }
-             | call function seps      { $$ = $1 ;
-                                         $$->name = $2->name ;
-                                         $$->p[0] = $2->p[0] ;
-                                         RejectNode( $2 ); }
+call_stat    : call call_name exprs seps { $$ = $1 ;
+                                           $$->p[0] = $3 ;
+                                           $$->name = (streng *) $2 ; }
+             | call call_name exprs ')'  { exiterror(ERR_UNEXPECTED_PARAN, 2);}
+             | call string exprs seps    { $$ = $1 ;
+                                           $$->type = X_EX_FUNC ;
+                                           $$->p[0] = $3 ;
+                                           $$->name = (streng *) $2 ; }
+             | call string exprs ')'     { exiterror(ERR_UNEXPECTED_PARAN, 2);}
              | call on error { exiterror( ERR_INV_SUBKEYWORD, 1, "ERROR FAILURE HALT NOTREADY", __reginatext ) ;}
                        seps
              | call off error { exiterror( ERR_INV_SUBKEYWORD, 2, "ERROR FAILURE HALT NOTREADY", __reginatext ) ;}
@@ -321,6 +336,10 @@ call_stat    : call asymbol exprs seps { $$ = $1 ;
                                          $$->type = X_CALL_SET ;
                                          $$->p[0] = $2 ;
                                          $$->p[1] = $3 ; }
+             ;
+
+call_name    : asymbol                 { $$ = $1; }
+             | error                   { exiterror( ERR_STRING_EXPECTED, 2, __reginatext );}
              ;
 
 expr_stat    : expr seps
@@ -375,8 +394,7 @@ repetitor    : dovar '=' expr tobyfor tobyfor tobyfor
                                          $$->name = (streng *)$1 ;
                                          checkdosyntax($$) ; }
              | FOREVER                 { $$ = makenode(X_REP_FOREVER,0) ; }
-             | FOREVER error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                       seps
+             | FOREVER error { exiterror( ERR_INV_SUBKEYWORD, 16, "WHILE UNTIL", __reginatext ) ; }
              | expr                    { $1 = makenode(X_DO_EXPR,1,$1) ;
                                          $$ = makenode(X_REP,2,NULL,$1) ; }
              |                         { $$ = NULL ; }
@@ -474,52 +492,66 @@ resources    : STREAM nnvir            { /* ANSI extension: nsimsymb is
                                           * there are no reasons why using
                                           * it here as a must. FGC
                                           */
-                                         $$ = makenode(X_ADDR_WITH, 0) ;
-                                         $$->name = (streng *) $2 ;
-                                         $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ;
-                                         $$->u.of.awt = isSTREAM;
+                                         $$ = $2 ;
+                                         $$->u.of.awt = awtSTREAM;
                                          SymbolDetect |= SD_ADDRWITH ; }
              | STREAM error            { exiterror( ERR_INVALID_OPTION, 1, __reginatext ) ; }
              | STEM nsimsymb           {
-                                         streng *tmp=(streng *)$2;
-                                         if ( tmp->value[(tmp->len)-1] != '.' )
+                                         streng *tmp = $2->name;
+                                         char *p;
+
+                                         /*
+                                          * expect a single dot as the last character
+                                          */
+                                         p = memchr( tmp->value, '.', tmp->len );
+                                         if ( p != tmp->value + tmp->len - 1 )
                                             exiterror( ERR_INVALID_OPTION, 3, __reginatext );
-                                         $$ = makenode(X_ADDR_WITH, 0, 0) ;
-                                         $$->name = (streng *) $2 ;
-                                         $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ;
-                                         $$->u.of.awt = isSTEM;
+                                         $$ = $2 ;
+                                         $$->u.of.awt = awtSTEM ;
                                          SymbolDetect |= SD_ADDRWITH ; }
              | STEM error              { exiterror( ERR_INVALID_OPTION, 2, __reginatext ) ; }
              | LIFO nnvir              {
-                                         $$ = makenode(X_ADDR_WITH, 0) ;
-                                         $$->name = (streng *) $2 ;
-                                         $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ;
-                                         $$->u.of.awt = isLIFO;
+                                         $$ = $2 ;
+                                         $$->u.of.awt = awtLIFO ;
                                          SymbolDetect |= SD_ADDRWITH ; }
              | LIFO error              { exiterror( ERR_INVALID_OPTION, 100, __reginatext ) ; }
              | FIFO nnvir              {
-                                         $$ = makenode(X_ADDR_WITH, 0) ;
-                                         $$->name = (streng *) $2 ;
-                                         $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ;
-                                         $$->u.of.awt = isFIFO;
+                                         $$ = $2 ;
+                                         $$->u.of.awt = awtFIFO ;
                                          SymbolDetect |= SD_ADDRWITH ; }
              | FIFO error              { exiterror( ERR_INVALID_OPTION, 101, __reginatext ) ; }
              ;
 
 nsimsymb     :                         { SymbolDetect &= ~SD_ADDRWITH ; }
-               nspace xsimsymb         { $$ = $3 ; }
+               nspace addrSim          { $$ = $3 ; }
              ;
 
 nnvir        :                         { SymbolDetect &= ~SD_ADDRWITH ; }
-               nspace nvir             { $$ = $3 ; }
+               nspace addrAll          { $$ = $3 ; }
              ;
 
 nspace       : SPACE
              |
+             ;
+
+addrAll      : addrSim                 { $$ = $1 ; }
+             | addrString              { $$ = $1 ; }
+             ;
+
+addrSim      : xsimsymb                { $$ = makenode(X_ADDR_WITH, 0) ;
+                                         $$->name = (streng *) $1 ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->u.of.ant = antSIMSYMBOL;
+                                       }
+             ;
+
+addrString   : string                  { $$ = makenode(X_ADDR_WITH, 0) ;
+                                         $$->name = (streng *) $1 ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->u.of.ant = antSTRING;
+                                       }
              ;
 
 dovar        : DOVARIABLE              { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
@@ -659,7 +691,12 @@ parse_stat   : parse parse_param template seps
                      seps
              ;
 
-templs       : template ',' templs     { $$ = $1 ; $$->next = $3 ; }
+templs       : templs ',' template     { $$ = $1 ; /* fixes bugs like bug 579711 */
+                                         if ( $$->o.last == NULL )
+                                            $$->next = $3 ;
+                                         else
+                                            $$->o.last->next = $3 ;
+                                         $$->o.last = $3 ; }
              | template                { $$ = $1 ; }
              ;
 
@@ -671,7 +708,7 @@ parse_param  : LINEIN                  { $$ = makenode(X_PARSE_EXT,0) ; }
              | VAR simsymb             { $$ = makenode(X_PARSE_VAR,0) ;
                                          $$->name = (streng *) $2 ; }
              | VALUE nexpr WITH        { $$ = makenode(X_PARSE_VAL,1,$2) ; }
-             | VALUE error seps        { exiterror( ERR_INVALID_TEMPLATE, 3 ) ;}
+             | VALUE error             { exiterror( ERR_INVALID_TEMPLATE, 3 ) ;}
              ;
 
 proc_stat    : proc seps               { $$ = $1 ; }
@@ -723,13 +760,18 @@ select_stat  : select seps when_stats otherwise_stat sel_end seps
                                        {  exiterror( ERR_INCOMPLETE_STRUCT, 0 ) ;}
              ;
 
-when_stats   : when_stat when_stats    { $$->next = $2 ; }
+when_stats   : when_stats when_stat    { $$ = $1 ;
+                                         if ( $$->o.last == NULL )
+                                            $$->next = $2 ;
+                                         else
+                                            $$->o.last->next = $2 ;
+                                         $$->o.last = $2 ; }
              | when_stat               { $$ = $1 ; }
              | error                   {  exiterror( ERR_WHEN_EXPECTED, 0 )  ;}
              ;
 
 when_stat    : when expr nseps THEN nseps statement
-                                       { $$ = $1 ;
+                                       { $$ = $1 ; /* fixes bugs like bug 579711 */
                                          $$->p[0] = $2 ;
                                          $$->p[1] = $6 ; }
              | when expr nseps THEN nseps statement THEN
@@ -758,9 +800,9 @@ otherwise_stat : otherwise nseps nxstats {
 signal_stat : signal VALUE expr seps   { $$ = $1 ;
                                          $$->type = X_SIG_VAL ;
                                          $$->p[0] = $3 ; }
-            | signal asymbol error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
+            | signal signal_name error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
                              seps
-            | signal asymbol seps      { $$ = $1 ;
+            | signal signal_name seps  { $$ = $1 ;
                                          $$->name = (streng *)$2 ; }
             | signal on error { exiterror( ERR_INV_SUBKEYWORD, 3, "ERROR FAILURE HALT NOTREADY NOVALUE SYNTAX LOSTDIGITS", __reginatext ) ;}
                         seps
@@ -790,13 +832,16 @@ signal_stat : signal VALUE expr seps   { $$ = $1 ;
                                          $$->p[1] = $3 ; }
             ;
 
+signal_name  : asymbol                 { $$ = $1; }
+             | error                   { exiterror( ERR_STRING_EXPECTED, 4, __reginatext );}
+             ;
+
 namespec    : NAME SIMSYMBOL           { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue);}
             | NAME error               { exiterror( ERR_STRING_EXPECTED, 3, __reginatext ) ;}
             ;
 
 asymbol     : CONSYMBOL                { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
             | SIMSYMBOL                { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
-            | error                    { exiterror( ERR_STRING_EXPECTED, 0 ) ;}
             ;
 
 on          : ON                       { $$ = makenode(X_ON,0) ; }
@@ -815,6 +860,7 @@ s_action    : c_action                 { $$ = $1 ; }
             | NOVALUE                  { $$ = makenode(X_S_NOVALUE,0) ; }
             | SYNTAX                   { $$ = makenode(X_S_SYNTAX,0) ; }
             | LOSTDIGITS               { $$ = makenode(X_S_LOSTDIGITS,0) ; }
+            ;
 
 trace_stat  : trace VALUE expr seps    { $$ = $1 ;
                                          $$->p[0] = $3 ; }
@@ -832,7 +878,7 @@ whatever    : WHATEVER                 { $$ = (nodeptr)Str_cre_TSD(parser_data.T
 
 assignment  : ass_part nexpr seps      { $$ = $1 ;
                                          $$->p[1] = $2 ;
-                                         if (($2) && gettypeof($$->p[1])==1)
+                                         if (($2) && gettypeof($$->p[1])==IS_A_NUMBER)
                                             $$->type = X_NASSIGN ; }
             ;
 
@@ -844,6 +890,7 @@ ass_part    : ASSIGNMENTVARIABLE       { $$ = makenode(X_ASSIGN,0) ;
 
 
 expr        : '(' expr ')'             { $$ = $2 ; }
+            | '(' expr ','             { exiterror( ERR_UNEXPECTED_PARAN, 1 );}
             | NOT expr                 { $$ = makenode(X_LOG_NOT,1,$2) ; }
             |      NOT                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "NOT" ) ;}
             | expr '+' expr            { $$ = makenode(X_PLUSS,2,$1,$3) ; }
@@ -929,8 +976,14 @@ symbtree    : SIMSYMBOL                { $$ = (nodeptr)create_head( (const char 
 
 function    : extfunc  exprs ')'       { $$ = makenode(X_EX_FUNC,1,$2) ;
                                          $$->name = (streng *)$1 ; }
+            | extfunc exprs error      { exiterror( ERR_UNMATCHED_PARAN, 0 );
+                                         /* fixes bug 499163 */
+                                       }
             | intfunc  exprs ')'       { $$ = makenode(X_IN_FUNC,1,$2) ;
                                          $$->name = (streng *)$1 ; }
+            | intfunc exprs error      { exiterror( ERR_UNMATCHED_PARAN, 0 );
+                                         /* fixes bug 499163 */
+                                       }
             ;
 
 intfunc     : INFUNCNAME               { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
@@ -942,7 +995,6 @@ extfunc     : EXFUNCNAME               { $$ = (nodeptr)Str_cre_TSD(parser_data.T
 template    : pv solid template        { $$ =makenode(X_TPL_SOLID,3,$1,$2,$3);}
             | pv                       { $$ =makenode(X_TPL_SOLID,1,$1) ; }
             | error { exiterror( ERR_INVALID_TEMPLATE, 1, __reginatext ) ;}
-              seps
             ;
 
 solid       : '-' offset               { $$ = makenode(X_NEG_OFFS,0) ;
@@ -987,8 +1039,7 @@ string      : STRING                   { $$ = (nodeptr) Str_cre_TSD(parser_data.
             ;
 
 pv          : PLACEHOLDER pv           { $$ = makenode(X_TPL_POINT,1,$2) ; }
-            | symbtree pv              { $$ = makenode(X_TPL_SYMBOL,1,$2) ;
-                                         $$->p[1] = $1 ; }
+            | symbtree pv              { $$ = makenode(X_TPL_SYMBOL,2,$2,$1) ; }
             |                          { $$ = NULL ; }
             ;
 
@@ -1193,7 +1244,9 @@ static nodeptr create_head( const char *name )
    const char *cptr ;
    nodeptr node ;
 
-   for (cptr=name; *cptr && *cptr!='.'; cptr++) ;
+   /* Bypass reserved variables */
+   cptr = ( *name ) ? ( name + 1 ) : name;
+   for (; *cptr && *cptr!='.'; cptr++) ;
    node = makenode( X_SIM_SYMBOL, 0 ) ;
    node->name = Str_ncre_TSD( parser_data.TSD, name, cptr-name+(*cptr=='.')) ;
 
@@ -1210,12 +1263,8 @@ static nodeptr create_head( const char *name )
    return node ;
 }
 
-#define IS_UNKNOWN   0
-#define IS_A_NUMBER  1
-#define IS_NO_NUMBER 2
-#define IS_IRREG_NUMBER 10
 
-static int gettypeof( nodeptr this )
+static node_type gettypeof( nodeptr this )
 {
    tsd_t *TSD = parser_data.TSD;
 
@@ -1251,29 +1300,20 @@ static int gettypeof( nodeptr this )
 
 
       case X_SIM_SYMBOL:
-         return 3 ;
+         return IS_SIM_SYMBOL ;
 
       case X_HEAD_SYMBOL:
-         return 4 ;
+         return IS_COMP_SYMBOL ;
 
       case X_STRING:
       case X_CON_SYMBOL:
       {
-         if (this->u.number)
+         if (this->u.number)      /* FIXME: When does this happen? */
             return IS_A_NUMBER ;
 
-         this->u.number = is_a_descr( TSD, this->name ) ;
-         if (this->u.number)
-         {
-            streng *stmp = str_norm( TSD, this->u.number, NULL ) ;
-            if (Str_cmp(stmp,this->name))
-            {
-               Free_stringTSD( stmp ) ;
-               return IS_UNKNOWN ;
-            }
-            Free_stringTSD( stmp ) ;
-         }
-         return (this->u.number) ? IS_A_NUMBER : IS_NO_NUMBER ;
+         if ( ( this->u.number = is_a_descr( TSD, this->name ) ) != NULL )
+            return IS_A_NUMBER;
+         return IS_NO_NUMBER;
       }
    }
    return IS_UNKNOWN ;
@@ -1283,13 +1323,14 @@ static int gettypeof( nodeptr this )
 
 static void transform( nodeptr this )
 {
-   int left, rght, type ;
+   int type ;
+   node_type left,rght;
 
    left = gettypeof( this->p[0] ) ;
    rght = gettypeof( this->p[1] ) ;
    type = this->type ;
 
-   if (left==1 && rght==1)
+   if ( ( left == IS_A_NUMBER ) && ( rght == IS_A_NUMBER ) )
    {
       if (type==X_EQUAL)
          this->type = X_NEQUAL ;
@@ -1304,7 +1345,7 @@ static void transform( nodeptr this )
       else if (type==X_LT)
          this->type = X_NLT ;
    }
-   else if (left==2 || rght==2)
+   else if ( ( left == IS_NO_NUMBER ) || ( rght == IS_NO_NUMBER ) )
    {
       if (type==X_EQUAL)
          this->type = X_SEQUAL ;
@@ -1322,19 +1363,21 @@ static void transform( nodeptr this )
    else
    {
       type = this->p[0]->type ;
-      if (left==1 && (type==X_STRING || type==X_CON_SYMBOL))
+      if ( ( left == IS_A_NUMBER )
+        && ( ( type == X_STRING ) || ( type == X_CON_SYMBOL ) ) )
          this->u.flags.lnum = 1 ;
-      else if (left==3)
+      else if ( left == IS_SIM_SYMBOL )
          this->u.flags.lsvar = 1 ;
-      else if (left==4)
+      else if ( left == IS_COMP_SYMBOL )
          this->u.flags.lcvar = 1 ;
 
       type = this->p[1]->type ;
-      if (rght==1 && (type==X_STRING || type==X_CON_SYMBOL))
+      if ( ( rght == IS_A_NUMBER )
+        && ( ( type == X_STRING ) || ( type == X_CON_SYMBOL ) ) )
          this->u.flags.rnum = 1 ;
-      else if (rght==3)
+      else if ( rght == IS_SIM_SYMBOL )
          this->u.flags.rsvar = 1 ;
-      else if (rght==4)
+      else if ( rght == IS_COMP_SYMBOL )
          this->u.flags.rcvar = 1 ;
    }
 }
@@ -1350,6 +1393,13 @@ static int is_const( cnodeptr this )
       case X_STRING:
       case X_CON_SYMBOL:
          return 1 ;
+
+#if 0
+      Pre-evaluation is not allowed. DIGITS and FUZZ may change within loops
+      and the resulting value may or may not be the same. Concatenation with
+      or without spaces is the sole allowed operation.
+
+      NEVER ENABLE THIS AGAIN WITHOUT SOLVING THIS PROBLEMS!
 
       case X_U_PLUSS:
       case X_U_MINUS:
@@ -1379,6 +1429,8 @@ static int is_const( cnodeptr this )
       case X_NGT:
       case X_NLTE:
       case X_NLT:
+#endif
+
       case X_SPACE:
       case X_CONCAT:
          return is_const( this->p[0] ) && is_const( this->p[1] ) ;

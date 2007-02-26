@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: macros.c,v 1.11 2001/08/21 11:46:58 mark Exp $";
+static char *RCSid = "$Id: macros.c,v 1.16 2002/10/11 07:58:34 florian Exp $";
 #endif
 
 /*
@@ -86,8 +86,8 @@ void killsystem( tsd_t *TSD, sysinfo systm )
    FreeTSD( systm ) ;
 }
 
-streng *do_instore( tsd_t *TSD, const streng *name, paramboxptr args,
-                    const streng *envir, int *RetCode, int hooks,
+streng *do_instore( tsd_t * volatile TSD, const streng *name, paramboxptr args,
+                    const streng *envir, int * volatile RetCode, int hooks,
                     const void *instore, unsigned long instore_length,
                     const char *instore_source,
                     unsigned long instore_source_length,
@@ -98,6 +98,9 @@ streng *do_instore( tsd_t *TSD, const streng *name, paramboxptr args,
    streng *ptr=NULL ;
    jmp_buf *jbuf=NULL ;
    unsigned InterpreterStatus[IPRT_BUFSIZE];
+   tsd_t * volatile saved_TSD;
+   int * volatile saved_RetCode;
+   volatile proclevel oldlevel;
 
    if (RetCode)
       *RetCode = 0 ;
@@ -106,8 +109,14 @@ streng *do_instore( tsd_t *TSD, const streng *name, paramboxptr args,
    TSD->instore_is_errorfree = 0 ;
    jbuf = MallocTSD( sizeof(jmp_buf) ) ;
    assert(!TSD->in_protected);
+
+   saved_TSD = TSD; /* vars used until here */
+   saved_RetCode = RetCode;
    if (setjmp(*jbuf))
    {
+      TSD = saved_TSD; /* prevents bugs like  592393 */
+      RetCode = saved_RetCode;
+
       ptr = TSD->systeminfo->result ;
       TSD->systeminfo->result = NULL ;
       if (!TSD->instore_is_errorfree && RetCode)
@@ -115,13 +124,17 @@ streng *do_instore( tsd_t *TSD, const streng *name, paramboxptr args,
    }
    else
    {
-      nodeptr savecurrentnode = TSD->currentnode; /* pgb */
+      nodeptr savecurrentnode = TSD->currentnode; /* pgb fixes bug 595300 */
 
       TSD->currentnode = NULL ;
 
       newsystem = creat_sysinfo( TSD, Str_dupTSD(envir)) ;
       newsystem->previous = TSD->systeminfo ;
-      TSD->systeminfo->currlevel0 = TSD->currlevel ;
+      /*
+       * see note in execute_external
+       * Fixes bug 604219
+       */
+      oldlevel = TSD->currlevel;
 
       TSD->currlevel = NULL ;
       TSD->systeminfo = newsystem ;
@@ -161,7 +174,7 @@ streng *do_instore( tsd_t *TSD, const streng *name, paramboxptr args,
 
    tmpsys = TSD->systeminfo ;
    TSD->systeminfo = TSD->systeminfo->previous ;
-   TSD->currlevel = TSD->systeminfo->currlevel0 ;
+   TSD->currlevel = oldlevel;
    TSD->trace_stat = TSD->currlevel->tracestat ;
 
    tmpsys->currlevel0->args = NULL ;
@@ -172,35 +185,40 @@ streng *do_instore( tsd_t *TSD, const streng *name, paramboxptr args,
    return (ptr) ? ptr : nullstringptr()  ;
 }
 
-streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
-                          const streng *envir, int *RetCode, int hooks, int ctype )
+streng *execute_external( tsd_t * volatile TSD, const streng *command,
+                          paramboxptr args, const streng *envir,
+                          int * volatile RetCode, int hooks, int ctype )
 {
    sysinfobox *newsystem=NULL, *tmpsys=NULL ;
    char name[1024] ;
    streng *ptr=NULL ;
    const char *cptr=NULL, *eptr=NULL, *start=NULL, *stop=NULL ;
    char path[1024] ;
-   FILE *fptr=NULL ;
+   FILE *fptr ;
    jmp_buf *jbuf=NULL ;
    internal_parser_type parsing;
-   volatile proclevel oldlevel; /* volatile needed at least for GCC 2.7.2 */
+   volatile proclevel oldlevel;
    unsigned InterpreterStatus[IPRT_BUFSIZE];
-   nodeptr savecurrentnode = TSD->currentnode; /* pgb */
+   nodeptr savecurrentnode = TSD->currentnode;
+   tsd_t * volatile saved_TSD;
+   int * volatile saved_RetCode;
 
    if (RetCode)
       *RetCode = 0 ;
 
    SaveInterpreterStatus(TSD,InterpreterStatus);
-   fptr = NULL ;
    jbuf = MallocTSD( sizeof(jmp_buf) ) ;
    TSD->instore_is_errorfree = 0 ;
-
    assert(!TSD->in_protected);
+
+   saved_TSD = TSD; /* vars used until here */
+   saved_RetCode = RetCode;
+
    if (setjmp(*jbuf))
    {
-/*      if (fptr != stdin)
-         fclose(fptr) ;
-*/
+      TSD = saved_TSD; /* prevents bugs like  592393 */
+      RetCode = saved_RetCode;
+
       ptr = TSD->systeminfo->result ;
       TSD->systeminfo->result = NULL ;
       if (!TSD->instore_is_errorfree && RetCode)
@@ -208,6 +226,7 @@ streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
    }
    else
    {
+      fptr = NULL ;
       /* FGC: Check length first to avoid  */
       /*      access of invalid buffer     */
       if ( ( command->len == 7 )
@@ -255,27 +274,6 @@ streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
                   {
                      *RetCode = -ERR_PROG_UNREADABLE;
                   }
-#if 0
-                  if (RetCode)
-                  {
-                     *RetCode = -ERR_PROG_UNREADABLE;
-                     if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
-                     {
-                        fprintf(stdout,"REXX: Error %d: %s: \"%s\"\n",
-                             ERR_ROUTINE_NOT_FOUND,
-                             errortext( TSD, ERR_ROUTINE_NOT_FOUND, 0, 0, &is_fmt ), path );
-                        /* JH 19991105 the variable name was not set by
-                           get_external_routine() when file is not found. */
-                        fflush( stdout );
-                     }
-                     else
-                        fprintf(stderr,"REXX: Error %d: %s: \"%s\"\n",
-                             ERR_ROUTINE_NOT_FOUND,
-                             errortext( TSD, ERR_ROUTINE_NOT_FOUND, 0, 0, &is_fmt ), path );
-                     /* JH 19991105 the variable name was not set by
-                        get_external_routine() when file is not found. */
-                  }
-#endif
                   return NULL ;
                }
             }
@@ -293,6 +291,7 @@ streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
        *            I detected the error in THE using regina while calling
        *            macros in macros called by THE in a macro.
        *            (confusing, hmm? :-(  )
+       * FIXME!
        */
       oldlevel = TSD->currlevel;
 
@@ -305,7 +304,8 @@ streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
       TSD->systeminfo->input_file = Str_crestrTSD( name ) ;
       TSD->systeminfo->currlevel0 = TSD->currlevel = newlevel( TSD, NULL ) ;
 
-      savecurrentnode = TSD->currentnode; /* pgb */
+      savecurrentnode = TSD->currentnode; /* pgb fixes bug 595300 */
+      TSD->systeminfo->trace_override = newsystem->previous->trace_override;
 
       TSD->currlevel->args = args ;
       TSD->currentnode = NULL ;
@@ -317,6 +317,9 @@ streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
       {
          TSD->systeminfo->tree = parsing ;
          treadit( TSD->systeminfo->tree.root ) ;
+         /*
+          * Execute any RXINI system exit
+          */
          if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_INIT))
             hookup( TSD, HOOK_INIT ) ;
 
@@ -330,6 +333,9 @@ streng *execute_external( tsd_t *TSD, const streng *command, paramboxptr args,
          exiterror( ERR_YACC_SYNTAX, 1, parsing.tline ) ;
       }
    }
+   /*
+    * Execute any RXTER system exit
+    */
    if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_TERMIN))
       hookup( TSD, HOOK_TERMIN ) ;
 

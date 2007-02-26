@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: envir.c,v 1.14 2002/03/23 01:31:59 mark Exp $";
+static char *RCSid = "$Id: envir.c,v 1.21 2003/04/03 10:58:24 mark Exp $";
 #endif
 
 /*
@@ -54,8 +54,10 @@ static void clear_environpart(environpart *ep)
    ep->SameAsOutput = 0;
    ep->FileRedirected = 0;
    ep->tempname = NULL ;
+   ep->tmp_queue = NULL ;
+   ep->queue = NULL ;
    ep->type = 0 ;
-   ep->hdls[1] = ep->hdls[0] = -1;
+   ep->hdls[2] = ep->hdls[1] = ep->hdls[0] = -1;
 }
 
 void add_envir( tsd_t *TSD, const streng *name, int type, int subtype )
@@ -68,6 +70,7 @@ void add_envir( tsd_t *TSD, const streng *name, int type, int subtype )
    clear_environpart(&ptr->e.input);
    clear_environpart(&ptr->e.output);
    clear_environpart(&ptr->e.error);
+   ptr->e.input.flags.isinput = 1 ;
 
    ptr->e.name = Str_dupTSD( name ) ;
    ptr->e.subtype = subtype ;
@@ -168,20 +171,6 @@ void del_envir( tsd_t *TSD, const streng *name )
    FreeTSD( ptr ) ;
 }
 
-static void set_currname( const tsd_t *TSD, environpart *e )
-/* Sets the initial currname of the environpart from its name. e->currname
- * must be free previously.
- */
-{
-   int len ;
-
-   /* we need space for "." and the maximal number */
-   len = Str_len( e->name ) ;
-   e->currname = Str_makeTSD( len + 3*sizeof(int) ) ;
-   memcpy( e->currname->value, e->name->value, len ) ;
-   e->currname->len = len ; /* pro forma, will be recomputed */
-}
-
 static void update_environpart( const tsd_t *TSD, environpart *e,
                                                              const nodeptr new)
 /* e is the environpart which has to be reset. new is the new part and has
@@ -194,7 +183,6 @@ static void update_environpart( const tsd_t *TSD, environpart *e,
    {
       e->name = Str_dupTSD( new->name ) ;
       e->base = Str_makeTSD( 3*sizeof(int) ) ;
-      set_currname( TSD, e ) ;
    }
 
    e->flags = new->u.of ;
@@ -243,15 +231,13 @@ static void dup_environpart( const tsd_t *TSD, environpart *dest,
       {
          dest->name = Str_dupTSD( src->name ) ;
          dest->base = Str_makeTSD( 3*sizeof(int) ) ;
-         set_currname( TSD, dest ) ;
       }
       dest->flags = src->flags ;
    }
    clear_environpart(dest);
 }
 
-static struct envir *dup_envir( tsd_t *TSD, const streng *name,
-                                                            const nodeptr ios )
+static struct envir *dup_envir( tsd_t *TSD, const streng *name, cnodeptr ios )
 /* This functions returns a new instance of the environment with the given
  * name or NULL if there is not such an environment name.
  * The current IO-redirection settings are overwritten with the
@@ -280,11 +266,11 @@ int init_envir( tsd_t *TSD )
       const char *name ;
       int         subtype ;
    } locals[] = {
-      { "COMMAND",        SUBENVIR_COMMAND } ,
+      { "COMMAND",        SUBENVIR_PATH    } , /* was SUBENVIR_COMMAND */
       { "SYSTEM",         SUBENVIR_SYSTEM  } ,
       { "OS2ENVIRONMENT", SUBENVIR_SYSTEM  } ,
       { "ENVIRONMENT",    SUBENVIR_SYSTEM  } ,
-      { "CMD",            SUBENVIR_COMMAND } ,
+      { "CMD",            SUBENVIR_PATH    } , /* was SUBENVIR_COMMAND */
       { "PATH",           SUBENVIR_PATH    } ,
       { "REGINA",         SUBENVIR_REXX    } ,
       { "REXX",           SUBENVIR_REXX    }
@@ -486,25 +472,68 @@ static int get_io_flag( tsd_t *TSD, streng *command, streng **rxqueue )
    return flag ;
 }
 
+/*
+ * ANSI 8.2.4 and 8.3.5 and others forces us to set some variables showing
+ * the result and to raise some conditions in case of errors after
+ * processing an external command.
+ */
+static void post_process_system_call( tsd_t *TSD, const streng *cmd,
+                                      int rc_code, const streng *rc_value,
+                                      cnodeptr this )
+{
+   streng *rs;
+   trap *traps;
+   int type;
 
-streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodeptr this )
-/* If and only if this->p[1] is set, a new instance of the environment is
+   /*
+    * ANSI 8.2.4 etc. forces us to do the following.
+    *
+    */
+
+   if (!TSD->systeminfo->interactive)
+      set_rc( TSD, Str_dupTSD( rc_value ) );
+
+   /* set .RS: -1==Failure, 0=OK, 1=Error */
+   if (rc_code == 0)
+      rs = int_to_streng( TSD, 0 );
+   else if (rc_code < 0)
+      rs = int_to_streng( TSD, -1 );
+   else
+      rs = int_to_streng( TSD, 1 );
+   setvalue( TSD, dotRS_name, rs );
+
+   if ( rc_code )
+   {
+      traceerror( TSD, this, rc_code );
+      traps = gettraps( TSD, TSD->currlevel );
+      type = ( rc_code > 0 ) ? SIGNAL_ERROR : SIGNAL_FAILURE;
+
+      if ( traps[type].on_off )
+         condition_hook( TSD, type, rc_code, 0, this->lineno, Str_dupTSD( cmd ), NULL );
+   }
+}
+
+streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodeptr this, cnodeptr overwrite )
+/* If and only if overwrite is set, a new instance of the environment is
  * temporarily created and reset to the new IO-redirections.
  */
 {
    int rc=0, io_flag=0, clearq=0, tempenvir=0;
-   struct envir *eptr=NULL ;
+   struct envir *eptr;
    streng *retstr=NULL ;
    streng *rxqueue=NULL;
    streng *cmd=Str_dupTSD(command);
    streng *saved_queue=NULL;
    char *rxq=NULL;
-   streng *rs;
 
-   if (this->p[1])
+   if ( overwrite )
    {
-      if (( eptr = dup_envir( TSD, envir, this->p[1] ) ) != NULL)
-         tempenvir = 1 ;
+      /*
+       * fixes bug 653214, overwrite was this->p[1] in former versions, which
+       * was wrong is this wasn't an ADDRESS statement.
+       */
+      if (( eptr = dup_envir( TSD, envir, overwrite ) ) != NULL)
+         tempenvir = 1;
    }
    else
    {
@@ -554,7 +583,7 @@ streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodept
                   io_flag -= REDIR_CLEAR;
                }
             }
-            rc = posix_do_command( TSD, cmd, io_flag, &eptr->e ) ;
+            rc = posix_do_command( TSD, cmd, io_flag, &eptr->e, NULL ) ;
             /*
              * Change the current queue name back
              * to the saved name
@@ -562,7 +591,7 @@ streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodept
             if ( get_options_flag( TSD->currlevel, EXT_INTERNAL_QUEUES ) )
             {
                if ( clearq )
-                  drop_buffer( TSD, 0);
+                  drop_buffer( TSD, 0 ) ; /* FIXME: Kill the whole queue??? */
                set_queue( TSD, saved_queue );
                if ( rxqueue != NULL )
                   Free_stringTSD( rxqueue );
@@ -579,35 +608,10 @@ streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodept
       retstr = SubCom( TSD, cmd, envir, &rc ) ;
    }
 
-   if (!TSD->systeminfo->interactive) /* J18PUB 8.2.4 */
-      setvalue(TSD,&RC_name,Str_dupTSD(retstr)) ;
-
    if (tempenvir)
       del_envir( TSD, envir ) ;
 
-   /* set .RS: -1==Failure, 0=OK, 1=Error */
-   if (rc == 0)
-      rs = int_to_streng(TSD, 0);
-   else if (rc < 0)
-      rs = int_to_streng(TSD, -1);
-   else
-      rs = int_to_streng(TSD, 1);
-   setvalue(TSD, dotRS_name, rs);
-
-   if (rc && this)
-   {
-      trap *traps ;
-      int type ;
-
-      traceerror( TSD, this, rc ) ;
-      traps = gettraps( TSD, TSD->currlevel ) ;
-      type = (rc>0) ? SIGNAL_ERROR : SIGNAL_FAILURE ;
-
-      if ((type==SIGNAL_FAILURE) && (traps[type].on_off))
-         condition_hook( TSD, type, rc, 0, this->lineno, Str_dupTSD(cmd), NULL ) ;
-      else if (traps[SIGNAL_ERROR].on_off)
-         condition_hook( TSD, SIGNAL_ERROR, rc, 0, this->lineno, Str_dupTSD(cmd), NULL ) ;
-   }
+   post_process_system_call( TSD, cmd, rc, retstr, this );
 
    Free_stringTSD( cmd ) ;
    return retstr ;
@@ -627,6 +631,7 @@ streng *run_popen( tsd_t *TSD, const streng *command, const streng *envir )
    int rc;
    streng *retval;
    struct envir *ptr=NULL ;
+   Queue *q ;
 
    for (ptr=TSD->firstenvir; ptr; ptr=ptr->prev)
    {
@@ -643,13 +648,15 @@ streng *run_popen( tsd_t *TSD, const streng *command, const streng *envir )
    /* Create a new environment with no redirections. */
    add_envir(TSD, ptr->e.name, ENVIR_SHELL, ptr->e.subtype);
 
-   rc = posix_do_command(TSD, command, REDIR_OUTSTRING, TSD->firstenvir);
-   retval = stack_to_line(TSD);
+   q = find_free_slot( TSD ) ;
+   q->type = QisTemp;
+   rc = posix_do_command(TSD, command, REDIR_OUTSTRING, TSD->firstenvir, q ) ;
+   retval = stack_to_line( TSD, q ) ;
 
    /* restore the previous environment and delete the temporary one */
    del_envir(TSD, ptr->e.name);
 
-   setvalue(TSD, &RC_name, int_to_streng(TSD, rc));
+   set_rc( TSD, int_to_streng( TSD, rc ) );
 
    if (rc >= 0)
       return(retval);

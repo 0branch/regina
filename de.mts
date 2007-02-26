@@ -163,7 +163,7 @@
  40, 19,Routine %s, Argument 2, "%s", genügt nicht dem Format beschrieben in Argument 3, "%s"|<bif>,<value>,<value>
  40, 21,Routine %s, Argument %d darf nicht leer sein|<bif>,<argnumber>
  40, 23,Routine %s, Argument %d muß ein einzelnes Zeichen sein; "%s" gefunden|<bif>,<argnumber>,<value>
- 40, 24,Routine %s, Argument 1 muß eine Binätzeichenkette sein; "%s" gefunden|<bif>,<value>
+ 40, 24,Routine %s, Argument 1 muß eine Binärzeichenkette sein; "%s" gefunden|<bif>,<value>
  40, 25,Routine %s, Argument 1 muß eine Hexadezimalzeichenkette sein; "%s" gefunden|<bif>,<value>
  40, 26,Routine %s, Argument 1 muß ein gültiges Symbol sein; "%s" gefunden|<bif>,<value>
  40, 27,Routine %s, Argument 1 muß ein gültiger Dateiname sein; "%s" gefunden|<bif>,<value>
@@ -180,12 +180,13 @@
  40, 39,Routine %s, Argument 3 ist weder Null noch Eins; "%s" gefunden|<bif>,<value>
  40, 41,Routine %s, Argument %d muß innerhalb der Dateigrenzen sein; "%s" gefunden|<bif>,<argnumber>,<value>
  40, 42,Routine %s, Argument 1: auf dieser Datei kann nicht positioniert werden; "%s" gefunden|<bif>,<value>
- 40,914,[Routine %s, Argument %d: muß ein Wert aus "%s" sein; found "%s"]|<bif>,<argnumber>,<optionslist>,<value>
+ 40,914,[Routine %s, Argument %d: muß ein Wert aus "%s" sein; gefunden: "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[Routine %s: Systemfehler bei der Ein-/Ausgabe auf der Datei; %s]|<bif>,<description>
  40,921,[Routine %s, Argument %d: Dateipositionierung im Modus "%s"; nicht kompatibel mit dem Öffnungsmodus]|<bif>,<argnumber>,<value>
  40,922,[Routine %s, Argument %d: Zuwenig Folgebefehle; das Minimum ist %d; gefunden %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[Routine %s, Argument %d, Zuviele Folgebefehle; das Maximum ist %d; gefunden %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[Routine %s, Argument %d, ungültige Positionierungsbasis; erwartet wird ein Wort aus "%s"; gefunden "%s"]|<bif>,<argnumber>,<value>,<value>
+ 40,930,[Routine RXQUEUE, Funktion TIMEOUT: Ein Ganzzahlwert zwischen -1 und %d erwartet; gefunden: \"%s\"]|<value>,<value>
  41,  0,Fehlerhafte Zahlumwandlung
  41,  1,Nichtnumerischer Wert ("%s") zur Linken des arithmetischen Operators "%s"|<value>,<operator>
  41,  2,Nichtnumerischer Wert ("%s") zur Rechten des arithmetischen Operators "%s"|<value>,<operator>
@@ -252,6 +253,9 @@
  94,106,[Höchstanzahl für externe Warteschlangen überschritten: %d]|<maxqueues>
  94,107,[Fehler während des Lesens eines Sockets: %s]|<systemerror>
  94,108,[Ungültiger Schalter weitergegeben. Es muß einer aus "%s" sein.]|<switch>
+ 94,109,[Queue \"%s\" nicht gefunden]|<queuename>
+ 94,110,[Routine %s ungültig bei externen Queues]|<bif>
+ 94,111,[Routine RXQUEUE, Funktion %s ungültig bei internen Queues]|<functionname>
  95,  0,[Gesperrte Routine im "geschützten" Modus benutzt]
  95,  1,[Routine %s ungültig im "geschützten" Modus]|<token>
  95,  2,[Routine %s, Argument %d ungültig im "geschützten" Modus]|<bif>,<argnumber>

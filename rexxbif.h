@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rexxbif.h,v 1.3 2001/04/26 10:15:00 mark Exp $
+ * $Id: rexxbif.h,v 1.4 2003/03/11 10:40:05 florian Exp $
  */
 
 #ifndef _REXXBIF_H_INCLUDED
@@ -85,7 +85,7 @@ typedef struct tsdtype { /* FGC: This will lead to severe troubles. Imagine
 # define MAKESTRENG( size )    MakeStreng( size )
 # define DROPSTRENG( x )       DropStreng( x )
 # define REXX_RIGHT( s,l,p )   Rexx_right( NULL,s,l,p )
-# define REXX_X2D( x )         Rexx_x2d( NULL,x )
+# define REXX_X2D( x,err )     Rexx_x2d( NULL,x,err )
 # define REXX_D2X( x )         Rexx_d2x( NULL,x )
 # ifndef STRENG_TYPEDEFED
 /*
@@ -108,12 +108,12 @@ typedef struct strengtype {
 # define MAKESTRENG( size )    Str_makeTSD( size )
 # define DROPSTRENG( x )       FreeTSD( x )
 # define REXX_RIGHT( s,l,p )   Rexx_right( TSD,s,l,p )
-# define REXX_X2D( x )         Rexx_x2d( TSD,x )
+# define REXX_X2D( x,err )     Rexx_x2d( TSD,x,err )
 # define REXX_D2X( x )         Rexx_d2x( TSD,x )
 #endif
 
 extern streng *Rexx_right( const tsd_t *TSD, streng *str, int length, char padch );
-extern int Rexx_x2d( const tsd_t *TSD, streng *hex );
+extern int Rexx_x2d( const tsd_t *TSD, const streng *hex, int *error );
 extern streng *Rexx_d2x( const tsd_t *TSD, int num );
 
 #ifdef EXTERNAL_TO_REGINA

@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: configur.h,v 1.18 2002/01/12 04:55:56 mark Exp $
+ * $Id: configur.h,v 1.29 2003/04/02 07:44:51 mark Exp $
  */
 
 /*
@@ -256,6 +256,32 @@
 # endif
 #endif
 
+#if defined(WIN32) && defined(__LCC__)
+# define HAVE_FCNTL_H         1
+# define HAVE_DIRECT_H        1
+# define HAVE_LIMITS_H        1
+# define HAVE_MALLOC_H        1
+# define HAVE_PROCESS_H       1
+# define HAVE_SETJMP_H        1
+# define HAVE_SIGNAL_H        1
+# define HAVE_STDLIB_H        1
+# define HAVE_STRING_H        1
+# define HAVE_UNISTD_H        1
+/* # define HAVE__FULLPATH        1 */
+# define HAVE_PUTENV          1
+/* # define HAVE_GETTIMEOFDAY    1 */
+/* # define HAVE_FTRUNCATE       1 */
+# define HAVE_MEMCPY          1
+# define HAVE_MEMMOVE         1
+# define HAVE_STRERROR        1
+# define HAVE_VSPRINTF        1
+# define HAVE_GETPID  
+/* # define TIME_WITH_SYS_TIME   1 */
+# if defined(DYNAMIC)
+#  define DYNAMIC_WIN32
+# endif
+#endif
+
 #if defined(DOS) && defined(DJGPP)
 # define HAVE_FCNTL_H
 # define HAVE_GRP_H
@@ -270,9 +296,11 @@
 # define HAVE_NETDB_H
 # define HAVE_ARPA_INET_H
 # define HAVE_PUTENV
+# define HAVE_DRAND48
 # define HAVE_GETTIMEOFDAY
 # define HAVE_FTRUNCATE
 # define HAVE_RANDOM
+# define HAVE_DRAND48
 # define HAVE_USLEEP
 # define HAVE_MEMCPY
 # define HAVE_MEMMOVE
@@ -411,7 +439,7 @@
 # endif
 #endif
 
-#if defined(__vms)
+#if defined(VMS)
 # include "vms.h"
 #endif
 
@@ -460,12 +488,6 @@
 # define DEFAULT_LINEOUTTRUNC 1
 #endif
 
-/*
- * Whether the OPEN() and CLOSE() bifs are available by default
- */
-#define DEFAULT_OPEN_BIF 1
-#define DEFAULT_CLOSE_BIF 1
-
 #define DEFAULT_MAKEBUF_BIF 1
 #define DEFAULT_DROPBUF_BIF 1
 #define DEFAULT_BUFTYPE_BIF 1
@@ -474,25 +496,60 @@
 #define DEFAULT_CACHEEXT 0
 #define DEFAULT_PRUNE_TRACE 1
 
-#define DEFAULT_FIND_BIF 1
-
-#define DEFAULT_EXT_COMMANDS_AS_FUNCS  1
-#define DEFAULT_STDOUT_FOR_STDERR      0
-#define DEFAULT_INTERNAL_QUEUES        0
-#define DEFAULT_TRACE_HTML             0
-#define DEFAULT_FAST_LINES_BIF_DEFAULT 1
-#define DEFAULT_STRICT_ANSI            0
-#define DEFAULT_PGB_PATCH1             0  /* pgb */
-#define DEFAULT_REGINA_BIFS            1 
-
 /*
- * Define the following if your machine has putenv(), unfortunately,
- *   Standard C does not include a way to set environmentvariables, just
- *   to read them. But most machines have the putenv() function.
- * If it is not defined, you will not be able to set the environment
- *   variables throught the VALUE() builtin function.
+ * Indicates that Regina treats external commands as functions by default
  */
-/* #define HAVE_PUTENV */ /* handled in makefile - TBD in autoconf */
+#define DEFAULT_EXT_COMMANDS_AS_FUNCS  1
+/*
+ * Indicates that Regina does not send output that normally goes to stderr, to stdout
+ */
+#define DEFAULT_STDOUT_FOR_STDERR      0
+/*
+ * Indicates that Regina allows external queues (and internal queues) by default
+ */
+#define DEFAULT_INTERNAL_QUEUES        0
+/*
+ * Indicates that Regina does not wrap trace output in HTML code by default
+ */
+#define DEFAULT_TRACE_HTML             0
+/*
+ * Indicates that Regina returns 1 or 0 for when calling LINES BIF without optional 2nd argument by default
+ */
+#define DEFAULT_FAST_LINES_BIF_DEFAULT 1
+/*
+ * Indicates that Regina does not observe strict ANSI functionality by default
+ */
+#define DEFAULT_STRICT_ANSI            0
+/*
+ * Indicates that Regina-specific BUFs are available by default
+ */
+#define DEFAULT_REGINA_BIFS            1 
+/*
+ * Indicates that Regina does not do strict white space comparison by default
+ */
+#define DEFAULT_STRICT_WHITE_SPACE_COMPARISONS 0
+/*
+ * Indicates if the ARexx BIFs (OPEN, CLOSE, EOF) use AREXX semantics or not
+ * On Amiga and AROS, they are on by default.
+ */
+#if defined(_AMIGA) || defined(__AROS__)
+# define DEFAULT_AREXX_SEMANTICS        1
+#else
+# define DEFAULT_AREXX_SEMANTICS        0
+#endif
+/*
+ * Indicates that AREXX BIFs are available by default on Amiga and AROS, but
+ * OFF on other platforms
+ */
+#if defined(_AMIGA) || defined(__AROS__)
+# define DEFAULT_AREXX_BIFS             1
+#else
+# define DEFAULT_AREXX_BIFS             0
+#endif
+/*
+ * Indicates if the user want the "broken" semantics of ADDRESS COMMAND
+ */
+#define DEFAULT_BROKEN_ADDRESS_COMMAND 0
 
 /*
  * The FILE_SEPARATOR is one character, and defines the char that separates
@@ -629,8 +686,6 @@
 #  undef HAVE_GETTIMEOFDAY
 # endif
 #endif
-
-#define OLD_REGINA_FEATURES
 
 /*
  * DLOPEN   - dlopen()/dlsym() under SunOS and SysV4

@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: strings.h,v 1.5 2001/01/25 22:21:59 mark Exp $
+ * $Id: strings.h,v 1.10 2003/02/23 09:39:55 florian Exp $
  */
 
 
@@ -33,6 +33,36 @@ typedef struct strengtype {
    char value[4] ;
 #endif
 } streng ;
+
+/*
+ * Some strange define's to allow constant strengs to be defined. They will
+ * be accessible as pointers.
+ */
+#ifdef CHECK_MEMORY
+#  define conststreng(name,value) const streng __regina__##name = { sizeof( value ) - 1, \
+                                                        sizeof( value ) - 1,             \
+                                                        value };                         \
+                                  const streng *name = (const streng *) &__regina__##name
+#  define staticstreng(name,value) const static streng x_##name = { sizeof( value ) - 1, \
+                                                                sizeof( value ) - 1,     \
+                                                                value };                 \
+                                   const static streng *name = (const streng *) &x_##name
+#else
+#  define conststreng(name,value) const struct {                               \
+                                     int len, max;                             \
+                                     char content[sizeof( value )];            \
+                                  } x__regina__##name = { sizeof( value ) - 1, \
+                                                sizeof( value ) - 1,           \
+                                                value };                       \
+                                  const streng *name = (streng *) &x__regina__##name
+#  define staticstreng(name,value) static const struct {               \
+                                      int len, max;                    \
+                                      char content[sizeof( value )];   \
+                                   } x_##name = { sizeof( value ) - 1, \
+                                                 sizeof( value ) - 1,  \
+                                                 value };              \
+                                   static const streng *name = (const streng *) &x_##name
+#endif
 #define STRENG_TYPEDEFED 1
 
 #define Str_len(a) ((a)->len)
@@ -47,11 +77,22 @@ typedef struct strengtype {
 
 typedef struct num_descr_type
 {
-   char *num ;     /* pointer to matissa of presicion + 1 */
-   int negative ;  /* boolean, true if negative number */
-   int exp ;       /* value of exponent */
-   int size ;      /* how much of num is actually used */
-   int max ;       /* how much can num actually take */
+   char *num ;      /* pointer to matissa of presicion + 1 */
+   int negative ;   /* boolean, true if negative number */
+   int exp ;        /* value of exponent */
+   int size ;       /* how much of num is actually used */
+   int max ;        /* how much can num actually take */
+
+   /*
+    * The number of used digits depends on its usage. In general, it's a good
+    * idea to use the standard value. used_digits shall be reset after each
+    * computation and may or may be be respected. It shall be respected, and
+    * this is the intention, by str_norm and all other function which make
+    * a string from the number accidently. Functions like string_add may
+    * or may not use this value.
+    * fixes bug 675395
+    */
+   int used_digits;
 } num_descr ;
 
 

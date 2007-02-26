@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: convert.c,v 1.5 2001/09/04 11:15:45 mark Exp $";
+static char *RCSid = "$Id: convert.c,v 1.7 2003/02/23 09:39:55 florian Exp $";
 #endif
 
 /*
@@ -325,7 +325,7 @@ static streng *pack_hex( const tsd_t *TSD, const streng *string )
  * will also be returned if 'length' is zero, or if 'string' is the
  * nullstring.
  */
-static streng *numerize( const tsd_t *TSD, const streng *string, int length )
+static streng *numerize( tsd_t *TSD, const streng *string, int length )
 {
    int start=0 ;       /* character to start reading at */
    int sign=0 ;        /* is this to be interpreted as signed? */
@@ -718,8 +718,13 @@ streng *std_c2x( tsd_t *TSD, cparamboxptr parms )
    return unpack_hex( TSD, parms->value ) ;
 }
 
-
-
+static void check_wholenum( tsd_t *TSD, const char *bif, const streng *arg,
+                            num_descr **num )
+{
+   if ( !myiswnumber( TSD, arg, num,
+                      get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) ) )
+      exiterror( ERR_INCORRECT_CALL, 12, bif, 1, tmpstr_of( TSD, arg ) );
+}
 
 /* ---------------------------------------------------------------------
  * Converts a whole number into char string. This is just a wrapper
@@ -727,15 +732,28 @@ streng *std_c2x( tsd_t *TSD, cparamboxptr parms )
  */
 streng *std_d2c( tsd_t *TSD, cparamboxptr parms )
 {
-   int length=0 ;  /* the length of the output string */
+   int length;  /* the length of the output string */
+   num_descr *num;
 
-   checkparam(  parms,  1,  2 , "D2C" ) ;
-   if ((parms->next)&&(parms->next->value))
-      length = atozpos( TSD, parms->next->value, "D2C", 2 ) ;
+   checkparam( parms,  1,  2 , "D2C" );
+
+   check_wholenum( TSD, "D2C", parms->value, &num );
+   if ( parms->next && parms->next->value )
+      length = atozpos( TSD, parms->next->value, "D2C", 2 );
    else
-      length = (-1) ;
+   {
+      /*
+       * The strange syntax forces a check for non-negative first arg if the
+       * second doesn't exist.
+       */
+      if ( num->negative )
+         exiterror( ERR_INCORRECT_CALL, 13, "D2C", 1,
+                    tmpstr_of( TSD, parms->value ) );
 
-   return str_binerize( TSD, parms->value, length ) ;
+      length = -1;
+   }
+
+   return str_binerize( TSD, num, length );
 }
 
 
@@ -747,50 +765,63 @@ streng *std_d2c( tsd_t *TSD, cparamboxptr parms )
  */
 streng *std_d2x( tsd_t *TSD, cparamboxptr parms )
 {
-   int length=0 ;         /* holds the requested langth of the result */
-   streng *result=NULL ;  /* the output streng */
-   streng *packed=NULL ;  /* tmp variable, holds the packed string */
+   int length;         /* holds the requested langth of the result */
+   streng *result;     /* the output streng */
+   streng *packed;     /* tmp variable, holds the packed string */
+   num_descr *num;
 
    /*
     * Check the parameters, and set 'length' to the specified length, or
     * to -1 if the second parameter was not specified.
     */
-   checkparam(  parms,  1,  2 , "D2X" ) ;
-   if ((parms->next)&&(parms->next->value))
-      length = atozpos( TSD, parms->next->value, "D2X", 2 ) ;
+   checkparam(  parms,  1,  2 , "D2X" );
+
+   check_wholenum( TSD, "D2C", parms->value, &num );
+   if ( parms->next && parms->next->value )
+      length = atozpos( TSD, parms->next->value, "D2X", 2 );
    else
-      length = (-1) ;
+   {
+      /*
+       * The strange syntax forces a check for non-negative first arg if the
+       * second doesn't exist.
+       */
+      if ( num->negative )
+         exiterror( ERR_INCORRECT_CALL, 13, "D2C", 1,
+                    tmpstr_of( TSD, parms->value ) );
+
+      length = -1;
+   }
 
    /*
     * Convert the whole number into a hex string in a two step operation.
     * First it is converted into a char string, and then that char string
     * is converted into a hexstring.
     */
-   packed = str_binerize( TSD, parms->value, (length==(-1))?(-1):((length+1)/2) ) ;
-   result = unpack_hex( TSD, packed ) ;
-   Free_stringTSD( packed ) ;
+   packed = str_binerize( TSD, num, ( length == -1 ) ? -1 : ( length+1 ) / 2 );
+   result = unpack_hex( TSD, packed );
+   Free_stringTSD( packed );
 
    /*
     * Since we used char string as a temporary format, the hex string
     * will now be padded with one extra zero at the left. If we specified
-    * length, and that length does notmatch the actual length, we must
-    * strip away the first zero in 'result'
+    * length, and that length does not match the actual length, we must
+    * strip away the first zero in 'result'.
     *
     * Here we check for length>0, since we want to catch it if length was
     * specified, but not if it was 0. In the latter case, the string will
     * be the nullstring, and we don't need to do anything anyway.
     */
-   if ((length>0) && (Str_len(result)!=length) && Str_len(result))
+   if ( ( length > 0 ) && ( Str_len( result ) != length ) && Str_len( result ) )
    {
-      assert( Str_len(result) == length+1 ) ;
-      memmove( result->value, &result->value[1], --result->len ) ;
+      assert( Str_len( result ) == length + 1 );
+      memmove( result->value, &result->value[1], --result->len );
    }
 
    /*
     * Just to be safe, check that we did get the nullstring if length
     * was specified to 0
     */
-   assert( (length!=0) || (Str_len(result)==0) ) ;
+   assert( ( length != 0 ) || ( Str_len(result) == 0 ) );
 
    /*
     * If length was not specified, there might be leading zeros in the
@@ -805,16 +836,16 @@ streng *std_d2x( tsd_t *TSD, cparamboxptr parms )
     * occur, but it will be handled, since the result should then be
     * the nullstring.
     */
-   if ((length==(-1)) && (result->value[0]=='0'))
+   if ( ( length == -1 ) && ( result->value[0] == '0' ) )
    {
-      assert( Str_len(result)>1 ) ;
-      assert(( result->value[0]=='0') && (result->value[1]!='0')) ;
+      assert( Str_len( result ) > 1 );
+      assert( ( result->value[0] == '0') && ( result->value[1] != '0' ) );
 
-      memmove( result->value, &result->value[1], --result->len ) ;
+      memmove( result->value, &result->value[1], --result->len );
    }
 
    /*
     * That's it, now we just have to get out of here
     */
-   return result ;
+   return result;
 }

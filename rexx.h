@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rexx.h,v 1.34 2002/04/22 11:06:12 mark Exp $
+ * $Id: rexx.h,v 1.56 2003/03/23 10:36:17 mark Exp $
  */
 #ifndef __REXX_H_INCLUDED
 #define __REXX_H_INCLUDED
@@ -91,6 +91,13 @@
 #else
 # define REG_FAR
 #endif
+
+/*
+ * define MAX_ARGS_TO_REXXSTART to specify the maximum number of arguments that
+ * can be passed to the RexxStart() and RexxCallBack() API functions.
+ */
+#define MAX_ARGS_TO_REXXSTART  32
+
 
 #include "defs.h"
 #if defined(HAVE_CONFIG_H)
@@ -249,13 +256,15 @@
 #endif
 
 #define REGINA_VERSION_MAJOR "3"
-#define REGINA_VERSION_MINOR "0"
+#define REGINA_VERSION_MINOR "1"
+#define REGINA_VERSION_SUPP  ""
 
 #define PARSE_VERSION_STRING    "REXX-Regina_" REGINA_VERSION_MAJOR "." \
-                                REGINA_VERSION_MINOR REGINA_VERSION_THREAD \
-                                " 4.95 25 Apr 2002"
+                                REGINA_VERSION_MINOR REGINA_VERSION_SUPP \
+                                REGINA_VERSION_THREAD \
+                                " 5.00 5 Apr 2003"
 
-#define INSTORE_VERSION 3 /* Must be incremented each time the parser/lexer
+#define INSTORE_VERSION 4 /* Must be incremented each time the parser/lexer
                            * or data structure changes something.
                            */
 

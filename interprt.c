@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: interprt.c,v 1.20 2002/03/23 00:56:06 mark Exp $";
+static char *RCSid = "$Id: interprt.c,v 1.40 2003/04/02 07:44:51 mark Exp $";
 #endif
 
 /*
@@ -36,16 +36,22 @@ static char *RCSid = "$Id: interprt.c,v 1.20 2002/03/23 00:56:06 mark Exp $";
 
 #define XOR(a,b) (( (a) && (!(b)) )||( (!(a)) && (b) ))
 
-#define OPTIMIZE
-
 #define TRACELINE(a) if (TSD->trace_stat!='O' && TSD->trace_stat!='N') traceline(TSD,a,(char)TSD->trace_stat,0)
 #define TRACEVALUE(a,b) if (TSD->trace_stat=='I') tracevalue(TSD, a,b)
 #define TRACENUMBER(a,b) if (TSD->trace_stat=='I') tracenumber(TSD, a,b)
 
-const streng RC_name = { 2, 2, "RC" } ;
-const streng SIGL_name = { 4, 4, "SIGL" };
-const streng *dotRS_name = NULL; /* pseudo const: is set by init_spec_vars */
-const streng *RESULT_name = NULL; /* pseudo const: is set by init_spec_vars */
+#ifdef WIN32
+/* Asynchroneous scheduled in another thread: */
+volatile int __regina_Win32CtrlCRaised = 0;
+#endif
+staticstreng(    RC_name,      "RC" );
+staticstreng( dotRC_name,     ".RC" );
+staticstreng(    RESULT_name,  "RESULT" );
+staticstreng( dotRESULT_name, ".RESULT" );
+staticstreng(    SIGL_name,    "SIGL" );
+staticstreng( dotSIGL_name,   ".SIGL" );
+conststreng(  dotMN_name,     ".MN" );
+conststreng(  dotRS_name,     ".RS" );
 
 static const char default_action[SIGNALS] = { 1, 1, 0, 1, 1, 0 } ;
 static const char default_ignore[SIGNALS] = { 1, 1, 0, 0, 1, 0 } ;
@@ -65,6 +71,7 @@ typedef struct _stackelem {
    num_descr *        increment ;
    num_descr *        stopval ;
    nodeptr            this ;
+   cnodeptr           incr_node;
    struct _stackelem *prev ; /* needed for a look back */
 } stackelem;
 
@@ -80,6 +87,7 @@ typedef struct _stackbox {
 typedef struct { /* itp_tsd: static variables of this module (thread-safe) */
    nodeptr    nvar_rc;
    nodeptr    nvar_sigl;
+   nodeptr    nvar_result;
    nstackbox  nbox;
    nstackbox *nbox_top;
    stackbox   sbox;
@@ -138,19 +146,13 @@ int init_spec_vars( tsd_t *TSD )
 
    it->nvar_sigl = MallocTSD(sizeof(*it->nvar_sigl)) ;
    it->nvar_sigl->u.varbx = NULL ;
-   it->nvar_sigl->name = Str_dupTSD( &SIGL_name ) ;
+   it->nvar_sigl->name = Str_dupTSD( SIGL_name ) ;
    it->nvar_sigl->type = X_SIM_SYMBOL ;
 
    it->nvar_rc = MallocTSD(sizeof(*it->nvar_rc)) ;
    it->nvar_rc->u.varbx = NULL ;
-   it->nvar_rc->name = Str_dupTSD( &RC_name ) ;
+   it->nvar_rc->name = Str_dupTSD( RC_name ) ;
    it->nvar_rc->type = X_SIM_SYMBOL ;
-
-   /* Allocate this only once, these are global values */
-   if (RESULT_name == NULL)
-      RESULT_name = (const streng *) Str_creTSD( "RESULT" ) ;
-   if (dotRS_name == NULL)
-      dotRS_name = (const streng *) Str_creTSD( ".RS" ) ;
 
 #ifdef TRACEMEM
    regmarker( TSD, mark_spec_vars ) ;
@@ -186,13 +188,56 @@ void update_envirs( const tsd_t *TSD, proclevel level )
 /*
  * set_sigl sets a shortcut to nvar_sigl (the variable called "SIGL"). This
  * is the setting to the numeric value argument.
+ * FIXME, FGC: This routines gives me a bad feeling until we know more
+ *             about setshortcut. Does setshortcut always use the top
+ *             level procedure layer or the "pool 0"? Strange things may
+ *             occur. Next, set_sigl sets the variable at least once before
+ *             any exceptions occurs. Very bad for SIGL processing routines
+ *             in this case.
  */
-void set_sigl(const tsd_t *TSD, int line)
+void set_sigl( const tsd_t *TSD, int line )
 {
    itp_tsd_t *it;
 
    it = TSD->itp_tsd;
    setshortcut( TSD, it->nvar_sigl, int_to_streng( TSD, line )) ;
+   setvalue( TSD, dotSIGL_name, int_to_streng( TSD, line ) );
+}
+
+/*
+ * set_rc sets a shortcut to nvar_rc (the variable called "RC").
+ * FIXME, FGC: This routines gives me a bad feeling until we know more
+ *             about setshortcut. Does setshortcut always use the top
+ *             level procedure layer or the "pool 0"? Strange things may
+ *             occur.
+ *             The argument will be consumed.
+ */
+void set_rc( const tsd_t *TSD, streng *value )
+{
+   itp_tsd_t *it;
+
+   it = TSD->itp_tsd;
+   setshortcut( TSD, it->nvar_rc, Str_dupTSD( value ) );
+   setvalue( TSD, dotRC_name, value );
+}
+
+/*
+ * set_result sets or drops the value of the variables called "RESULT" and
+ * ".RESULT". The value is NULL for a drop operation or non-NULL for a
+ * set operation and will be consumed.
+ */
+static void set_result( const tsd_t *TSD, streng *value )
+{
+   if ( value )
+   {
+      setvalue( TSD, RESULT_name, Str_dupTSD( value ) );
+      setvalue( TSD, dotRESULT_name, value );
+   }
+   else
+   {
+      drop_var( TSD, RESULT_name );
+      drop_var( TSD, dotRESULT_name );
+   }
 }
 
 /* nstackpush pushes the arg pnode on the nstack. (copy, then increment)
@@ -215,6 +260,7 @@ static void nstackpush(const tsd_t *TSD,nodeptr pnode)
          ns->next->used = 0;
          ns->next->sum = ns->sum + NSTACKELEMS;
       }
+      assert( ns->next->used == 0 ) ; /* be sure to have an empty block */
       it->nbox_top = ns->next;
    }
 }
@@ -243,7 +289,6 @@ static nodeptr nstackpop(const tsd_t *TSD)
       assert(ns->prev);
       if (!ns->prev)
       {
-         ns->used = 0;
          return(NULL);
       }
       it->nbox_top = ns = ns->prev;
@@ -289,6 +334,7 @@ static void nstackcleanup(const tsd_t *TSD,
    while (trigger < ns->sum) /* The complete block may be killed! */
    {
       if (match)
+      {
          while (ns->used)
          {
             if (ns->elems[--ns->used] == m)
@@ -297,6 +343,11 @@ static void nstackcleanup(const tsd_t *TSD,
                return;
             }
          }
+      }
+      else
+      {
+         ns->used = 0 ;
+      }
       /* For a delayed deletion preserve this box and delete the next one */
       if (ns->next)
       {
@@ -360,9 +411,9 @@ static void stackpush(const tsd_t *TSD,const stackelem *sbox)
          sb->next = MallocTSD(sizeof(stackbox));
          sb->next->prev = sb;
          sb->next->next = NULL;
-         sb->next->used = 0;
-         sb->next->sum = sb->sum + STACKELEMS;
+         sb->next->sum = sb->sum + STACKELEMS; /* const to each block */
       }
+      assert( sb->next->used == 0 ) ; /* be sure to have an empty block */
       it->stk_top = sb->next;
    }
 }
@@ -392,7 +443,6 @@ static stackelem stackpop(const tsd_t *TSD)
       assert(sb->prev);
       if (!sb->prev)
       {
-         sb->used = 0;
          memset(&zero,0,sizeof(zero));
          return(zero);
       }
@@ -506,7 +556,7 @@ void RestoreInterpreterStatus(const tsd_t *TSD,const unsigned *state)
    stackcleanup(TSD,state[1]);
 }
 
-streng *interpret(tsd_t *TSD, treenode *this)
+streng *interpret(tsd_t * volatile TSD, treenode * volatile this)
 {
    int i ;
    int stackmark ;
@@ -518,41 +568,46 @@ streng *interpret(tsd_t *TSD, treenode *this)
    volatile unsigned nstktrigger ;
    nodeptr innerloop=NULL ;
    num_descr *tdescr=NULL ;
-   nodeptr secure_this=NULL ;
-   itp_tsd_t *it;
+   volatile nodeptr secure_this ;
+   tsd_t * volatile secure_TSD ;
+   itp_tsd_t * volatile it;
 
    it = TSD->itp_tsd;
 
    nstktrigger = nstacktrigger(TSD);
    stktrigger = stacktrigger(TSD);
+
+   secure_TSD = TSD; /* vars used until here */
+   secure_this = this;
+
    if ( TSD->currlevel->buf == NULL )
    {
       TSD->currlevel->buf = MallocTSD( sizeof(jmp_buf) ) ;
 
-      secure_this = this ;
       assert(!TSD->in_protected);
       if (setjmp( *(TSD->currlevel->buf) ))
       {
+         /* A signal arrived and a longjmp from anywhere jumps here.
+          * We can't believe in anything and have to rebuild it from
+          * scratch or volatile pointers. Even an unoptimized compiler
+          * may have optimized the access to values of any kind.
+          * We have to do the full reinitialization.
+          * prevents bugs like 592393
+          */
+         this = secure_this ;
+         TSD = secure_TSD ;
+         it = TSD->itp_tsd ;
+
          tdescr = NULL ;
          innerloop = NULL ;
          memset(&s,0,sizeof(s));
-         /* this might have cleared an access pointer thus loosing some
-          * values. Someone should figure out the possible lifetime of
-          * the variables and say what should happen here.
-          */
 
-         this = secure_this ;
          nstackcleanup(TSD,nstktrigger,NULL);
          stackcleanup(TSD,stktrigger);
          no_next_interactive = 0 ;
 
-         /* oppps, we have experienced an SIGNAL, I believe */
-         /* just go on right in, only have to reinitiate initiated vars */
-         /* PLEASE, REMEMBER TO DO THAT !!! */
-
          goto fakerecurse ;
       }
-      this = secure_this ;
    }
    memset(&s,0,sizeof(s));
    no_next_interactive = 0 ;
@@ -560,9 +615,15 @@ streng *interpret(tsd_t *TSD, treenode *this)
    innerloop = NULL ;
 
 reinterpret:
+#ifdef WIN32
+   if ( __regina_Win32CtrlCRaised )
+      __regina_Win32RaiseCtrlC( TSD );
+#endif
 
    if (this==NULL)
       goto fakereturn ;
+
+   secure_this = this;
 
    TSD->currentnode = this ;
    if (TSD->trace_stat!='O' && TSD->trace_stat!='N')
@@ -577,7 +638,7 @@ reinterpret:
       this->now = NULL;
    }
 
-   this->called = 0;
+   this->o.called = 0;
 
    switch ( /*(unsigned char)*/ (this->type) )
    {
@@ -594,7 +655,7 @@ reinterpret:
       case 255:
       case X_DO:
       {
-         streng *tmpstr ;
+         streng *tmpstr,*tmpkill=NULL;
 
          if (innerloop==this)
          {
@@ -624,13 +685,14 @@ reinterpret:
             stackpush(TSD,&s);
          }
 
+         s.incr_node = NULL;
          s.increment = s.stopval = tdescr = NULL ;
          s.incrdir = 1 ;
          s.number = -1 ;
          tmpstr = NULL ;
          tdescr = NULL ;
          if ((this->p[0])&&(this->p[0]->name))
-            tmpstr = evaluate( TSD, this->p[0]->p[0], NULL ) ;
+            tmpstr = evaluate( TSD, this->p[0]->p[0], &tmpkill );
 
          for (i=1;i<4;i++)
          {
@@ -645,6 +707,7 @@ reinterpret:
                      break ;
 
                   case X_DO_BY:
+                     s.incr_node = this->p[0]->p[i]->p[0] ;
                      tmpptr = this->p[0]->p[i]->p[0] ;
                      s.increment = calcul(TSD,tmpptr,NULL) ;
                      s.incrdir = descr_sign( s.increment ) ;
@@ -654,31 +717,35 @@ reinterpret:
                   case X_DO_EXPR:
                   {
                      int iptr, error ;
-                     streng *chptr ;
+                     streng *chptr,*chkill;
 
                      tmpptr = this->p[0]->p[i]->p[0] ;
-                     chptr = evaluate(TSD, tmpptr, NULL);
-                     iptr = streng_to_int(TSD, chptr, &error) ;
-                     if (error)  exiterror( ERR_INVALID_INTEGER, (this->p[0]->p[i]->type==X_DO_EXPR) ? 2 : 3, chptr->value )  ;
-                     if (iptr<0)  exiterror( ERR_INVALID_RESULT, 0 )  ;
+                     chptr = evaluate(TSD, tmpptr, &chkill );
+                     iptr = streng_to_int(TSD, chptr, &error);
+                     if ( error )
+                        exiterror( ERR_INVALID_INTEGER, (this->p[0]->p[i]->type==X_DO_EXPR) ? 2 : 3, chptr->value );
+                     if ( iptr < 0 )
+                        exiterror( ERR_INVALID_RESULT, 0 );
                      s.number = iptr ;
-                     Free_stringTSD( chptr ) ;
+                     if ( chkill )
+                     Free_stringTSD( chkill );
                      break ;
                   }
                }
             }
          }
-         if (tmpstr)
+         if ( tmpstr )
          {
-            setshortcut( TSD, this->p[0], str_normalize(TSD, tmpstr)) ;
-            tdescr = shortcutnum( TSD, this->p[0] ) ;
-            Free_stringTSD( tmpstr ) ;
+            /*
+             * what says ANSI? must "???" in "do i = ???" be normalized?
+             * FIXME, Florian, 26.12.2002
+             */
+            setshortcut( TSD, this->p[0], str_normalize( TSD, tmpstr ) );
+            tdescr = shortcutnum( TSD, this->p[0] );
+            if ( tmpkill )
+               Free_stringTSD( tmpkill );
          }
 
-/*
-         if (s.increment==NULL)
-            s.increment = get_a_descr( TSD, &def_incr ) ;
- */
          if (TSD->systeminfo->interactive)
          {
             if (intertrace(TSD))
@@ -737,7 +804,6 @@ one:
 
          if ((this->p[0])&&(this->p[0]->name))
          {
-#ifdef OPTIMIZE
             tdescr = shortcutnum( TSD, this->p[0] ) ;
             /*
              * Check if we still have a valid number. If not
@@ -761,9 +827,10 @@ one:
  */
 
             if (s.increment)
-               string_add( TSD, tdescr, s.increment, tdescr ) ;
+               string_add( TSD, tdescr, s.increment, tdescr, this->p[0],
+                           s.incr_node ) ;
             else
-               string_incr( TSD, tdescr ) ;
+               string_incr( TSD, tdescr, this->p[0] ) ;
 
             if (this->p[0]->u.varbx)
             {
@@ -780,11 +847,6 @@ one:
             }
             else
                setshortcut( TSD, this->p[0], str_norm( TSD, tdescr, NULL )) ;
-
-#else
-            setshortcut(TSD, this->p[0], scutvar=
-                            str_add(TSD, s.increment, shortcut(TSD,this->p[0])));
-#endif
          }
 
          if (TSD->nextsig)
@@ -833,17 +895,26 @@ endloop: if (s.increment)
       }
       case X_NASSIGN:
       {
-         num_descr *ntmp ;
+         num_descr *ntmp;
+         streng *preferred_str;
+         int type;
 
-         ntmp = calcul(TSD,this->p[1],NULL) ;
-         assert( ntmp->size ) ;
+         ntmp = calcul(TSD,this->p[1],NULL);
+         assert( ntmp->size );
+
+         type = this->p[1]->type;
+         if ( ( type == X_STRING ) || ( type == X_CON_SYMBOL ) )
+            preferred_str = Str_dupTSD( this->p[1]->name );
+         else
+            preferred_str = NULL;
+
          if (this->p[0]->type==X_HEAD_SYMBOL)
          {
-            fix_compoundnum( TSD, this->p[0], ntmp ) ;
+            fix_compoundnum( TSD, this->p[0], ntmp, preferred_str );
          }
          else
          {
-            setshortcutnum( TSD, this->p[0], ntmp ) ;
+            setshortcutnum( TSD, this->p[0], ntmp, preferred_str );
          }
       }
       break ;
@@ -912,10 +983,10 @@ endloop: if (s.increment)
       case X_SAY:
       {
          int ok=HOOK_GO_ON ;
-         streng *stringen ;
+         streng *stringen,*kill=NULL;
 
          if (this->p[0])
-            stringen = evaluate(TSD,this->p[0],NULL) ;
+            stringen = evaluate( TSD, this->p[0], &kill );
          else
             stringen = NULL ;
 
@@ -937,8 +1008,8 @@ endloop: if (s.increment)
             fflush( stdout ) ;
          }
 
-         if (stringen)
-            Free_stringTSD(stringen) ;
+         if (stringen && kill)
+            Free_stringTSD( kill );
 
          break ;
       }
@@ -953,8 +1024,9 @@ endloop: if (s.increment)
                set_trace( TSD, this->name ) ;
             else if (this->p[0])
             {
-               set_trace( TSD, tptr=evaluate(TSD,this->p[0],NULL) ) ;
-               Free_stringTSD( tptr ) ;
+               set_trace( TSD, evaluate(TSD,this->p[0], &tptr ) );
+               if ( tptr )
+                  Free_stringTSD( tptr ) ;
             }
             else
                exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
@@ -983,11 +1055,22 @@ endloop: if (s.increment)
             longjmp( *(TSD->systeminfo->panic), 1 ) ;
          }
 
-         if (this->p[0]==NULL
-         ||  !myisinteger( evaluate( TSD, this->p[0], NULL ) ) )
+         if ( this->p[0] == NULL )
             rc = EXIT_SUCCESS ;
          else
-            rc = myatol(TSD, evaluate(TSD,this->p[0],NULL)) ;
+         {
+            streng *retval,*kill; /* fixes bug 481482 */
+            int error;
+
+            retval = evaluate( TSD, this->p[0], &kill );
+
+            /* fixes bug 657345 */
+            rc = streng_to_int( TSD, retval, &error );
+            if ( error )
+               rc = EXIT_SUCCESS;
+            if ( kill )
+               Free_stringTSD( kill );
+         }
 
          if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_TERMIN))
             hookup( TSD, HOOK_TERMIN ) ;
@@ -1013,29 +1096,31 @@ endloop: if (s.increment)
 
       case X_COMMAND:
       {
-         streng *stmp ;
+         streng *stmp,*kill;
 
          update_envirs( TSD, TSD->currlevel ) ;
          if (this->p[0]) {
             /* bja - added Free_stringTSD() around perform() */
-            stmp = evaluate(TSD,this->p[0],NULL);
-            Free_stringTSD(perform(TSD, stmp, TSD->currlevel->environment, this)) ;
-            Free_stringTSD(stmp) ;
+            stmp = evaluate( TSD, this->p[0], &kill );
+            Free_stringTSD(perform(TSD, stmp, TSD->currlevel->environment, this, NULL)) ;
+            if ( kill )
+               Free_stringTSD( kill );
             break ; }
       }
 
       case X_ADDR_N:   /* ADDRESS environment [expr] */
       {
-         streng *envir, *tmp ;
+         streng *envir,*tmp,*kill;
          update_envirs( TSD, TSD->currlevel ) ;
          envir = this->name ;
          if (this->p[0])
          {
             /* bja - added Free_stringTSD() around perform() */
             /* the IO-redirection is temporarily in this case. */
-            tmp = evaluate(TSD,this->p[0],NULL);
-            Free_stringTSD(perform(TSD, tmp, envir, this)) ;
-            Free_stringTSD( tmp ) ;
+            tmp = evaluate( TSD, this->p[0], &kill );
+            Free_stringTSD(perform(TSD, tmp, envir, this, this->p[1]));
+            if ( kill )
+               Free_stringTSD( kill ) ;
          }
          else
          {
@@ -1209,7 +1294,8 @@ endloop: if (s.increment)
       case X_SIG_VAL:
       case X_SIG_LAB:
       {
-         streng *cptr, *kill=NULL ;
+         streng *cptr, *kill=NULL;
+         volatile char *tmp_str ;
          stackelem *top;
          unsigned i;
 
@@ -1227,11 +1313,18 @@ endloop: if (s.increment)
          stackcleanup(TSD,stktrigger);
          set_sigl( TSD, this->lineno ) ;
          entry = getlabel( TSD, cptr ) ;
+         /*
+          * We have to make a temporary copy of the label we are signalling
+          * in case it doesn't exist because the "kill" processing will destroy
+          * the value.
+          */
+         tmp_str = tmpstr_of( TSD, cptr );
 
          if (kill)
             Free_stringTSD( kill ) ;
 
-         if ((entry)==NULL)  exiterror( ERR_UNEXISTENT_LABEL, 1, tmpstr_of( TSD, cptr ) ) ;
+         if ((entry) == NULL)
+            exiterror( ERR_UNEXISTENT_LABEL, 1, tmp_str ) ;
          this = entry->next ;
          goto fakerecurse ;
          break ;
@@ -1261,11 +1354,16 @@ endloop: if (s.increment)
       }
       case X_CALL:
       {
+         /*
+          * Find an internal label matching the label on the CALL
+          * statement, and determine if its in internal of external
+          * subroutine call.
+          */
          this->u.node = getlabel(TSD, this->name) ;
          this->type = (this->u.node) ? X_IS_INTERNAL : X_IS_BUILTIN ;
-         this->called = 1;
+         this->o.called = 1;
       }
-
+      /* THIS IS MEANT TO FALL THROUGH! */
       case X_IS_INTERNAL:
       {
          paramboxptr targs ;
@@ -1294,10 +1392,7 @@ endloop: if (s.increment)
             TSD->trace_stat = TSD->currlevel->tracestat ;
             TSD->systeminfo->interactive = TSD->currlevel->traceint ; /* MDW 30012002 */
 
-            if (result)
-               setvalue( TSD, RESULT_name, result ) ;
-            else
-               drop_var( TSD, RESULT_name ) ;
+            set_result( TSD, result );
 
             break ;
          }
@@ -1314,15 +1409,12 @@ endloop: if (s.increment)
          }
          else
          {
-            if (result)
-               setvalue( TSD, RESULT_name, result ) ;
-            else
-               drop_var( TSD, RESULT_name ) ;
+            set_result( TSD, result );
 
             break ;
          }
       }
-
+      /* THIS IS MEANT TO FALL THROUGH! */
       case X_IS_EXTERNAL:
       {
          streng *ptr, *command ;
@@ -1334,49 +1426,20 @@ endloop: if (s.increment)
          update_envirs( TSD, TSD->currlevel ) ;
 
          args = targs = initplist( TSD, this ) ;
-#if 0
-         command = Str_makeTSD( 1000 ) ;
-         command = Str_catTSD(command,this->name ) ;
-         for (;targs;targs=targs->next)
-            if (targs->value)
-            {
-               command = Str_catstrTSD(command," ") ;
-               command = Str_catTSD(command,targs->value) ;
-            }
          stackmark = pushcallstack( TSD, TSD->currentnode ) ;
-         ptr = execute_external(TSD,command,args,TSD->systeminfo->environment,
-                                NULL,0, INVO_SUBROUTINE);
-         popcallstack( TSD, stackmark ) ;
-         deallocplink( TSD, args ) ;
-
-         if (ptr==command)
-         {
-            drop_var( TSD, RESULT_name ) ;
-            ptr = NULL ;
-         }
-         if (!ptr)
-         {
-            ptr = run_popen( TSD, command, TSD->currlevel->environment ) ;
-
-            if (!ptr)
-            {
-                exiterror( ERR_ROUTINE_NOT_FOUND, 0 )  ;
-               ptr = nullstringptr() ;
-            }
-            setvalue( TSD, RESULT_name, ptr ) ;
-         }
-
-         Free_stringTSD( command ) ;
-#else
-         stackmark = pushcallstack( TSD, TSD->currentnode ) ;
-         ptr = execute_external(TSD,this->name,args,
-                                TSD->systeminfo->environment,NULL,0,
+         ptr = execute_external(TSD,
+                                this->name,
+                                args,
+                                TSD->systeminfo->environment,
+                                NULL,
+                                        /* Fixes bug 604219                  */
+                                TSD->systeminfo->hooks,
                                 INVO_SUBROUTINE);
          popcallstack( TSD, stackmark ) ;
 
-         if (ptr==this->name) /* MH no idea what this does */
+         if (ptr==this->name) /* FIXME,MH: no idea what this does */
          {
-            drop_var( TSD, RESULT_name ) ;
+            set_result( TSD, NULL );
             ptr = NULL ;
          }
 
@@ -1411,10 +1474,9 @@ endloop: if (s.increment)
             }
          }
          if (ptr)
-            setvalue( TSD, RESULT_name, ptr ) ;
+            set_result( TSD, ptr );
          deallocplink( TSD, args ) ;
 
-#endif
          break ;
       }
 
@@ -1430,80 +1492,77 @@ endloop: if (s.increment)
       case X_PARSE_U:
       case X_PARSE:
       {
-         int killit ;
-         streng *source = NULL ;
+         /*
+          * We always have to produce a duplicate of the content we have to
+          * parse. We can't use variable locking and we can't assume that
+          * the content doesn't contain variable names used in the template.
+          * This fixes bug 688503.
+          */
+         streng *source = NULL;
 
-         killit = 1 ;
-         switch (this->p[0]->type)
+         switch ( this->p[0]->type )
          {
             case X_PARSE_VAR:
                /* must duplicate, parsing may have side effects */
                /* else, we must have locking of variables */
-               source = Str_dupTSD( shortcut( TSD, this->p[0] )) ;
-/*             source = Str_dupTSD(getvalue( TSD, this->p[0]->name, 1 )) ; */
+               source = Str_dupTSD( shortcut( TSD, this->p[0] ) );
                break ;
 
             case X_PARSE_VAL:
-               source = evaluate(TSD,this->p[0]->p[0],NULL);
+            {
+               /*
+                * Must duplicate, parsing may have side effects, we must have
+                * locking of variables otherwise.
+                * fixes bug
+                */
+               source = evaluate( TSD, this->p[0]->p[0], NULL );
                break ;
+            }
 
             case X_PARSE_PULL:
-               source = popline( TSD, NULL, NULL, 0 ) ;
+               source = popline( TSD, NULL, NULL, 0 );
                break ;
 
             case X_PARSE_VER:
-               source = Str_creTSD(PARSE_VERSION_STRING) ;
+               source = Str_creTSD( PARSE_VERSION_STRING );
                break ;
 
             case X_PARSE_EXT:
-               source = readkbdline( TSD ) ;
+               source = readkbdline( TSD );
                break ;
 
             case X_PARSE_SRC:
             {
                const char *stype ;
-               streng *origfile, *inpfile ;
+               streng *origfile, *inpfile;
 
-               stype = system_type() ;
-               origfile = TSD->systeminfo->called_as ;
-               inpfile = TSD->systeminfo->input_file ;
-               source = Str_makeTSD(strlen(stype)+4+
-                        strlen(invo_strings[TSD->systeminfo->invoked])+
-                        Str_len(origfile)+Str_len(inpfile)) ;
-               source->len = 0 ;
+               stype = system_type();
+               origfile = TSD->systeminfo->called_as;
+               inpfile = TSD->systeminfo->input_file;
+               source = Str_makeTSD( strlen( stype ) + 4 +
+                        strlen( invo_strings[TSD->systeminfo->invoked] ) +
+                        Str_len( origfile ) + Str_len( inpfile ) );
+               source->len = 0;
 
-               Str_catstrTSD(source,stype) ;
-               Str_catstrTSD(source," ") ;
-               Str_catstrTSD(source,invo_strings[TSD->systeminfo->invoked]) ;
-               Str_catstrTSD(source," ") ;
-               Str_catTSD(source,inpfile) ;
-#if 0
-               /*
-                * Removed fourth, incompatible return value
-                * of PARSE SOURCE
-                * MH 0.08e
-                */
-               Str_catstrTSD(source," ") ;
-               Str_catTSD(source,origfile) ;
-#endif
-               break ;
+               Str_catstrTSD( source, stype );
+               Str_catstrTSD( source, " " );
+               Str_catstrTSD( source, invo_strings[TSD->systeminfo->invoked] );
+               Str_catstrTSD( source, " " );
+               Str_catTSD(source,inpfile );
+               break;
             }
          }
 
-         if (this->type==X_PARSE_U)
+         if ( this->type == X_PARSE_U )
          {
-            if (!killit)
-               source = Str_dupTSD(source) ;
-
-            (void)upcase(source) ;
+            upcase(source);
          }
 
          /* Use parseargtree() instead, that's more efficient */
-         doparse( TSD, source, this->p[1] ) ;
-         if (killit)
-            Free_stringTSD( source ) ;
+         doparse( TSD, source, this->p[1] );
 
-         break ;
+         Free_stringTSD( source );
+         break;
       }
 
       case X_PULL:
@@ -1562,37 +1621,62 @@ endloop: if (s.increment)
 
          Stacked = stacktrigger(TSD) - stktrigger;
 
-         if (innerloop)
+         if ( innerloop )
          { /* push the current count to let it been found below if "LEAVE name". */
             s.this = innerloop;
-            stackpush(TSD,&s);
+            stackpush( TSD, &s );
             Stacked++;
          }
 
          top = stacktop(TSD);
-         for (;;) /* while iteration counter name not found */
+         for ( ;; ) /* while iteration counter name not found */
          {
-            if (Stacked<=0)
+            if ( Stacked <= 0 )
             {
-               if (innerloop)
-                  exiterror( ERR_INVALID_LEAVE, (this->type==X_LEAVE)?3:4, tmpstr_of( TSD, this->name ) )  ;
+               if ( innerloop )
+                  exiterror( ERR_INVALID_LEAVE, (this->type==X_LEAVE)?3:4, tmpstr_of( TSD, this->name ) );
                else
-                  exiterror( ERR_INVALID_LEAVE, (this->type==X_LEAVE)?1:2 )  ;
+                  exiterror( ERR_INVALID_LEAVE, (this->type==X_LEAVE)?1:2 );
             }
-            iptr = top->this ;
-            if (this->name==NULL)
-               break;
-            if ((iptr->p[0]==NULL)||(iptr->p[0]->name==NULL))
+
+            iptr = top->this;
+
+            if ( this->name == NULL )
             {
-               popcallstack(TSD,-1) ;
-               if (top->stopval == s.stopval )
-                  s.stopval = NULL ;
-               if ( top->increment == s.increment )
-                  s.increment = NULL ;
-               stack_destroyelement(TSD,top);
+               /*
+                * LEAVE/ITERATE without any argument. Automatically pop one
+                * stack element later.
+                */
+               break;
             }
-            else if (Str_cmp(this->name,iptr->p[0]->name)==0)
-               break; /* can't use a while loop because of a possible NULL */
+
+            /*
+             * Backtrace all pending loops and compare the iterator name if
+             * one exists. We have to keep care for unnamed loops like
+             * "do 5 ; say fred ; end".
+             */
+            if ( ( iptr->p[0] != NULL ) &&
+                 ( iptr->p[0]->name != NULL ) &&
+                 ( Str_cmp( this->name, iptr->p[0]->name ) == 0 ) )
+            {
+               /*
+                * Iterator name equals our argument. Automatically pop one
+                * stack element later.
+                */
+               break;
+            }
+
+            /*
+             * Unnamed loop or a loop with a nonmatching name, cleanup!
+             * fixes bug 672864
+             */
+            popcallstack( TSD, -1 );
+            if ( top->stopval == s.stopval )
+               s.stopval = NULL;
+            if ( top->increment == s.increment )
+               s.increment = NULL;
+            stack_destroyelement( TSD, top );
+
             Stacked--;
             top = top->prev;
          }
@@ -1638,18 +1722,22 @@ endloop: if (s.increment)
       case X_NUM_D:
       {
          int tmp, error ;
-         streng *cptr = evaluate( TSD,this->p[0],NULL ) ;
+         streng *cptr,*kill;
          volatile char *err ;
-         tmp = streng_to_int( TSD, cptr, &error ) ;
-         if (error || tmp<0)
+
+         cptr = evaluate( TSD, this->p[0], &kill );
+         tmp = streng_to_int( TSD, cptr, &error );
+         if ( error || tmp < 0 )
          {
              err = tmpstr_of( TSD, cptr );
-             Free_stringTSD( cptr ) ;
+             if ( kill )
+               Free_stringTSD( kill );
              exiterror( ERR_INVALID_INTEGER, 5, err ) ;
          }
-         Free_stringTSD( cptr ) ;
+         if ( kill )
+            Free_stringTSD( kill );
          if (TSD->currlevel->numfuzz >= tmp)
-             exiterror( ERR_INVALID_RESULT, 1, tmp, TSD->currlevel->numfuzz )  ;
+             exiterror( ERR_INVALID_RESULT, 1, tmp, TSD->currlevel->numfuzz );
 #if 0
 /*
  * Remove unneccessary limitaion on numeric digits as suggested by
@@ -1681,16 +1769,20 @@ endloop: if (s.increment)
       case X_NUM_FUZZ:
       {
          int tmp, error ;
-         streng *cptr = evaluate( TSD,this->p[0],NULL ) ;
+         streng *cptr,*kill;
          volatile char *err ;
-         tmp = streng_to_int( TSD, cptr, &error ) ;
-         if (error || tmp<0)
+
+         cptr = evaluate( TSD, this->p[0], &kill );
+         tmp = streng_to_int( TSD, cptr, &error );
+         if ( error || tmp < 0 )
          {
              err = tmpstr_of( TSD, cptr );
-             Free_stringTSD( cptr ) ;
+             if ( kill )
+               Free_stringTSD( kill );
              exiterror( ERR_INVALID_INTEGER, 6, err )  ;
          }
-         Free_stringTSD( cptr ) ;
+         if ( kill )
+            Free_stringTSD( kill );
          if (TSD->currlevel->currnumsize <= tmp)
              exiterror( ERR_INVALID_RESULT, 1, TSD->currlevel->currnumsize, tmp )  ;
          TSD->currlevel->numfuzz = tmp ;
@@ -1710,8 +1802,9 @@ endloop: if (s.increment)
 
       case X_NUM_V:
       {
-         streng *tmpstr ;
-         tmpstr = evaluate( TSD, this->p[0], NULL ) ;
+         streng *tmpstr,*kill;
+
+         tmpstr = evaluate( TSD, this->p[0], &kill );
          if (tmpstr->len==10
          && !xstrncasecmp(tmpstr->value,"SCIENTIFIC",10))
             TSD->currlevel->numform = NUM_FORM_SCI ;
@@ -1726,6 +1819,8 @@ endloop: if (s.increment)
                       TSD->currlevel->numform = NUM_FORM_ENG ;
                    else
                       exiterror( ERR_INVALID_RESULT, 0 )  ;
+         if ( kill )
+            Free_stringTSD( kill );
          break ;
       }
 
@@ -1819,7 +1914,7 @@ fakerecurse:
          entry = getlabel( TSD, traps[i].name ) ;
          set_sigl( TSD, TSD->currlevel->sig->lineno ) ;
          if (TSD->currlevel->sig->type == SIGNAL_SYNTAX )
-            setshortcut( TSD, it->nvar_rc, int_to_streng( TSD, TSD->currlevel->sig->rc )) ;
+            set_rc( TSD, int_to_streng( TSD, TSD->currlevel->sig->rc ) );
 
          if ((entry)==NULL)  exiterror( ERR_UNEXISTENT_LABEL, 1, tmpstr_of( TSD, traps[i].name ) ) ;
          this = entry ;
@@ -1999,14 +2094,11 @@ proclevel newlevel( tsd_t *TSD, proclevel oldlevel )
 
       set_options_flag( level, EXT_LINEOUTTRUNC, DEFAULT_LINEOUTTRUNC ) ;
       set_options_flag( level, EXT_FLUSHSTACK, DEFAULT_FLUSHSTACK ) ;
-      set_options_flag( level, EXT_CLOSE_BIF, DEFAULT_CLOSE_BIF ) ;
-      set_options_flag( level, EXT_OPEN_BIF, DEFAULT_OPEN_BIF ) ;
       set_options_flag( level, EXT_MAKEBUF_BIF, DEFAULT_MAKEBUF_BIF ) ;
       set_options_flag( level, EXT_DROPBUF_BIF, DEFAULT_DROPBUF_BIF ) ;
       set_options_flag( level, EXT_DESBUF_BIF, DEFAULT_DESBUF_BIF ) ;
       set_options_flag( level, EXT_BUFTYPE_BIF, DEFAULT_BUFTYPE_BIF ) ;
       set_options_flag( level, EXT_CACHEEXT, DEFAULT_CACHEEXT ) ;
-      set_options_flag( level, EXT_FIND_BIF, DEFAULT_FIND_BIF ) ;
       set_options_flag( level, EXT_PRUNE_TRACE, DEFAULT_PRUNE_TRACE ) ;
       set_options_flag( level, EXT_EXT_COMMANDS_AS_FUNCS, DEFAULT_EXT_COMMANDS_AS_FUNCS ) ;
       set_options_flag( level, EXT_STDOUT_FOR_STDERR, DEFAULT_STDOUT_FOR_STDERR ) ;
@@ -2014,8 +2106,11 @@ proclevel newlevel( tsd_t *TSD, proclevel oldlevel )
       set_options_flag( level, EXT_FAST_LINES_BIF_DEFAULT, DEFAULT_FAST_LINES_BIF_DEFAULT ) ;
       set_options_flag( level, EXT_STRICT_ANSI, DEFAULT_STRICT_ANSI ) ;
       set_options_flag( level, EXT_INTERNAL_QUEUES, DEFAULT_INTERNAL_QUEUES ) ;
-      set_options_flag( level, EXT_PGB_PATCH1, DEFAULT_PGB_PATCH1 ) ;
       set_options_flag( level, EXT_REGINA_BIFS, DEFAULT_REGINA_BIFS ) ;
+      set_options_flag( level, EXT_STRICT_WHITE_SPACE_COMPARISONS, DEFAULT_STRICT_WHITE_SPACE_COMPARISONS ) ;
+      set_options_flag( level, EXT_AREXX_SEMANTICS, DEFAULT_AREXX_SEMANTICS ) ;
+      set_options_flag( level, EXT_AREXX_BIFS, DEFAULT_AREXX_BIFS ) ;
+      set_options_flag( level, EXT_BROKEN_ADDRESS_COMMAND, DEFAULT_BROKEN_ADDRESS_COMMAND ) ;
 
       level->varflag = 1 ;
       level->tracestat = (char) TSD->systeminfo->tracing ;

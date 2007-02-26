@@ -421,10 +421,10 @@ LONG APIENTRY query_term_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    RexxFreeMemory( data.strptr ) ;
 
    rc = RexxDeleteQueue( "FRED" );
-   iverify( "Query Init exit", rc, RXQUEUE_OK ) ;
+   iverify( "Query Term exit", rc, RXQUEUE_OK ) ;
 
    rc = RexxDeleteQueue( "TEST1" );
-   iverify( "Query Init exit", rc, RXQUEUE_OK ) ;
+   iverify( "Query Term exit", rc, RXQUEUE_OK ) ;
 
    return RXEXIT_HANDLED ;
 }
@@ -475,7 +475,7 @@ LONG APIENTRY it_term_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    name = "bar" ;
    shv.shvname.strptr = name ;
    shv.shvnamelen = shv.shvname.strlength = strlen(name) ;
-   
+
    /* The value is the same as above (value) and therefore valid */
 #if 0
     shv.shvvalue.strptr = value ;
@@ -1188,7 +1188,7 @@ static void qtest( void )
    Exits[1].sysexit_code = RXTER ;
    Exits[2].sysexit_code = RXENDLST ;
    RexxRegisterExitExe( "query_init", (PFN)query_init_exit, NULL ) ;
-   RexxRegisterExitExe( "query_term", (PFN)query_init_exit, NULL ) ;
+   RexxRegisterExitExe( "query_term", (PFN)query_term_exit, NULL ) ;
 
    Instore[0].strptr = "call rxqueue 'Set', 'test1';"
                        "if queued() \\= 2 then say 'error:line 2';"
@@ -1197,6 +1197,7 @@ static void qtest( void )
                        "parse pull line;"
                        "if line \\= 'line2' then say 'error:line 5';"
                        "if rxqueue('Create','FRED') \\= 'FRED' then say 'error:line 6';"
+                       "if rxqueue('Set','FRED') \\= 'TEST1' then say 'error:line 7';"
                        "push '1line';push '2line';" ;
    Instore[0].strlength = strlen( Instore[0].strptr ) ;
    Instore[1].strptr = NULL ;

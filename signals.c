@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: signals.c,v 1.11 2001/09/09 10:23:48 mark Exp $";
+static char *RCSid = "$Id: signals.c,v 1.15 2002/11/10 04:00:42 florian Exp $";
 #endif
 
 /*
@@ -43,7 +43,8 @@ const char *signalnames[] = {
    "HALT",
    "NOVALUE",
    "NOTREADY",
-   "SYNTAX"
+   "SYNTAX",
+   "LOSTDIGITS"
 } ;
 
 #ifdef TRACEMEM
@@ -157,9 +158,9 @@ int condition_hook( tsd_t *TSD, int type, int errorno, int suberrorno, int linen
       /* traps[type].on_off = 0 ;  */ /* turn trap off */
       /* traps[type].trapped = 0 ; */ /* unecessary, just to be sure */
          traps[type].delayed = 0 ;    /* ... ditto ... */
-         setvalue( TSD, &SIGL_name, int_to_streng( TSD, lineno )) ;
+         set_sigl( TSD, lineno );
          if (type == SIGNAL_SYNTAX) /* special condition */
-            setvalue( TSD, &RC_name, int_to_streng( TSD, errorno )) ;
+            set_rc( TSD, int_to_streng( TSD, errorno ) );
 
          TSD->nextsig = sigptr ;
 
@@ -189,12 +190,13 @@ int identify_trap( int type )
 {
    switch (type)
    {
-      case X_S_HALT:     return SIGNAL_HALT ;
-      case X_S_SYNTAX:   return SIGNAL_SYNTAX ;
-      case X_S_NOVALUE:  return SIGNAL_NOVALUE ;
-      case X_S_NOTREADY: return SIGNAL_NOTREADY ;
-      case X_S_ERROR:    return SIGNAL_ERROR ;
-      case X_S_FAILURE:  return SIGNAL_FAILURE ;
+      case X_S_HALT:       return SIGNAL_HALT ;
+      case X_S_SYNTAX:     return SIGNAL_SYNTAX ;
+      case X_S_NOVALUE:    return SIGNAL_NOVALUE ;
+      case X_S_NOTREADY:   return SIGNAL_NOTREADY ;
+      case X_S_ERROR:      return SIGNAL_ERROR ;
+      case X_S_FAILURE:    return SIGNAL_FAILURE ;
+      case X_S_LOSTDIGITS: return SIGNAL_LOSTDIGITS;
    }
    exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
    return SIGNAL_FATAL ;
@@ -238,9 +240,36 @@ signal_handler regina_signal(int signum,signal_handler action)
 }
 #endif
 
+#ifdef WIN32
+/*
+ * Braindamaged Win32 systems raise ^C in a different thread. We need a
+ * synchroneous alert. We just set a global flag in the halt handler and
+ * reset it here doing the proper functionality for the signal. One
+ * thread has to pick the signal during execution in the main loop.
+ * fixes bug 553022
+ */
+void __regina_Win32RaiseCtrlC( tsd_t *TSD )
+{
+   __regina_Win32CtrlCRaised = 0;
+
+   if ( !condition_hook( TSD,
+                         SIGNAL_HALT,
+                         ERR_PROG_INTERRUPT,
+                         0,
+                         lineno_of( TSD->currentnode ),
+                         Str_creTSD( signals_names[SIGINT] ),
+                         NULL ) )
+      exiterror( ERR_PROG_INTERRUPT, 0 );
+}
+#endif
+
 /* Yuk! Some of these should *really* have been volatilized */
 static void halt_handler( int num )
 {
+#ifdef WIN32
+   regina_signal( num, halt_handler );
+   __regina_Win32CtrlCRaised = 1;
+#else
    tsd_t *TSD = __regina_get_tsd(); /* The TSD must be fetched directly. */
 
 #ifdef VMS
@@ -259,8 +288,7 @@ static void halt_handler( int num )
                        NULL
                        ))
       exiterror( ERR_PROG_INTERRUPT, 0 )  ;
-
-   return ;
+#endif
 }
 
 #if !defined(__WINS__) && !defined(__EPOC32__)

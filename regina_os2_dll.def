@@ -40,3 +40,4 @@ EXPORTS
         RexxQueryQueue
         RexxReorderMacro
         RexxSaveMacroSpace
+        RexxCallBack

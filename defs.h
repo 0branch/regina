@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: defs.h,v 1.18 2002/03/23 01:33:20 mark Exp $
+ * $Id: defs.h,v 1.27 2003/04/02 07:44:51 mark Exp $
  */
 
 #define X_NULL          1
@@ -241,6 +241,7 @@
 /* No errortexts have not been defined to the next to numbers */
 #define ERR_SYSTEM_FAILURE      48
 #define ERR_INTERPRETER_FAILURE 49
+#define ERR_RESERVED_SYMBOL     50
 #define ERR_UNQUOTED_FUNC_STOP  51
 #define ERR_INVALID_OPTION      53
 #define ERR_INVALID_STEM_OPTION 54
@@ -316,14 +317,15 @@
 #define NUM_FORM_ENG    1
 
 
-#define SIGNAL_FATAL   -1
-#define SIGNAL_ERROR    0
-#define SIGNAL_FAILURE  1
-#define SIGNAL_HALT     2
-#define SIGNAL_NOVALUE  3
-#define SIGNAL_NOTREADY 4
-#define SIGNAL_SYNTAX   5
-#define SIGNALS         6
+#define SIGNAL_FATAL     -1
+#define SIGNAL_ERROR      0
+#define SIGNAL_FAILURE    1
+#define SIGNAL_HALT       2
+#define SIGNAL_NOVALUE    3
+#define SIGNAL_NOTREADY   4
+#define SIGNAL_SYNTAX     5
+#define SIGNAL_LOSTDIGITS 6
+#define SIGNALS           7
 
 #define SIGTYPE_ON    0
 #define SIGTYPE_OFF   1
@@ -364,6 +366,8 @@
 #define HOOK_FUNC      7
 #define HOOK_GETENV    8
 #define HOOK_SETENV    9
+#define HOOK_GETCWD   10
+#define HOOK_SETCWD   11
 
 #define HOOK_MASK(a)   (1<<(a))
 
@@ -379,6 +383,7 @@
 #define SYMBOL_STEM     2
 #define SYMBOL_SIMPLE   3
 #define SYMBOL_COMPOUND 4
+#define SYMBOL_NUMBER   5
 
 
 #define VFLAG_NONE   0x0000
@@ -389,25 +394,36 @@
 
 #define UNKNOWN_QUEUE -1
 /*
- * For refering to the extensions, must correspond with the bitfields
- * in the definition of the u.options field of proclevel in types.h
+ * For refering to the extensions.
  */
-#define EXT_FLUSHSTACK              0
-#define EXT_LINEOUTTRUNC            1
-#define EXT_CLOSE_BIF               2
-#define EXT_OPEN_BIF                3
-#define EXT_BUFTYPE_BIF             4
-#define EXT_DESBUF_BIF              5
-#define EXT_DROPBUF_BIF             6
-#define EXT_MAKEBUF_BIF             7
-#define EXT_CACHEEXT                8
-#define EXT_FIND_BIF                9
-#define EXT_PRUNE_TRACE            10
-#define EXT_EXT_COMMANDS_AS_FUNCS  11
-#define EXT_STDOUT_FOR_STDERR      12
-#define EXT_TRACE_HTML             13
-#define EXT_FAST_LINES_BIF_DEFAULT 14
-#define EXT_STRICT_ANSI            15
-#define EXT_INTERNAL_QUEUES        16
-#define EXT_PGB_PATCH1             17  /* pgb */
-#define EXT_REGINA_BIFS            18
+#define EXT_FLUSHSTACK                       0
+#define EXT_LINEOUTTRUNC                     1
+#define EXT_BUFTYPE_BIF                      2
+#define EXT_DESBUF_BIF                       3
+#define EXT_DROPBUF_BIF                      4
+#define EXT_MAKEBUF_BIF                      5
+#define EXT_CACHEEXT                         6
+#define EXT_PRUNE_TRACE                      7
+#define EXT_EXT_COMMANDS_AS_FUNCS            8
+#define EXT_STDOUT_FOR_STDERR                9
+#define EXT_TRACE_HTML                      10
+#define EXT_FAST_LINES_BIF_DEFAULT          11
+#define EXT_STRICT_ANSI                     12
+#define EXT_INTERNAL_QUEUES                 13
+#define EXT_REGINA_BIFS                     14
+#define EXT_STRICT_WHITE_SPACE_COMPARISONS  15
+#define EXT_AREXX_SEMANTICS                 16
+#define EXT_AREXX_BIFS                      17
+#define EXT_BROKEN_ADDRESS_COMMAND          18
+
+/*
+ * Regina 3.1 introduced "pool 0" variables. There exist only some and they
+ * can be determined by known_reserved_variable. Here are the return
+ * values of this function.
+ */
+#define POOL0_NOT_RESERVED    0  /* must be 0, following must be consecutive */
+#define POOL0_RC              1
+#define POOL0_RESULT          2
+#define POOL0_SIGL            3
+#define POOL0_RS              4
+#define POOL0_MN              5

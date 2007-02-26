@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: types.h,v 1.13 2002/04/29 10:48:07 mark Exp $
+ * $Id: types.h,v 1.18 2002/09/07 13:25:15 florian Exp $
  */
 
 
@@ -48,22 +48,25 @@ typedef struct {
 } compflags ;
 
 typedef enum {
-   isUNKNOWN = 0,
-   isSTREAM = 1,
-   isSTEM = 2,
-   isLIFO = 3,
-   isFIFO = 4
+   awtUNKNOWN = 0,
+   awtSTREAM = 1,
+   awtSTEM = 2,
+   awtLIFO = 3,
+   awtFIFO = 4
 } AddressWithType;
+
+typedef enum {
+   antUNKNOWN = 0,
+   antSTRING = 1,
+   antSIMSYMBOL = 2
+} AddressNameType;
+
 typedef struct {
    unsigned int append:1 ;
    unsigned int isinput:1 ;
    unsigned int awt:3 ; /* overlay with AddressWithType */
+   unsigned int ant:2 ; /* overlay with AddressNameType */
 } outputflags ; /* used by ADDRESS WITH resourceo */
-
-typedef struct pparambox *paramboxptr ;
-typedef const struct pparambox *cparamboxptr ;
-typedef struct tnode *nodeptr ;
-typedef const struct tnode *cnodeptr ;
 
 typedef struct  {
    long sec ;
@@ -74,10 +77,22 @@ struct _tsd_t; /* If this won't work change "struct _tsd_t *" to "void *"
                 * below. This will require more changes. Let your compiler
                 * choose the places.
                 */
+
+typedef struct pparambox *paramboxptr ;
+typedef const struct pparambox *cparamboxptr ;
+typedef struct pparambox {
+   paramboxptr next ;
+   int dealloc ;
+   struct strengtype *value ;
+} parambox ;
+
 typedef struct tnode {
    unsigned int type ;
    int charnr, lineno ;
-   int called;
+   union {                 /* saves memory which is really needed          */
+      int called;          /* used during execution *and* don't need init  */
+      struct tnode *last;  /* used during parsing                          */
+   } o ;
    struct strengtype *name ;
    rexx_time *now ;
    struct tnode *p[4] ;
@@ -94,12 +109,8 @@ typedef struct tnode {
    struct tnode *next ;
    unsigned long nodeindex ; /* for an effectiv relocation, never change! */
 } treenode ;
-
-typedef struct pparambox {
-   paramboxptr next ;
-   int dealloc ;
-   struct strengtype *value ;
-} parambox ;
+typedef struct tnode *nodeptr ;
+typedef const struct tnode *cnodeptr ;
 
 typedef struct lineboxx *lineboxptr ;
 typedef const struct lineboxx *clineboxptr ;
@@ -146,22 +157,114 @@ typedef struct __regina_option
    char *contains ;
 } option_type ;
 
+typedef struct _StackLine {
+   /* A stack line is a double linked list element of a streng. The streng
+    * never contains a line end and is never NULL.
+    * A read operations will happen at the top end, as well as a LIFO
+    * operation.
+    * A FIFO operation will happen at the bottom end.
+    */
+   struct _StackLine *higher ;
+   struct _StackLine *lower ;
+   streng *contents ;
+} StackLine ;
+
+typedef struct _Buffer {
+   /* A buffer is a double linked list of stack line bundles.
+    * MAKEBUF() adds a new buffer at the newest end.
+    */
+   struct _Buffer *higher ;
+   struct _Buffer *lower ;
+
+   /* The "content" of the buffer. See StackLine for a description.
+    * For a faster response of QUEUED(), we count the elements of lines.
+    */
+   StackLine *top ;
+   StackLine *bottom ;
+   unsigned elements ;
+} Buffer ;
+
+typedef struct {
+   /* A queue is one of different implementations of queue types.
+    * See the picture and the description at the beginning of stack.c.
+    */
+   enum { QisUnused, QisSESSION, QisInternal, QisExternal, QisTemp } type ;
+   union {
+      struct { /* internal or SESSION: i */
+         /* name is the uppercased name of the queue. In rare cases this
+          * may be NULL for QisSESSION after initialisation.
+          */
+         streng *name ;
+         /*
+          * Indicates if the queue is a "real" queue
+          * or a false queue as a result of a rxqueue('set', 'qname')
+          * on a queue that doesn't exist. This is crap behaviour!
+          * but that's how Object Rexx works :-(
+          */
+         int isReal ;
+         /*
+          * Content: We have a double linked list of buffers. See Buffer
+          * for a description.
+          */
+         Buffer *top ;
+         Buffer *bottom ;
+
+         /* This is the count of buffers including the zeroth buffer */
+         unsigned buffers ;
+
+         /* This is the overall count of elements in all buffers */
+         unsigned elements ;
+      } i ;
+      struct { /* external: e */
+         /*
+          * The port number for the current connection to an external rxstack
+          * Valid values: 1..0xFFFF, unused: 0
+          */
+         int portno;
+         /*
+          * The socket fd for the current connection to an external rxstack
+          * Valid values: not -1, unused/error: -1
+          */
+         int socket;
+         /*
+          * The server address of the current connection. Used to determine if
+          * we need to disconnect from one rxstack server and connect to
+          * another.
+          * The true data type is a 32 bit system depending type.
+          * Valid values: not 0, unused: 0
+          */
+         int address;
+         /*
+          * The server name of the current connection.
+          * Unused value: NULL
+          */
+         streng *name;
+      } e ;
+      Buffer t ; /* temp: t */
+   } u ;
+} Queue ;
+
 typedef struct { /* one for each redirection in environment */
-   streng      *name; /* stemname or streamname if any */
+   streng      *name;     /* name if any, but not expanded      */
    outputflags  flags;
    streng      *base;     /* "number" if name is a stem         */
-   streng      *currname; /* name + ".number" if name is a stem */
+   streng      *currname; /* expanded name + ".number" if name  */
+                          /* is a stem                          */
+   int          currnamelen;  /* len(currname) without ".number"*/
    int          currnum;  /* current number for a stem position */
                           /* or -1 if unknown                   */
    int          maxnum;   /* maximum number for a stem position */
                           /* or -1 if unknown                   */
    void        *file;     /* fileboxptr of the file with the    */
                           /* above name or NULL.                */
+   Queue       *queue;    /* queue with the above name or NULL. */
+   Queue       *tmp_queue;/* temporary queue for the redirection*/
+                          /* or NULL without this helper.       */
    unsigned int SameAsOutput:1;   /* locally used in shell.c    */
    unsigned int FileRedirected:1; /* locally used in shell.c    */
    char        *tempname; /* locally used filename in shell.c   */
    int          type;     /* locally used source in shell.c     */
-   int          hdls[2];  /* locally used connection in shell.c */
+   int          hdls[3];  /* locally used connection in shell.c */
 } environpart;
 
 typedef struct {

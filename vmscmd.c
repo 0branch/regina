@@ -49,7 +49,7 @@ you. You may do the work in this order:
  */
 
 /*
- * $Id: vmscmd.c,v 1.4 2001/07/29 07:37:40 mark Exp $
+ * $Id: vmscmd.c,v 1.5 2002/09/08 02:29:29 mark Exp $
  */
 
 #include <stdio.h>
@@ -260,7 +260,7 @@ static void write_out_ast()
    return;
 }
 
-int vms_do_command( tsd_t *TSD, const streng *cmd, int in, int out, int fout, const environment *env )
+int vms_do_command( tsd_t *TSD, const streng *cmd, int io_flags, environment *env, Queue *redir )
 {
    struct dsc$descriptor_s name, input, output, prc_name ;
    int fdin[2], fdout[2], strval[2], strval2[2], lim=0, max=0 ;

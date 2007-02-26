@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 #include "rexxsaa.h"
 
@@ -50,37 +51,9 @@ static const RexxFunction RexxSqlFunctions[] = {
    {(PSZ)NAME_FUNCTION1,   (PFN)Test2Function1  },
    {(PSZ)NAME_FUNCTION2,   (PFN)Test2Function2  },
    {(PSZ)NAME_DROPFUNCS,   (PFN)Test2DropFuncs  },
+   {(PSZ)NAME_LOADFUNCS,   (PFN)Test2LoadFuncs  },
    {NULL,NULL}
 };
-
-/*-----------------------------------------------------------------------------
- * Uppercases the supplied string.
- *----------------------------------------------------------------------------*/
-char *make_upper(char *str)
-{
-   char *save_str=str;
-   while(*str)
-   {
-      if (islower(*str))
-         *str = (char) toupper(*str);
-      ++str;
-   }
-   return(save_str);
-}
-
-/*-----------------------------------------------------------------------------
- * Copy a non terminated character array to the nominated buffer (truncate
- * if necessary) and null terminate.
- *----------------------------------------------------------------------------*/
-char *MkAsciz(char *buf, size_t bufsize, const char *str, size_t len)
-{
-   bufsize--;     /* Make room for terminating byte */
-   if (len > bufsize)
-      len = bufsize;
-   memcpy(buf, str, len);
-   buf[len] = '\0';
-   return buf;
-}
 
 static void static_show_parameter(ULONG argc, RXSTRING argv[], PSZ func_name)
 {
@@ -98,7 +71,11 @@ static void static_show_parameter(ULONG argc, RXSTRING argv[], PSZ func_name)
  return;
 }
 
+#if defined(DYNAMIC_STATIC)
+static void global_show_parameter(ULONG argc, RXSTRING argv[], PSZ func_name)
+#else
 void global_show_parameter(ULONG argc, RXSTRING argv[], PSZ func_name)
+#endif
 {
    char buf[100];
    if (argc == 0)
@@ -177,3 +154,16 @@ APIRET APIENTRY LOADFUNCS(PCSZ name,ULONG argc,PRXSTRING argv,PCSZ stck,PRXSTRIN
    retstr->strlength = strlen(retstr->strptr);
    return 0L;
 }
+
+#if defined( DYNAMIC_STATIC )
+void *getTest2FunctionAddress( char *name )
+{
+   const RexxFunction  *func=NULL;
+   for (func = RexxSqlFunctions; func->function_name; func++)
+   {
+      if ( strcmp( func->function_name, name) == 0 )
+         return func->EntryPoint;
+   }
+   return NULL;
+}
+#endif

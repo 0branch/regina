@@ -28,6 +28,7 @@ parsing.obj   &
 files.obj     &
 misc.obj      &
 unxfuncs.obj  &
+arxfuncs.obj  &
 os2funcs.obj  &
 cmsfuncs.obj  &
 shell.obj     &
@@ -65,6 +66,7 @@ parsing.dlo   &
 files.dlo     &
 misc.dlo      &
 unxfuncs.dlo  &
+arxfuncs.dlo  &
 os2funcs.dlo  &
 cmsfuncs.dlo  &
 shell.dlo     &
@@ -141,6 +143,7 @@ rexx.exe : $(OFILES) rexx.obj
         @%append dummy.lnk file files.obj
         @%append dummy.lnk file misc.obj
         @%append dummy.lnk file unxfuncs.obj
+        @%append dummy.lnk file arxfuncs.obj
         @%append dummy.lnk file os2funcs.obj
         @%append dummy.lnk file cmsfuncs.obj
         @%append dummy.lnk file shell.obj
@@ -205,6 +208,7 @@ $(LIBFILE): $(OFILES) client.obj drexx.obj rexxsaa.obj
         @%append lib.rsp +files.obj
         @%append lib.rsp +misc.obj
         @%append lib.rsp +unxfuncs.obj
+        @%append lib.rsp +arxfuncs.obj
         @%append lib.rsp +os2funcs.obj
         @%append lib.rsp +cmsfuncs.obj
         @%append lib.rsp +shell.obj
@@ -251,6 +255,7 @@ $(DLLFILE): $(DLOFILES) client.dlo drexx.dlo rexxsaa.dlo
         @%append dummy.lnk file files.dlo
         @%append dummy.lnk file misc.dlo
         @%append dummy.lnk file unxfuncs.dlo
+        @%append dummy.lnk file arxfuncs.dlo
         @%append dummy.lnk file os2funcs.dlo
         @%append dummy.lnk file cmsfuncs.dlo
         @%append dummy.lnk file shell.dlo
@@ -362,6 +367,9 @@ misc.obj:     $(SRC)misc.c $(HFILES)
         $(CC) $(CCFLAGS) /fo=$@ $(SRC)$*.c
 
 unxfuncs.obj: $(SRC)unxfuncs.c $(HFILES)
+        $(CC) $(CCFLAGS) /fo=$@ $(SRC)$*.c
+
+arxfuncs.obj: $(SRC)arxfuncs.c $(HFILES)
         $(CC) $(CCFLAGS) /fo=$@ $(SRC)$*.c
 
 os2funcs.obj: $(SRC)os2funcs.c $(HFILES)
@@ -488,6 +496,9 @@ misc.dlo:     $(SRC)misc.c $(HFILES)
         $(CC) $(CCFLAGS) /bd /fo=$*.dlo $(SRC)$*.c
 
 unxfuncs.dlo: $(SRC)unxfuncs.c $(HFILES)
+        $(CC) $(CCFLAGS) /bd /fo=$*.dlo $(SRC)$*.c
+
+arxfuncs.dlo: $(SRC)arxfuncs.c $(HFILES)
         $(CC) $(CCFLAGS) /bd /fo=$*.dlo $(SRC)$*.c
 
 os2funcs.dlo: $(SRC)os2funcs.c $(HFILES)

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: strings.c,v 1.7 2002/01/28 05:51:03 mark Exp $";
+static char *RCSid = "$Id: strings.c,v 1.8 2002/11/10 04:00:42 florian Exp $";
 #endif
 
 /*
@@ -286,7 +286,7 @@ streng *Str_nocat_TSD( const tsd_t *TSD, streng *first, const streng *second, in
       tmp = length ;
 
    ptr = assure( TSD, first, first->len + tmp);
-   memcpy( &first->value[first->len], &second->value[offset], tmp ) ;
+   memcpy( &ptr->value[first->len], &second->value[offset], tmp ) ;
 
    ptr->len += tmp ;
    return ptr ;
@@ -304,7 +304,7 @@ streng *Str_cat_TSD( const tsd_t *TSD, streng *first, const streng *second )
    int tmp=0 ;
 
    ptr = assure( TSD, first, (tmp=Str_len(first)+Str_len(second)) ) ;
-   memcpy( &first->value[Str_len(first)], second->value, Str_len(second) ) ;
+   memcpy( &ptr->value[Str_len(first)], second->value, Str_len(second) ) ;
    ptr->len = tmp ;
 
    return ptr ;
@@ -322,7 +322,7 @@ streng *Str_ncat_TSD( const tsd_t *TSD, streng *first, const streng *second, int
    int tmp=0 ;
 
    ptr = assure( TSD, first, Str_len(first) + (tmp=MIN(length,Str_len(second))) ) ;
-   memcpy( &first->value[Str_len(first)], second->value, tmp ) ;
+   memcpy( &ptr->value[Str_len(first)], second->value, tmp ) ;
 
    ptr->len += tmp ;
    return ptr ;

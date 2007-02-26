@@ -182,6 +182,7 @@
  40,922,[%s-argument %d, for få underkommandoer; minst %d forventet; fant %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[%s-argument %d, for mange underkommandoer; maksimalt %d forventet; fant %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s-argument %d, ugyldig posisjonsspesifikasjon; ventet en av "%s"; fant "%s"]|<bif>,<argnumber>,<value>,<value>
+ 40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>
  41,  0,Feil i aritmetisk konvertering
  41,  1,Ikke-numerisk verdi ("%s") til venstre for aritmetisk operasjon "%s"|<value>,<operator>
  41,  2,Ikke-numerisk verdi ("%s") til høyre for aritmetisk operasjon "%s"|<value>,<operator>
@@ -248,6 +249,9 @@
  94,106,[Maksimalt antall eksterne køer overskredet: %d]|<maxqueues>
  94,107,[Feil oppstod under lesing av socket: %s]|<systemerror>
  94,108,[Ugyldig bryter oversendt. Må være en av "%s"]|<switch>
+ 94,109,[Queue \"%s\" not found]|<queuename>
+ 94,110,[%s invalid for external queues]|<bif>
+ 94,111,[RXQUEUE function %s invalid for internal queues]|<functionname>
  95,  0,[Restricted feature used in "safe" mode]
  95,  1,[%s invalid in "safe" mode]|<token>
  95,  2,[%s argument %d invalid in "safe" mode]|<bif>,<argnumber>

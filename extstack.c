@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: extstack.c,v 1.6 2002/03/23 00:56:47 mark Exp $";
+static char *RCSid = "$Id: extstack.c,v 1.11 2003/03/11 10:39:36 florian Exp $";
 #endif
 
 /*
@@ -22,7 +22,7 @@ static char *RCSid = "$Id: extstack.c,v 1.6 2002/03/23 00:56:47 mark Exp $";
  */
 
 #include "rexx.h"
- 
+
 #ifdef EXTERNAL_TO_REGINA
 # include <assert.h>
 /* tmpstr_of must be defined before the inclusion of extstack.h since it
@@ -48,6 +48,7 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 #  endif
 # else
 #  include <windows.h>
+#  include <winsock.h>
 # endif
 # include <io.h>
 #else
@@ -77,11 +78,22 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 
 #include "extstack.h"
 
-#ifndef NDEBUG
-# define DEBUGDUMP(x) {x;}
-#else
-# define DEBUGDUMP(x) {}
-#endif
+static int debug = -1 ;
+#define DEBUGDUMP(x) {                                                       \
+                        if ( debug == -1 )                                   \
+                        {                                                    \
+                           debug = ( getenv( "RXDEBUG" ) == NULL ) ? 0 : 1 ; \
+                        }                                                    \
+                        if ( debug )                                         \
+                        {                                                    \
+                           x ;                                               \
+                        }                                                    \
+                     }
+
+/* "localhost" maps to "127.0.0.1" on most systems but it may use DNS on
+ * badly configured systems. Use "127.0.0.1" to bypass any errors.
+ */
+static const char ReginaLocalHost[] = "127.0.0.1";
 
 void showerror( int err, int suberr, char *tmpl, ...)
 {
@@ -124,25 +136,9 @@ void term_external_queue( void )
 #endif
 }
 
-int get_default_port_number( void )
+int get_length_from_header( const tsd_t *TSD, const streng *header )
 {
-   int portno;
-   char *port = getenv("RXSTACK");
-   if ( port == NULL )
-   {
-      portno = RXSOCKET;
-   }
-   else
-   {
-      portno = atoi(port);
-
-   }
-   return portno;
-}
-
-int get_length_from_header( const tsd_t *TSD, streng *header )
-{
-   int length=0;
+   int length=0,error=1;
    streng *result=NULL;
 
    result = MAKESTRENG( RXSTACK_HEADER_SIZE - 1 );
@@ -150,67 +146,108 @@ int get_length_from_header( const tsd_t *TSD, streng *header )
    {
       result->len = RXSTACK_HEADER_SIZE - 1;
       memcpy( result->value, header->value+1, RXSTACK_HEADER_SIZE-1 );
-      DEBUGDUMP(printf("Hex value: %s\n", result->value););
-      length = REXX_X2D( result );
+      DEBUGDUMP(printf("Hex value: %.*s\n", PSTRENGLEN(result),PSTRENGVAL(result)););
+      length = REXX_X2D( result, &error );
       DROPSTRENG( result );
    }
-   return length;
+   return ( error ) ? 0 : length;
 }
 
 #if !defined(NO_EXTERNAL_QUEUES)
-
-int get_default_server_address( void )
+int default_port_number( void )
 {
-   return inet_addr( "127.0.0.1" );
+   int portno;
+   char dummy;
+   char *port = getenv("RXSTACK"); /* FIXME: May be overwritten by VALUE-BIF */
+
+   if ( port != NULL )
+   {
+      if ( sscanf( port, "%d %c", &portno, &dummy ) == 1 )
+         if ( (portno > 1) && (portno < 0xFFFF) )
+            return portno;
+   }
+   return RXSOCKET;
 }
 
-int connect_to_rxstack( tsd_t *TSD, int portno, streng *server_name, int server_address )
+int default_external_address( void )
+{
+   return inet_addr( ReginaLocalHost );
+}
+
+streng *default_external_name( const tsd_t *TSD )
+{
+   int len;
+   streng *result;
+
+   len = sizeof(ReginaLocalHost); /* includes the term. \0 */
+   result = MAKESTRENG( len );
+   result->len = len;
+   memcpy( result->value, ReginaLocalHost, len ) ;
+   return result ;
+}
+
+int connect_to_rxstack( tsd_t *TSD, Queue *q )
 {
    struct sockaddr_in server;
-   int sock;
+
    /*
     * Connect to external rxstack process/daemon/service
     */
+   assert( q->type == QisExternal ) ;
+   DEBUGDUMP(printf("In connect_to_rxstack: q = {name=%.*s, address=%08X, portno=%d}\n", q->u.e.name->len, q->u.e.name->value, q->u.e.address, q->u.e.portno););
    memset( &server, 0, sizeof(server) );
    server.sin_family = AF_INET;
-   server.sin_addr.s_addr = server_address;
-   server.sin_port = htons((unsigned short) portno);
+   server.sin_addr.s_addr = q->u.e.address;
+   server.sin_port = htons((unsigned short) q->u.e.portno);
 
-   sock = socket( AF_INET, SOCK_STREAM, 0 );
-   if ( sock < 0 )
-      return sock;
-   if ( connect( sock, (struct sockaddr *)&server, sizeof(server) ) < 0 )
+   q->u.e.socket = socket( AF_INET, SOCK_STREAM, 0 );
+   if ( q->u.e.socket >= 0 )
    {
-      /* TSD can be NULL when called from rxqueue or rxstack */
-      if ( TSD == NULL || TSD->called_from_saa )
-         showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, ERR_RXSTACK_CANT_CONNECT_TMPL, server_name->value, portno, strerror ( errno ) );
-      else
-         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, tmpstr_of( (void *) TSD, server_name), portno, strerror ( errno ) );
-      return -1;
+      if ( connect( q->u.e.socket, (struct sockaddr *)&server, sizeof(server) ) < 0 )
+      {
+         int eno = errno;
+         close(q->u.e.socket);
+         q->u.e.socket = -1;
+         errno = eno;
+      }
+      DEBUGDUMP(printf("In connect_to_rxstack: socket=%d\n", q->u.e.socket););
+      return(q->u.e.socket);
    }
-   return sock;
-}
-#endif
+   /* TSD can be NULL when called from rxqueue or rxstack */
+   if ( TSD == NULL || TSD->called_from_saa )
+      showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, ERR_RXSTACK_CANT_CONNECT_TMPL, q->u.e.name, q->u.e.portno, strerror ( errno ) );
+   else
+      exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, tmpstr_of( (void *) TSD, q->u.e.name ), q->u.e.portno, strerror ( errno ) );
 
-#if !defined(NO_EXTERNAL_QUEUES)
-int disconnect_from_rxstack( const tsd_t *TSD, int sock )
+   return -1;
+}
+
+int disconnect_from_rxstack( const tsd_t *TSD, Queue *q )
 {
    int rc;
 
-   DEBUGDUMP(printf("Diconnecting from socket %d\n", sock ););
-   rc = send_command_to_rxstack( TSD, sock, RXSTACK_EXIT_STR, NULL, 0 );
-   close( sock );
+   assert( q->type == QisExternal ) ;
+   if (q->u.e.socket != -1)
+   {
+      DEBUGDUMP(printf("Diconnecting from socket %d\n", q->u.e.socket ););
+      rc = send_command_to_rxstack( TSD, q->u.e.socket, RXSTACK_EXIT_STR, NULL, 0 );
+      close( q->u.e.socket );
+   }
+   else
+      rc = 0; /* success: 0 bytes transfered */
+   if (q->u.e.name != NULL)
+      DROPSTRENG( q->u.e.name );
+   memset( q, 0, sizeof(Queue) ) ;
+   q->type = QisUnused ;
    return rc;
 }
-#endif
 
-#if !defined(NO_EXTERNAL_QUEUES)
-int send_command_to_rxstack( const tsd_t *TSD, int sock, char *action, char *str, int len )
+int send_command_to_rxstack( const tsd_t *TSD, int sock, const char *action, const char *str, int len )
 {
    streng *qlen, *header;
    int rc=-1;
 
-   DEBUGDUMP(printf("Sending to %d Action: %s <%s> Len:%d\n", sock, action, (str) ? str : "", len););
+   DEBUGDUMP(printf("Sending to %d Action: %s <%.*s> Len:%d\n", sock, action, len, (str) ? str : "", len););
    qlen = REXX_D2X( len );
    if ( qlen )
    {
@@ -220,7 +257,7 @@ int send_command_to_rxstack( const tsd_t *TSD, int sock, char *action, char *str
       {
          header->value[0] = action[0];
          rc = send( sock, PSTRENGVAL(header), PSTRENGLEN(header), 0 );
-         DEBUGDUMP(printf("Send length: %s(%d) rc %d\n", PSTRENGVAL(header),PSTRENGLEN(header),rc););
+         DEBUGDUMP(printf("Send length: %.*s(%d) rc %d\n", PSTRENGLEN(header),PSTRENGVAL(header),PSTRENGLEN(header),rc););
          if ( str && rc != -1 )
          {
             rc = send( sock, str, len, 0 );
@@ -231,9 +268,22 @@ int send_command_to_rxstack( const tsd_t *TSD, int sock, char *action, char *str
    }
    return rc;
 }
-#endif
 
-#if !defined(NO_EXTERNAL_QUEUES)
+static int inject_result_from_rxstack( int sock, streng *str, int size )
+{
+  /*
+   * Reads size bytes from sock and adds them to str. No overflow checking
+   * is performed.
+   * returns the result from recv.
+   */
+   int rc;
+
+   rc = recv( sock, PSTRENGVAL(str) + PSTRENGLEN(str), size, 0 );
+   DEBUGDUMP(printf("Recv result: %.*s(%d) rc %d\n", size, PSTRENGVAL(str) + PSTRENGLEN(str), PSTRENGLEN(str), rc ); );
+   str->len += size;
+   return rc;
+}
+
 streng *read_result_from_rxstack( const tsd_t *TSD, int sock, int result_size )
 {
   /*
@@ -247,172 +297,124 @@ streng *read_result_from_rxstack( const tsd_t *TSD, int sock, int result_size )
    result = MAKESTRENG( result_size );
    if ( result )
    {
-      result->len = result_size;
       if ( result_size )
       {
-         rc = recv( sock, PSTRENGVAL(result), PSTRENGLEN(result), 0 );
-         DEBUGDUMP(printf("Recv result: %s(%d) length: %d\n", PSTRENGVAL(result),PSTRENGLEN(result), rc););
+         result->len = 0 ; /* MAKESTRENG sets ->len to nonzero sometimes */
+         rc = inject_result_from_rxstack( sock, result, result_size );
       }
    }
    return result;
 }
-#endif
 
-#if !defined(NO_EXTERNAL_QUEUES)
-int parse_queue( tsd_t *TSD, streng *queue, streng **server_name, int *server_address, int *portno )
+/* parse_queue validates the queue name. The format is [queue][@host[:port]]
+ * *eq is filled and may contain default values.
+ * queue may be empty to designate the current/default queue.
+ * host may be empty to designate the local host. It has to be either a
+ * IPv4 hostname or a IPv4 IP address.
+ * The [@host[:port]] part is chopped off and the pure queue name remains.
+ * return values:
+ * -1: error detected (exiterror() is thrown normally!)
+ *  0: queue is NULL
+ *  1: queue is parsed successfully, either with or without host part.
+ */
+int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
 {
-   /*
-    * Validate the queue name. Format is [queue][@host[:port]]
-    */
-   int num_colons=0,num_ats=0,num_dots=0,i,colon_pos=-1,at_pos=-1;
-   char *tmp_server=NULL,*tmp_port=NULL;
-   int len=PSTRENGLEN( queue );
-   struct hostent *host;
-   struct in_addr *ptr;
+   int len, AtPos;
+   char *h, dummy;
+   struct hostent *he;
 
-   /*
-    * Find the optional '@' and ':'...
+   q->type = QisExternal ;
+   q->u.e.portno = 0;  /* Good practise for initialisation */
+   q->u.e.socket = -1;
+   q->u.e.address = 0;
+   q->u.e.name = NULL;
+
+   if ( queue == NULL )
+      return 0 ;
+
+   len = PSTRENGLEN( queue );
+   if (( h = memchr( PSTRENGVAL( queue ), '@', len ) ) == NULL )
+      return 1 ;
+
+   AtPos = (int) ( h - PSTRENGVAL( queue ) ) ;
+   h++ ;
+   len -= AtPos + 1 ;
+
+   /* h is at host, len contains its length. We now do a trick. We copy the
+    * complete host part into q->u.e.name, but a '\0' appended. We can simply
+    * check out the portno part and we can apply sscanf() on it. Working with
+    * a temporary buffer for the portno has no benefit, we can save 5 byte
+    * per connection with a maximum of 1 permanent connection ==> 5 byte
     */
-   for ( i = 0; i < len; i++ )
-   {
-      if ( queue->value[i] == '@' )
-      {
-         num_ats++;
-         at_pos = i;
-         tmp_server = queue->value+at_pos+1;
-         queue->value[at_pos] = '\0';
-      }
-      else if ( queue->value[i] == ':' )
-      {
-         num_colons++;
-         colon_pos = i;
-         tmp_port = queue->value+colon_pos+1;
-         queue->value[colon_pos] = '\0';
-      }
-   }
-   if ( num_colons > 1 
-   ||   num_ats > 1 
-   || ( num_colons == 1 
-      &&   num_ats == 1
-      &&   at_pos > colon_pos ) )
+   q->u.e.name = MAKESTRENG( len + 1 ) ;
+   if (q->u.e.name == NULL )
    {
       /* TSD can be NULL when called from rxqueue or rxstack */
       if ( TSD == NULL || TSD->called_from_saa )
-         showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, ERR_RXSTACK_INVALID_QUEUE_TMPL, queue->value );
+         showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
       else
-         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of( (void *) TSD, queue ) );
-      return 1;
+         exiterror( ERR_STORAGE_EXHAUSTED, 0 );
+      return -1;
    }
-   /*
-    * Sort out the port number portion...
-    */
-   if ( num_colons == 1 )
-   {
-      *portno = atoi( tmp_port );
-      queue->len = colon_pos;
-   }
+   memcpy( PSTRENGVAL( q->u.e.name ), h, len ) ;
+   PSTRENGVAL( q->u.e.name )[len] = '\0' ;
+   q->u.e.name->len = len ;
+
+   if (( h = memchr( PSTRENGVAL( q->u.e.name ), ':', len ) ) == NULL )
+      q->u.e.portno = default_port_number();
    else
    {
-      *portno = get_default_port_number();
-   }
-   DEBUGDUMP(printf("port <%d>\n", *portno ););
-   /*
-    * Sort out server_name portion...
-    */
-   if ( num_ats == 1 )
-   {
-      /*
-       * Get the length of the server portion of the specified queue
-       * If 3 dots, we have an IP address for the server address and queue name
-       */
-      len = strlen( tmp_server );
-      for( i = 0, num_dots = 0; i < len; i++ )
+      q->u.e.name->len = (int) ( h - PSTRENGVAL( q->u.e.name ) ) ;
+      *h++ = '\0' ; /* chop off the portno part and jump over ':' */
+      if ( sscanf( h, "%d %c", &q->u.e.portno, &dummy ) != 1 )
+         q->u.e.portno = 0;
+      if ( ( q->u.e.portno < 1 ) || ( q->u.e.portno > 0xFFFF ) )
       {
-         if ( tmp_server[i] == '.' )
-            num_dots++;
-      }
-      if ( num_dots == 0 )
-      {
-         host = gethostbyname( tmp_server );
-         if ( host )
-         {
-            ptr = (struct in_addr *)host->h_addr;
-            *server_address = ptr->s_addr;
-            *server_name = MAKESTRENG( len+1 );
-            if ( *server_name == NULL )
-            {
-               /* TSD can be NULL when called from rxqueue or rxstack */
-               if ( TSD == NULL || TSD->called_from_saa )
-                  showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
-               else
-                  exiterror( ERR_STORAGE_EXHAUSTED, 0 );
-               return 1;
-            }
-            (*server_name)->len = len;
-            memcpy( (*server_name)->value, tmp_server, len );
-            (*server_name)->value[len] = '\0';
-         }
-         else
-         {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
-               showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, ERR_RXSTACK_NO_IP_TMPL, tmp_server );
-            else
-               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, tmp_server );
-            return 1;
-         }
-      }
-      else if ( num_dots == 3 )
-      {
-         *server_address = inet_addr( tmp_server );
-         *server_name = MAKESTRENG( len+1 );
-         if ( *server_name == NULL )
-         {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
-               showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
-            else
-               exiterror( ERR_STORAGE_EXHAUSTED, 0 );
-            return 1;
-         }
-         (*server_name)->len = len;
-         memcpy( (*server_name)->value, tmp_server, len );
-         (*server_name)->value[len] = '\0';
-      }
-      else
-      {
-         /* TSD can be NULL when called from rxqueue or rxstack */
          if ( TSD == NULL || TSD->called_from_saa )
-            showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_SERVER, ERR_RXSTACK_INVALID_SERVER_TMPL, tmp_server );
+            showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, ERR_RXSTACK_INVALID_QUEUE_TMPL, PSTRENGVAL( queue ) );
          else
-            exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_SERVER, tmp_server );
-         return 1;
+            exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of( (void *) TSD, queue ) );
+         DROPSTRENG( q->u.e.name ) ;
+         q->u.e.name = NULL ;
+         return -1 ;
       }
-      queue->len = at_pos;
    }
-   else 
-   {
-      *server_address = inet_addr("127.0.0.1");
-      *server_name = MAKESTRENG( 10 );
-      if ( *server_name == NULL )
-      {
-         /* TSD can be NULL when called from rxqueue or rxstack */
-         if ( TSD == NULL || TSD->called_from_saa )
-            showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
-         else
-            exiterror( ERR_STORAGE_EXHAUSTED, 0 );
-         return 1;
-      }
-      (*server_name)->len = 10;
-      memcpy( (*server_name)->value, "127.0.0.1", 9 );
-      (*server_name)->value[9] = '\0';
-   }
-   DEBUGDUMP(printf("server <%s>\n", (*server_name)->value ););
-   return 0;
-}
-#endif
 
-int delete_queue_from_rxstack( const tsd_t *TSD, int sock, streng *queue_name )
+   h = PSTRENGVAL( q->u.e.name ) ;
+   if ( *h == '\0' ) /* FIXME: need to use default_external_name? */
+      q->u.e.address = default_external_address( ) ;
+   else
+   {
+      /* h is either a dotted name or a host name, always try the dotted one
+       * first. It's MUCH faster.
+       */
+      q->u.e.address = inet_addr( h );
+      if ( ( q->u.e.address == 0 ) || ( q->u.e.address == -1 ) ) /* various errors */
+      {
+         he = gethostbyname( h ) ;
+         if ( ( he != NULL )
+           && ( he->h_addr != NULL )
+           && ( he->h_addrtype == AF_INET ) )
+            q->u.e.address = ( ( struct in_addr * ) he->h_addr )->s_addr;
+         if ( ( q->u.e.address == 0 ) || ( q->u.e.address == -1 ) )
+         {
+            /* TSD can be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL || TSD->called_from_saa )
+               showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, ERR_RXSTACK_NO_IP_TMPL, PSTRENGVAL( q->u.e.name ) );
+            else
+               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, tmpstr_of( (void *) TSD, q->u.e.name ) );
+            DROPSTRENG( q->u.e.name ) ;
+            q->u.e.name = NULL ;
+            return -1;
+         }
+      }
+   }
+
+   queue->len = AtPos ; /* chop off the host part */
+   return 1 ;
+}
+
+int delete_queue_from_rxstack( const tsd_t *TSD, int sock, const streng *queue_name )
 {
    int rc;
    streng *result;
@@ -442,7 +444,7 @@ int timeout_queue_on_rxstack( const tsd_t *TSD, int sock, long timeout )
       DROPSTRENG( qtimeout );
       if ( hex_timeout )
       {
-         DEBUGDUMP(printf("Send timeout: %s(%d) rc %d\n", PSTRENGVAL(hex_timeout),PSTRENGLEN(hex_timeout),rc););
+         DEBUGDUMP(printf("Send timeout: %.*s(%d) rc %d\n", PSTRENGLEN(hex_timeout),PSTRENGVAL(hex_timeout),PSTRENGLEN(hex_timeout),rc););
          rc = send_command_to_rxstack( TSD, sock, RXSTACK_TIMEOUT_QUEUE_STR, PSTRENGVAL(hex_timeout), PSTRENGLEN(hex_timeout) );
          DROPSTRENG( hex_timeout );
          if ( rc != -1 )
@@ -473,10 +475,10 @@ int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock )
          rc = header->value[0]-'0';
          if ( rc == 0 )
          {
-            /* 
+            /*
              * now get the length from the header
              */
-            DEBUGDUMP(printf("before get_length_from_header: %s\n", header->value););
+            DEBUGDUMP(printf("before get_length_from_header: %.*s\n", header->len, header->value););
             length = get_length_from_header( TSD, header );
          }
          else
@@ -493,25 +495,114 @@ int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock )
    return length;
 }
 
-int get_queue_from_rxstack( const tsd_t *TSD, int sock, streng **result )
+int clear_queue_on_rxstack( const tsd_t *TSD, int sock )
+{
+   int rc ;
+   streng *result ;
+
+   rc = send_command_to_rxstack( TSD, sock, RXSTACK_EMPTY_QUEUE_STR, NULL, 0 );
+   if ( rc != -1 )
+   {
+      result = read_result_from_rxstack( TSD, sock, RXSTACK_HEADER_SIZE );
+      if ( result )
+      {
+         rc = result->value[0]-'0';
+         DROPSTRENG( result );
+      }
+   }
+   return rc ;
+}
+
+static streng *init_connect_string( const tsd_t *TSD, const Queue *q, int addlength )
+{
+   /* Determines the length of the connect string of eq and sums up
+    * addlength. A streng of that size is created and returned.
+    */
+   streng *retval ;
+   int len = 0 ;
+
+   assert( q->type == QisExternal ) ;
+   if ( q->u.e.name != 0 )
+      len = PSTRENGLEN( q->u.e.name ) ;
+   if ( len == 0 )
+      len = 15 ; /* enough for "xxx.xxx.xxx.xxx" */
+   len += 8 ;    /* enough for "@" and ":65535" and a terminating 0 */
+
+   retval = MAKESTRENG( len + addlength ) ;
+   if ( retval == NULL )
+   {
+      /* TSD can be NULL when called from rxqueue or rxstack */
+      if ( TSD == NULL || TSD->called_from_saa )
+         showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
+      else
+         exiterror( ERR_STORAGE_EXHAUSTED, 0 );
+   }
+   else
+      retval->len = 0 ; /* MAKESTRENG sets ->len to nonzero sometimes */
+   return retval ;
+}
+
+static void add_connect_string( const Queue *q, streng *str )
+{
+   /* Adds the connect string of eq to str.
+    * This may be "@localhost:5757"
+    * We always add the port. It may be redefined in between by a call to
+    * the VALUE BIF.
+    */
+   int sum = 0, len ;
+   char *ptr = PSTRENGVAL( str ) ;
+   char *addr ;
+   struct in_addr ia ;
+
+   assert( q->type == QisExternal ) ;
+   ptr += PSTRENGLEN( str ) ;
+   *ptr++ = '@' ;
+   sum++ ;
+   if ( q->u.e.name != 0 )
+   {
+      len = PSTRENGLEN( q->u.e.name ) ;
+      memcpy( ptr, PSTRENGVAL( q->u.e.name ), len ) ;
+      ptr += len ;
+      sum += len ;
+   }
+   if ( sum == 1 ) /* no q->u.e.name? use the dotted IP address */
+   {
+      ia.s_addr = q->u.e.address ;
+      addr = inet_ntoa( ia ) ;
+      len = strlen( addr ) ;
+      memcpy( ptr, addr, len ) ;
+      ptr += len ;
+      sum += len ;
+   }
+   /* finally add the port */
+   sum += sprintf( ptr, ":%u", (unsigned) q->u.e.portno ) ;
+   str->len += sum ;
+}
+
+int get_queue_from_rxstack( const tsd_t *TSD, const Queue *q, streng **result )
 {
    int rc,length;
    streng *header;
 
-   rc = send_command_to_rxstack( TSD, sock, RXSTACK_GET_QUEUE_STR, NULL, 0 );
+   assert( q->type == QisExternal ) ;
+   rc = send_command_to_rxstack( TSD, q->u.e.socket, RXSTACK_GET_QUEUE_STR, NULL, 0 );
    if ( rc != -1 )
    {
-      header = read_result_from_rxstack( TSD, sock, RXSTACK_HEADER_SIZE );
+      header = read_result_from_rxstack( TSD, q->u.e.socket, RXSTACK_HEADER_SIZE );
       if ( header )
       {
          rc = header->value[0]-'0';
          if ( rc == 0 )
          {
-            /* 
+            /*
              * now get the length from the header and get that many characters...
              */
             length = get_length_from_header( TSD, header );
-            *result = read_result_from_rxstack( TSD, sock, length );
+            if ( ( *result = init_connect_string( TSD, q, length ) ) != NULL )
+            {
+               inject_result_from_rxstack( q->u.e.socket, *result, length ) ;
+               add_connect_string( q, *result );
+            }
          }
          else
          {
@@ -527,12 +618,12 @@ int get_queue_from_rxstack( const tsd_t *TSD, int sock, streng **result )
    return rc;
 }
 
-int get_line_from_rxstack( const tsd_t *TSD, int sock, streng **result )
+int get_line_from_rxstack( const tsd_t *TSD, int sock, streng **result, int nowait )
 {
    int rc,length;
    streng *header;
 
-   rc = send_command_to_rxstack( TSD, sock, RXSTACK_PULL_STR, NULL, 0 );
+   rc = send_command_to_rxstack( TSD, sock, (nowait) ? RXSTACK_FETCH_STR : RXSTACK_PULL_STR, NULL, 0 );
    if ( rc != -1 )
    {
       header = read_result_from_rxstack( TSD, sock, RXSTACK_HEADER_SIZE );
@@ -541,7 +632,7 @@ int get_line_from_rxstack( const tsd_t *TSD, int sock, streng **result )
          rc = header->value[0]-'0';
          if ( rc == 0 )
          {
-            /* 
+            /*
              * now get the length from the header and get that many characters...
              */
             length = get_length_from_header( TSD, header );
@@ -568,46 +659,48 @@ int get_line_from_rxstack( const tsd_t *TSD, int sock, streng **result )
    return rc;
 }
 
-int create_queue_on_rxstack( const tsd_t *TSD, int sock, streng *queue, streng **result )
+int create_queue_on_rxstack( const tsd_t *TSD, const Queue *q, const streng *queue, streng **result )
 {
    int rc,length;
    streng *header;
 
-   rc = send_command_to_rxstack( TSD, sock, RXSTACK_CREATE_QUEUE_STR, (queue) ? PSTRENGVAL( queue ) : NULL, (queue) ? PSTRENGLEN( queue ) : 0 );
+   assert( q->type == QisExternal ) ;
+   rc = send_command_to_rxstack( TSD, q->u.e.socket, RXSTACK_CREATE_QUEUE_STR, (queue) ? PSTRENGVAL( queue ) : NULL, (queue) ? PSTRENGLEN( queue ) : 0 );
    if ( rc != -1 )
    {
-      header = read_result_from_rxstack( TSD, sock, RXSTACK_HEADER_SIZE );
+      header = read_result_from_rxstack( TSD, q->u.e.socket, RXSTACK_HEADER_SIZE );
       if ( header )
       {
          rc = header->value[0]-'0';
          if ( rc == 0 )
          {
-            /* 
+            /*
              * the requested queue name was created, so put the input
              * value into the result
+             * FGC: Note: This should never happen. Newer rxstack versions
+             *            return 1 by default with a valid queue name.
              */
-            *result = MAKESTRENG( PSTRENGLEN( queue ) );
-            if ( *result == NULL )
+            length = get_length_from_header( TSD, header );
+            if ( ( *result = init_connect_string( TSD, q, length ) ) != NULL )
             {
-               /* TSD can be NULL when called from rxqueue or rxstack */
-               if ( TSD == NULL || TSD->called_from_saa )
-                  showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
-               else
-                  exiterror( ERR_STORAGE_EXHAUSTED, 0 );
-            }
-            else
-            {
-               (*result)->len = PSTRENGLEN( queue );
-               memcpy( (*result)->value, PSTRENGVAL( queue ), PSTRENGLEN( queue ) );
+               length = PSTRENGLEN( queue );
+               memcpy( PSTRENGVAL( *result ), PSTRENGVAL( queue ), length );
+               ( *result )->len = length ;
+               Str_upper( *result ) ;
+               add_connect_string( q, *result );
             }
          }
          else if ( rc == 1 )
          {
-            /* 
+            /*
              * now get the length from the header and get that many characters...
              */
             length = get_length_from_header( TSD, header );
-            *result = read_result_from_rxstack( TSD, sock, length );
+            if ( ( *result = init_connect_string( TSD, q, length ) ) != NULL )
+            {
+               inject_result_from_rxstack( q->u.e.socket, *result, length ) ;
+               add_connect_string( q, *result );
+            }
          }
          else
          {
@@ -623,10 +716,10 @@ int create_queue_on_rxstack( const tsd_t *TSD, int sock, streng *queue, streng *
    return rc;
 }
 
-int set_queue_in_rxstack( const tsd_t *TSD, int sock, streng *queue_name, streng **result )
+int set_queue_in_rxstack( const tsd_t *TSD, int sock, const streng *queue_name )
 {
    int rc,length;
-   streng *header;
+   streng *header, *dummy;
 
    rc = send_command_to_rxstack( TSD, sock, RXSTACK_SET_QUEUE_STR, PSTRENGVAL( queue_name ), PSTRENGLEN( queue_name ) );
    if ( rc != -1 )
@@ -637,17 +730,19 @@ int set_queue_in_rxstack( const tsd_t *TSD, int sock, streng *queue_name, streng
          rc = header->value[0]-'0';
          if ( rc == 0 )
          {
-            /* 
+            /*
              * now get the length from the header and get that many characters...
              */
             length = get_length_from_header( TSD, header );
-            *result = read_result_from_rxstack( TSD, sock, length );
+            dummy = read_result_from_rxstack( TSD, sock, length );
+            /* dummy is no longer used */
+            DROPSTRENG( dummy ) ;
          }
          else
          {
             /* TSD can be NULL when called from rxqueue or rxstack */
             if ( TSD == NULL || TSD->called_from_saa )
-               showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Setting quueue" );
+               showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Setting queue" );
             else
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Setting quueue" );
          }
@@ -657,7 +752,7 @@ int set_queue_in_rxstack( const tsd_t *TSD, int sock, streng *queue_name, streng
    return rc;
 }
 
-int queue_line_fifo_to_rxstack( const tsd_t *TSD, int sock, streng *line )
+int queue_line_fifo_to_rxstack( const tsd_t *TSD, int sock, const streng *line )
 {
    int rc;
    streng *header;
@@ -683,7 +778,7 @@ int queue_line_fifo_to_rxstack( const tsd_t *TSD, int sock, streng *line )
    return rc;
 }
 
-int queue_line_lifo_to_rxstack( const tsd_t *TSD, int sock, streng *line )
+int queue_line_lifo_to_rxstack( const tsd_t *TSD, int sock, const streng *line )
 {
    int rc;
    streng *header;
@@ -708,3 +803,4 @@ int queue_line_lifo_to_rxstack( const tsd_t *TSD, int sock, streng *line )
    }
    return rc;
 }
+#endif

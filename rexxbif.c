@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <limits.h>
 #include "rexxbif.h"
 
 #ifdef EXTERNAL_TO_REGINA
@@ -29,15 +30,20 @@ void exiterror( int errorno, int suberrorno, ... )
 }
 #endif
 
-int Rexx_x2d( const tsd_t *TSD, streng *hex )
+int Rexx_x2d( const tsd_t *TSD, const streng *hex, int *error )
 {
    int dec=0,i;
    char c;
 
    TSD = TSD; /* keep compiler happy */
 
+   if ( PSTRENGLEN(hex) == 0 )
+   {
+      *error = 1;
+      return -1;
+   }
    for ( i = 0; i < PSTRENGLEN(hex); i++ )
-   {    
+   {
       dec <<= 4;
       c = hex->value[i];
       if ( c >='0'&& c<='9')
@@ -46,12 +52,13 @@ int Rexx_x2d( const tsd_t *TSD, streng *hex )
          dec += c-'A'+10;
       else if( c >='a' && c <='f' )
          dec += c-'a'+10;
-      else 
+      else
       {
-         dec = -1;
-         break;
+         *error = 1;
+         return -1;
       }
    }
+   *error = 0;
    return dec;
 }
 
@@ -72,7 +79,7 @@ streng *Rexx_right( const tsd_t *TSD, streng *str, int length, char padch )
 streng *Rexx_d2x( const tsd_t *TSD, int num )
 {
    streng *out;
-   out = MAKESTRENG( (2+(num/16)) );
+   out = MAKESTRENG( 1 + sizeof( int ) / 4 );
    if ( out )
    {
       sprintf( PSTRENGVAL(out), "%X", num );

@@ -5,7 +5,7 @@
 // based on RECPDF.MMP:
 // Copyright (c) 2000 Sander van der Wal
 //
-// $Id: rexx.mmp,v 1.1 2001/07/29 06:21:59 mark Exp $
+// $Id: rexx.mmp,v 1.2 2002/11/25 10:01:53 mark Exp $
 //
 
 TARGET         rexx.exe
@@ -17,7 +17,7 @@ SUBPROJECT     .
 SYSTEMINCLUDE  \epoc32\include \epoc32\include\libc
 USERINCLUDE    . ..
 
-SOURCE         ..\alloca.c ..\builtin.c ..\cmath.c ..\cmsfuncs.c ..\convert.c ..\dbgfuncs.c ..\debug.c ..\doscmd.c ..\envir.c ..\error.c ..\expr.c ..\extlib.c ..\extstack.c ..\files.c ..\funcs.c ..\getopt.c ..\instore.c ..\interp.c ..\interprt.c ..\lexsrc.c ..\library.c ..\macros.c ..\memory.c ..\misc.c ..\mt_notmt.c ..\nosaa.c ..\options.c ..\os2funcs.c ..\parsing.c ..\rexx.c ..\rexxbif.c ..\rexxext.c ..\shell.c ..\signals.c ..\stack.c ..\strings.c ..\strmath.c ..\tracing.c ..\unxfuncs.c ..\variable.c ..\wrappers.c ..\yaccsrc.c epoc32.cpp
+SOURCE         ..\alloca.c ..\arxfuncs.c ..\builtin.c ..\cmath.c ..\cmsfuncs.c ..\convert.c ..\dbgfuncs.c ..\debug.c ..\doscmd.c ..\envir.c ..\error.c ..\expr.c ..\extlib.c ..\extstack.c ..\files.c ..\funcs.c ..\getopt.c ..\instore.c ..\interp.c ..\interprt.c ..\lexsrc.c ..\library.c ..\macros.c ..\memory.c ..\misc.c ..\mt_notmt.c ..\nosaa.c ..\options.c ..\os2funcs.c ..\parsing.c ..\rexx.c ..\rexxbif.c ..\rexxext.c ..\shell.c ..\signals.c ..\stack.c ..\strings.c ..\strmath.c ..\tracing.c ..\unxfuncs.c ..\variable.c ..\wrappers.c ..\yaccsrc.c epoc32.cpp
 
 DOCUMENT       rexx.mmp
 

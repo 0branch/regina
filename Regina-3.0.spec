@@ -1,7 +1,7 @@
 Summary: Regina Rexx Interpreter
 Name: Regina
 Version: 3.0
-Release: 4
+Release: 5
 Copyright: LGPL
 Group: Development/Languages
 Source: ftp://prdownloads.sourceforge.net/regina-rexx/Regina-REXX-3.0.tar.gz
@@ -27,7 +27,7 @@ make install
 /usr/bin/rxqueue
 /usr/bin/rxstack
 /usr/lib/libregina.a
-/usr/man/man1/rexx.1
+/usr/man/man1/regina.1
 /usr/include/rexxsaa.h
 /usr/lib/libregina.so.3.0
 /usr/share/regina/rexxcps.rexx
@@ -38,13 +38,3 @@ cd /usr/lib
 ln -sf ./libregina.so.3.0 ./libregina.so.3
 ln -sf ./libregina.so.3.0 ./libregina.so
 ldconfig /usr/lib
-cd /etc/rc.d/rc0.d
-ln -sf ../init.d/rxstack ./K10rxstack
-cd /etc/rc.d/rc2.d
-ln -sf ../init.d/rxstack ./K10rxstack
-cd /etc/rc.d/rc6.d
-ln -sf ../init.d/rxstack ./K10rxstack
-cd /etc/rc.d/rc3.d
-ln -sf ../init.d/rxstack ./S99rxstack
-cd /etc/rc.d/rc5.d
-ln -sf ../init.d/rxstack ./S99rxstack

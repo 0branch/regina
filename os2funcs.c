@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: os2funcs.c,v 1.11 2002/01/12 04:55:56 mark Exp $";
+static char *RCSid = "$Id: os2funcs.c,v 1.13 2002/12/28 09:38:05 mark Exp $";
 #endif
 
 /*
@@ -83,6 +83,10 @@ static char *RCSid = "$Id: os2funcs.c,v 1.11 2002/01/12 04:55:56 mark Exp $";
 # include <dir.h>
 #endif
 
+#ifdef HAVE_DIRECT_H
+# include <direct.h>
+#endif
+
 
 #ifdef __WATCOMC__
 # include <i86.h>
@@ -122,6 +126,7 @@ static char *RCSid = "$Id: os2funcs.c,v 1.11 2002/01/12 04:55:56 mark Exp $";
 streng *os2_directory( tsd_t *TSD, cparamboxptr parms )
 {
    streng *result ;
+   int ok=HOOK_GO_ON ;
 #ifdef __EMX__
    int i;
 #endif
@@ -131,39 +136,53 @@ streng *os2_directory( tsd_t *TSD, cparamboxptr parms )
 
    if (parms&&parms->value)
    {
-      path = str_of( TSD, parms->value ) ;
-      if (chdir( path ) )
+      if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_SETCWD))
+         ok = hookup_output( TSD, HOOK_SETCWD, parms->value ) ;
+
+      if (ok==HOOK_GO_ON)
       {
+         path = str_of( TSD, parms->value ) ;
+         if (chdir( path ) )
+         {
+            FreeTSD( path ) ;
+            return nullstringptr() ;
+         }
          FreeTSD( path ) ;
-         return nullstringptr() ;
       }
-      FreeTSD( path ) ;
    }
 
-#if defined(HAVE__FULLPATH)
-   result = Str_makeTSD( REXX_PATH_MAX );
-   _fullpath(result->value, ".", REXX_PATH_MAX);
-# if defined(__EMX__)
    /*
-    * Convert / to \ as the API call doesn't do this for us
+    * The remainder of this is for obtaining the current working directory...
     */
-   result->len = strlen( result->value ) ;
-   for ( i=0; i < result->len; i++)
+   if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_GETCWD))
+      ok = hookup_input( TSD, HOOK_GETCWD, &result ) ;
+
+   if (ok==HOOK_GO_ON)
    {
-      if ( result->value[i] == '/' )
-         result->value[i] = '\\';
-   }
+#if defined(HAVE__FULLPATH)
+      result = Str_makeTSD( REXX_PATH_MAX );
+      _fullpath(result->value, ".", REXX_PATH_MAX);
+# if defined(__EMX__)
+      /*
+       * Convert / to \ as the API call doesn't do this for us
+       */
+      result->len = strlen( result->value ) ;
+      for ( i=0; i < result->len; i++)
+      {
+         if ( result->value[i] == '/' )
+            result->value[i] = '\\';
+      }
 # endif
 #elif defined(HAVE__TRUENAME)
-   result = Str_makeTSD( _MAX_PATH ) ;
-   _truename(".", result->value);
+      result = Str_makeTSD( _MAX_PATH ) ;
+      _truename(".", result->value);
 #else
-   result = Str_makeTSD( 1024 ) ;
-   if (my_fullpath(result->value, ".", 1024) == -1)
-      result = nullstringptr() ;
+      result = Str_makeTSD( 1024 ) ;
+      if (my_fullpath(result->value, ".", 1024) == -1)
+         result = nullstringptr() ;
 #endif
-   result->len = strlen( result->value ) ;
-
+      result->len = strlen( result->value ) ;
+   }
    return result;
 }
 

@@ -3,7 +3,7 @@
 #
 # Using SAS/C on Amiga, dedicated to Regina Henke
 #
-SRCDIR	    = /Regina-2.2
+SRCDIR	    = /Regina-3.1
 DEMODIR	    = $(SRCDIR)/demo
 CC	    = sc
 CEXTRA	    = ANSI DEF _POSIX_SOURCE DEF NO_EXTERNAL_QUEUES
@@ -91,20 +91,20 @@ LEX = lex
 README = $(SRCDIR)/README.* COPYING-LIB
 
 FILES = funcs builtin error variable interprt debug dbgfuncs \
-	memory parsing files misc unxfuncs os2funcs cmsfuncs shell rexxext stack \
+	memory parsing files misc unxfuncs arxfuncs os2funcs cmsfuncs shell rexxext stack \
 	tracing interp cmath convert strings library strmath signals \
 	macros envir extlib wrappers options doscmd alloca mt_notmt nosaa instore #r2perl
 
 CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/variable.c \
 	$(SRCDIR)/interprt.c $(SRCDIR)/debug.c $(SRCDIR)/dbgfuncs.c $(SRCDIR)/memory.c $(SRCDIR)/parsing.c $(SRCDIR)/files.c \
-	$(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/os2funcs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c \
+	$(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/arxfuncs.c $(SRCDIR)/os2funcs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c \
 	$(SRCDIR)/tracing.c $(SRCDIR)/interp.c $(SRCDIR)/cmath.c $(SRCDIR)/convert.c $(SRCDIR)/strings.c $(SRCDIR)/library.c \
 	$(SRCDIR)/strmath.c $(SRCDIR)/signals.c $(SRCDIR)/macros.c $(SRCDIR)/envir.c $(SRCDIR)/expr.c \
 	$(SRCDIR)/extlib.c $(SRCDIR)/wrappers.c $(SRCDIR)/options.c $(SRCDIR)/doscmd.c $(SRCDIR)/alloca.c $(SRCDIR)/mt_notmt $(SRCDIR)/nosaa $(SRCDIR)/instore.c #$(SRCDIR)/r2perl.c
 
 OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	interprt.$(OBJ) debug.$(OBJ) dbgfuncs.$(OBJ) memory.$(OBJ) parsing.$(OBJ) files.$(OBJ) \
-	misc.$(OBJ) unxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ) stack.$(OBJ) \
+	misc.$(OBJ) unxfuncs.$(OBJ) arxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ) stack.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ) library.$(OBJ) \
 	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) alloca.$(OBJ) \
 	extlib.$(OBJ) yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) doscmd.$(OBJ) wrappers.$(OBJ) $(MT_FILE).$(OBJ) instore.$(OBJ) #nosaa.$(OBJ) r2perl.$(OBJ)
@@ -112,7 +112,7 @@ OBJECTS	    = $(OFILES)
 
 SHOFILES = funcs.sho builtin.sho error.sho variable.sho \
 	interprt.sho debug.sho dbgfuncs.sho memory.sho parsing.sho files.sho \
-	misc.sho unxfuncs.sho cmsfuncs.sho shell.sho os2funcs.sho rexxext.sho stack.sho \
+	misc.sho unxfuncs.sho arxfuncs.sho cmsfuncs.sho shell.sho os2funcs.sho rexxext.sho stack.sho \
 	tracing.sho interp.sho cmath.sho convert.sho strings.sho library.sho \
 	strmath.sho signals.sho macros.sho envir.sho expr.sho alloca.sho \
 	extlib.sho yaccsrc.sho lexsrc.sho wrappers.sho options.sho doscmd.sho \
@@ -219,6 +219,9 @@ misc.$(OBJ) :	 $(SRCDIR)/misc.c
 
 unxfuncs.$(OBJ) :$(SRCDIR)/unxfuncs.c
 	$(CC) $(COPT) $(CC2O) $(SRCDIR)/unxfuncs.c
+
+arxfuncs.$(OBJ) :$(SRCDIR)/arxfuncs.c
+	$(CC) $(COPT) $(CC2O) $(SRCDIR)/arxfuncs.c
 
 os2funcs.$(OBJ) :$(SRCDIR)/os2funcs.c
 	$(CC) $(COPT) $(CC2O) $(SRCDIR)/os2funcs.c
@@ -411,6 +414,12 @@ misc.sho :    $(SRCDIR)/misc.c
 unxfuncs.sho :$(SRCDIR)/unxfuncs.c
 	$(O2SAVE)
 	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/unxfuncs.c
+	$(O2SHO)
+	$(SAVE2O)
+
+arxfuncs.sho :$(SRCDIR)/arxfuncs.c
+	$(O2SAVE)
+	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/arxfuncs.c
 	$(O2SHO)
 	$(SAVE2O)
 
@@ -611,7 +620,7 @@ zip:
 
 install: rexx $(LIBPRE)$(LIBFILE).a
 	cp rexx$(PROGEXT) $(BINDIR)/$(PROGNAME)$(PROGEXT)
-	cp ../rexx.1 $(MANDIR)/rexx.$(MANEXT)
+	cp ../regina.1 $(MANDIR)/regina.$(MANEXT)
 	cp $(LIBPRE)$(LIBFILE).a $(LIBDIR)/$(LIBPRE)$(LIBFILE).a
 	ranlib $(LIBDIR)/$(LIBPRE)$(LIBFILE).a
 

@@ -228,6 +228,7 @@
  40,922,[Argumento de %s número %d, muy pocos sub-comandos; el mínimo esperado es %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[Argumento de %s número %d, demasiados sub-comandos; el máximo esperado es %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[Argumento de %s número %d, especificación posicional inválida; esperando uno de "%s"; encontrado "%s"]|<bif>,<argnumber>,<value>,<value>
+ 40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>
  41,  0,Mala conversión aritmética
  41,  1,Valor no numérico ("%s") a la izquierda de la operación aritmética "%s"|<value>,<operator>
  41,  2,Valor no numérico ("%s") a la derecha de la operación aritmética "%s"|<value>,<operator>
@@ -294,6 +295,9 @@
  94,106,[Excedido el número máximo de colas externas: %d]|<maxqueues>
  94,107,[Error ocurrido leyendo el "socket": %s]|<systemerror>
  94,108,[El "Switch" pasado es inválido. Debe ser uno de "%s"]|<switch>
+ 94,109,[Queue \"%s\" not found]|<queuename>
+ 94,110,[%s invalid for external queues]|<bif>
+ 94,111,[RXQUEUE function %s invalid for internal queues]|<functionname>
  95,  0,[Propiedad restringida usada en modo "seguro" (safe)]
  95,  1,[%s inválido en modo "seguro" (safe)]|<token>
  95,  2,[Argumento de %s número %d inválido en modo "seguro" (safe)]|<bif>,<argnumber>

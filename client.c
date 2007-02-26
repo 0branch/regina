@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: client.c,v 1.21 2002/03/23 00:39:18 mark Exp $";
+static char *RCSid = "$Id: client.c,v 1.38 2003/03/26 07:05:38 mark Exp $";
 #endif
 
 /*
@@ -86,8 +86,8 @@ static char *RCSid = "$Id: client.c,v 1.21 2002/03/23 00:39:18 mark Exp $";
 #include <ctype.h>
 #endif
 
-#ifndef max
-# define max(a,b) (((a) > (b)) ? (a) : (b))
+#ifndef min
+# define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
 static int ReMapHook( const tsd_t *TSD, int NetHook ) ;
@@ -201,7 +201,91 @@ static paramboxptr parametrize( const tsd_t *TSD, int ArgCount, const int *ParLe
    return root ;
 }
 
-int IfcExecScript( int NameLen, const char *Name,
+/*
+ * ScriptSetup does the setup step of IfcExecScript.
+ * 1) panic becomes the new old value for a panicked exit.
+ * 2) environment is deregistered and freed.
+ * 3) A fresh Ifc-allocated copy of result is put into RetLen/RetString,
+ *    and result is freed.
+ * 4) InterpreterStatus is reset to the given value.
+ * This function is part of the technique to bypass problems with
+ * setjmp/longjmp.
+ */
+static void ScriptSetup(tsd_t *TSD,
+                        void **instore_buf, unsigned long *instore_length,
+                        streng **command, const char *Name, int NameLen,
+                        paramboxptr *params, int ArgCount,
+                              const int *ParLengths, const char **ParStrings,
+                        int *ctype, int CallType,
+                        int restricted,
+                        int *hooks, int ExitFlags,
+                        streng **environment, int EnvLen, const char *EnvName)
+{
+   int i;
+
+   *instore_buf = NULL;
+   *instore_length = 0;
+   *command = wrapstring( TSD, Name, NameLen );
+   assert( *command );
+   *params = parametrize( TSD, ArgCount, ParLengths, ParStrings );
+
+   *ctype = map_type( CallType );
+
+   TSD->restricted = restricted;
+
+   *hooks = 0;
+   for( i = 0; i < 30; i++ )
+   {
+      if ( ExitFlags & (1 << i) )
+         *hooks |= 1 << ReMapHook( TSD, i );
+   }
+
+   *environment = wrapstring( TSD, EnvName, EnvLen );
+   if ( *environment == NULL )
+      *environment = Str_creTSD( "DEFAULT" );
+
+   if ( !envir_exists( TSD, *environment ) )
+      add_envir( TSD, Str_dupTSD( *environment ), ENVIR_PIPE, 0 );
+}
+
+/*
+ * ScriptCleanup does the cleanup step of IfcExecScript.
+ * 1) panic becomes the new old value for a panicked exit.
+ * 2) environment is deregistered and freed.
+ * 3) A fresh Ifc-allocated copy of result is put into RetLen/RetString,
+ *    and result is freed.
+ * 4) InterpreterStatus is reset to the given value.
+ * This function is part of the technique to bypass problems with
+ * setjmp/longjmp.
+ */
+static void ScriptCleanup(tsd_t *TSD, jmp_buf *panic, streng *environment,
+                          streng *result, int *RetLen, char **RetString,
+                          unsigned *InterpreterStatus)
+{
+   TSD->systeminfo->panic = panic;
+   del_envir( TSD, environment );
+   Free_stringTSD( environment );
+   RestoreInterpreterStatus(TSD, InterpreterStatus);
+
+   if ( result && result->len )
+   {
+      *RetLen = result->len ;
+      *RetString=(char *) IfcAllocateMemory( result->len+1 );
+      if ( *RetString )
+      {
+         memcpy( *RetString, (void *) result->value, result->len );
+         *( *RetString+result->len ) = '\0';
+      }
+      else
+         *RetLen = RX_NO_STRING ;
+   }
+   else
+      *RetLen = RX_NO_STRING ;
+   if ( result )
+      FreeTSD( (void *) result );
+}
+
+int IfcExecScript( tsd_t * volatile TSD, int NameLen, const char *Name,
                    int ArgCount, const int *ParLengths, const char **ParStrings,
                    int CallType, int ExitFlags, int EnvLen, const char *EnvName,
                    int SourceCode, int restricted,
@@ -210,49 +294,35 @@ int IfcExecScript( int NameLen, const char *Name,
                    int *RetLen, char **RetString, void **instore_buf,
                    unsigned long *instore_length )
 {
-   streng * volatile command=NULL ;
-   int RetCode=0 ;
-   int num=0 ;
-   int type=0 ;
-   volatile paramboxptr params=NULL ;
-   jmp_buf panic, *oldpanic ;
-   tsd_t *wTSD;
-   /* We need volatiles here to prevent variable clobbering by longjmp. */
+   streng * volatile result=NULL;
+   tsd_t * volatile saved_TSD;
+   jmp_buf * volatile oldpanic;
+   int volatile RetCode=0;
+   streng * volatile environment=NULL;
    volatile int panicked=0;
-   volatile int hooks=0, ctype=0 ;
-   volatile streng * volatile environment=NULL ;
-   volatile streng * volatile result=NULL ;
-   volatile tsd_t *volatile TSD;
+   jmp_buf panic;
+   streng * command;
+   paramboxptr params;
+   int ctype,hooks,type;
    unsigned InterpreterStatus[IPRT_BUFSIZE];
 
-   TSD = __regina_get_tsd(); /* The TSD should be fetched directly.
-                              * see longjmp and below for more information.
-                              */
-   wTSD = (tsd_t *) TSD;
-
-   SaveInterpreterStatus(wTSD,InterpreterStatus);
-   *instore_buf = NULL;
-   *instore_length = 0;
-   command = wrapstring( wTSD, Name, NameLen ) ;
-   assert(command) ;
-   params = parametrize( wTSD, ArgCount, ParLengths, ParStrings ) ;
-
-   ctype = map_type(CallType) ;
-
-   TSD->restricted = restricted;
-
-   for (hooks=num=0; num<30; num++)
-   {
-      if ((ExitFlags>>num) & 0x01)
-         hooks |= (1 << (ReMapHook(wTSD, num))) ;
-   }
-
-   environment = wrapstring( wTSD, EnvName, EnvLen ) ;
-   if (!environment)
-      environment = Str_cre_TSD( wTSD, "DEFAULT" ) ;
-
-   if ( !envir_exists( wTSD, (streng *)environment ) )
-      add_envir( wTSD, Str_dup_TSD(wTSD, (streng *)environment), ENVIR_PIPE, 0 ) ;
+   /*
+    * NOTE:
+    * setjmp and longjmp will clobber all variables not explicitely marked
+    * as volatile. The reason is the unexpected jump from anywhere to the
+    * code following the setjmp() call. Every assumption of the compiler
+    * about valid register variables are wrong. We have to remove all
+    * register variables set by the optimizer. This can be done either by
+    * using volatile, or by not using variables before the setjmp() INCLUDING
+    * initialization or by using non-inline functions for manipulating
+    * values.
+    * We use a combination here.
+    * If you ever need to change ANY line before the setjmp() code,
+    * double-check the compiler's chance to cache some variables in registers.
+    * Florian
+    */
+   saved_TSD = TSD;
+   SaveInterpreterStatus( TSD, InterpreterStatus );
 
    /* It may be that TSD->systeminfo->panic is not set. This may lead to
     * an exit() call, e.g. at Rexx "EXIT". We set TSD->systeminfo->panic if it
@@ -268,43 +338,49 @@ int IfcExecScript( int NameLen, const char *Name,
    if ( ( oldpanic = TSD->systeminfo->panic ) == NULL )
    {
       TSD->systeminfo->panic = &panic;
-      assert(!TSD->in_protected);
+      assert( !TSD->in_protected );
       if ( setjmp( *TSD->systeminfo->panic ) )
       {
-         wTSD = (tsd_t *) TSD; /* Values in(!!) TSD may have changes due longjmp */
-         if (result == NULL)
-            result = Str_make_TSD(wTSD, 0);
-         if (!RetCode)
+         TSD = saved_TSD;
+         if ( result == NULL )
+            result = nullstringptr();
+         if ( !RetCode )
             RetCode = -1 ;
          panicked++ ;
       }
    }
-   wTSD = (tsd_t *) TSD; /* Values in(!!) TSD may have changes due longjmp */
    if ( !panicked )
    {
+      ScriptSetup(TSD,
+                  instore_buf, instore_length,
+                  &command, Name, NameLen,
+                  &params, ArgCount, ParLengths, ParStrings,
+                  &ctype, CallType,
+                  restricted,
+                  &hooks, ExitFlags,
+                  (streng **) &environment, EnvLen, EnvName);
+
       type = SourceCode ;
-      if (type==RX_TYPE_EXTERNAL)
+      if ( type == RX_TYPE_EXTERNAL )
       {
-         result=execute_external(wTSD,command,params,(streng *) environment,
-                                 &RetCode,hooks,ctype);
-         Free_string_TSD( wTSD, command );
+         result=execute_external( TSD, command, params, environment,
+                                  (int *) &RetCode, hooks, ctype );
+         Free_stringTSD( command );
       }
-      else if (type==RX_TYPE_INSTORE)
+      else if ( type == RX_TYPE_INSTORE )
       {
-         result=do_instore(wTSD,command,params,(streng *) environment,&RetCode,
-                           hooks,
-                           TinnedTree,TinnedTreeLen,
-                           SourceString,SourceStringLen,
-                           NULL,
-                           ctype);
+         result=do_instore( TSD, command, params, environment,
+                            (int *) &RetCode, hooks, TinnedTree, TinnedTreeLen,
+                            SourceString, SourceStringLen, NULL, ctype );
       }
-      else if (type==RX_TYPE_MACRO)
-         result = Str_make_TSD(wTSD, 0);
-      else if (type==RX_TYPE_SOURCE)
+      else if ( type == RX_TYPE_MACRO )
+         result = nullstringptr();
+      else if ( type == RX_TYPE_SOURCE )
       {
-         streng *SrcStr = wrapstring( wTSD, SourceString, SourceStringLen ) ;
+         streng *SrcStr = wrapstring( TSD, SourceString, SourceStringLen );
          internal_parser_type ipt;
-         ipt = enter_macro( wTSD, SrcStr, command, instore_buf, instore_length ) ;
+
+         ipt = enter_macro( TSD, SrcStr, command, instore_buf, instore_length ) ;
          if ( CallType == RX_TYPE_COMMAND
          && ArgCount
          && *ParLengths
@@ -313,50 +389,118 @@ int IfcExecScript( int NameLen, const char *Name,
             ; /* request for tokenisation only, don't execute */
          else
          {
-            ipt.kill = SrcStr ;
-            result=do_instore(wTSD,command,params,(streng *) environment,&RetCode,
-                           hooks,
-                           NULL,0,
-                           NULL,0,
-                           &ipt,
-                           ctype);
+            ipt.kill = SrcStr;
+            result=do_instore( TSD, command, params, environment,
+                               (int *) &RetCode, hooks, NULL,0, NULL,0, &ipt,
+                               ctype);
             /* do_instore already has deleted the internal structure */
          }
       }
       else
       {
-         exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
-         return 0 ;
+         exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" );
+         return 0;
       }
    }
 
-   TSD->systeminfo->panic = oldpanic;
-   del_envir( wTSD, (streng *) environment ) ;
-   Free_string_TSD( wTSD, (streng *) environment ) ;
-   RestoreInterpreterStatus(wTSD,InterpreterStatus);
+   ScriptCleanup( TSD, oldpanic, environment, result, RetLen, RetString,
+                  InterpreterStatus );
 
-   if (result && result->len)
+   return RetCode;
+}
+
+int IfcExecCallBack( tsd_t * volatile TSD, int NameLen, const char *Name,
+                     int ArgCount, const int *ParLengths, const char **ParStrings,
+                     int *RetLen, char **RetString )
+{
+   nodeptr mynode;
+   streng *result;
+   int RetCode=0;
+   int i,h,arglen=0;
+   char *cmd,*p;
+   streng *name;
+
+   /*
+    * If we can't find the label, no point in continuing.
+    */
+   name = Str_cre_TSD( TSD, Name );
+   if ( getlabel( TSD, name ) == NULL )
+   {
+      RetCode = RX_CODE_NOSUCH;
+      result = NULL;
+   }
+   else
+   {
+      /*
+       * Convert the procedurename and arguments into a string of the
+       * form:
+       * return procedurename(arg1, arg2,...)
+       */
+      for ( i = 0; i < ArgCount; i++ )
+      {
+         arglen += ParLengths[i] + 1;
+      }
+      arglen += NameLen + 10 + ArgCount;
+      p = cmd = MallocTSD( arglen );
+      p += sprintf( cmd, "RETURN %s(", Name );
+      for ( i = 0; i < ArgCount; i++ )
+      {
+         /*
+          * The arguments may or may not be 0-terminated. A terminating
+          * zero may appear before the length signals the end.
+          */
+         if ( i != 0 )
+            *p++ = ',';
+         h = ParLengths[i];
+         memcpy( p, ParStrings[i], h );
+         p[h] = '\0';
+         p += strlen(p);
+      }
+      strcpy( p, ")" );
+   
+      mynode = Malloc_TSD( TSD, sizeof( treenode ));
+      memset( mynode, 0, sizeof( treenode ));
+      mynode->type = X_IPRET;
+      mynode->lineno = 1;
+      mynode->charnr = 1;
+      mynode->p[0] = Malloc_TSD( TSD, sizeof( treenode ));
+      memset( mynode->p[0], 0, sizeof( treenode ));
+      mynode->p[0]->type = X_STRING;
+      mynode->p[0]->lineno = 0;
+      mynode->p[0]->charnr = 0;
+      mynode->p[0]->name = Str_cre_TSD( TSD, cmd );
+
+      result = interpret( TSD, mynode );
+
+      FreeTSD( cmd );
+      FreeTSD( mynode->p[0] );
+      FreeTSD( mynode );
+   }
+   FreeTSD( name );
+
+   if ( result && result->len )
    {
       *RetLen = result->len ;
-      *RetString=(char *)IfcAllocateMemory(result->len+1);
+      *RetString=(char *) IfcAllocateMemory( result->len+1 );
       if ( *RetString )
       {
-         memcpy(*RetString,(void *) result->value,result->len);
-         *(*RetString+(result->len)) = '\0';
+         memcpy( *RetString, (void *) result->value, result->len );
+         *( *RetString+result->len ) = '\0';
       }
       else
          *RetLen = RX_NO_STRING ;
    }
    else
       *RetLen = RX_NO_STRING ;
-   if (result)
-      Free_TSD(wTSD, (void *) result);
+   if ( result )
+      FreeTSD( (void *) result );
 
-   return RetCode ;
+   return RetCode;
 }
 
 
-static int handle_source( const tsd_t *TSD, int *Length, char **String )
+static int handle_source( const tsd_t *TSD, int *Length, char **String,
+                          int *allocated )
 {
    int infile=0, total=0, invoked=0 ;
    const char *stype=NULL ;
@@ -373,6 +517,7 @@ static int handle_source( const tsd_t *TSD, int *Length, char **String )
    sprintf( ctmp, "%s %s ", stype, invo_strings[TSD->systeminfo->invoked]) ;
    strncat( ctmp, TSD->systeminfo->input_file->value, infile ) ;
 
+   *allocated = 1;
    return RX_CODE_OK ;
 }
 
@@ -418,11 +563,13 @@ static int handle_no_of_params( const tsd_t *TSD, int *Length, char **String )
 
 
 
-static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings )
+static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings,
+                         int *allocated )
 {
    variableptr value=NULL, rval=NULL, rrval=NULL ;
    int l;
 
+   *allocated = 0;
    if (TSD->var_indicator==0)
    {
       get_next_variable( TSD, 1 ) ;
@@ -432,7 +579,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings )
    for (;;)
    {
       value = get_next_variable( TSD, 0 ) ;
-      for (rval=value; rval && rval->realbox; rval=rval->realbox) 
+      for (rval=value; rval && rval->realbox; rval=rval->realbox)
       {
         ;
       }
@@ -440,11 +587,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings )
       {
          if (rval->flag & VFLAG_NUM)
          {
-#ifdef DEBUG
             expand_to_str( TSD, rval ) ;
-#else
-            expand_to_str( TSD, rval ) ;
-#endif
             break ;
          }
 
@@ -459,11 +602,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings )
          {
             if (rval->flag & VFLAG_NUM)
             {
-#ifdef DEBUG
                expand_to_str( TSD, rval ) ;
-#else
-               expand_to_str( TSD, rval ) ;
-#endif
                break ;
             }
             else
@@ -477,6 +616,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings )
    {
       if (rval->stem)
       {
+         *allocated |= 1;
          l = Lengths[0] = rval->stem->name->len + rval->name->len ;
          Strings[0] = MallocTSD( (l < 1) ? 1 : l ) ;
          memcpy(Strings[0], rval->stem->name->value, rval->stem->name->len);
@@ -496,6 +636,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings )
       }
       else
       {
+         *allocated |= 2;
          assert( rval->stem && rrval->value ) ;
          l = Lengths[1] = rval->stem->name->len + rval->name->len ;
          Strings[1] = MallocTSD( (l < 1) ? 1 : l ) ;
@@ -534,6 +675,9 @@ static int MapHook( const tsd_t *TSD, int RexxHook )
       case HOOK_GETENV: return RX_EXIT_GETENV ;
       case HOOK_SETENV: return RX_EXIT_SETENV ;
 
+      case HOOK_GETCWD: return RX_EXIT_GETCWD ;
+      case HOOK_SETCWD: return RX_EXIT_SETCWD ;
+
       default:
          closedown( TSD ) ;
    }
@@ -558,6 +702,9 @@ static int ReMapHook( const tsd_t *TSD, int NetHook )
 
       case RX_EXIT_GETENV: return HOOK_GETENV ;
       case RX_EXIT_SETENV: return HOOK_SETENV ;
+
+      case RX_EXIT_GETCWD: return HOOK_GETCWD ;
+      case RX_EXIT_SETCWD: return HOOK_SETCWD ;
 
       default:
          closedown( TSD ) ;
@@ -593,7 +740,7 @@ int hookup_output( const tsd_t *TSD, int hook, const streng *outdata )
    int len = 0;
 
    code = MapHook( TSD, hook );
-   assert (code == RX_EXIT_STDOUT || code == RX_EXIT_STDERR );
+/*   assert (code == RX_EXIT_STDOUT || code == RX_EXIT_STDERR ); */
    if (outdata)
    {
       str = str_of( TSD, outdata ) ;
@@ -627,7 +774,7 @@ int hookup_output2( const tsd_t *TSD, int hook, const streng *outdata1, const st
    int len1 = 0, len2 = 0;
 
    code = MapHook( TSD, hook );
-   assert (code == RX_EXIT_SETENV );
+/*   assert (code == RX_EXIT_SETENV ); */
    if (outdata1)
    {
       str1 = str_of( TSD, outdata1 ) ;
@@ -678,7 +825,7 @@ int hookup_input( const tsd_t *TSD, int hook, streng **indata )
    char *retstr=RetBuf;
 
    code = MapHook( TSD, hook );
-   assert (code == RX_EXIT_PULL || code == RX_EXIT_TRCIN );
+/*   assert (code == RX_EXIT_PULL || code == RX_EXIT_TRCIN ); */
 
    strcpy(RetBuf,"");
    /* FIXME, FGC: The documentation says that the input of a PULL or TRCIN is
@@ -714,7 +861,7 @@ int hookup_input_output( const tsd_t *TSD, int hook, const streng *outdata, stre
    char *retstr=RetBuf;
 
    code = MapHook( TSD, hook );
-   assert (code == RX_EXIT_GETENV );
+/*   assert (code == RX_EXIT_GETENV );*/
 
    if (outdata)
    {
@@ -784,17 +931,21 @@ streng *SubCom( const tsd_t *TSD, const streng *command, const streng *envir, in
  *     issue, as there is code in variable.c to return default values.
  *
  ****************************************************************************/
-static int GetVariable( tsd_t *TSD, int Code, int *Lengths, char *Strings[] )
+static int GetVariable( tsd_t *TSD, int Code, int *Lengths, char *Strings[],
+                        int *allocated)
 {
    const streng *value ;
-   streng *retval, *varbl;
-   int rcode, i ;
+   streng *varbl;
+   char *retval;
+   int i,len;
 
    varbl = wrapstring( TSD, Strings[0], Lengths[0] ) ;
 
-   assert(varbl); /* FIXME, FGC: Shouldn't this better result in
-                   * RX_CODE_INVNAME?
-                   */
+   if ( !varbl )
+   {
+      Lengths[1] = RX_NO_STRING ;
+      return RX_CODE_INVNAME ;
+   }
 
    if (!valid_var_symbol(varbl))
    {
@@ -803,40 +954,50 @@ static int GetVariable( tsd_t *TSD, int Code, int *Lengths, char *Strings[] )
       return RX_CODE_INVNAME ;
    }
 
-   rcode = RX_CODE_OK ; /* default value */
    if (Code == RX_GETSVAR)
       value = getvalue( TSD, varbl, 1 ) ;
    else
       value = getdirvalue( TSD, varbl, 1 ) ;
+   /*
+    * getvalue returns varbl on NOVALUE, don't free varbl until the final use
+    * of value and varbl.
+    */
 
-   retval = Str_dupTSD(value) ;
-   if (!var_was_found( TSD ))
+   if ( var_was_found( TSD ) )
    {
-      if (Code == RX_GETSVAR)
-         retval = Str_upper(retval) ;
-      else
-      {
-           /* JH 13-12-99 If this is a direct variable, only uppercase the
-            * stem name.
-            */
-         for(i=0;i<retval->len && '.' != retval->value[i];i++)
-            retval->value[i] = (unsigned char) toupper(retval->value[i]);
-      }
-      rcode = RX_CODE_NOVALUE ;
+      Lengths[1] = value->len;
+      Strings[1] = (char *) value->value;
+      *allocated = 0;
+      Free_stringTSD( varbl );
+      return RX_CODE_OK;
    }
 
-   Lengths[1] = retval->len ;
-   Strings[1] = IfcAllocateMemory(retval->len + 1);
-      /* Must be accessible by the application. */
+   Lengths[1] = len = value->len;
+   Strings[1] = retval = MallocTSD( len );
+   memcpy( retval, value->value, len );
+   *allocated = 2;
+   Free_stringTSD( varbl );
 
-   memcpy(Strings[1],retval->value,retval->len);
-   Strings[1][retval->len] = '\0'; /* termination may help bogus
-                                    * applications.
-                                    */
-
-   Free_stringTSD( retval ) ;
-   Free_stringTSD( varbl ) ;
-   return rcode ;
+   if ( Code == RX_GETSVAR )
+   {
+      for( i = 0; i < len; i++ )
+         retval[i] = (unsigned char) toupper( retval[i] );
+   }
+   else
+   {
+      /* JH 13-12-99 If this is a direct variable, only uppercase the
+       * stem name.
+       */
+      /*
+       * Bypass the dot test for the first character to allow reserved
+       * variables.
+       */
+      if ( len )
+         retval[0] = (unsigned char) toupper( retval[0] );
+      for( i = 1; i < len && '.' != retval[i]; i++ )
+         retval[i] = (unsigned char) toupper( retval[i] );
+   }
+   return RX_CODE_NOVALUE;
 }
 
 /****************************************************************************
@@ -862,17 +1023,29 @@ static int SetVariable(const tsd_t *TSD, int Code, int *Lengths, char *Strings[]
 
    varbl = wrapstring( TSD, Strings[0], Lengths[0] ) ;
 
-   assert(varbl); /* FIXME, FGC: Shouldn't this better result in
-                   * RX_CODE_INVNAME?
-                   */
+   if ( varbl == NULL )
+   {
+      /*
+       * If the variable name is empty, return an error
+       */
+      return RX_CODE_INVNAME ;
+   }
 
    if (Code == RX_SETSVAR)
       varname = Str_upper(Str_dupTSD(varbl)) ;
    else
    {
       varname = Str_dupTSD(varbl) ;
-      for (i=0;i<varname->len && '.' != varname->value[i];i++)
+      /*
+       * Bypass the dot test for the first character to allow reserved
+       * variables.
+       */
+      if ( varname->len )
+         varname->value[0] = (unsigned char) toupper( varname->value[0] );
+      for( i = 1; i < varname->len && '.' != varname->value[i]; i++ )
+      {
          varname->value[i] = (unsigned char) toupper(varname->value[i]);
+      }
    }
    Free_stringTSD( varbl ) ;
    varbl = NULL; /* For debugging purpose only */
@@ -932,23 +1105,26 @@ static int handle_queue( int *Length, char **String )
  *  BUG022  To make Direct setting of stems Direct and not Symbolic.
  *   - Added checks for the direct variable functions RX_GETVAR and RX_SETVAR.
  *
- *
+ *  *allocated will be set, if the returned value(s) is/are allocated and
+ *  should be freed after the use.
  *
  ****************************************************************************/
-int IfcVarPool( tsd_t *TSD, int Code, int *Lengths, char *Strings[] )
+int IfcVarPool( tsd_t *TSD, int Code, int *Lengths, char *Strings[],
+                int *allocated )
 {
    int rc=0 ;
 
+   *allocated = 0;
    if (Code==RX_GETSVAR ||Code==RX_GETVAR )
-      rc = GetVariable( TSD, Code, Lengths, Strings ) ;
+      rc = GetVariable( TSD, Code, Lengths, Strings, allocated ) ;
    else if (Code==RX_SETSVAR ||Code==RX_SETVAR )
       rc = SetVariable( TSD, Code, Lengths, Strings ) ;
    else if (Code==RX_NEXTVAR)
-      rc = get_next_var( TSD, Lengths, Strings ) ;
+      rc = get_next_var( TSD, Lengths, Strings, allocated ) ;
    else if (Code==RX_CODE_VERSION)
       rc = handle_version( Lengths, Strings ) ;
    else if (Code==RX_CODE_SOURCE)
-      rc = handle_source( TSD, Lengths, Strings ) ;
+      rc = handle_source( TSD, Lengths, Strings, allocated ) ;
    else if (Code==RX_CODE_QUEUE)
       rc = handle_queue( Lengths, Strings ) ;
    else if (Code==RX_CODE_PARAMS)
@@ -1003,61 +1179,6 @@ int IfcQueryFunc( tsd_t *TSD, const char *Name )
    Free_stringTSD(name);
    return(retval);
 }
-
-/* You are not allowed to use TSD or __regina_get_tsd() here! */
-void *IfcAllocateMemory( unsigned long size )
-{
-   void *ret;
-#if defined( WIN32 )
-   /* We now use the Virtual-functions instead of Global... */
-   ret = VirtualAlloc( NULL, size, MEM_COMMIT, PAGE_READWRITE ) ;
-   return ret;
-#elif defined( __EMX__ ) && !defined(DOS)
-   if (_osmode == OS2_MODE)
-   {
-      if ( ( BOOL )DosAllocMem( &ret, size, fPERM|PAG_COMMIT ) )
-         return NULL;
-      else
-         return ret;
-   }
-   else /* DOS or something else */
-   {
-      ret = (void *)malloc( size );
-      return ret;
-   }
-#elif defined( OS2 )
-   if ( ( BOOL )DosAllocMem( &ret, size, fPERM|PAG_COMMIT ) )
-      return NULL;
-   else
-      return ret;
-#else
-   ret = (void *)malloc( size );
-   return ret;
-#endif
-}
-
-/* You are not allowed to use TSD or __regina_get_tsd() here! */
-unsigned long IfcFreeMemory( void *ptr )
-{
-#if defined( WIN32 )
-   /* In opposite to most(!) of the documentation from Microsoft we shouldn't
-    * decommit and release together. This won't work at least under NT4SP6a.
-    * We can first decommit and then release or release at once. FGC.
-    */
-   VirtualFree( ptr, 0, MEM_RELEASE ) ;
-#elif defined( __EMX__ ) && !defined(DOS)
-   if (_osmode == OS2_MODE)
-      DosFreeMem( ptr );
-   else /* DOS or something else */
-      free( ptr );
-#elif defined( OS2 )
-   DosFreeMem( ptr );
-#else
-   free( ptr );
-#endif
-   return 0;
-}
-
 
 /* Removes ct->Strings and ct->Lengths AND ct->ExternalName. */
 static void RemoveParams(const tsd_t *TSD)
@@ -1233,13 +1354,13 @@ int IfcCreateQueue( tsd_t *TSD, const char *qname, const int qlen, char *data, u
       /*
        * Return the new queue name
        */
-      memcpy( data, strdata->value, max( strdata->len, (int) buflen) - 1 );
-      *(data+(max( strdata->len, (int) buflen) - 1)) = '\0';
+      memcpy( data, strdata->value, min( strdata->len, (int) buflen - 1 ) );
+      data[min( strdata->len, (int) buflen - 1)] = '\0';
       /*
        * If the returned queue name is different to
        * the one we requested, set the dupflag
        */
-      if ( queuename 
+      if ( queuename
       &&   rc == 1 )
          *dupflag = 3;
       else
@@ -1276,7 +1397,10 @@ int IfcQueryQueue( tsd_t *TSD, const char *qname, const int qlen, unsigned long 
    if ( rc < 0 )
       rc = -rc;
    else
+   {
       *count = rc;
+      rc = 0;
+   }
    FreeTSD( queuename );
    return rc;
 }
@@ -1299,7 +1423,6 @@ int IfcAddQueue( tsd_t *TSD, const char *qname, const int qlen, const char *data
    else
       rc = stack_fifo( TSD, strdata, queuename );
    FreeTSD( queuename );
-   FreeTSD( strdata );
    return rc;
 }
 

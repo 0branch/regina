@@ -22,7 +22,7 @@
 /*   in REXX, and to fool the interpreter to make a mistake           */
 /*                                                                    */
 /* Created ... ... : April 1989                                       */
-/* Last modified . : 6th September 1980                               */
+/* Last modified . : 14th March 2003                                  */
 /*                                                                    */
 /* Current version : 2.00                                             */
 /*                                                                    */
@@ -79,14 +79,6 @@ test = 'foo', /*comment*/
    'bar'
 if (test\=='foo bar') then
    call complain 'Comment after continutation mark confuses interpreter'
-
-/*----- Comments can come in the middle of operators -----------------*/
-if ( 'abc'=/* */=' abc ' ) then
-   call complain 'Comments could not be place inside operators'
-
-if ( 'abc'=/* *//* */=' abc ' ) then
-   call complain 'Comments could not be place inside operators'
-
 
 /*----- Comments can come in front of left paran in functions --------*/
 if words/* */('foo bar') words/* *//* */('foo bar') \== '2 2' then
@@ -497,7 +489,7 @@ strings_2:
 rc = -1000
 123 <= "hallo"
 if (rc \== '0') then
-   call complain 'Command was not executed, somehow'
+   call complain 'Command was not executed, is "." in PATH ?'
 
 'rm -f ./1'
 

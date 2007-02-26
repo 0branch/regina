@@ -2,7 +2,7 @@
 # Makefile for Regina REXX Interpreter using Watcom C++ 10.6
 #
 
-VER=20
+VER=31
 
 #
 # good from here down
@@ -60,6 +60,7 @@ misc.obj      &
 unxfuncs.obj  &
 os2funcs.obj  &
 cmsfuncs.obj  &
+arxfuncs.obj  &
 shell.obj     &
 rexxext.obj   &
 stack.obj     &
@@ -101,6 +102,7 @@ misc.dlo      &
 unxfuncs.dlo  &
 os2funcs.dlo  &
 cmsfuncs.dlo  &
+arxfuncs.dlo  &
 shell.dlo     &
 rexxext.dlo   &
 stack.dlo     &
@@ -160,6 +162,7 @@ rexx.exe : $(OFILES) rexx.obj nosaa.obj
         @%append dummy.lnk file files.obj
         @%append dummy.lnk file misc.obj
         @%append dummy.lnk file unxfuncs.obj
+        @%append dummy.lnk file arxfuncs.obj
         @%append dummy.lnk file os2funcs.obj
         @%append dummy.lnk file cmsfuncs.obj
         @%append dummy.lnk file shell.obj
@@ -257,6 +260,7 @@ $(LIBFILE): $(OFILES) client.obj drexx.obj rexxsaa.obj
         @%append lib.rsp +files.obj
         @%append lib.rsp +misc.obj
         @%append lib.rsp +unxfuncs.obj
+        @%append lib.rsp +arxfuncs.obj
         @%append lib.rsp +os2funcs.obj
         @%append lib.rsp +cmsfuncs.obj
         @%append lib.rsp +shell.obj
@@ -308,6 +312,7 @@ $(DLLFILE): $(DLOFILES) client.dlo drexx.dlo rexxsaa.dlo
         @%append dummy.lnk file files.dlo
         @%append dummy.lnk file misc.dlo
         @%append dummy.lnk file unxfuncs.dlo
+        @%append dummy.lnk file arxfuncs.dlo
         @%append dummy.lnk file os2funcs.dlo
         @%append dummy.lnk file cmsfuncs.dlo
         @%append dummy.lnk file shell.dlo
@@ -423,6 +428,9 @@ misc.obj:     $(SRC)\misc.c $(HFILES)
         $(CC) $(CCFLAGS) /fo=$@ $(SRC)\$*.c
 
 unxfuncs.obj: $(SRC)\unxfuncs.c $(HFILES)
+        $(CC) $(CCFLAGS) /fo=$@ $(SRC)\$*.c
+
+arxfuncs.obj: $(SRC)\arxfuncs.c $(HFILES)
         $(CC) $(CCFLAGS) /fo=$@ $(SRC)\$*.c
 
 os2funcs.obj: $(SRC)\os2funcs.c $(HFILES)
@@ -579,6 +587,9 @@ misc.dlo:     $(SRC)\misc.c $(HFILES)
         $(CC) $(CCFLAGS) $(DYN_COMP) /fo=$*.dlo $(SRC)\$*.c
 
 unxfuncs.dlo: $(SRC)\unxfuncs.c $(HFILES)
+        $(CC) $(CCFLAGS) $(DYN_COMP) /fo=$*.dlo $(SRC)\$*.c
+
+arxfuncs.dlo: $(SRC)\arxfuncs.c $(HFILES)
         $(CC) $(CCFLAGS) $(DYN_COMP) /fo=$*.dlo $(SRC)\$*.c
 
 os2funcs.dlo: $(SRC)\os2funcs.c $(HFILES)

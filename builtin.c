@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: builtin.c,v 1.24 2002/04/01 05:36:50 mark Exp $";
+static char *RCSid = "$Id: builtin.c,v 1.27 2003/02/23 09:39:55 florian Exp $";
 #endif
 
 /*
@@ -29,6 +29,7 @@ static char *RCSid = "$Id: builtin.c,v 1.24 2002/04/01 05:36:50 mark Exp $";
 #include <time.h>
 #include <stdio.h>
 #include <assert.h>
+#include <limits.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -144,7 +145,7 @@ static int contained_in( const char *first, const char *fend, const char *second
       if (first==fend)
          return 1 ;
 
-      for (; (first<fend)&&(isspace(*first)); first++) 
+      for (; (first<fend)&&(isspace(*first)); first++)
       {
          ;
       }
@@ -410,7 +411,7 @@ streng *std_delword( tsd_t *TSD, cparamboxptr parms )
       {
          ;
       }
-      for (; (cptr<end) && isspace(*cptr); cptr++ ) 
+      for (; (cptr<end) && isspace(*cptr); cptr++ )
       {
          ;
       }
@@ -603,7 +604,7 @@ streng *std_symbol( tsd_t *TSD, cparamboxptr parms )
    if (type==SYMBOL_BAD)
       return Str_creTSD("BAD") ;
 
-   if (type!=SYMBOL_CONSTANT)
+   if ( ( type != SYMBOL_CONSTANT ) && ( type != SYMBOL_NUMBER ) )
    {
       assert(type==SYMBOL_STEM||type==SYMBOL_SIMPLE||type==SYMBOL_COMPOUND);
       if (isvariable(TSD, parms->value))
@@ -1753,7 +1754,7 @@ streng *std_sourceline( tsd_t *TSD, cparamboxptr parms )
       otp = ipt->srclines; /* NULL if incore_source==NULL */
       if (line > 0)
       {
-         while (otp && ((int) otp->num < line)) 
+         while (otp && ((int) otp->num < line))
          {
             line -= otp->num;
             otp = otp->next;
@@ -1878,7 +1879,7 @@ streng *std_errortext( tsd_t *TSD, cparamboxptr parms )
    /*
     * Only restrict the error number passed if STRICT_ANSI is in effect.
     */
-   if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) 
+   if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI )
    &&   ( errnum > 90 || suberrnum > 900 ) )
       exiterror( ERR_INCORRECT_CALL, 17, "ERRORTEXT", tmpstr_of( TSD, parms->value ) )  ;
 
@@ -2038,49 +2039,78 @@ streng *std_substr( tsd_t *TSD, cparamboxptr parms )
 }
 
 
+static streng *minmax( tsd_t *TSD, cparamboxptr parms, const char *name,
+                       int sign )
+{
+   /*
+    * fixes bug 677645
+    */
+   streng *retval;
+   num_descr *m,*test;
+   int ccns,fuzz,StrictAnsi,result;
 
+   StrictAnsi = get_options_flag( TSD->currlevel, EXT_STRICT_ANSI );
+   /*
+    * Round the number according to NUMERIC DIGITS. This is rule 9.2.1.
+    * Don't set DIGITS or FUZZ where it's possible to raise a condition.
+    * We don't have a chance to set it back to the original value.
+    */
+   ccns = TSD->currlevel->currnumsize;
+   fuzz = TSD->currlevel->numfuzz;
+
+   if ( !parms->value )
+       exiterror( ERR_INCORRECT_CALL, 3, name, 1 );
+   m = get_a_descr( TSD, parms->value );
+   if ( StrictAnsi )
+   {
+      str_round_lostdigits( TSD, m, ccns );
+   }
+
+   while ( parms )
+   {
+      if ( !parms->value )
+         continue;
+      test = get_a_descr( TSD, parms->value );
+      if ( StrictAnsi )
+      {
+         str_round_lostdigits( TSD, test, ccns );
+      }
+
+      if ( ( TSD->currlevel->currnumsize = test->size ) < m->size )
+         TSD->currlevel->currnumsize = m->size;
+      TSD->currlevel->numfuzz = 0;
+      result = string_test( TSD, test, m ) * sign;
+      TSD->currlevel->currnumsize = ccns;
+      TSD->currlevel->numfuzz = fuzz;
+
+      if ( result <= 0 )
+      {
+         free_a_descr( TSD, test );
+      }
+      else
+      {
+         free_a_descr( TSD, m );
+         m = test;
+      }
+      parms = parms->next;
+   }
+
+   m->used_digits = m->size;
+   retval = str_norm( TSD, m, NULL );
+   free_a_descr( TSD, m );
+   return retval;
+
+}
 streng *std_max( tsd_t *TSD, cparamboxptr parms )
 {
-   double largest=0, current=0 ;
-   cparamboxptr ptr=NULL ;
-   streng *result=NULL ;
-
-   if (!(ptr=parms)->value)
-       exiterror( ERR_INCORRECT_CALL, 3, "MAX", 1 )  ;
-
-   largest = myatof( TSD, ptr->value ) ;
-
-   for(;ptr;ptr=ptr->next)
-      if ((ptr->value)&&((current=myatof(TSD,ptr->value))>largest))
-         largest = current ;
-
-   result = Str_makeTSD( sizeof(double)*3+7 ) ;
-   sprintf(result->value, "%G", largest) ;
-   result->len = strlen(result->value) ;
-   return result ;
+   return minmax( TSD, parms, "MAX", 1 );
 }
 
 
 
 streng *std_min( tsd_t *TSD, cparamboxptr parms )
 {
-   double smallest=0, current=0 ;
-   cparamboxptr ptr=NULL ;
-   streng *result=NULL ;
-
-   if (!(ptr=parms)->value)
-       exiterror( ERR_INCORRECT_CALL, 3, "MIN", 1 )  ;
-
-   smallest = myatof( TSD, ptr->value ) ;
-
-   for(;ptr;ptr=ptr->next)
-      if ((ptr->value)&&((current=myatof(TSD,ptr->value))<smallest))
-         smallest = current ;
-
-   result = Str_makeTSD( sizeof(double)*3+7 ) ;
-   sprintf(result->value, "%G", smallest) ;
-   result->len = strlen(result->value) ;
-   return result ;
+   return minmax( TSD, parms, "MIN", -1 );
 }
 
 
@@ -2178,24 +2208,21 @@ streng *std_copies( tsd_t *TSD, cparamboxptr parms )
 
 streng *std_sign( tsd_t *TSD, cparamboxptr parms )
 {
-   double number=0 ;
+   checkparam(  parms,  1,  1 , "SIGN" );
 
-   checkparam(  parms,  1,  1 , "SIGN" ) ;
-
-   number = myatof( TSD, parms->value ) ;
-   return int_to_streng( TSD,(number) ? ((number>0) ? 1 : -1) : 0 ) ;
+   return str_sign( TSD, parms->value );
 }
 
 
 streng *std_trunc( tsd_t *TSD, cparamboxptr parms )
 {
-   int decimals=0 ;
+   int decimals=0;
 
-   checkparam(  parms,  1,  2 , "TRUNC" ) ;
-   if ((parms->next)&&(parms->next->value))
-      decimals = atozpos( TSD, parms->next->value, "TRUNC", 2 ) ;
+   checkparam(  parms,  1,  2 , "TRUNC" );
+   if ( parms->next && parms->next->value )
+      decimals = atozpos( TSD, parms->next->value, "TRUNC", 2 );
 
-   return str_trunc( TSD, parms->value, decimals ) ;
+   return str_trunc( TSD, parms->value, decimals );
 }
 
 
@@ -2440,7 +2467,7 @@ streng *std_datatype( tsd_t *TSD, cparamboxptr parms )
             break ;
 
          case 'W':
-            res = myiswnumber(TSD, string) ;
+            res = myiswnumber( TSD, string, NULL, 0 );
             break ;
 
          case 'X':

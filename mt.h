@@ -1,6 +1,8 @@
 #ifndef MT_H_INCLUDED
 #define MT_H_INCLUDED
 
+#include <setjmp.h>
+
 struct extlib_funcbox; /* private type in extlib.c */
 
 /* tsd_t holds all global vars which may change between threads as expected.*/
@@ -20,11 +22,10 @@ typedef struct _tsd_t {
    void *                  shl_tsd ;           /* local variables of shell.c */
    void *                  mat_tsd ;           /* local variables of strmath.c */
    void *                  cli_tsd ;           /* local variables of client.c */
+   void *                  arx_tsd ;           /* local variables of arxfuncs.c */
    void *                  mt_tsd ;            /* local variables of mt_???.c */
 
    void *                  CH;                 /* only rexxsaa.c */
-   int                     stemidx;            /* only get_next_variable() */
-   int                     tailidx ;           /* only get_next_variable() */
    int                     indentsize;         /* only in r2perl.c */
    int                     loopcnt;            /* only in r2perl.c */
    paramboxptr             listleaked_params ; /* only in funcs.c */

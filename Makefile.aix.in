@@ -59,9 +59,8 @@ LIBEXE  =          @LIBEXE@
 LIBFLAGS  =        @LIBFLAGS@
 LIBLINK  =         @LIBLINK@
 LINKSHL  =         @LINKSHL@
-SHLPRE =         @SHLPRE@
-SHLPST =         @SHLPST@
-RXLIBLEN =         @RXLIBLEN@
+SHLPRE =           @SHLPRE@
+SHLPST =           @SHLPST@
 OBJECTS  =         @OBJECTS@
 DYN_COMP  =        @DYN_COMP@
 SYS_DEFS  =        @SYS_DEFS@
@@ -107,7 +106,7 @@ MISCDEFS = -DHAVE_CONFIG_H $(TRACEMEM) $(FLISTS) -I. -I$(srcdir) $(SYS_DEFS)
 COPT = $(DEBUG) $(CFLAGS) $(CEXTRA) $(MISCDEFS) $(THREADING_COMPILE)
 LINKOPT = $(DEBUG) $(CFLAGS) $(EEXTRA) $(THREADING_LINK)
 
-README = $(REG_DIR)/README.??? $(REG_DIR)/COPYING-LIB $(REG_DIR)/INSTALL $(REG_DIR)/rexx.1 $(REG_DIR)/BUGS $(REG_DIR)/TODO
+README = $(REG_DIR)/README.??? $(REG_DIR)/COPYING-LIB $(REG_DIR)/INSTALL $(REG_DIR)/regina.1 $(REG_DIR)/BUGS $(REG_DIR)/TODO
 
 FILES = funcs builtin error variable interprt debug dbgfuncs \
         memory parsing files misc os2funcs unxfuncs cmsfuncs shell rexxext stack \
@@ -168,14 +167,6 @@ rexx$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 
 regina$(EXE) : $(EXECISER_DEP) regina.$(OBJ)
 	$(PURIFY) $(CC) $(LINKOPT) $(DYNAMIC_LDFLAGS) -o regina$(EXE) regina.$(OBJ) $(LINKSHL) $(SHLIBS)
-	$(LDEXTRA)
-
-trexx$(EXE) : trexx.$(OBJ) $(OFILES) rexxsaa.$(OBJ) client.$(OBJ) drexx.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o trexx$(EXE) trexx.$(OBJ) rexxsaa.$(OBJ) client.$(OBJ) drexx.$(OBJ) $(OFILES) $(BOTHLIBS)
-	$(LDEXTRA)
-
-tregina$(EXE) : $(EXECISER_DEP) tregina.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(DYNAMIC_LDFLAGS) -o tregina$(EXE) tregina.$(OBJ) $(LINKSHL) $(BOTHLIBS) $(SHLIBS)
 	$(LDEXTRA)
 
 execiser$(EXE) : execiser.$(OBJ) $(EXECISER_DEP)
@@ -379,31 +370,19 @@ erexxbif.$(OBJ) : $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h
 	$(CC) -DEXTERNAL_TO_REGINA $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxbif.c
 
 #
-# Rules for Regina tokeniser targets
-#
-trexx.$(OBJ) : $(srcdir)/tregina.c
-	-mv tregina.$(OBJ) tregina$(OSAVE)
-	$(CC) $(COPT) $(DYN_COMP) -c $(srcdir)/tregina.c
-	-mv tregina.$(OBJ) trexx.$(OBJ)
-	-mv tregina$(OSAVE) tregina.$(OBJ)
-
-tregina.$(OBJ) : $(srcdir)/tregina.c
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/tregina.c
-
-#
 # Rules for sample programs
 #
 test1.$(OBJ): $(srcdir)/test1.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(srcdir)/test1.c
 
 $(SHLPRE)test1$(SHLPST): test1.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(TEST1EXP)
-	$(LD_RXLIB_A1) $(TEST1EXPORTS) -o $@ test1.$(OBJ) $(LD_RXLIB_B1)
+	$(LD_RXLIB_A1) $@ $(TEST1EXPORTS) test1.$(OBJ) $(LD_RXLIB_B1)
 
 test2.$(OBJ): $(srcdir)/test2.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(srcdir)/test2.c
 
 $(SHLPRE)test2$(SHLPST): test2.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(TEST2EXP)
-	$(LD_RXLIB_A2) $(TEST2EXPORTS) -o $@ test2.$(OBJ) $(LD_RXLIB_B2)
+	$(LD_RXLIB_A2) $@ $(TEST2EXPORTS) test2.$(OBJ) $(LD_RXLIB_B2)
 
 regina.exp: ./rexx$(EXE) $(srcdir)/regina_w32_dll.def $(srcdir)/def2exp.rexx
 	./rexx$(EXE) $(srcdir)/def2exp.rexx $(srcdir)/regina_w32_dll.def regina.exp
@@ -461,7 +440,7 @@ install: all
 	$(INSTALL) -m 755 -c ./tregina $(bindir)/tregina
 	$(INSTALL) -m 755 -c ./regina-config $(bindir)/$(SHLFILE)-config
 	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE).a $(libdir)/$(SHLPRE)$(SHLFILE).a
-	$(INSTALL) -m 744 -c $(srcdir)/rexx.1 $(mandir)/man1/rexx.1
+	$(INSTALL) -m 744 -c $(srcdir)/regina.1 $(mandir)/man1/regina.1
 	$(INSTALL) -m 744 -c $(srcdir)/rexxsaa.h $(includedir)/rexxsaa.h
 	$(INSTALL) -m 744 -c ./pt.mtb $(sharedir)/pt.mtb
 	$(INSTALL) -m 744 -c ./no.mtb $(sharedir)/no.mtb

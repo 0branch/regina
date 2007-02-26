@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: wrappers.c,v 1.13 2002/03/23 00:41:35 mark Exp $
+ * $Id: wrappers.c,v 1.14 2002/07/28 02:27:06 mark Exp $
  */
 
 /*
@@ -72,7 +72,11 @@
 #  define DYNAMIC_DLOPEN
 # endif
 
-# if defined(DYNAMIC_DLOPEN)
+# if defined(DYNAMIC_STATIC)
+   typedef void * handle_type;
+#  define DYNLIBPRE ""
+#  define DYNLIBPST ""
+# elif defined(DYNAMIC_DLOPEN)
 #  include <dlfcn.h>
    typedef void *handle_type ;
 #  ifndef RTLD_LAZY
@@ -195,9 +199,7 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
 #endif
    char *file_name, *module_name, *udpart, *postfix;
 
-#ifndef DYNLIBLEN
-   file_name = module_name = str_ofTSD(module);
-#else
+#ifdef DYNLIBLEN
    module_name = MallocTSD( Str_len( module ) + strlen(DYNLIBPRE) +
                            strlen(DYNLIBPST) + 1 ) ;
    strcpy(module_name, DYNLIBPRE );
@@ -210,9 +212,18 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    find_shared_library(TSD,module_name,"SHLIB_PATH",buf);
    file_name = buf;
 # endif
+#else
+   file_name = module_name = str_ofTSD(module);
 #endif
 
-#if defined(DYNAMIC_DLOPEN)
+#if defined(DYNAMIC_STATIC)
+   handle = static_dlopen( file_name );
+   if (handle == NULL)
+   {
+      set_err_message(TSD, "static_dlopen() failed loading:", file_name );
+      handle = (handle_type)NULL;
+   }
+#elif defined(DYNAMIC_DLOPEN)
    handle = dlopen( file_name, RTLD_LAZY ) ;
 
    /* deal with incorrect case in call */
@@ -319,13 +330,25 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
 #if defined(DYNAMIC_BEOS)
    status_t rc=0;
 #endif
+#if defined(DYNAMIC_STATIC)
+   int rc=0;
+#endif
 #if defined(MODULES_NEED_USCORE)
    streng *us_func;
 #endif
 
    funcname = str_of( TSD, name ) ;
 
-#if defined(DYNAMIC_DLOPEN)
+#if defined(DYNAMIC_STATIC)
+   rc = static_dlsym( handle, funcname,(void **)&addr );
+   if ( rc != 0 )
+   {
+      char buf[150];
+      sprintf(buf,"static_dlsym() failed with %d looking for %s", rc, funcname );
+      set_err_message(TSD,  buf, "" ) ;
+      addr = NULL;
+   }
+#elif defined(DYNAMIC_DLOPEN)
 # if defined(MODULES_NEED_USCORE)
    /*
     * Some platforms need to have an underscore prepended to the function
@@ -382,8 +405,10 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
       if (!rc)
          addr = (PFN)eaddr ;
    }
+
 #elif defined(DYNAMIC_AIXLOAD)
    addr = (PFN)handle ;
+
 #elif defined(DYNAMIC_OS2)
    rc = DosQueryProcAddr(handle,0L,funcname,&addr);
    if (rc)
@@ -392,6 +417,7 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
       sprintf(buf,"DosQueryProcAddr() failed with %ld looking for %s", (long) rc, funcname );
       set_err_message(TSD, buf, "" ) ;
    }
+
 #elif defined(DYNAMIC_WIN32)
    /*  13/12/1999 JH moved cast, (HMODULE), from second parm to first.  Removed
     * a compiler warning,
@@ -414,6 +440,7 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
          }
       }
    }
+
 #elif defined(DYNAMIC_BEOS)
    rc = get_image_symbol(handle,funcname,B_SYMBOL_TYPE_TEXT,(void **)&addr);
    if (rc == B_BAD_IMAGE_ID)

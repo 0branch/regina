@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: unxfuncs.c,v 1.15 2002/04/29 10:48:31 mark Exp $";
+static char *RCSid = "$Id: unxfuncs.c,v 1.22 2002/12/28 09:38:34 mark Exp $";
 #endif
 
 /*
@@ -40,7 +40,7 @@ static char *RCSid = "$Id: unxfuncs.c,v 1.15 2002/04/29 10:48:31 mark Exp $";
 #endif
 
 #define HAVE_FORK
-#if !defined(__WATCOMC__) && !defined(_MSC_VER)  && !(defined(__IBMC__) && defined(WIN32)) && !defined(__SASC) && !defined(__MINGW32__) && !defined(__BORLANDC__)
+#if defined(__WATCOMC__) || defined(_MSC_VER)  || (defined(__IBMC__) && defined(WIN32)) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(DOS) || defined(__WINS__) || defined(__EPOC32__) ||defined(__LCC__)
 # undef HAVE_FORK
 #endif
 #if defined(__WATCOMC__) && defined(__QNX__)
@@ -58,7 +58,7 @@ static char *RCSid = "$Id: unxfuncs.c,v 1.15 2002/04/29 10:48:31 mark Exp $";
 
 #include <errno.h>
 
-#if defined(VMS) || defined(MAC)
+#if defined(MAC)
 # include <types.h>
 typedef struct utsname
 {
@@ -85,7 +85,7 @@ typedef struct utsname
    char *version ;
    char *machine ;
 } _utsname ;
-# elif defined(__WATCOMC__) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__WINS__) || defined(__EPOC32__)
+# elif (defined(__WATCOMC__) && defined(__QNX__)) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__WINS__) || defined(__EPOC32__) || defined(__LCC__)
 #  include "utsname.h"
 #  if !defined(__SASC) && !defined(__QNX__) && !defined(__WINS__) && !defined(__EPOC32__)
 #   include <process.h>
@@ -136,7 +136,7 @@ streng *unx_popen( tsd_t *TSD, cparamboxptr parms )
       lines = lines_in_stack( TSD, NULL ) ;
    }
 
-   result = perform( TSD, cptr, TSD->currlevel->environment, TSD->currentnode ) ;
+   result = perform( TSD, cptr, TSD->currlevel->environment, TSD->currentnode, NULL ) ;
    Free_stringTSD( cptr ) ;
 
    if (parms->next && parms->next->value)
@@ -302,12 +302,22 @@ streng *unx_unixerror( tsd_t *TSD, cparamboxptr parms )
 streng *unx_chdir( tsd_t *TSD, cparamboxptr parms )
 {
    char *path;
-   int rc;
+   int rc=0;
+   int ok=HOOK_GO_ON ;
 
    checkparam(  parms,  1,  1 , "CD" ) ;
-   path = str_of( TSD, parms->value ) ;
-   rc = chdir( path ) ;
-   FreeTSD( path ) ;
+   /*
+    * Check if we have a registred system exit
+    */
+   if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_SETCWD))
+      ok = hookup_output( TSD, HOOK_SETCWD, parms->value ) ;
+
+   if (ok==HOOK_GO_ON)
+   {
+      path = str_of( TSD, parms->value ) ;
+      rc = chdir( path ) ;
+      FreeTSD( path ) ;
+   }
    return int_to_streng( TSD, rc!=0 ) ;
 }
 
@@ -317,19 +327,26 @@ streng *unx_getenv( tsd_t *TSD, cparamboxptr parms )
    streng *retval=NULL ;
    char *output=NULL ;
    char *path ;
+   int ok=HOOK_GO_ON ;
 
    checkparam(  parms,  1,  1 , "GETENV" ) ;
-   path = str_of( TSD, parms->value ) ;
-   output = mygetenv( TSD, path, NULL, 0 ) ;
-   FreeTSD( path ) ;
-   if ( output )
-   {
-      retval = Str_creTSD( output ) ;
-      FreeTSD( output );
-   }
-   else
-      retval = nullstringptr() ;
 
+   if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_GETENV))
+      ok = hookup_input_output( TSD, HOOK_GETENV, parms->value, &retval ) ;
+
+   if (ok==HOOK_GO_ON)
+   {
+      path = str_of( TSD, parms->value ) ;
+      output = mygetenv( TSD, path, NULL, 0 ) ;
+      FreeTSD( path ) ;
+      if ( output )
+      {
+         retval = Str_creTSD( output ) ;
+         FreeTSD( output );
+      }
+      else
+         retval = nullstringptr() ;
+   }
    return retval ;
 }
 

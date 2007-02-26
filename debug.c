@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: debug.c,v 1.5 2002/03/23 00:39:59 mark Exp $";
+static char *RCSid = "$Id: debug.c,v 1.7 2003/03/11 10:38:08 florian Exp $";
 #endif
 
 /*
@@ -29,131 +29,141 @@ static char *RCSid = "$Id: debug.c,v 1.5 2002/03/23 00:39:59 mark Exp $";
 
 #ifndef NDEBUG
 
-void dumpvars( const tsd_t *TSD, cvariableptr *hashptr )
+/*
+ * Prints the value of v to fp. ", number ???" may be appended if v is a number.
+ * In addition, the helper fields are printed and the line is terminated.
+ */
+void dumpvarcontent( const tsd_t *TSD, FILE *fp, cvariableptr v, int exposed )
 {
-/* change by bja: dumpvars to use stderr, as trace or listleaked do */
-/* modified my mh: respect stdout_for_stderr OPTION also */
-/* change by bja: display variable's length in front of value       */
-   cvariableptr ptr=NULL, tptr=NULL ;
-   int i=0, j=0, k=0 ;
-   FILE *fp=stderr;
+   const streng *s;
+   const num_descr *n;
 
+   s = v->value;
+   if ( s )
+   {
+      fprintf( fp, "\"%.*s\"", s->len, s->value );
+   }
+   else
+   {
+      fprintf( fp, "<none>" );
+   }
+
+   n = v->num;
+   fprintf( fp, ",\tnumber " );
+   if ( n ) /* variable is a number */
+   {
+      fprintf( fp, "%s0.%.*sE%+d",
+               ( n->negative ) ? "-" : "",
+               n->size, n->num, n->exp );
+   }
+   else
+   {
+      fprintf( fp, "<none>" );
+   }
+
+   switch ( v->flag )
+   {
+      case VFLAG_NONE: fprintf( fp, ",\tflag NONE, " ); break;
+      case VFLAG_STR:  fprintf( fp, ",\tflag STR,  " );  break;
+      case VFLAG_NUM:  fprintf( fp, ",\tflag NUM,  " );  break;
+      case VFLAG_BOTH: fprintf( fp, ",\tflag BOTH, " ); break;
+      default:         fprintf( fp, ",\tflag %d, ", v->flag );
+   }
+   fprintf( fp, "hwired %ld, valid %ld, guard %d%s\n",
+                v->hwired, v->valid, v->guard,
+                ( exposed ) ? ", exposed" : "" );
+}
+
+/*
+ * get_realbox returns either p or the realbox associated with p if it exists.
+ * This function is NULL-pointer safe.
+ * *exposed is set to 0 if p is set in the current frame, it is set to 1 if p
+ * is an exposed value from one of the upper frames.
+ */
+static cvariableptr get_realbox( cvariableptr p, int *exposed )
+{
+   *exposed = 0;
+   if ( p == NULL )
+      return p;
+   if ( p->realbox == NULL )
+      return p;
+
+   *exposed = 1;
+   for ( p = p->realbox; p->realbox; p = p->realbox )
+      ;
+   return p;
+}
+
+/*
+ * dumpvars dumps the set of valid variables of the current PROCEDURE frame.
+ * The destination is stderr of stdout in case of STDOUT_FOR_STDERR.
+ */
+void dumpvars( const tsd_t *TSD )
+{
+   cvariableptr ptr,tptr,rb,trb;
+   int i,j,isstem,isexposed;
+   FILE *fp;
+   streng *s;
+   cvariableptr *hashptr;
+
+   fp = stderr;
    if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
       fp = stdout;
-   if (hashptr==NULL)
-      hashptr = (cvariableptr *) TSD->currlevel->vars ;
 
-   fprintf(fp,"\nDumping variables to <stdout>\n") ;
-   for (i=0;i!=HASHTABLENGTH;i++)
+   hashptr = (cvariableptr *) TSD->currlevel->vars;
+
+   fprintf( fp, "\nDumping variables, 1. no after \">>>\" is the bin number\n" );
+   for ( i = 0; i != HASHTABLENGTH; i++ )
    {
-      if (hashptr[i]!=NULL)
-         fprintf(fp,"   Variables from bin no %d\n",i) ;
-      for (ptr=hashptr[i];ptr!=NULL;ptr=ptr->next)
+      if ( hashptr[i] == NULL )
+         continue;
+
+      /*
+       * One bin of same hashvalues may have several vars connected by a
+       * simple linked list.
+       */
+      for ( ptr = hashptr[i]; ptr != NULL; ptr = ptr->next )
       {
-         if ((ptr->name->value)[ptr->name->len-1]=='.')
+         rb = get_realbox( ptr, &isexposed );
+         s = rb->name;
+         isstem = s->value[s->len - 1] == '.';
+
+         fprintf( fp, "   >>> %3d %s \"%.*s\",\tvalue ",
+                      i, ( isstem ) ? "    Stem" : "Variable",
+                      s->len, s->value );
+
+         dumpvarcontent( TSD, fp, rb, isexposed );
+
+         if ( !isstem )
+            continue;
+
+         for ( j = 0; j < HASHTABLENGTH; j++ )
          {
-#if 0
-            fprintf(fp,"   >>> Stem    : //%s// Default: //%s//  Values:\n",
-                  ptr->name->value,(ptr->value)?(ptr->value->value):"<none>") ;
-#else
-            fprintf(fp,"   >>> Stem    : ");
-            fprintf(fp,"(%d) :",ptr->name->len);
-            for (k=0;k<ptr->name->len;k++)
-               putc(ptr->name->value[k],fp);
- /* avoid problems with exposed variables                                              bja */
-            if (ptr->realbox)
+            /*
+             * The variables of a stem are organized as a normal variable
+             * bunch. We have to iterate as for the level's variable set.
+             * Keep in mind that a variable "a.b." isn't a stem, we can't
+             * iterate once more.
+             */
+            if ( ( tptr = rb->index[j] ) != NULL )
             {
-               fprintf(fp," Exposed!\n");
-               continue;
-            }
- /* end of avoid problems with exposed variables                                       bja */
-            fprintf(fp, " Default: [");
-            if (ptr->value)
-            {
-               fprintf(fp,"(%d) :",ptr->value->len);
-               for (k=0;k<ptr->value->len;k++)
-                  putc(ptr->value->value[k],fp);
-            }
-            else
-               fprintf(fp, "<none>");
-            fprintf(fp, "]  Values:\n");
-#endif
-            for (j=0;j<HASHTABLENGTH;j++)
-            {
-               if ((tptr=((ptr->index))[j])!=NULL)
+               for ( ; tptr; tptr = tptr->next )
                {
-                  fprintf(fp, "      Sub-bin no %d\n",j) ;
-                  for (;tptr;tptr=tptr->next)
+                  trb = get_realbox( tptr, &isexposed );
+                  s = trb->name;
+                  if ( s )
                   {
-                     if (tptr->name)
-                     {
-#if 0
-                        fprintf(fp, "      >>> Variable: //%s// Value: //%s//\n",
-                              tptr->name->value,tptr->value->value) ;
-#else
-                        fprintf(fp, "      >>> Tail: ");
-                        fprintf(fp, "(%d) :",tptr->name->len);
-                        for (k=0;k<tptr->name->len;k++)
-                           putc(tptr->name->value[k],fp);
-                        if ( tptr->num ) /* variable is a number */
-                        {
-/* try printing numbers a bit better...                                                bja
-                           fprintf(fp, " (number: %s) ",ptr->num->num );
- */                                                                                  /* bja */
-                           fprintf(fp, " (number: ");                             /* bja */
-                           if (tptr->num->negative) fprintf(fp,"-");              /* bja */
-                           fprintf(fp, "%.*s) ",tptr->num->size, tptr->num->num );/* bja */
-                        }
-                        fprintf(fp," Flag: %d hwired: %ld valid: %ld ",ptr->flag, ptr->hwired, ptr->valid );
-                        fprintf(fp," Value: [");
-                        if (tptr->value)
-                        {
-                           fprintf(fp,"(%d) :",tptr->value->len);
-                           for (k=0;k<tptr->value->len;k++)
-                              putc(tptr->value->value[k],fp);
-                        }
-                        else
-                        {                                               /* added bja */
-                           fprintf(fp,"<none>");                           /* added bja */
-                        }
-                        fprintf(fp,"]\n");
-#endif
-                     }
+                     fprintf( fp, "      >>> %3d  Tail \"%.*s\",\tvalue ",
+                                  j, s->len, s->value );
+                     dumpvarcontent( TSD, fp, trb, isexposed );
                   }
                }
             }
          }
-         else
-         {
-#if 0
-            fprintf(fp,"   >>> Variable: //%s// Value: //%s//\n",
-                                     ptr->name->value,ptr->value->value) ;
-#else
-            fprintf(fp,"   >>> Variable: ");
-            fprintf(fp,"(%d) :",ptr->name->len);
-            for (k=0;k<ptr->name->len;k++)
-               putc(ptr->name->value[k],fp);
- /* avoid problems with exposed variables                                              bja */
-            if (ptr->realbox)
-            {
-               fprintf(fp," Exposed\n");
-               continue;
-            }
- /* end of avoid problems with exposed variables                                       bja */
-            fprintf(fp," Value: [");
-            if (ptr->value)
-            {
-               fprintf(fp,"(%d) :",ptr->value->len);
-               for (k=0;k<ptr->value->len;k++)
-                  putc(ptr->value->value[k],fp);
-            }
-            fprintf(fp,"]\n");
-#endif
-         }
       }
    }
 
-   return ;
+   return;
 }
 
 
