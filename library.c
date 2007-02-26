@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: library.c,v 1.19 2004/04/25 01:34:56 mark Exp $";
+static char *RCSid = "$Id: library.c,v 1.25 2005/08/04 11:28:40 mark Exp $";
 #endif
 
 /*
@@ -73,8 +73,9 @@ int init_library( tsd_t *TSD )
    if ( TSD->lib_tsd != NULL )
       return 1;
 
-   if ( ( lt = TSD->lib_tsd = MallocTSD( sizeof( lib_tsd_t ) ) ) == NULL )
+   if ( ( TSD->lib_tsd = MallocTSD( sizeof( lib_tsd_t ) ) ) == NULL )
       return 0;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    memset( lt, 0, sizeof( lib_tsd_t ) );  /* correct for all values */
    return 1;
 }
@@ -88,7 +89,7 @@ static void insert_library( const tsd_t *TSD, struct library *ptr )
 {
    lib_tsd_t *lt;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    ptr->prev = NULL;
    ptr->next = lt->first_library;
    lt->first_library = ptr;
@@ -169,7 +170,7 @@ static void remove_library( const tsd_t *TSD, struct library *ptr )
 
    assert( ptr->used == 0 );
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    if ( ptr->next )
       ptr->next->prev = ptr->prev;
 
@@ -194,7 +195,7 @@ static void remove_library( const tsd_t *TSD, struct library *ptr )
 /*
  * remove_entry removes the passed library entry from the linked list of used
  * library entries unconditionally.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  * Used memory will be freed and the holding library will be removed if this
  * entry was the last entry used of the library.
  */
@@ -204,12 +205,12 @@ static void remove_entry( tsd_t *TSD, struct entry_point *fptr, int slot )
 
    assert( slot >= FUNCS && slot <= SUBCOMS );
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    if ( fptr->name )
       Free_stringTSD( fptr->name );
 #if defined(HAVE_GCI) && defined(DYNAMIC)
    if ( ( fptr->special.gci_info != NULL ) && ( slot == FUNCS ) )
-      GCI_remove_structure( TSD, fptr->special.gci_info );
+      GCI_remove_structure( TSD, (GCI_treeinfo *)fptr->special.gci_info );
 #endif
    if ( fptr->next )
       fptr->next->prev = fptr->prev;
@@ -236,7 +237,7 @@ static void remove_entry( tsd_t *TSD, struct entry_point *fptr, int slot )
 void free_orphaned_libs( tsd_t *TSD )
 {
 #ifdef DYNAMIC
-   lib_tsd_t *lt = TSD->lib_tsd;
+   lib_tsd_t *lt = (lib_tsd_t *)TSD->lib_tsd;
 
    unlink_orphaned_libs( TSD, lt, 0 );
 #else
@@ -255,7 +256,7 @@ void purge_library( tsd_t *TSD )
    lib_tsd_t *lt;
    int i, j;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    if ( lt->first_library != NULL )
    {
       for ( i = FUNCS; i <= SUBCOMS; i++ )
@@ -290,14 +291,14 @@ void purge_library( tsd_t *TSD )
 #ifdef DYNAMIC
 /*
  * find_library returns the internal structure associated with the passed
- * library name or NULL if such a library doesn't exists.
+ * library name or NULL if such a library doesn't exist.
  */
 struct library *find_library( const tsd_t *TSD, const streng *name )
 {
    struct library *lptr;
    lib_tsd_t *lt;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    lptr = lt->first_library;
    for ( ; lptr; lptr = lptr->next )
    {
@@ -312,7 +313,7 @@ struct library *find_library( const tsd_t *TSD, const streng *name )
 /*
  * add_entry creates a new library entry from the passed data and inserts it
  * in the linked list of used entries unconditionally.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  * rxname is the name that can be used by a REXX script.
  * addr is the entry point of the function/exit hook/subcom hook.
  * lptr is a loaded library or NULL for a call of RexxRegister???Exe.
@@ -321,7 +322,8 @@ struct library *find_library( const tsd_t *TSD, const streng *name )
  * The internal counter of the library isn't incremented.
  */
 static void add_entry( const tsd_t *TSD, int slot, const streng *rxname,
-                       PFN addr, struct library *lptr, void *gci_info,
+                       PFN addr,
+                       struct library *lptr, void *gci_info,
                        void *user_area )
 {
    int hash0;
@@ -329,9 +331,9 @@ static void add_entry( const tsd_t *TSD, int slot, const streng *rxname,
    struct entry_point *fptr;
 
    assert( slot >= FUNCS && slot <= SUBCOMS );
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
 
-   fptr = MallocTSD( sizeof( struct entry_point ) );
+   fptr = (struct entry_point *)MallocTSD( sizeof( struct entry_point ) );
    fptr->name = Str_upper( Str_dupstrTSD( rxname ) );
    fptr->hash = hashvalue( rxname->value, rxname->len );
    fptr->addr = addr;
@@ -359,7 +361,7 @@ static void add_entry( const tsd_t *TSD, int slot, const streng *rxname,
  * if both the name and the library match. Returns any entry with a fitting
  * name if the library doesn't match but the name exists.
  * library may be NULL for entries registered by RexxRegister???Exe.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  */
 static struct entry_point *find_entry_point( const tsd_t *TSD,
                                              const streng *name,
@@ -371,7 +373,7 @@ static struct entry_point *find_entry_point( const tsd_t *TSD,
    lib_tsd_t *lt;
    struct entry_point *retval = NULL;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    hash = hashvalue( name->value, name->len );
    hash0 = hash % EP_COUNT;
    for ( lptr = lt->ep[slot][hash0]; lptr; lptr = lptr->next )
@@ -392,7 +394,7 @@ static struct entry_point *find_entry_point( const tsd_t *TSD,
 /*
  * find_first_entry_point returns NULL if no entry is found and returns the
  * most recent hook otherwise.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  */
 static struct entry_point *find_first_entry_point( const tsd_t *TSD,
                                                    const streng *name,
@@ -402,7 +404,7 @@ static struct entry_point *find_first_entry_point( const tsd_t *TSD,
    unsigned hash, hash0;
    lib_tsd_t *lt;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    hash = hashvalue( name->value, name->len );
    hash0 = hash % EP_COUNT;
    for ( lptr = lt->ep[slot][hash0]; lptr; lptr = lptr->next )
@@ -419,7 +421,7 @@ static struct entry_point *find_first_entry_point( const tsd_t *TSD,
  * find_all_entries returns 0 if no entry is found. Otherwise it returns the
  * number of all matching entries with the given name, different in the module
  * name only.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  * *list will be set to a list of all available entries.
  *
  * This function is slow.
@@ -432,7 +434,7 @@ static int find_all_entries( const tsd_t *TSD, const streng *name, int slot,
    lib_tsd_t *lt;
    int cnt;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    hash = hashvalue( name->value, name->len );
    hash0 = hash % EP_COUNT;
    for ( cnt = 0, lptr = lt->ep[slot][hash0]; lptr; lptr = lptr->next )
@@ -448,7 +450,7 @@ static int find_all_entries( const tsd_t *TSD, const streng *name, int slot,
       return 0;
    }
 
-   array = MallocTSD( cnt * sizeof( struct entry_point * ) );
+   array = (struct entry_point **)MallocTSD( cnt * sizeof( struct entry_point * ) );
    *list = array;
 
    for ( cnt = 0, lptr = lt->ep[slot][hash0]; lptr; lptr = lptr->next )
@@ -472,7 +474,7 @@ void set_err_message( const tsd_t *TSD, const char *message1,
    lib_tsd_t *lt;
    int size;
 
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    if ( lt->err_message )
       Free_stringTSD( lt->err_message );
 
@@ -495,7 +497,7 @@ void set_err_message( const tsd_t *TSD, const char *message1,
  * or function that is exported by the library.
  * entry will be used if lptr == NULL only and is the entry point of the hook
  * or function.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  * Either gci_info or user_area may be set depending on the kind of the entry.
  *
  * Return codes:
@@ -509,7 +511,8 @@ void set_err_message( const tsd_t *TSD, const char *message1,
  *    4 if external libraries are not supported.
  */
 static int load_entry( const tsd_t *TSD, struct library *lptr,
-                       const streng *rxname, const streng *objnam, PFN entry,
+                       const streng *rxname, const streng *objnam,
+                       PFN entry,
                        int slot, void *gci_info, void *user_area )
 {
    int result=0;
@@ -559,7 +562,7 @@ static int load_entry( const tsd_t *TSD, struct library *lptr,
  * rxname is the name that can be used by a REXX script.
  * module is the name of the library and may be NULL for a generic request
  * or is a RexxRegister???Exe registered funcion/hook shall be unloaded.
- * The slot must be either FUNCS, EXISTS, or SUBCOMS.
+ * The slot must be either FUNCS, EXITS, or SUBCOMS.
  *
  * Return codes:
  *    0 on success.
@@ -632,7 +635,8 @@ static int unload_entry( tsd_t *TSD, const streng *rxname,
  * Returns a return code suitable for RexxRegisterFunction???.
  */
 static int loadrxfunc( const tsd_t *TSD, struct library *lptr,
-                       const streng *rxname, const streng *objnam, PFN entry,
+                       const streng *rxname, const streng *objnam,
+                       PFN entry,
                        void *gci_info )
 {
    int rc;
@@ -659,12 +663,13 @@ static int loadrxfunc( const tsd_t *TSD, struct library *lptr,
  * that is exported by the library.
  * entry will be used if lptr == NULL only and is the entry point of the hook.
  * user_area is the passed parameter called UserArea of the Registration.
- * The slot must be either EXISTS or SUBCOMS.
+ * The slot must be either EXITS or SUBCOMS.
  *
  * Returns a return code suitable for RexxRegister???.
  */
 static int loadrxhook( const tsd_t *TSD, struct library *lptr,
-                       const streng *rxname, const streng *objnam, PFN entry,
+                       const streng *rxname, const streng *objnam,
+                       PFN entry,
                        void *user_area, int slot )
 {
    int rc;
@@ -705,7 +710,7 @@ static int unloadrxfunc( tsd_t *TSD, const streng *rxname )
  * module is the name of the module that contains the hook or NULL if either
  * the generic hook should be removed or if a RexxRegister???Exe-hook should
  * be removed. The later one has precedence.
- * The slot must be either EXISTS or SUBCOMS.
+ * The slot must be either EXITS or SUBCOMS.
  *
  * Returns a return code suitable for RexxDeregister???.
  */
@@ -735,14 +740,15 @@ static int unloadrxhook( tsd_t *TSD, const streng *rxname,
  * Returns a return code suitable for RexxRegisterFunction???.
  */
 static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
-                        const streng *module, const streng *objnam, PFN entry,
+                        const streng *module, const streng *objnam,
+                        PFN entry,
                         void *gci_info )
 {
    struct library *lptr=NULL;
    int rc;
 #ifdef DYNAMIC
    void *handle;
-   int new = 0;
+   int newhandle = 0;
 #endif
 
    assert( rxname != NULL );
@@ -753,11 +759,11 @@ static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
 #ifdef DYNAMIC
       if ( ( lptr = find_library( TSD, module ) ) == NULL )
       {
-         new = 1;
+         newhandle = 1;
          handle = wrapper_load( TSD, module ) ;
          if ( handle )
          {
-            lptr = MallocTSD( sizeof( struct library )) ;
+            lptr = (struct library *)MallocTSD( sizeof( struct library )) ;
             lptr->name = Str_dupstrTSD( module ) ;
             lptr->handle = handle ;
             lptr->used = 0l;
@@ -779,7 +785,7 @@ static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
    if ( ( rc = loadrxfunc( TSD, lptr, rxname, objnam, entry, gci_info ) ) != 0 )
    {
 #ifdef DYNAMIC
-      if ( new )
+      if ( newhandle )
          remove_library( TSD, lptr );
 #endif
    }
@@ -798,19 +804,20 @@ static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
  * entry will be used if module == NULL only and is the entry point of the
  * hook.
  * user_area is the passed parameter called UserArea of the Registration.
- * The slot must be either EXISTS or SUBCOMS.
+ * The slot must be either EXITS or SUBCOMS.
  *
  * Returns a return code suitable for RexxRegister???.
  */
 static int rex_hookadd( const tsd_t *TSD, const streng *rxname,
-                        const streng *module, const streng *objnam, PFN entry,
+                        const streng *module, const streng *objnam,
+                        PFN entry,
                         void *user_area, int slot )
 {
    struct library *lptr=NULL;
    int rc;
 #ifdef DYNAMIC
    void *handle;
-   int new = 0;
+   int newhandle = 0;
 #endif
 
    assert( rxname != NULL );
@@ -821,11 +828,11 @@ static int rex_hookadd( const tsd_t *TSD, const streng *rxname,
 #ifdef DYNAMIC
       if ( ( lptr = find_library( TSD, module ) ) == NULL )
       {
-         new = 1;
+         newhandle = 1;
          handle = wrapper_load( TSD, module ) ;
          if ( handle )
          {
-            lptr = MallocTSD( sizeof( struct library )) ;
+            lptr = (struct library *)MallocTSD( sizeof( struct library )) ;
             lptr->name = Str_dupstrTSD( module ) ;
             lptr->handle = handle ;
             lptr->used = 0l;
@@ -848,7 +855,7 @@ static int rex_hookadd( const tsd_t *TSD, const streng *rxname,
    if ( ( rc != 0 ) && ( rc != 10 ) )
    {
 #ifdef DYNAMIC
-      if ( new )
+      if ( newhandle )
          remove_library( TSD, lptr );
 #endif
    }
@@ -867,7 +874,7 @@ streng *rex_rxfuncerrmsg( tsd_t *TSD, cparamboxptr parms )
    checkparam( parms, 0, 0, "RXFUNCERRMSG" );
 
 #ifdef DYNAMIC
-   lt = TSD->lib_tsd;
+   lt = (lib_tsd_t *)TSD->lib_tsd;
    if ( lt->err_message )
       return Str_dupTSD( lt->err_message );
    else
@@ -896,14 +903,8 @@ streng *rex_rxfuncquery( tsd_t *TSD, cparamboxptr parms )
 
    if ( fptr )
       return int_to_streng( TSD, 0 );
-   /*
-    * FIXME: We have to discuss whether to return a stupid 1 or a
-    *        more informational 30/60 for RXFUNC_NOTREG or RXFUNC_NOTINIT
-    */
-   /* return int_to_streng( TSD, 30 ); */ /* RXFUNC_NOTREG */
    return int_to_streng( TSD, 1 );
 #else
-   /* return int_to_streng( TSD, 60 ); */ /* RXFUNC_NOTINIT */
    return int_to_streng( TSD, 1 );
 #endif
 }
@@ -987,11 +988,67 @@ streng *rex_rxfuncdefine( tsd_t *TSD, cparamboxptr parms )
    rc = rex_funcadd( TSD, rxname, module, objnam, NULL, gci_info );
    Free_stringTSD( rxname );
    if ( rc )
-      GCI_remove_structure( TSD, gci_info );
+      GCI_remove_structure( TSD, (GCI_treeinfo *)gci_info );
    return int_to_streng( TSD, rc );
 #else
    return int_to_streng( TSD, 60 ); /* RXFUNC_NOTINIT */
 #endif
+}
+
+/*
+ * rex_gciprefixchar implements the BIF GciPrefixChar.
+ *
+ * parameters:
+ *   1) new prefix character
+ */
+streng *rex_gciprefixchar( tsd_t *TSD, cparamboxptr parms )
+{
+   static const char valid[] = " !?_#$@"; /* last 3 are Regina specific */
+   char oldval[2], newval[2];
+   streng *value;
+
+   checkparam( parms, 0, 1, "GCIPREFIXCHAR" );
+
+   oldval[0] = TSD->gci_prefix[0];
+   oldval[1] = TSD->gci_prefix[1];
+   newval[1] = '\0';
+
+   value = parms->value;
+   if ( value )
+   {
+      if ( Str_len( value ) == 0 )
+      {
+         newval[0] = '\0';
+      }
+      else if ( Str_len( value ) > 1 )
+      {
+         exiterror( ERR_INCORRECT_CALL, 23, "GCIPREFIXCHAR", 1, tmpstr_of( TSD, value ) );
+      }
+      else
+      {
+         newval[0] = Str_val( value )[0];
+         if ( newval[0] )
+         {
+            if ( strchr( valid, (int) newval[0] ) == NULL )
+            {
+               exiterror( ERR_INCORRECT_CALL, 28, "GCIPREFIXCHAR", 1, valid, newval );
+            }
+         }
+         if ( newval[0] == ' ' )
+         {
+            newval[0] = '\0';
+         }
+      }
+   }
+   else
+   {
+      newval[0] = oldval[0];
+   }
+
+   TSD->gci_prefix[0] = newval[0];
+   TSD->gci_prefix[1] = newval[1];
+
+   return Str_creTSD( oldval );
 }
 #endif
 
@@ -1015,7 +1072,8 @@ streng *rex_rxfuncdrop( tsd_t *TSD, cparamboxptr parms )
  * Either entry or module and objnam must be set.
  */
 int IfcRegFunc( const tsd_t *TSD, const char *rxname, const char *module,
-                const char *objnam, PFN entry )
+                const char *objnam,
+                PFN entry )
 {
    int rc;
    streng *ext;
@@ -1047,7 +1105,8 @@ int IfcRegFunc( const tsd_t *TSD, const char *rxname, const char *module,
  * Either entry or module and objnam must be set.
  */
 static int IfcRegHook( const tsd_t *TSD, const char *rxname,
-                       const char *module, const char *objnam, PFN entry,
+                       const char *module, const char *objnam,
+                       PFN entry,
                        void *user_area, int slot )
 {
    int rc;
@@ -1080,7 +1139,9 @@ static int IfcRegHook( const tsd_t *TSD, const char *rxname,
  * Either entry or module and objnam must be set.
  */
 int IfcRegExit( const tsd_t *TSD, const char *rxname, const char *module,
-                const char *objnam, PFN entry, void *user_area )
+                const char *objnam,
+                PFN entry,
+                void *user_area )
 {
    return IfcRegHook( TSD, rxname, module, objnam, entry, user_area, EXITS );
 }
@@ -1091,8 +1152,14 @@ int IfcRegExit( const tsd_t *TSD, const char *rxname, const char *module,
  * Either entry or module and objnam must be set.
  */
 int IfcRegSubcom( const tsd_t *TSD, const char *rxname, const char *module,
-                  const char *objnam, PFN entry, void *user_area )
+                  const char *objnam,
+                  PFN entry,
+                  void *user_area )
 {
+   streng *env;
+   env = Str_creTSD( rxname );
+   set_subcomed_envir( TSD, env, 1 );
+   Free_stringTSD( env );
    return IfcRegHook( TSD, rxname, module, objnam, entry, user_area, SUBCOMS );
 }
 
@@ -1147,6 +1214,10 @@ int IfcDelExit( tsd_t *TSD, const char *rxname, const char *module )
  */
 int IfcDelSubcom( tsd_t *TSD, const char *rxname, const char *module )
 {
+   streng *env;
+   env = Str_creTSD( rxname );
+   set_subcomed_envir( TSD, env, 0 );
+   Free_stringTSD( env );
    return IfcDelHook( TSD, rxname, module, SUBCOMS );
 }
 

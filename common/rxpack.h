@@ -83,6 +83,10 @@
 # include <io.h>
 #endif
 
+#ifdef HAVE_FCNTL_H
+# include <fcntl.h>
+#endif
+
 /*
  * All things that this application may require out of os2.h must be
  * specified here in one place.  This is because EMX includes all Rexx
@@ -136,8 +140,8 @@
 # define FALSE  0
 #endif
 
-/* 
- * Run time modes 
+/*
+ * Run time modes
  */
 #define MODE_DEBUG        1
 #define MODE_VERBOSE      2
@@ -146,8 +150,18 @@
 
 #define REXX_FAIL      1
 
-#define RXSTRCAT(dst,dstlen,src,srclen) (memcpy((dst)+(dstlen),(src),(srclen)),(dstlen)+=(srclen),*((dst)+(dstlen))='\0')
-#define RXSTRCPY(dst,dstlen,src,srclen) (memcpy((dst),(src),(srclen)),(dstlen)=(srclen),*((dst)+(dstlen))='\0')
+#define RXSTRCAT(dst,dstlen,src,srclen)   \
+{                                         \
+   memcpy((dst)+(dstlen),(src),(srclen)); \
+   (dstlen)+=(srclen);                    \
+   *((dst)+(dstlen))='\0';                \
+}
+#define RXSTRCPY(dst,dstlen,src,srclen)   \
+{                                         \
+   memcpy((dst),(src),(srclen));          \
+   (dstlen)=(srclen);                     \
+   *((dst)+(dstlen))='\0';                \
+}
 
 #if !defined(max)
 # define max(a,b)        (((a) > (b)) ? (a) : (b))
@@ -172,6 +186,27 @@ typedef unsigned int RX_UINT;
 typedef long RX_LONG;
 typedef unsigned long RX_ULONG;
 
+/*
+ * Typedef a common "long long"
+ */
+#if defined(_MSC_VER) || defined(__LCC__)
+   /* MS VC++ or LCC on Win32 */
+   typedef signed __int64 rx_long_long;
+#  define RX_LL_FORMAT "%I64d"
+#elif (defined(__WATCOMC__) && !defined(__QNX__)) || (defined(__GNUC__) && defined(WIN32))
+   /* Watcom C++ on WIn32 or OS/2 or Cygwin on Win32 */
+   typedef long long rx_long_long;
+#  define RX_LL_FORMAT "%I64d"
+#elif defined(HAVE_LONG_LONG)
+   /* Any compiler that supports "long long" */
+   typedef long long rx_long_long;
+#  define RX_LL_FORMAT "%lld"
+#else
+   /* No "long long" support; make it "long" */
+   typedef long rx_long_long;
+#  define RX_LL_FORMAT "%ld"
+#endif
+
 #ifdef USE_REXX6000
 typedef USHORT RexxFunctionHandler(PSZ, ULONG, PRXSTRING, PSZ, PRXSTRING) ;
 #endif
@@ -185,7 +220,7 @@ typedef USHORT RexxFunctionHandler(PSZ, ULONG, PRXSTRING, PSZ, PRXSTRING) ;
  *----------------------------------------------------------------------------*/
 typedef struct {
    RRFD_ARG0_TYPE      ExternalName;
-   RRFE_ARG1_TYPE      EntryPoint; 
+   RRFE_ARG1_TYPE      EntryPoint;
    RRFD_ARG2_TYPE      InternalName;
    int                 DllLoad;
 } RexxFunction;
@@ -195,7 +230,7 @@ typedef struct {
  * external function packages.  A similar structure should exists
  * for package-specific data.
  */
-typedef struct 
+typedef struct
 {
    int RxRunFlags;                    /* debug/verbose flags */
    char FName[100];                   /* current function name */
@@ -210,7 +245,7 @@ typedef struct
 /*
  * The following structure contains details of a package's constants
  */
-typedef struct 
+typedef struct
 {
    char *name;          /* base name of constant */
    int type;            /* 0 (numeric), 1 (text), 2 (float), 3 (char) */
@@ -266,7 +301,7 @@ int RxReturnUnsignedNumber Args(( RxPackageGlobalDataDef *, RXSTRING *, ULONG ))
 int RxReturnDouble Args(( RxPackageGlobalDataDef *, RXSTRING *, double ));
 int RxReturnPointer Args(( RxPackageGlobalDataDef *, RXSTRING *, void * ));
 int memcmpi Args(( char *, char *, int ));
-int my_checkparam Args(( RxPackageGlobalDataDef *, char *, int, int, int ));
+int my_checkparam Args(( RxPackageGlobalDataDef *, RFH_ARG0_TYPE, int, int, int ));
 int RxStrToInt Args(( RxPackageGlobalDataDef *, RXSTRING *, int * ));
 int RxStrToUInt Args(( RxPackageGlobalDataDef *, RXSTRING *, unsigned int * ));
 int RxStrToLong Args(( RxPackageGlobalDataDef *, RXSTRING *, long * ));
@@ -288,6 +323,34 @@ int RxNumberToVariable Args(( RxPackageGlobalDataDef *, RXSTRING *, ULONG ));
 # define DEBUGDUMP(x) {x;}
 #else
 # define DEBUGDUMP(x) {}
+#endif
+/*
+ * Directory and PATH separators
+ */
+#if defined(MSDOS) || ( defined(__WATCOMC__) && !defined(__QNX__) ) || defined(_MSC_VER) || defined(DOS) || defined(OS2) ||defined(__OS2__) || defined(__WINS__) || defined(__EPOC32__) || defined(__LCC__)
+# define FILE_SEPARATORS     "\\/:"
+# define FILE_SEPARATOR      '\\'
+# define FILE_SEPARATOR_STR  "\\"
+# define PATH_SEPARATOR      ';'
+# define PATH_SEPARATOR_STR  ";"
+#elif defined(VMS)
+# define FILE_SEPARATORS    "]"
+# define FILE_SEPARATOR     ']'
+# define FILE_SEPARATOR_STR "]"
+# define PATH_SEPARATOR     '?'
+# define PATH_SEPARATOR_STR "?"
+#elif defined(MAC)
+# define FILE_SEPARATOR     "]"
+# define FILE_SEPARATOR     ']'
+# define FILE_SEPARATOR_STR "]"
+# define PATH_SEPARATOR     '?'
+# define PATH_SEPARATOR_STR "?"
+#else
+# define FILE_SEPARATORS    "/"
+# define FILE_SEPARATOR     '/'
+# define FILE_SEPARATOR_STR "/"
+# define PATH_SEPARATOR     ':'
+# define PATH_SEPARATOR_STR ":"
 #endif
 
 #endif /* !_RXPACK_H */

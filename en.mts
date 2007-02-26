@@ -5,7 +5,7 @@
 # dutch - Gert van der Kooij <geko@wanadoo.nl>
 # french - Mark <cotemark@globetrotter.net>
 # german - <florian@grosse-coosmann.de>
-# norwegian (bokmal) - Vidar Tysse <vtsystem@bgnett.no>
+# norwegian (bokmal) - Vidar Tysse <vtysse@broadpark.no>
 # portuguese - brian <bcarpent@nucleus.com>
 # russian - Oleg Kulikov <kulikov@xanadu.ru>
 # spanish - Pablo Garcia-Abia <Pablo.Garcia@cern.ch>
@@ -127,7 +127,7 @@
  26,  2,Value of repetition count expression in DO instruction must be zero or a positive whole number; found "%s"|<value>
  26,  3,Value of FOR expression in DO instruction must be zero or a positive whole number; found "%s"|<value>
  26,  4,Positional parameter of parsing template must be a whole number; found "%s"|<value>
- 26,  5,NUMERIC DIGITS value must be zero or a positive whole number; found "%s"|<value>
+ 26,  5,NUMERIC DIGITS value must be a positive whole number; found "%s"|<value>
  26,  6,NUMERIC FUZZ value must be zero or a positive whole number; found "%s"|<value>
  26,  7,Number used in TRACE setting must be a whole number; found "%s"|<value>
  26,  8,Operand to right of power operator ("**") must be a whole number; found "%s"|<value>

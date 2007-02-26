@@ -111,14 +111,14 @@ README = $(REG_DIR)/README.??? $(REG_DIR)/COPYING-LIB $(REG_DIR)/INSTALL $(REG_D
 FILES = funcs builtin error variable interprt debug dbgfuncs \
         memory parsing files misc os2funcs unxfuncs cmsfuncs shell rexxext stack \
         tracing interp cmath convert strings library strmath signals \
-        macros envir extlib wrappers options doscmd #r2perl
+        macros envir extlib wrappers options os_unx #r2perl
 
 OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	interprt.$(OBJ) debug.$(OBJ) dbgfuncs.$(OBJ) memory.$(OBJ) parsing.$(OBJ) files.$(OBJ) \
 	misc.$(OBJ) unxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ) stack.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ) library.$(OBJ) \
 	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) extstack.$(OBJ) \
-	extlib.$(OBJ) yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) doscmd.$(OBJ) rexxbif.$(OBJ) \
+	extlib.$(OBJ) yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) os_unx.$(OBJ) rexxbif.$(OBJ) \
 	wrappers.$(OBJ) $(ALLOCA) $(MT_FILE).$(OBJ) instore.$(OBJ) #r2perl.$(OBJ)
 
 SHOFILES = $(OFILES) \
@@ -311,8 +311,8 @@ extstack.$(OBJ) : $(srcdir)/extstack.c $(srcdir)/extstack.h $(srcdir)/rexxbif.h
 rexxbif.$(OBJ) : $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h
 	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxbif.c
 
-doscmd.$(OBJ) :  $(srcdir)/doscmd.c
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/doscmd.c
+os_unx.$(OBJ) :  $(srcdir)/os_unx.c
+	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/os_unx.c
 
 rexx.$(OBJ) :    $(srcdir)/rexx.c
 	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexx.c
@@ -375,13 +375,13 @@ erexxbif.$(OBJ) : $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h
 test1.$(OBJ): $(srcdir)/test1.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(srcdir)/test1.c
 
-$(SHLPRE)test1$(SHLPST): test1.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(TEST1EXP)
+$(SHLPRE)rxtest1$(SHLPST): test1.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(TEST1EXP)
 	$(LD_RXLIB_A1) $@ $(TEST1EXPORTS) test1.$(OBJ) $(LD_RXLIB_B1)
 
 test2.$(OBJ): $(srcdir)/test2.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(srcdir)/test2.c
 
-$(SHLPRE)test2$(SHLPST): test2.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(TEST2EXP)
+$(SHLPRE)rxtest2$(SHLPST): test2.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(TEST2EXP)
 	$(LD_RXLIB_A2) $@ $(TEST2EXPORTS) test2.$(OBJ) $(LD_RXLIB_B2)
 
 regina.exp: ./rexx$(EXE) $(srcdir)/regina_w32_dll.def $(srcdir)/def2exp.rexx
@@ -461,8 +461,8 @@ install: all
 	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/newstr.rexx   $(sharedir)/newstr.rexx
 	-chmod 755 $(sharedir)/newstr.rexx
 	$(INSTALL) -m 755 -c ./regina $(bindir)/regina
-	$(INSTALL) -m 755 -c ./$(SHLPRE)test1$(SHLPST) $(libdir)/$(SHLPRE)test1$(SHLPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)test2$(SHLPST) $(libdir)/$(SHLPRE)test2$(SHLPST)
+	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(SHLPST) $(libdir)/$(SHLPRE)rxtest1$(SHLPST)
+	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(SHLPST) $(libdir)/$(SHLPRE)rxtest2$(SHLPST)
 
 clean:
 	rm -f $(JUNK)

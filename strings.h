@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: strings.h,v 1.12 2003/12/19 07:17:07 florian Exp $
+ * $Id: strings.h,v 1.14 2006/09/03 09:51:18 mark Exp $
  */
 
 
@@ -78,16 +78,22 @@ typedef struct strengtype {
 
 typedef struct num_descr_type
 {
-   char *num ;      /* pointer to matissa of presicion + 1 */
+   char *num ;      /* pointer to matissa of precision + 1 */
    int negative ;   /* boolean, true if negative number */
    int exp ;        /* value of exponent */
    int size ;       /* how much of num is actually used */
    int max ;        /* how much can num actually take */
 
    /*
+    * The number has an absolute value of
+    *   *********************
+    *   * "0."<num>"E"<exp> *
+    *   *********************
+    * Only size byte of num are used.
+    *
     * The number of used digits depends on its usage. In general, it's a good
     * idea to use the standard value. used_digits shall be reset after each
-    * computation and may or may be be respected. It shall be respected, and
+    * computation and may or may not be respected. It shall be respected, and
     * this is the intention, by str_norm and all other function which make
     * a string from the number accidently. Functions like string_add may
     * or may not use this value.

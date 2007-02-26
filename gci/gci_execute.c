@@ -51,6 +51,7 @@
  * novalue: Flag if the loaded value was a default while filling basebuf.
  * count:   Value for checking indirect array and container VALUE parameters.
  * helper:  buffer for the textual iterator.
+ * prefix:  prefix character for names.
  */
 typedef struct {
    void               *hidden;
@@ -65,6 +66,7 @@ typedef struct {
    int                 novalue;
    unsigned            count;
    char                helper[80];
+   const char         *prefix;
 } reader;
 
 /*
@@ -80,6 +82,7 @@ typedef struct {
  * strbuf:  A hollow string used with GCI_strfromascii for strings.
  * drop:    NULL-string for dropping a variable.
  * helper:  buffer for the textual iterator.
+ * prefix:  prefix character for names.
  */
 typedef struct {
    void               *hidden;
@@ -90,6 +93,7 @@ typedef struct {
    GCI_str             strbuf;
    GCI_str             drop;
    char                helper[80];
+   const char         *prefix;
 } writer;
 
 /*
@@ -119,6 +123,7 @@ static int validArgs( int argc,
          {
             if ( GCI_ccontent( &args[i] ) != NULL )
                return 0;
+            break;
          }
          else
          {
@@ -237,6 +242,17 @@ static GCI_result assignArgumentsFromParameters( void *hidden,
             basebuf[pos + GCI_strlen( &args[i] )] = '\0';
             break;
 
+         case GCI_raw:
+            if ( (unsigned) GCI_strlen( &args[i] ) > info->size )
+               return GCI_StringRange;
+            memcpy( basebuf + pos,
+                    GCI_ccontent( &args[i] ),
+                    GCI_strlen( &args[i] ) );
+            memset( basebuf + pos + GCI_strlen( &args[i] ),
+                    0,
+                    info->size - GCI_strlen( &args[i] ) );
+            break;
+
          default:
             return GCI_InternalError;
       }
@@ -253,6 +269,7 @@ static GCI_result assignArgumentsFromParameters( void *hidden,
  * rdr->novalue.
  * If novalueBreakout is not set, even a unregistered variable are accepted and
  * the default value is assigned.
+ * If notAString is set, the buffer is treated as a buffer, not as a string.
  *
  * GCI_OK:              Everything is fine.
  *
@@ -268,9 +285,11 @@ static GCI_result assignArgumentsFromParameters( void *hidden,
 static GCI_result readString( reader *rdr,
                               const GCI_parseinfo *info,
                               unsigned basepos,
-                              int novalueBreakout )
+                              int novalueBreakout,
+                              int notAString )
 {
    GCI_result rc;
+   int size = (notAString) ? info->size : info->size + 1;
 
    /*
     * We have to support a terminating zero in the buffer of the
@@ -279,8 +298,8 @@ static GCI_result readString( reader *rdr,
     * return a correct value in this case. Of course we have to check
     * for an overused buffer afterwards.
     */
-   GCI_strfromascii( &rdr->strbuf, rdr->basebuf + basepos, info->size + 1 );
-   assert( basepos + info->size + 1 <= rdr->max );
+   GCI_strfromascii( &rdr->strbuf, rdr->basebuf + basepos, size );
+   assert( basepos + size <= rdr->max );
    rdr->novalue = 0;
    rc = GCI_readRexx( rdr->hidden,
                       rdr->base,
@@ -290,7 +309,7 @@ static GCI_result readString( reader *rdr,
                       &rdr->novalue );
    if ( rdr->novalue && novalueBreakout )
    {
-      memset( rdr->basebuf + basepos, 0, info->size + 1 );
+      memset( rdr->basebuf + basepos, 0, size );
       return GCI_OK;
    }
    switch ( rc )
@@ -306,7 +325,16 @@ static GCI_result readString( reader *rdr,
    }
    if ( (unsigned) GCI_strlen( &rdr->strbuf ) > info->size )
       return GCI_StringRange;
-   rdr->basebuf[basepos + GCI_strlen( &rdr->strbuf )] = '\0';
+   if ( notAString )
+   {
+      memset( rdr->basebuf + basepos + GCI_strlen( &rdr->strbuf ),
+              0,
+              size - GCI_strlen( &rdr->strbuf ) );
+   }
+   else
+   {
+      rdr->basebuf[basepos + GCI_strlen( &rdr->strbuf )] = '\0';
+   }
 
    return GCI_OK;
 }
@@ -414,7 +442,9 @@ static GCI_result readTree( reader *rdr,
 
    info = &n->type;
 
-   if ( ( rc = GCI_strcats( rdr->base, ".VALUE" ) ) != GCI_OK )
+   GCI_strcats( rdr->base, "." );
+   GCI_strcats( rdr->base, rdr->prefix );
+   if ( ( rc = GCI_strcats( rdr->base, "VALUE" ) ) != GCI_OK )
       return rc;
    if ( info->indirect )
    {
@@ -443,10 +473,12 @@ static GCI_result readTree( reader *rdr,
             break;
 
          case GCI_string:
+         case GCI_raw:
             if ( ( rc = readString( rdr,
                                     info,
                                     n->indirect_pos + rdr->ishift,
-                                    1 ) ) != GCI_OK )
+                                    1,
+                                    ( info->type == GCI_raw ) ) ) != GCI_OK )
                return rc;
             if ( rdr->novalue )
             {
@@ -521,10 +553,12 @@ static GCI_result readTree( reader *rdr,
             break;
 
          case GCI_string:
+         case GCI_raw:
             if ( ( rc = readString( rdr,
                                     info,
                                     n->direct_pos + rdr->dshift,
-                                    0 ) ) != GCI_OK )
+                                    0,
+                                    ( info->type == GCI_raw ) ) ) != GCI_OK )
                return rc;
             break;
 
@@ -546,6 +580,7 @@ static GCI_result readTree( reader *rdr,
       case GCI_float:
       case GCI_char:
       case GCI_string:
+      case GCI_raw:
          return GCI_OK;
 
       case GCI_container:
@@ -670,7 +705,7 @@ static GCI_result loadStem( void *hidden,
    /*
     * We do a non-symbolic access later. Make sure we don't loose!
     */
-   GCI_uppercase( &stemval );
+   GCI_uppercase( hidden, &stemval );
    l = GCI_strlen( &stemval );
    if ( ( l > 0 ) & ( GCI_content( &stemval )[l - 1] == '.' ) )
       GCI_strsetlen( &stemval, l - 1 );
@@ -692,6 +727,8 @@ static GCI_result loadStem( void *hidden,
  * ti contains all informations we need to parse and assign the arguments.
  *
  * basebuf is the buffer we need for all arguments to pass to GCI_call.
+ *
+ * prefixChar is the prefix that must be used in front of stem names.
  *
  * Return values:
  * GCI_OK:              Everything is fine.
@@ -716,7 +753,8 @@ static GCI_result loadStem( void *hidden,
 static GCI_result assignArgumentsFromStem( void *hidden,
                                            GCI_str *base,
                                            const GCI_treeinfo *ti,
-                                           char *basebuf )
+                                           char *basebuf,
+                                           const char *prefixChar )
 {
    GCI_result rc;
    int i, start;
@@ -737,6 +775,7 @@ static GCI_result assignArgumentsFromStem( void *hidden,
    rdr.dshift =  0;
    rdr.ishift =  0;
    rdr.max =     ti->size;
+   rdr.prefix =  prefixChar;
 
    for ( i = 0; i < GCI_REXX_ARGS; i++ )
    {
@@ -758,11 +797,14 @@ static GCI_result assignArgumentsFromStem( void *hidden,
  * dump dumps the complete buffer of the arguments to stdout if the
  * environment variable "_GCI_DUMP" is set.
  */
-static void dump( const void *buf,
+static void dump( void *hidden,
+                  const void *buf,
                   unsigned size )
 {
-   const unsigned char *b = buf;
+   const unsigned char *b = (const unsigned char *) buf;
    unsigned i, j;
+
+   (hidden = hidden);
 
    if ( getenv("_GCI_DUMP") == NULL )
       return;
@@ -775,12 +817,12 @@ static void dump( const void *buf,
          printf( " %02X", b[j] );
       printf( "%*s", ( i + 16 - j ) * 3 + 2, "");
       for ( j = i; ( j < i + 16 ) && ( j < size ); j++ )
-         printf( "%c", rx_isprint( b[j] ) ? b[j] : '.' );
+         printf( "%c", GCI_isprint( b[j] ) ? b[j] : '.' );
       printf( "\n" );
    }
 }
 #else
-# define dump(x,size)
+# define dump(hidden,x,size)
 #endif
 
 /*
@@ -849,7 +891,10 @@ static GCI_result dropStem( writer *wrt,
       case GCI_float:
       case GCI_char:
       case GCI_string:
-         if ( ( rc = GCI_strcats( wrt->base, ".VALUE" ) ) != GCI_OK )
+      case GCI_raw:
+         GCI_strcats( wrt->base, "." );
+         GCI_strcats( wrt->base, wrt->prefix );
+         if ( ( rc = GCI_strcats( wrt->base, "VALUE" ) ) != GCI_OK )
             return rc;
          if ( ( rc = GCI_writeRexx( wrt->hidden,
                                     wrt->base,
@@ -933,7 +978,9 @@ static GCI_result fillStem( writer *wrt,
                                      info->type ) ) != GCI_OK )
             return rc;
          GCI_strsetlen( wrt->tmp, wrt->size );
-         if ( ( rc = GCI_strcats( wrt->base, ".VALUE" ) ) != GCI_OK )
+         GCI_strcats( wrt->base, "." );
+         GCI_strcats( wrt->base, wrt->prefix );
+         if ( ( rc = GCI_strcats( wrt->base, "VALUE" ) ) != GCI_OK )
             return rc;
          if ( ( rc = GCI_writeRexx( wrt->hidden,
                                     wrt->base,
@@ -944,12 +991,23 @@ static GCI_result fillStem( writer *wrt,
          return GCI_OK;
 
       case GCI_string:
-         if ( ( rc = GCI_strcats( wrt->base, ".VALUE" ) ) != GCI_OK )
+      case GCI_raw:
+         GCI_strcats( wrt->base, "." );
+         GCI_strcats( wrt->base, wrt->prefix );
+         if ( ( rc = GCI_strcats( wrt->base, "VALUE" ) ) != GCI_OK )
             return rc;
+         if ( info->type == GCI_string )
+         {
+            GCI_migratefromascii( &wrt->strbuf, direct );
+         }
+         else
+         {
+            GCI_strfromascii( &wrt->strbuf, (char *) direct, info->size );
+            GCI_strsetlen( &wrt->strbuf, info->size );
+         }
          if ( ( rc = GCI_writeRexx( wrt->hidden,
                                     wrt->base,
-                                    GCI_migratefromascii( &wrt->strbuf,
-                                                          direct ),
+                                    &wrt->strbuf,
                                     0 ) ) != GCI_OK )
             return rc;
          GCI_strsetlen( wrt->base, origlen );
@@ -964,7 +1022,9 @@ static GCI_result fillStem( writer *wrt,
     */
    GCI_strsetlen( wrt->tmp,
                   sprintf( GCI_content( wrt->tmp), "%d", info->size ) );
-   if ( ( rc = GCI_strcats( wrt->base, ".VALUE" ) ) != GCI_OK )
+   GCI_strcats( wrt->base, "." );
+   GCI_strcats( wrt->base, wrt->prefix );
+   if ( ( rc = GCI_strcats( wrt->base, "VALUE" ) ) != GCI_OK )
       return rc;
    if ( ( rc = GCI_writeRexx( wrt->hidden,
                               wrt->base,
@@ -1003,7 +1063,8 @@ static GCI_result setArgumentToStem( void *hidden,
                                      GCI_str *base,
                                      const GCI_treeinfo *ti,
                                      int startingIndex,
-                                     const char *basebuf )
+                                     const char *basebuf,
+                                     const char *prefixChar )
 {
    writer wrt;
    char tmp[256];
@@ -1015,6 +1076,7 @@ static GCI_result setArgumentToStem( void *hidden,
    wrt.base = base;
    wrt.nodes = ti->nodes;
    wrt.tmp = &str_tmp;
+   wrt.prefix = prefixChar;
 
    n = ti->nodes + startingIndex;
 
@@ -1030,7 +1092,8 @@ static GCI_result setArgumentToStem( void *hidden,
 static GCI_result setArgumentsToStem( void *hidden,
                                       GCI_str *base,
                                       const GCI_treeinfo *ti,
-                                      const char *basebuf )
+                                      const char *basebuf,
+                                      const char *prefixChar )
 {
    GCI_result rc;
    int i;
@@ -1052,7 +1115,8 @@ static GCI_result setArgumentsToStem( void *hidden,
                                      base,
                                      ti,
                                      ti->args[i],
-                                     basebuf ) ) != GCI_OK )
+                                     basebuf,
+                                     prefixChar ) ) != GCI_OK )
          return rc;
       GCI_strsetlen( base, origlen );
    }
@@ -1118,7 +1182,7 @@ static GCI_result setFunctionReturn( void *hidden,
    p = basebuf + n->direct_pos;
    if ( n->type.indirect )
    {
-      p = *((const void **) p);
+      p = *((const char **) p);
       if ( p == NULL )
       {
          GCI_strsetlen( error_disposition, 0 );
@@ -1144,6 +1208,10 @@ static GCI_result setFunctionReturn( void *hidden,
 
       case GCI_string:
          size = strlen( p );
+         break;
+
+      case GCI_raw:
+         size = n->type.size;
          break;
 
       default:
@@ -1186,6 +1254,8 @@ static GCI_result setFunctionReturn( void *hidden,
  *
  * retval is a non-allocated string on entry. It will contain the value
  * in case of a "as function" call.
+ *
+ * prefixChar is the prefix that must be used in front of stem names.
  *
  * The string base may contain the error location within the stem in case of
  * an error.
@@ -1232,7 +1302,8 @@ GCI_result GCI_execute( void *hidden,
                         int argc,
                         const GCI_str *args,
                         GCI_str *error_disposition,
-                        GCI_str *retval )
+                        GCI_str *retval,
+                        const char *prefixChar )
 {
    GCI_result rc;
    const GCI_callinfo *ci = &ti->callinfo;
@@ -1248,7 +1319,7 @@ GCI_result GCI_execute( void *hidden,
    /*
     * We're ready to read in all the values.
     */
-   if ( ( basebuf = GCI_malloc( hidden, ti->size ) ) == NULL )
+   if ( ( basebuf = (char *) GCI_malloc( hidden, ti->size ) ) == NULL )
       return GCI_NoMemory;
    memset( basebuf, 0, ti->size );
 
@@ -1271,14 +1342,15 @@ GCI_result GCI_execute( void *hidden,
          rc = assignArgumentsFromStem( hidden,
                                        error_disposition,
                                        ti,
-                                       basebuf );
+                                       basebuf,
+                                       prefixChar );
    }
    if ( rc != GCI_OK )
    {
       GCI_free( hidden, basebuf );
       return rc;
    }
-   dump( basebuf, ti->size );
+   dump( hidden, basebuf, ti->size );
 
    rc = GCI_call( hidden, func, ti, basebuf );
    if ( rc != GCI_OK )
@@ -1286,7 +1358,7 @@ GCI_result GCI_execute( void *hidden,
       GCI_strfree( hidden, error_disposition );
       return rc;
    }
-   dump( basebuf, ti->size );
+   dump( hidden, basebuf, ti->size );
 
    /*
     * Assign back all arguments and return values.
@@ -1299,7 +1371,8 @@ GCI_result GCI_execute( void *hidden,
       if ( ( rc = setArgumentsToStem( hidden,
                                       error_disposition,
                                       ti,
-                                      basebuf ) ) != GCI_OK )
+                                      basebuf,
+                                      prefixChar ) ) != GCI_OK )
          return rc;
    }
 
@@ -1323,14 +1396,17 @@ GCI_result GCI_execute( void *hidden,
       if ( ti->retval != -1 )
       {
          assert( !ci->with_parameters );
-         if ( ( rc = GCI_strcats( error_disposition, ".RETURN" ) ) != GCI_OK )
+         GCI_strcats( error_disposition, "." );
+         GCI_strcats( error_disposition, prefixChar );
+         if ( ( rc = GCI_strcats( error_disposition, "RETURN" ) ) != GCI_OK )
             return rc;
 
          if ( ( rc = setArgumentToStem( hidden,
                                         error_disposition,
                                         ti,
                                         ti->retval,
-                                        basebuf ) ) != GCI_OK )
+                                        basebuf,
+                                        prefixChar ) ) != GCI_OK )
             return rc;
       }
    }

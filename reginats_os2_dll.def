@@ -6,7 +6,6 @@ DESCRIPTION 'Regina Rexx Interpreter - Thread Safe'
 DATA    MULTIPLE NONSHARED
 
 STACKSIZE   40960
-HEAPSIZE    40960
 
 EXPORTS
         RexxAllocateMemory

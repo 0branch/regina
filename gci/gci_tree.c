@@ -46,7 +46,8 @@ typedef struct {
    void           *arg;
    GCI_str         tempbuf;  /* buffer for the content of each structure line*/
    char            helper[80]; /* buffer for the textual iterator   */
-   int             recurCount;
+   int             recurCount; /* counts recursions in LIKE */
+   const char     *prefixChar; /* must be used in front of stem names */
 } callblock;
 
 /*
@@ -76,13 +77,14 @@ static GCI_basetype checkname( const char **str,
       { GCI_indirect,  8, "INDIRECT"  },
       { GCI_like,      4, "LIKE"      },
       { GCI_integer,   7, "INTEGER"   },
+      { GCI_raw,       3, "RAW",      },
       { GCI_string,    6, "STRING"    },
       { GCI_unsigned,  8, "UNSIGNED"  }
    };
    const char *s = *str;
    int i, l, len = *size;
 
-   for ( i = 0; i < elements( list ); i++ )
+   for ( i = 0; i < (int) elements( list ); i++ )
    {
       l = list[i].length;
       if ( len < l )
@@ -100,6 +102,9 @@ static GCI_basetype checkname( const char **str,
 /*
  * decode decodes one line of the type structure named str into the
  * a parseinfo block called pi. depth is the current depth which may be 0.
+ *
+ * newName is set in case of ARRAY (to the empty string) or CONTAINER. In this
+ * case is set to the LIKE parameter or to the empty string.
  *
  * Leading and trailing spaces are ignored completely, "INDIRECTFLOAT32" is
  * acceptable. Differences in case are ignored.
@@ -123,12 +128,12 @@ static GCI_result decode( void *hidden,
    /*
     * Chop off leading and trailing spaces. We really need it.
     */
-   while ( ( size > 0 ) && rx_isspace( *ptr ) )
+   while ( ( size > 0 ) && GCI_isspace( *ptr ) )
    {
       ptr++;
       size--;
    }
-   while ( ( size > 0 ) && rx_isspace( ptr[size - 1] ) )
+   while ( ( size > 0 ) && GCI_isspace( ptr[size - 1] ) )
       size--;
 
    memset( pi, 0, sizeof( GCI_parseinfo ) );
@@ -137,7 +142,7 @@ static GCI_result decode( void *hidden,
       return GCI_UnsupportedType;
    if ( pi->type == GCI_indirect )
    {
-      while ( ( size > 0 ) && rx_isspace( *ptr ) )
+      while ( ( size > 0 ) && GCI_isspace( *ptr ) )
       {
          ptr++;
          size--;
@@ -153,7 +158,7 @@ static GCI_result decode( void *hidden,
    /*
     * Check for a size operand.
     */
-   while ( ( size > 0 ) && rx_isspace( *ptr ) )
+   while ( ( size > 0 ) && GCI_isspace( *ptr ) )
    {
       ptr++;
       size--;
@@ -168,13 +173,13 @@ static GCI_result decode( void *hidden,
    switch ( pi->type )
    {
       case GCI_container:
-         if (size > 0)
+         if ( size > 0 )
          {
             GCI_str tmp;
 
             if ( checkname( &ptr, &size ) != GCI_like )
                return GCI_UnsupportedType;
-            while ( ( size > 0 ) && rx_isspace( *ptr ) )
+            while ( ( size > 0 ) && GCI_isspace( *ptr ) )
             {
                ptr++;
                size--;
@@ -186,7 +191,7 @@ static GCI_result decode( void *hidden,
                 */
                return GCI_UnsupportedType;
             }
-            while ( rx_isspace( ptr[size - 1] ) )
+            while ( GCI_isspace( ptr[size - 1] ) )
                size--;
             /*
              * Cut off a final dot, we append one later.
@@ -241,6 +246,7 @@ static GCI_result decode( void *hidden,
          break;
 
       case GCI_string:
+      case GCI_raw:
          if ( size == 0 ) /* length must be supplied */
             return GCI_UnsupportedType;
          break;
@@ -260,13 +266,14 @@ static GCI_result decode( void *hidden,
          return GCI_UnsupportedType;
    }
 
-   if ( ( pi->type == GCI_string ) && ( pi->size > 0 ) )
+   if ( ( ( pi->type == GCI_string ) || ( pi->type == GCI_raw ) ) &&
+        ( pi->size > 0 ) )
       return GCI_OK;
 
    /*
     * A byte has 8 bit, always! We don't support PDP10.
     */
-   if ( pi->type != GCI_string )
+   if ( ( pi->type != GCI_string ) && ( pi->type != GCI_raw ) )
    {
       if ( pi->size % 8 )
          return GCI_UnsupportedType;
@@ -335,7 +342,9 @@ static GCI_result parse( callblock *cb,
    int origlen = GCI_strlen( cb->buffer );
 
    GCI_strfromascii( &newName, NULL, 0 );
-   if ( ( rc = GCI_strcats( cb->buffer, ".TYPE" ) ) != GCI_OK )
+   GCI_strcats( cb->buffer, "." );
+   GCI_strcats( cb->buffer, cb->prefixChar );
+   if ( ( rc = GCI_strcats( cb->buffer, "TYPE" ) ) != GCI_OK )
       return rc;
    if ( ( rc = GCI_readRexx( cb->hidden,
                              cb->buffer,
@@ -348,7 +357,7 @@ static GCI_result parse( callblock *cb,
          rc = GCI_MissingName;
       return rc;
    }
-   GCI_uppercase( &cb->tempbuf );
+   GCI_uppercase( cb->hidden, &cb->tempbuf );
 
    if ( ( rc = decode( cb->hidden, &cb->tempbuf, &pi, cb->depth, &newName ) )
                                                                     != GCI_OK )
@@ -523,12 +532,14 @@ static GCI_result parse( callblock *cb,
  * callback is described later. arg is passed to callback without further
  * interpretation.
  *
+ * prefixChar is the prefix that must be used in front of stem names.
+ *
  * The function loops over a type structure tree, the current node name is
  * placed in cb->buffer. We do a depth-first iteration. The callback function
  * is called at least for each type declaration. The callback is described
  * below the error codes.
  *
- * THE COMPLETE PATSING IS STOPPED IF THE callback RETURNS ANOTHER VALUE THAN
+ * THE COMPLETE PARSING IS STOPPED IF THE callback RETURNS ANOTHER VALUE THAN
  * GCI_OK.
  *
  * THE GENERATED TYPES MAY HAVE ILLEGAL BIT SIZES. IT ISN'T CHECKED ALWAYS!
@@ -594,7 +605,8 @@ GCI_result GCI_parsetree( void *hidden,
                                                  int itemnumber,
                                                  void *arg,
                                                  const GCI_parseinfo *info),
-                          void *arg )
+                          void *arg,
+                          const char *prefixChar )
 {
    callblock cb;
    /*
@@ -615,6 +627,7 @@ GCI_result GCI_parsetree( void *hidden,
    cb.arg = arg;
    cb.tempbuf = str_tmp;
    cb.recurCount = 0;
+   cb.prefixChar = prefixChar;
 
    return parse( &cb, 0 );
 }

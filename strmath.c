@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: strmath.c,v 1.21 2004/02/10 10:44:23 mark Exp $";
+static char *RCSid = "$Id: strmath.c,v 1.27 2006/09/13 07:52:48 mark Exp $";
 #endif
 
 /*
@@ -36,10 +36,9 @@ static char *RCSid = "$Id: strmath.c,v 1.21 2004/02/10 10:44:23 mark Exp $";
 # define MIN(a,b) (((a)<(b))?(a):(b))
 #endif
 #define IS_AT_LEAST(ptr,now,min) \
-   if (now<min) { if (ptr) FreeTSD(ptr); ptr=MallocTSD(now=min) ; } ;
+   if (now<min) { if (ptr) FreeTSD(ptr); ptr=(char *)MallocTSD(now=min) ; } ;
 
 
-#define MAX_EXPONENT 999999999
 #define stringize(x) #x
 #define stringize_value(x) stringize(x)
 
@@ -83,9 +82,10 @@ int init_math( tsd_t *TSD )
    if (TSD->mat_tsd != NULL)
       return(1);
 
-   if ((mt = TSD->mat_tsd = MallocTSD(sizeof(mat_tsd_t))) == NULL)
+   if ( ( TSD->mat_tsd = MallocTSD( sizeof(mat_tsd_t) ) ) == NULL )
       return(0);
-   memset(mt,0,sizeof(mat_tsd_t));
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+   memset( mt, 0, sizeof(mat_tsd_t) );
 
    mt->max_exponent_len = strlen(stringize_value(MAX_EXPONENT));
    return(1);
@@ -96,7 +96,7 @@ void mark_descrs( const tsd_t *TSD )
 {
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
    if (mt->rdescr.num) markmemory( mt->rdescr.num, TRC_MATH ) ;
    if (mt->sdescr.num) markmemory( mt->sdescr.num, TRC_MATH ) ;
    if (mt->fdescr.num) markmemory( mt->fdescr.num, TRC_MATH ) ;
@@ -242,7 +242,7 @@ static int whole_number( const num_descr *input, int *value )
 
 int descr_to_int( const num_descr *input )
 {
-   int result;
+   int result = 0;
 
    if ( !whole_number( input, &result ) )
        exiterror( ERR_INVALID_INTEGER, 0 );
@@ -291,13 +291,12 @@ void str_strip( num_descr *num )
 
 int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
 /* converts num into a descr and returns 0 if successfully.
- * returns 1 in case of an error. descr contains nonsense in this case.
+ * returns 9 or 11 in case of an error. descr contains nonsense in this case.
+ * 9 is returned if the exponent is too big, 11 if num is no number.
  * The newly generated descr is as short as possible: leading and
  * trailing zeros (after a period) will be cut, rounding occurs.
  * We don't use registers and hope the compiler does it better than outselves
  * in the optimization stage, else try in this order: c, inlen, in, out, exp.
- *
- * Since 3.1 we never use
  */
 {
    const char *in;      /* num->value */
@@ -310,7 +309,7 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
    int   pointseen,     /* point in mantissa seen? */
          exp,           /* exp from mantissa */
          exp2,          /* exp from "1E1" */
-         expminus;      /* exp in "1E-1" is negative? */
+         expsign;       /* sign of the exp in "1E-1", 1 or -1 */
 
    /*
     * The maximum size of the mantissa is the worst case of a plain number,
@@ -335,7 +334,7 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
    }
 
    if (!inlen)
-      return 1 ;
+      return 11 ;
 
    c = *in;
 
@@ -352,7 +351,7 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
       }
 
       if (!inlen)
-         return 1 ;
+         return 11 ;
    }
    else
       descr->negative = 0 ;
@@ -378,7 +377,7 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
          descr->negative = 0;
          return 0 ;
       }
-      return 1 ;
+      return 11 ;
    }
 
    /* Transfer digits and check for points */
@@ -391,7 +390,7 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
       if ((c = *in) == '.')
       {
          if (pointseen)
-            return 1 ;
+            return 11 ;
          pointseen = 1;
          in++;
          inlen--;
@@ -424,20 +423,20 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
    if (inlen)
    {
       /* c is *in at this point, see above */
-      expminus = 0;
+      expsign = 1;
       if ((c != 'e') && (c != 'E'))
-         return 1 ;
+         return 11 ;
       if (--inlen == 0) /* at least one digit must follow */
-         return 1 ;
+         return 11 ;
       in++;
 
       c = *in;
       if ((c == '+') || (c == '-'))
       {
          if (c == '-')
-            expminus = 1;
+            expsign = -1;
          if (--inlen == 0) /* at least one digit must follow */
-            return 1 ;
+            return 11 ;
          in++;
       }
       exp2 = 0;
@@ -445,10 +444,15 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
       {
          c = *in++;
          if (!rx_isdigit(c))
-            return 1 ;
-         exp2 = exp2*10 + (c - '0'); /* Hmm, no overflow checking? */
+            return 11 ;
+         /* a rough test first, assume a mantissa with length < MAX_EXPONENT */
+         if ( exp2 > MAX_EXPONENT / 10 )
+            return 9;
+         exp2 = exp2*10 + (c - '0');
+         if ( expsign * (exp + expsign * exp2) - 1 > MAX_EXPONENT )
+            return 9;
       }
-      if (expminus)
+      if (expsign < 0)
          exp -= exp2;
         else
          exp += exp2;
@@ -456,7 +460,7 @@ int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr )
    if (outpos == 0) /* no digit or 0.000 with or without exp */
    {
       if (!lastdigit)
-         return 1 ;
+         return 11 ;
       out[outpos++] = '0';
       exp = 1;
       descr->negative = 0;
@@ -603,299 +607,262 @@ void descr_copy( const tsd_t *TSD, const num_descr *f, num_descr *s )
    memcpy( s->num, f->num, f->size ) ;
 }
 
-
-
 /*
+ * string_add2 computes
  *
+ * r=f+s
  *
- * So, why don't we just flush the changes into the result string
- * directly, without temporarily storing it in the out string? Well,
- * the answer is that if this function is called like:
+ * with the current digits() setting of ccns (e.g. TSD->currlevel->currnumsize)
+ * Keep in mind that f or s may be identical to r.
  *
- *    string_add( TSD, &descr1, &descr2, &descr1 )
- *
- * then it should be able to produce the correct answer, which is
- * impossible to do without a temporary storage. (Hmmm. No, that is
- * bogos, it just takes a bit of care to not overwrite anything that
- * we might need. Must be rewritten). Another problem, if the result
- * string is to small to hold the answer, we must reallocate space
- * so we might have to live with the out anyway.
- *
- * ccns is TSD->currlevel->currnumsize or whatever you want instead.
+ * Function rewritten completely on 03.07.2005 by FGC. The former one was
+ * incompatible with the standard. This approach follows the ANSI standard's
+ * code example.
  */
 static void string_add2( tsd_t *TSD, const num_descr *f, const num_descr *s,
                          num_descr *r, int ccns )
 {
-   int count1, carry, tmp, sum, neg;
-   int lsd ; /* least significant digit */
-   int msd, loan;
-   int flog,fexp,fsize,slog,ssize,sexp,sdiff,fdiff;
-   char *fnum,*snum;
-   mat_tsd_t *mt;
-
-   mt = TSD->mat_tsd;
-
-   fexp = f->exp ;
-   fsize = f->size ;
-   sexp = s->exp ;
-   ssize = s->size ;
-   flog = f->negative & !s->negative;
-   slog = s->negative & !f->negative;
-   sdiff = sexp - ssize ;
-   fdiff = fexp - fsize ;
-   fnum = f->num ;
-   snum = s->num ;
+   mat_tsd_t *mt;       /* mt->add_out is used      */
+   int neg;             /* negate the result if set, and also: f WAS negative*/
+   int sneg_factor;     /* -1: s is negative, 1: s is positive */
+   int carry;           /* carry flag */
+   int loan;            /* loan flag */
+   const char *fnum;    /* mantissa start of f */
+   const char *snum;    /* mantissa start of s */
+   char *fpoint;        /* least significant mantissa position of f */
+   const char *spoint;  /* least significant mantissa position of s */
+                        /* There is no more digits available if point < num */
+   int h, h2, h3;       /* helper */
+   const num_descr *swp;/* helper */
+   int c;               /* helper */
+   static const char none[2] ="";  /* just to keep pointers valid */
 
    /*
-    * Make sure that we have enough space for the internal use.
+    * In opposite to ANSI we don't have to consider NUMERIC FUZZ. The
+    * comparisons are done using string_test.
     */
 
-   IS_AT_LEAST( mt->add_out, mt->add_outsize, ccns+2 ) ;
+   /*
+    * ANSI results f if s==0 (strict comparison!) and s if f==0 with respect
+    * to the operator which is "+" in string_add2.
+    */
+   if ((s->size == 1) && (s->num[0] == '0'))
+   {
+      descr_copy( TSD, f, r );
+      return;
+   }
+   if ((f->size == 1) && (f->num[0] == '0'))
+   {
+      descr_copy( TSD, s, r );
+      return;
+   }
+
+   /*
+    * The other shortcut isn't mentioned in ANSI where the exponents differ
+    * so significantly that one operand isn't used at all. So just continue
+    * to try computing 1+1e1000.
+    */
+
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+   /*
+    * We use a temporary buffer for the result. We don't know the magnitude of
+    * the result in advance (99.99 may be rounded to 100), so we need 2 more
+    * digits: one for the digits after ccns which is calculated to determine
+    * a first rounding and one for the overflow.
+    * Thus, the most significant number which is a template of the result
+    * has a virtual mantissa position of 1 because position 0 is reserved for
+    * the overflow.
+    */
+   IS_AT_LEAST( mt->add_out, mt->add_outsize, ccns+2 );
 #ifdef TRACEMEM
-   mt->outptr5 = mt->add_out ;
+   mt->outptr5 = mt->add_out;
 #endif
 
-   /*
-    * If *s is zero compared to *f under NUMERIC DIGITS, set it to zero
-    * This also applies if *s is zero. TRL says that in that case, the
-    * other number is to be returned.
-    */
-   if ((ssize==1)&&(snum[0]=='0'))
+   if (f->exp < s->exp)
    {
-      descr_copy( TSD, f, r ) ;
-      return ;
+      /*
+       * The number with the most significant exponent needs to be the
+       * first one to make things simpler.
+       */
+      swp = f;
+      f = s;
+      s = swp;
    }
 
    /*
-    * And do  the same thing for *f
+    * It is much easier to reduce the various situations by making the first
+    * number positive:
+    * -x op y     is equivalent to       -(x op -y)
     */
-   if (( fsize==1)&&(fnum[0]=='0'))
+   if (f->negative)
    {
-      descr_copy( TSD, s, r ) ;
-      return ;
+      /* always use a positive number as the left operator */
+      neg = 1;
+      sneg_factor = s->negative ? 1 : -1;
+   }
+   else
+   {
+      neg = 0;
+      sneg_factor = s->negative ? -1 : 1;
    }
 
-   if (sexp > fexp)
+   fnum = f->num;
+   snum = s->num;
+   /*
+    * The most significant number is the base of the result. The other number
+    * is aligned to the most significant. Example where the second is the
+    * most significant number:
+    *
+    *       fffff.ff
+    *          ss.ssssss
+    */
+
+   h = f->exp - s->exp;
+   r->exp = f->exp;     /* save now even if s==r */
+   /*
+    * s may need an adjustement.
+    */
+   h2 = MIN( ccns + 1, f->size );     /* h2 = used mantissa length of f */
+   h3 = MIN( ccns + 1 - h, s->size ); /* h3 = used mantissa length of s */
+   if ( h3 < 0 )
    {
-      if (sexp > fexp + ccns)
+      /*
+       * spoint = snum + h3 - 1 is NOT allowed. h3 may be so small that
+       * spoint becomes really invalid and may cause a segment violation.
+       */
+      spoint = none;
+      snum = spoint + 1;
+   }
+   else
+   {
+      spoint = snum + h3 - 1;
+   }
+   r->size = MAX( h2, h + h3 );
+
+   /*
+    * We conpute "r = f; r += s;" This is much easier to handle than everything
+    * else.
+    */
+
+   mt->add_out[0] = '0';
+   memcpy( mt->add_out + 1, fnum, h2 );
+   memset( mt->add_out + h2 + 1, '0', r->size - h2 );
+
+   /*
+    * r += s;
+    *
+    * Get the fpoint to that position that needs to be added by spoint.
+    * This is a valid position because we filled up with 0 already.
+    */
+   fnum = mt->add_out;              /* NOT +1, keep it on the starting 0 */
+   fpoint = (char *) fnum + h + h3; /* NOT -1, because fnum is decremented */
+   carry = loan = 0;
+
+   while ( spoint >= snum )
+   {
+      c = *fpoint + sneg_factor * (*spoint - '0') + carry - loan;
+      if ((loan = (c < '0')) != 0)
       {
-         descr_copy( TSD, s, r ) ;
-         return ;
+         c += 10;
+      }
+      if ((carry = (c > '9')) != 0)
+      {
+         c -= 10;
+      }
+      spoint--;
+      *fpoint-- = (char)c;
+   }
+   while ( fpoint > fnum )
+   {
+      c = *fpoint + carry - loan;
+      if ((loan = (c < '0')) != 0)
+      {
+         c += 10;
+      }
+      if ((carry = (c > '9')) != 0)
+      {
+         c -= 10;
+      }
+      *fpoint-- = (char)c;
+   }
+   if ( !loan )
+   {
+      if ( carry )
+      {
+         *fpoint = '1';
+         r->exp++;
+         r->size++;
+      }
+      else
+      {
+         fpoint++;
       }
    }
    else
    {
-      if (fexp > sexp + ccns)
+      fpoint++;
+      /*
+       * Having a loan means we have a negative result. Reverse the result with
+       * r = -r;
+       */
+      neg = !neg;
+      for ( h = r->size - 1, carry = 10; h >= 0; h-- )
       {
-         descr_copy( TSD, f, r ) ;
-         return ;
-      }
-   }
-
-   /*
-    * Find the exponent number for the most significant digit and the
-    * least significant digit. 'size' is the size of the result, minus
-    * any extra carry. 'count1' is the loop variable that iterates
-    * through each digit.
-    *
-    * These initializations may look a bit complex, so there is a
-    * description of what they really means, consider the following
-    * addition:
-    *
-    *        xxxxx.xx
-    *           yy.yyyy
-    *
-    * The 'lsd' is the fourth digit after the decimal point, and is
-    * therefore set to -3. The 'msd' is the fifth digit before the
-    * decimal point, and is therefore set to 5. The size is set to
-    * the difference between them, that is 8.
-    * The 'carry' and 'loan' are initially
-    * cleared.
-    *
-    * Special consideration is taken, so that 'lsd' will never be more
-    * so small that the difference between them are bigger than the
-    * current precision.
-    */
-   msd = MAX( fexp, sexp ) ;
-   lsd = MAX( msd-(ccns+1), MIN( fdiff, sdiff));
-   carry = loan = 0 ;
-
-   /*
-    * Loop through the numbers, from the 'lsd' to the 'msd', letting
-    * 'count1' have the value of the current digit.
-    */
-
-#ifdef CHECK_MEMORY
-   /* The faster (and correct) algorithm uses fnum- and snum-pointers which
-      are initially set to perhaps illegal values. They become valid by
-      an offset. This isn't correctly understood by the bounds checker.
-      We use valid base pointers and a complex index here. See below for
-      the faster code. WARNING: Changes should be done both here and in the
-      '#else' - statement. FGC
-    */
-   for (count1=lsd; count1<msd; count1++ )
-   {
-      /*
-       * The variable 'sum' collects the sum for the addition of the
-       * current digit. This is done, in five steps. First, register
-       * any old value stored in 'carry' or 'loan'.
-       */
-      sum = carry - loan ;
-
-      /*
-       * Then, for each of the two numbers, add its digit to 'sum'.
-       * There are two considerations to be taken. First, are we
-       * within the range of that number. Then what are the sign of
-       * the number. The expression of the if statement checks for
-       * the validity of the range, and the contents of the if
-       * statement adds the digit to 'sum' taking note of the sign.
-       */
-      if (count1>=fdiff && fexp>count1)
+         if ( ( fpoint[h] = (char) (carry - (fpoint[h] - '0') + '0') ) > '9' )
          {
-             tmp = fnum[fexp - 1 - count1] - '0';
-             if (flog)
-                sum -= tmp ;
-             else
-                sum += tmp ;
-         }
-/*          else
-            fdiff = msd ;
- */
-      /*
-       * Repeat previous step for the second number
-       */
-      if (count1>=sdiff && sexp>count1)
-         {
-            tmp = snum[sexp - 1 - count1] - '0';
-            if (slog)
-               sum -= tmp ;
-            else
-               sum += tmp ;
-         }
-/*         else
-            sdiff = msd ; */
-
-      /*
-       * If the sum is more than 9, we have a carry, then set 'carry'
-       * and subtract 10. And similar, if the sum is less than 0,
-       * set 'loan' and add 10.
-       */
-      if ((carry = ( sum > 9 )))
-         sum -= 10 ;
-
-      if ((loan = ( sum < 0 )))
-         sum += 10 ;
-
-      /*
-       * Flush the resulting digit to the output string.
-       */
-      mt->add_out[ msd - count1 ] = (char) (sum + '0');
-   }
-#else
-   fnum += fexp - 1 ;
-   snum += sexp - 1 ;
-   for (count1=lsd; count1<msd; count1++ )
-   {
-      /*
-       * The variable 'sum' collects the sum for the addition of the
-       * current digit. This is done, in five steps. First, register
-       * any old value stored in 'carry' or 'loan'.
-       */
-      sum = carry - loan ;
-
-      /*
-       * Then, for each of the two numbers, add its digit to 'sum'.
-       * There are two considerations to be taken. First, are we
-       * within the range of that number. Then what are the sign of
-       * the number. The expression of the if statement checks for
-       * the validity of the range, and the contents of the if
-       * statement adds the digit to 'sum' taking note of the sign.
-       */
-      if (count1>=fdiff && fexp>count1)
-         {
-             tmp = fnum[-count1] - '0';
-             if (flog)
-                sum -= tmp ;
-             else
-                sum += tmp ;
-         }
-/*          else
-            fdiff = msd ;
- */
-      /*
-       * Repeat previous step for the second number
-       */
-      if (count1>=sdiff && sexp>count1)
-         {
-            tmp = snum[-count1] - '0';
-            if (slog)
-               sum -= tmp ;
-            else
-               sum += tmp ;
-         }
-/*         else
-            sdiff = msd ; */
-
-      /*
-       * If the sum is more than 9, we have a carry, then set 'carry'
-       * and subtract 10. And similar, if the sum is less than 0,
-       * set 'loan' and add 10.
-       */
-      if ((carry = ( sum > 9 )) != 0)
-         sum -= 10 ;
-
-      if ((loan = ( sum < 0 )) != 0)
-         sum += 10 ;
-
-      /*
-       * Flush the resulting digit to the output string.
-       */
-      mt->add_out[ msd - count1 ] = (char) (sum + '0');
-   }
-#endif
-
-   neg = ( f->negative && s->negative ) ;
-   IS_AT_LEAST( r->num, r->max, /*ccns+2*/ msd-lsd+3 ) ;
-
-   fnum = r->num ;
-   if ( carry )
-   {
-      *(fnum++) = '1' ;
-   }
-   else if ( loan )
-   {
-      int i ;
-      assert( neg==0 ) ;
-      neg = 1 ;
-      mt->add_out[0] = '0' ;
-      sum = 10 ;
-      for ( i=msd-lsd; i>0; i-- )
-      {
-         if ((mt->add_out[i] = (char) (sum - (mt->add_out[i]-'0') + '0')) > '9')
-         {
-           mt->add_out[i] = '0' ;
-           sum = 10 ;
+            fpoint[h] = '0';
+            carry = 10;
          }
          else
-           sum = 9 ;
+           carry = 9;
       }
-      snum = mt->add_out ;
-      msd-- ;
    }
-   else
+
+   /*
+    * Added so far. Now accomplish the rounding following ANSI rules.
+    *
+    * We can increase the result's accurracy by jumping over one leading
+    * zero if available first, but this breaks ANSI.
+    */
+
+   if ( r->size > ccns )
    {
-      msd-- ;
+      r->size = ccns;
+      if ( fpoint[ccns] > '4' )
+      {
+         /*
+          * Increment mantissa regardless of the true sign.
+          */
+         fnum = fpoint;
+         fpoint += ccns - 1;
+         carry = 1;
+         while ( fpoint >= fnum )
+         {
+            if ( ++(*fpoint) <= '9' )
+            {
+               carry = 0;
+               fpoint = (char *) fnum - 1;
+               break;
+            }
+            *fpoint = '0';
+            fpoint--;
+         }
+
+         if ( carry )
+         {
+            r->exp++;
+            *fpoint = '1';
+         }
+         else
+         {
+            fpoint++;
+         }
+      }
    }
-
-   r->negative = neg ;
-   r->exp = msd + 1 ;
-   r->size = r->exp - lsd ;
-
-   memcpy( fnum, mt->add_out+1, r->size - ( (carry) ? 1 : 0 ) ) ;
+   IS_AT_LEAST( r->num, r->max, r->size ) ;
+   memcpy( r->num, fpoint, r->size );
+   r->negative = neg;
    str_strip( r ) ;
-/*   for (; count1<fsize; count1++)
-      fnum[count1] = mt->add_out[count1]  ;
- */
 }
 
 void string_add( tsd_t *TSD, const num_descr *f, const num_descr *s,
@@ -924,11 +891,11 @@ streng *str_format(tsd_t *TSD, const streng *input, int Before,
  */
 {
 #define Enlarge(Num,atleast) if (Num.size + (atleast) > Num.max) {            \
-                                char *new = MallocTSD(Num.size + (atleast) + 5); \
+                                char *newnum = (char *)MallocTSD(Num.size + (atleast) + 5); \
                                 Num.max = Num.size + (atleast) + 5;           \
-                                memcpy(new,Num.num,Num.size);                 \
+                                memcpy( newnum, Num.num, Num.size );                 \
                                 FreeTSD(Num.num);                             \
-                                Num.num = new;                                \
+                                Num.num = newnum;                                \
                              }
    char *buf;
    size_t bufsize;
@@ -939,13 +906,18 @@ streng *str_format(tsd_t *TSD, const streng *input, int Before,
    mat_tsd_t *mt;
    int StrictAnsi;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    /*
     * Convert the input to a number and check if it is a number at all.
     */
-   if ( getdescr( TSD, input, &mt->fdescr ) )
-      exiterror( ERR_INCORRECT_CALL, 11, "FORMAT", 1, tmpstr_of( TSD, input ) );
+   if ( ( h = getdescr( TSD, input, &mt->fdescr ) ) != 0 )
+   {
+      if ( h == 9 )
+         exiterror( ERR_INCORRECT_CALL, h, "FORMAT", 1, mt->max_exponent_len, tmpstr_of( TSD, input ) );
+      else
+         exiterror( ERR_INCORRECT_CALL, h, "FORMAT", 1, tmpstr_of( TSD, input ) );
+   }
 
    StrictAnsi = get_options_flag( TSD->currlevel, EXT_STRICT_ANSI );
    /*
@@ -1241,7 +1213,7 @@ streng *str_format(tsd_t *TSD, const streng *input, int Before,
    }
 
    bufsize = Before + After + Expp + 4; /* Point, "E+", term. zero */
-   buf = MallocTSD(bufsize);
+   buf = (char *)MallocTSD(bufsize);
 
    /*
     * Now do the formatting, it's a little bit complicated, since the parts
@@ -1363,14 +1335,14 @@ streng *str_format(tsd_t *TSD, const streng *input, int Before,
  *
  * The value "in" may be rounded and reformatted.
  */
-streng *str_norm( const tsd_t *TSD, num_descr *in, streng *try )
+streng *str_norm( const tsd_t *TSD, num_descr *in, streng *trystr )
 {
    streng *result;
    int i;
    int size,exp,ccns,Point;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    ccns = in->used_digits;
    /*
@@ -1417,23 +1389,23 @@ streng *str_norm( const tsd_t *TSD, num_descr *in, streng *try )
       in->exp = 1;
       in->negative = 0;
       in->num[0] = '0';
-      if ( try )
+      if ( trystr )
       {
-         if ( try->max )
+         if ( trystr->max )
          {
-            try->value[0] = '0';
-            try->len = 1;
+            trystr->value[0] = '0';
+            trystr->len = 1;
          }
          else
          {
-            Free_stringTSD( try );
-            try = Str_creTSD( "0" );
+            Free_stringTSD( trystr );
+            trystr = Str_creTSD( "0" );
          }
       }
       else
-         try = Str_creTSD( "0" );
+         trystr = Str_creTSD( "0" );
 
-      return try;
+      return trystr;
    }
 
    /*
@@ -1587,16 +1559,16 @@ streng *str_norm( const tsd_t *TSD, num_descr *in, streng *try )
    }
    assert( size + 1 <= mt->norm_outsize );
 
-   if ( try )
+   if ( trystr )
    {
-      if ( try->max < size )
+      if ( trystr->max < size )
       {
-          Free_stringTSD( try );
-          try = NULL;
+          Free_stringTSD( trystr );
+          trystr = NULL;
       }
    }
-   if ( try )
-      result = try;
+   if ( trystr )
+      result = trystr;
    else
       result = Str_makeTSD( size );
    result->len = size;
@@ -1719,17 +1691,17 @@ num_descr *string_incr( tsd_t *TSD, num_descr *input, cnodeptr node )
       {
          if (input->size >= input->max)
          {
-            char *new ;
+            char *newnum ;
 
             assert( input->size == input->max ) ;
-            new = MallocTSD( input->max * 2 + 2 ) ;
-            memcpy( new+1, input->num, input->size ) ;
-            new[0] = '0' ;
+            newnum = (char *)MallocTSD( input->max * 2 + 2 ) ;
+            memcpy( newnum+1, input->num, input->size ) ;
+            newnum[0] = '0' ;
             input->size++ ;
             input->exp++ ;
             input->max = input->max*2 + 2 ;
             FreeTSD( input->num ) ;
-            cptr = input->num = new ;
+            cptr = input->num = newnum ;
          }
          else
          {
@@ -1742,6 +1714,47 @@ num_descr *string_incr( tsd_t *TSD, num_descr *input, cnodeptr node )
       }
    }
 }
+
+
+/*
+ * tests for an ANSI compatible whole number. Look at myiswnumber()
+ * for a description.
+ */
+static int test_whole( const tsd_t *TSD, const num_descr *input,
+                       int noDigitsLimit )
+{
+   int i;
+
+   if ( input->size > input->exp )
+   {
+      /*
+       * Check for non-zeros in the fractional part of the number.
+       */
+      i = MAX( 0, input->exp );
+      for ( ; i < input->size; i++ )
+      {
+         if ( input->num[i] != '0' )
+            return 0;
+      }
+   }
+
+   if ( !noDigitsLimit )
+   {
+      for (i = 0; i < input->size; i++)
+      {
+         if (input->num[i] != '0')
+            break;
+      }
+      if (i < input->size)
+      {
+         /* not a 0 */
+         if (input->exp - i > TSD->currlevel->currnumsize)
+            return 0;
+      }
+   }
+   return 1;
+}
+
 
 /*
  * Division in the typical manner we learn in school hopefully.
@@ -1767,7 +1780,7 @@ static void string_div2( tsd_t *TSD, const num_descr *f, const num_descr *s,
    int origneg,origexp;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    IS_AT_LEAST( mt->div_out, mt->div_outsize, (ccns+1) * 2 + 1 );
    IS_AT_LEAST( r->num, r->max, ccns+1 );
@@ -2013,9 +2026,19 @@ static void string_div2( tsd_t *TSD, const num_descr *f, const num_descr *s,
        * rounding and to prevent math errors. We have to check if rounding
        * would occur later.
        */
-      if ( ( outp > ccns ) && ( r->num[ccns] != '0' ) )
-         finished = 0;
-
+      if ( finished )
+      {
+         if ( ( outp > ccns ) && ( r->num[ccns] != '0' ) )
+            finished = 0;
+         /*
+          * FGC: I'm not sure whether the following test supersedes the
+          * the testing of the mantissa above. It should, but who can
+          * prove?
+          */
+         r->size = outp;
+         if ( !test_whole( TSD, r, 0 ) )
+            finished = 0;
+      }
       if ( !finished )
       {
          volatile char *fs, *ss;
@@ -2121,7 +2144,7 @@ static void string_mul2( tsd_t *TSD, const num_descr *f, const num_descr *s,
    int i,sskip,fskip,sstart,fstart,base,offset,carry,j;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    IS_AT_LEAST( mt->mul_out, mt->mul_outsize, 2*(ccns+1) ) ;
 #ifdef TRACEMEM
@@ -2301,26 +2324,36 @@ void free_a_descr( const tsd_t *TSD, num_descr *in )
 }
 
 
-num_descr *get_a_descr( const tsd_t *TSD, const streng *num )
+num_descr *get_a_descr( tsd_t *TSD, const char *bif, int argno,
+                        const streng *num )
 {
+   mat_tsd_t *mt;
    num_descr *descr=NULL ;
-
-   descr=MallocTSD( sizeof(num_descr)) ;
+   int i;
+   descr = (num_descr *)MallocTSD( sizeof(num_descr) ) ;
    descr->max = 0 ;
    descr->num = NULL ;
 
-   if (getdescr( TSD, num, descr ))
-       exiterror( ERR_BAD_ARITHMETIC, 0 )  ;
+   if ( ( i = getdescr( TSD, num, descr ) ) != 0 )
+   {
+      mt = (mat_tsd_t *)TSD->mat_tsd;
 
-   return (void*)descr ;
+      FreeTSD( descr );
+      if ( bif == NULL )
+         exiterror( ERR_BAD_ARITHMETIC, 0 );
+
+      if ( i == 9 )
+         exiterror( ERR_INCORRECT_CALL, i, bif, argno, mt->max_exponent_len, tmpstr_of( TSD, num ) );
+      else
+         exiterror( ERR_INCORRECT_CALL, i, bif, argno, tmpstr_of( TSD, num ) );
+   }
+
+   return descr ;
 }
 
 
 int str_true( const tsd_t *TSD, const streng *input )
 {
-   mat_tsd_t *mt;
-
-   mt = TSD->mat_tsd;
    if (input->len != 1)
        exiterror( ERR_UNLOGICAL_VALUE, 0 )  ;
 
@@ -2343,10 +2376,16 @@ streng *str_abs( tsd_t *TSD, const streng *input )
 {
    mat_tsd_t *mt;
    streng *retval;
+   int i;
 
-   mt = TSD->mat_tsd;
-   if ( getdescr( TSD, input, &mt->fdescr ) )
-       exiterror( ERR_BAD_ARITHMETIC, 0 );
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+   if ( ( i = getdescr( TSD, input, &mt->fdescr ) ) != 0 )
+   {
+      if ( i == 9 )
+         exiterror( ERR_INCORRECT_CALL, i, "ABS", 1, mt->max_exponent_len, tmpstr_of( TSD, input ) );
+      else
+         exiterror( ERR_INCORRECT_CALL, i, "ABS", 1, tmpstr_of( TSD, input ) );
+   }
 
    if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
    {
@@ -2368,9 +2407,14 @@ streng *str_sign( tsd_t *TSD, const streng *input )
    char *mant;
    int i;
 
-   mt = TSD->mat_tsd;
-   if ( getdescr( TSD, input, &mt->fdescr ) )
-       exiterror( ERR_BAD_ARITHMETIC, 0 );
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+   if ( ( i = getdescr( TSD, input, &mt->fdescr ) ) != 0 )
+   {
+      if ( i == 9 )
+         exiterror( ERR_INCORRECT_CALL, i, "SIGN", 1, mt->max_exponent_len, tmpstr_of( TSD, input ) );
+      else
+         exiterror( ERR_INCORRECT_CALL, i, "SIGN", 1, tmpstr_of( TSD, input ) );
+   }
 
    if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
    {
@@ -2402,11 +2446,16 @@ streng *str_trunc( tsd_t *TSD, const streng *number, int deci )
    streng *result=NULL ;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    /* first, convert number to internal representation */
-   if (getdescr( TSD, number, &mt->fdescr ))
-       exiterror( ERR_BAD_ARITHMETIC, 0 )  ;
+   if ( ( i = getdescr( TSD, number, &mt->fdescr ) ) != 0 )
+   {
+      if ( i == 9 )
+         exiterror( ERR_INCORRECT_CALL, i, "TRUNC", 1, mt->max_exponent_len, tmpstr_of( TSD, number ) );
+      else
+         exiterror( ERR_INCORRECT_CALL, i, "TRUNC", 1, tmpstr_of( TSD, number ) );
+   }
 
    /* get rid of possible excessive precision */
    if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
@@ -2497,18 +2546,21 @@ streng *str_trunc( tsd_t *TSD, const streng *number, int deci )
  * The 'input' variable is assumed to have at least one digit, so don't
  * call this function with a null string. Maybe the compiler could
  * optimize this function better if [esf]descr were locals?
+ *
+ * In case of errors we throw SYNTAX(40,35).
  */
 
-streng *str_digitize( tsd_t *TSD, const streng *input, int start, int sign )
+streng *str_digitize( tsd_t *TSD, streng *input, int start, int sign,
+                      const char *bif, int removeStringOnError )
 {
    int cur_byte=0 ;     /* current byte in 'input' */
    int cur_bit=0 ;      /* current bit in 'input' */
    int too_large=0 ;    /* error flag (see above) */
-   int ccns;
+   int i, ccns;
+   int user_ccns = TSD->currlevel->currnumsize;
    mat_tsd_t *mt;
-   streng *retval;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    /* do we have anything to work on? */
    assert( start < Str_len(input) );
@@ -2623,41 +2675,61 @@ streng *str_digitize( tsd_t *TSD, const streng *input, int start, int sign )
 
    /*
     * normalize answer and return to caller. Always show all digits if we
-    * don't have to support STRICT_ANSI.
+    * don't have to support STRICT_ANSI. In ANSI we have to throw a SYNTAX
+    * in case of number overflow.
     */
+   if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
    {
-      int user_ccns = TSD->currlevel->currnumsize;
-      if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
-         mt->edescr.used_digits = TSD->currlevel->currnumsize;
-      else
+      for (i = 0; i < mt->edescr.size; i++)
       {
-         int s,e;
-
-         for ( s = 0; s < mt->edescr.size; s++ )
-         {
-            if ( mt->edescr.num[s] != '0' )
-               break;
-         }
-         for ( e = mt->edescr.size - 1; e > s; e-- )
-         {
-            if ( mt->edescr.num[e] != '0' )
-               break;
-         }
-         e -= s - 1;
-         if ( e < 1 )
-            e = 1;
-         mt->edescr.used_digits = ( e < user_ccns ) ? user_ccns : e;
+         if (mt->edescr.num[i] != '0')
+            break;
       }
+      if (i < mt->edescr.size)
+      {
+         /* not a 0 */
+         if (mt->edescr.exp - i > user_ccns)
+         {
+            volatile char *msg;
+
+            if ( removeStringOnError )
+               Free_stringTSD( input );
+            mt->edescr.used_digits = mt->edescr.size;
+            input = str_norm( TSD, &mt->edescr, NULL );
+            msg = tmpstr_of( TSD, input );
+            Free_stringTSD( input );
+            /* fixes bug 1112956 */
+            exiterror( ERR_INCORRECT_CALL, 35, bif, msg );
+         }
+      }
+      mt->edescr.used_digits = user_ccns;
    }
-   retval = str_norm( TSD, &mt->edescr, NULL );
-   return retval;
+   else
+   {
+      int s,e;
+
+      for ( s = 0; s < mt->edescr.size; s++ )
+      {
+         if ( mt->edescr.num[s] != '0' )
+            break;
+      }
+      for ( e = mt->edescr.size - 1; e > s; e-- )
+      {
+         if ( mt->edescr.num[e] != '0' )
+            break;
+      }
+      e -= s - 1;
+      if ( e < 1 )
+         e = 1;
+      mt->edescr.used_digits = ( e < user_ccns ) ? user_ccns : e;
+   }
+   return str_norm( TSD, &mt->edescr, NULL );
 }
 
 streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
 {
    int i,ccns;
    streng *result;
-   char *res_ptr;
 
    /*
     * We are going to need two number in this algoritm, so we can
@@ -2673,7 +2745,7 @@ streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
 
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    ccns = ( num->exp < 3 ) ? 3 : num->exp;
 
@@ -2703,8 +2775,6 @@ streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
        */
       assert( num->exp > 0 );
       result = Str_makeTSD( ( length = ( MAX( num->exp, 0 ) ) / 2 ) + 1 );
-      res_ptr = result->value ;
-
 
       /*
        * Let's loop from the least significant part of edescr. For each
@@ -2747,7 +2817,6 @@ streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
        * makes it easy to deside how large the result string should be.
        */
       result = Str_makeTSD( length );
-      res_ptr = result->value;
 
       /*
        * In the loop, iterate once for each divition of 256, but stop
@@ -2796,9 +2865,10 @@ streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
 streng *str_normalize( const tsd_t *TSD, const streng *number )
 {
    mat_tsd_t *mt;
+   int err;
 
-   mt = TSD->mat_tsd;
-   if (getdescr( TSD, number, &mt->fdescr ))
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+   if ( ( err = getdescr( TSD, number, &mt->fdescr ) ) != 0 )
       exiterror( ERR_BAD_ARITHMETIC, 0 )  ;
 
    return str_norm( TSD, &mt->fdescr, NULL ) ;
@@ -2808,20 +2878,20 @@ streng *str_normalize( const tsd_t *TSD, const streng *number )
 
 num_descr *is_a_descr( const tsd_t *TSD, const streng *number )
 {
-   num_descr *new=NULL ;
+   num_descr *newnum=NULL ;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
-   if (getdescr( TSD, number, &mt->fdescr ))
+   if ( getdescr( TSD, number, &mt->fdescr ) != 0 )
       return NULL ;
 
-   new = MallocTSD( sizeof( num_descr )) ;
-   new->max = 0 ;
-   new->num = NULL ;
+   newnum = (num_descr *)MallocTSD( sizeof( num_descr )) ;
+   newnum->max = 0 ;
+   newnum->num = NULL ;
 
-   descr_copy( TSD, &mt->fdescr, new ) ;
-   return new ;
+   descr_copy( TSD, &mt->fdescr, newnum ) ;
+   return newnum ;
 }
 
 /*
@@ -2833,15 +2903,21 @@ num_descr *is_a_descr( const tsd_t *TSD, const streng *number )
  *
  * The value is loaded into mat_tsd_t.edescr. A pointer to this is
  * returned in *num.
+ *
+ * Added 08.03.2005 (tt.mm.yyyy), FGC: Due to some misinterpretation by my own
+ * this routine must not round, instead it must check for ANSI WHOLENUM.
+ * This means that the number must be representable without loss in the
+ * interval [-(10**digits()-1), 10**digits()-1].
+ * noDigitsLimit raises digits() virtually to endless. Don't use it in
+ * ANSI compatible environments.
  */
 int myiswnumber( tsd_t *TSD, const streng *number, num_descr **num,
-                 int round )
+                 int noDigitsLimit )
 {
-   int i;
    num_descr *input;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    if ( getdescr( TSD, number, &mt->edescr ) )
       return 0;
@@ -2849,23 +2925,7 @@ int myiswnumber( tsd_t *TSD, const streng *number, num_descr **num,
    if ( num != NULL )
       *num = input;
 
-   if ( round )
-      str_round_lostdigits( TSD, input, TSD->currlevel->currnumsize );
-
-   if ( input->size > input->exp )
-   {
-      /*
-       * Check for non-zeros in the fractional part of the number.
-       */
-      i = MAX( 0, input->exp );
-      for ( ; i < input->size; i++ )
-      {
-         if ( input->num[i] != '0' )
-            return 0;
-      }
-   }
-
-   return 1;
+   return test_whole( TSD, input, noDigitsLimit );
 }
 
 
@@ -2879,10 +2939,10 @@ int myiswnumber( tsd_t *TSD, const streng *number, num_descr **num,
  */
 int streng_to_int( const tsd_t *TSD, const streng *number, int *error )
 {
-   int result;
+   int result = 0;
    mat_tsd_t *mt;
 
-   mt = TSD->mat_tsd;
+   mt = (mat_tsd_t *)TSD->mat_tsd;
 
    if ( ( *error = getdescr( TSD, number, &mt->fdescr ) ) != 0 )
       return 0;
@@ -2892,3 +2952,13 @@ int streng_to_int( const tsd_t *TSD, const streng *number, int *error )
 
    return result;
 }
+
+int myisnumber( const tsd_t *TSD, const streng *string )
+{
+   mat_tsd_t *mt;
+
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+
+   return getdescr( TSD, string, &mt->edescr ) == 0;
+}
+

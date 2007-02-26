@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rxqueue.c,v 1.12 2003/10/06 09:54:42 florian Exp $";
+static char *RCSid = "$Id: rxqueue.c,v 1.13 2005/08/04 11:28:40 mark Exp $";
 #endif
 
 /*
@@ -160,7 +160,7 @@ int send_all( int sock, char *action )
             break;
          }
          if ( len >= bufflen
-         && (( buff = realloc( buff, bufflen <<= 1 ) ) == NULL ) )
+         && (( buff = (char *)realloc( buff, bufflen <<= 1 ) ) == NULL ) )
          {
            showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
            exit( ERR_STORAGE_EXHAUSTED );
@@ -196,7 +196,7 @@ char *force_remote( char *rxq )
 
    if ( strchr(rxq, '@' ) == NULL )
    {
-      if ( ( h = malloc( strlen( rxq ) + 2 ) ) != NULL )
+      if ( ( h = (char *)malloc( strlen( rxq ) + 2 ) ) != NULL )
       {
          strcpy( h, rxq ) ;
          strcat( h, "@" ) ;

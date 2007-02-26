@@ -16,7 +16,11 @@
  * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-static char RCSid[] = "$Id: rxpack.c,v 1.41 2004/04/01 11:21:08 mark Exp $";
+static char RCSid[] = "$Id: rxpack.c,v 1.55 2006/07/10 07:13:17 mark Exp $";
+
+#if defined(OS2) || defined(__OS2__)
+# define INCL_DOSMISC
+#endif
 
 #include "rxpack.h"
 
@@ -34,19 +38,19 @@ static RexxSubcomHandler RxSubcomHandler;
 /*
  * This function and the following description borrowed from Regina 0.08a
  *
- * Sigh! This must probably be done this way, although it's incredibly 
+ * Sigh! This must probably be done this way, although it's incredibly
  * backwards. Some versions of gcc comes with a complete set of ANSI C
  * include files, which contains the definition of strerror(). However,
- * that function does not exist in the default libraries of SunOS. 
- * To circumvent that problem, strerror() is #define'd to get_sys_errlist() 
- * in config.h, and here follows the definition of that function. 
+ * that function does not exist in the default libraries of SunOS.
+ * To circumvent that problem, strerror() is #define'd to get_sys_errlist()
+ * in config.h, and here follows the definition of that function.
  * Originally, strerror() was #defined to sys_errlist[x], but that does
- * not work if string.h contains a declaration of the (non-existing) 
- * function strerror(). 
+ * not work if string.h contains a declaration of the (non-existing)
+ * function strerror().
  *
  * So, this is a mismatch between the include files and the library, and
  * it should not create problems for Regina. However, the _user_ will not
- * encounter any problems until he compiles Regina, so we'll have to 
+ * encounter any problems until he compiles Regina, so we'll have to
  * clean up after a buggy installation of the C compiler!
  */
 char *rxpackage_get_sys_errlist( int num )
@@ -56,6 +60,20 @@ char *rxpackage_get_sys_errlist( int num )
 }
 #endif
 
+#if defined( __OS2__ ) || defined( OS2 )
+/*
+ * We need a getenv() that works in an OS/2 DLL
+ */
+char *rx_getenv( const char *name )
+{
+   unsigned char *value;
+   if (DosScanEnv( name, &value ) )
+      return NULL;
+   else
+      return value;
+}
+#define getenv( x ) rx_getenv( x )
+#endif
 
 /*-----------------------------------------------------------------------------
  * Compares buffers for equality ignoring case
@@ -161,7 +179,7 @@ char *MkAsciz
 /*-----------------------------------------------------------------------------
  * Check number of parameters
  *----------------------------------------------------------------------------*/
-int my_checkparam(RxPackageGlobalDataDef *RxPackageGlobalData, char *name, int argc, int mini, int maxi)
+int my_checkparam(RxPackageGlobalDataDef *RxPackageGlobalData, RFH_ARG0_TYPE name, int argc, int mini, int maxi)
 {
    if ( argc < mini )
    {
@@ -175,7 +193,7 @@ int my_checkparam(RxPackageGlobalDataDef *RxPackageGlobalData, char *name, int a
    &&   maxi != 0 )
    {
       RxDisplayError( RxPackageGlobalData,
-                      name, 
+                      name,
                       "*ERROR* Too many parameters in call to \"%s\". Maximum %d\n",
                       name, maxi);
       return 1;
@@ -312,7 +330,7 @@ RXSTRING *GetRexxVariable
       }
 #if defined(REXXFREEMEMORY)
       RexxFreeMemory( shv.shvvalue.strptr );
-#elif defined(WIN32) && (defined(USE_OREXX) || defined(USE_WINREXX) || defined(USE_QUERCUS))
+#elif defined(WIN32) && (defined(USE_OREXX) || defined(USE_WINREXX) || defined(USE_QUERCUS) || defined(USE_OOREXX))
       GlobalFree( shv.shvvalue.strptr );
 #elif defined(USE_OS2REXX)
       DosFreeMem( shv.shvvalue.strptr );
@@ -377,7 +395,7 @@ int *GetRexxVariableInteger
          value = NULL;
 #if defined(REXXFREEMEMORY)
       RexxFreeMemory( shv.shvvalue.strptr );
-#elif defined(WIN32) && (defined(USE_OREXX) || defined(USE_WINREXX) || defined(USE_QUERCUS))
+#elif defined(WIN32) && (defined(USE_OREXX) || defined(USE_WINREXX) || defined(USE_QUERCUS) || defined(USE_OOREXX))
       GlobalFree( shv.shvvalue.strptr );
 #elif defined(USE_OS2REXX)
       DosFreeMem( shv.shvvalue.strptr );
@@ -463,11 +481,11 @@ int DropRexxVariable
 int StrToInt
 
 #ifdef HAVE_PROTO
-   (RXSTRING *ptr, ULONG *result) 
+   (RXSTRING *ptr, ULONG *result)
 #else
-   (ptr, result) 
+   (ptr, result)
    RXSTRING *ptr;
-   ULONG    *result; 
+   ULONG    *result;
 #endif
 
 {
@@ -494,9 +512,9 @@ int StrToInt
 int StrToNumber
 
 #ifdef HAVE_PROTO
-   (RXSTRING *ptr, LONG *result) 
+   (RXSTRING *ptr, LONG *result)
 #else
-   (ptr, result) 
+   (ptr, result)
    RXSTRING *ptr;
    LONG     *result;
 #endif
@@ -532,11 +550,11 @@ int StrToNumber
 int StrToBool
 
 #ifdef HAVE_PROTO
-   (RXSTRING *ptr, ULONG *result) 
+   (RXSTRING *ptr, ULONG *result)
 #else
-   (ptr, result) 
+   (ptr, result)
    RXSTRING *ptr;
-   ULONG    *result; 
+   ULONG    *result;
 #endif
 
 {
@@ -736,7 +754,7 @@ int RxStrToDouble
    if ( sum == 0
    &&   errno != 0 )
       return -1;
-   if ( sum == 0 
+   if ( sum == 0
    &&   (char *)endptr == (char *)ptr->strptr )
       return -1;
    *result = sum;
@@ -1231,7 +1249,7 @@ RxPackageGlobalDataDef *FunctionPrologue
    {
       (void)fprintf( GlobalData->RxTraceFilePointer, "++\n" );
       (void)fprintf( GlobalData->RxTraceFilePointer, "++ Call %s%s\n", name, argc ? "" : "()" );
-      for (i = 0; i < argc; i++) 
+      for (i = 0; i < argc; i++)
       {
          (void)fprintf( GlobalData->RxTraceFilePointer, "++ %3ld: \"%s\"\n",
             i+1,
@@ -1428,7 +1446,7 @@ int RegisterRxInit
 #endif
 
 {
-   ULONG rc=0L;
+   ULONG rc=RXEXIT_OK;
 
    InternalTrace( RxPackageGlobalData, "RegisterRxInit", "Name: %s Addr: %ld", name, ptr );
 
@@ -1470,9 +1488,31 @@ int RegisterRxFunctions
 # if !defined(USE_REXX6000)
       if (func->DllLoad)
       {
+         char *err;
          rc = RexxRegisterFunctionDll( func->ExternalName,
               name,
               func->InternalName );
+         if ( rc != RXFUNC_OK
+         &&   RxPackageGlobalData->RxRunFlags & MODE_DEBUG)
+         {
+            switch( rc )
+            {
+               case RXFUNC_DEFINED:   err = "Already regsitered"; break;
+               case RXFUNC_NOMEM :    err = "Out of memory"; break;
+               case RXFUNC_NOTREG :   err = "Not registered"; break;
+               case RXFUNC_MODNOTFND: err = "Module not found"; break;
+               case RXFUNC_ENTNOTFND: err = "Entry point not found"; break;
+               case RXFUNC_NOTINIT:   err = "Not initialised"; break;
+               case RXFUNC_BADTYPE:   err = "Bad argument?"; break;
+               default:     err = "Unknown error with RexxRegisterFunctionDll()"; break;
+            }
+            (void)fprintf( RxPackageGlobalData->RxTraceFilePointer,
+               "*DEBUG* Error Registering internal \"%s\" external \"%s\" in \"%s\". %s.\n",
+               func->InternalName,
+               func->ExternalName,
+               name,
+               err );
+         }
          InternalTrace( RxPackageGlobalData, "RegisterRxFunctions","%s-%d: Registered (DLL) %s with rc = %ld",__FILE__,__LINE__,func->ExternalName,rc);
       }
 # endif
@@ -1685,7 +1725,7 @@ RxPackageGlobalDataDef *InitRxPackage
    {
       RxPackageGlobalData->RxRunFlags |= atoi(env);
    }
-   /* 
+   /*
     * Call any package-specific startup code here
     */
    if ( ptr )
@@ -1719,19 +1759,19 @@ int TermRxPackage
    InternalTrace( GlobalData, "TermRxPackage", "\"%s\",%d", progname, deregfunc );
 
    DEBUGDUMP(fprintf(stderr,"%s-%d: Start of TermRxPackage RxPackageGlobalData is %lx\n",__FILE__,__LINE__,(long)GlobalData);)
-   /* 
-    * De-register all REXX/SQL functions only 
-    * if DEBUG value = 99
+   /*
+    * De-register all package functions only if requested
+    * BE CAREFUL!!
     * DO NOT DO THIS FOR DYNAMIC LIBRARY
     * AS IT WILL DEREGISTER FOR ALL PROCESSES
-    * NOT JUST THE CURRENT ONE.               
+    * NOT JUST THE CURRENT ONE.
     */
    if (deregfunc)
    {
       if ( ( rc = DeregisterRxFunctions( GlobalData, RxPackageFunctions, 0 ) ) != 0 )
          return (int)FunctionEpilogue( GlobalData, "TermRxPackage", (long)rc );
    }
-   /* 
+   /*
     * Call any package-specific termination code here
     */
    if ( ptr )
@@ -1810,7 +1850,9 @@ int RxSetTraceFile
       }
       else
       {
-         if ( RxPackageGlobalData->RxTraceFilePointer != NULL )
+         if ( RxPackageGlobalData->RxTraceFilePointer != NULL
+         &&   RxPackageGlobalData->RxTraceFilePointer != stdout
+         &&   RxPackageGlobalData->RxTraceFilePointer != stderr )
             fclose( RxPackageGlobalData->RxTraceFilePointer );
          fp = fopen( name, "w" );
          if ( fp == NULL )
@@ -1860,7 +1902,7 @@ int RxSetConstantPrefix
 
    if ( ( strlen( name ) + 1 ) > sizeof( RxPackageGlobalData->ConstantPrefix ) )
    {
-      (void)fprintf( stderr, "ERROR: Constant prefix is too long. It must be <= %ld\n", sizeof( RxPackageGlobalData->ConstantPrefix ) - 1 );
+      (void)fprintf( stderr, "ERROR: Constant prefix is too long. It must be <= %d\n", sizeof( RxPackageGlobalData->ConstantPrefix ) - 1 );
       return( 1 );
    }
    strcpy( RxPackageGlobalData->PreviousConstantPrefix, RxPackageGlobalData->ConstantPrefix );
@@ -1915,7 +1957,7 @@ int RxGetRunFlags
    RxPackageGlobalDataDef *RxPackageGlobalData;
 #endif
 
-{  
+{
    InternalTrace( RxPackageGlobalData, "RxGetRunFlags", NULL );
    return ( RxPackageGlobalData->RxRunFlags );
 }
@@ -2115,7 +2157,7 @@ int RxReturnStringAndFree
    {
 #if defined(REXXFREEMEMORY)
       ret = (char *)RexxAllocateMemory( len + 1 );
-#elif defined(WIN32) && ( defined(USE_WINREXX) || defined(USE_QUERCUS) || defined(USE_OREXX) )
+#elif defined(WIN32) && ( defined(USE_WINREXX) || defined(USE_QUERCUS) || defined(USE_OREXX) || defined(USE_OOREXX) )
       ret = ( char * )GlobalLock( GlobalAlloc ( GMEM_FIXED, len + 1 ) );
 #elif defined(USE_OS2REXX)
       if ( ( BOOL )DosAllocMem( (void **)&ret, len + 1, fPERM|PAG_COMMIT ) )
@@ -2168,7 +2210,7 @@ static REH_RETURN_TYPE RxExitHandlerForSayTraceRedirection
          if ( say_parm->rxsio_string.strptr != NULL )
          {
             for( i = 0; i < (long)say_parm->rxsio_string.strlength; i++ )
-               fputc( ( char )say_parm->rxsio_string.strptr[i], 
+               fputc( ( char )say_parm->rxsio_string.strptr[i],
                   stdout );
          }
          fputc( '\n', stdout );
@@ -2181,7 +2223,7 @@ static REH_RETURN_TYPE RxExitHandlerForSayTraceRedirection
          if ( trc_parm->rxsio_string.strptr != NULL )
          {
             for( i = 0; i < (long)trc_parm->rxsio_string.strlength; i++ )
-               fputc( ( char )trc_parm->rxsio_string.strptr[i], 
+               fputc( ( char )trc_parm->rxsio_string.strptr[i],
                   stderr );
          }
          fputc( '\n', stderr );
@@ -2226,7 +2268,7 @@ static REH_RETURN_TYPE RxExitHandlerForSayTraceRedirection
  * This is the default subcommand handler for the package. It passes all
  * subcommands to the shell for execution.
  *----------------------------------------------------------------------------*/
-static RSH_RETURN_TYPE RxSubcomHandler
+static RSH_RETURN RxSubcomHandler
 
 #if defined(HAVE_PROTO)
    (
@@ -2262,7 +2304,7 @@ static RSH_RETURN_TYPE RxSubcomHandler
          *Flags = RXSUBCOM_ERROR;             /* raise an error condition   */
       else
          *Flags = RXSUBCOM_OK;                /* not found is not an error  */
-   
+
       sprintf(Retstr->strptr, "%d", rc); /* format return code string  */
                                               /* and set the correct length */
       Retstr->strlength = strlen(Retstr->strptr);

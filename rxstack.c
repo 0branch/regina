@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rxstack.c,v 1.31 2004/04/18 02:54:34 florian Exp $";
+static char *RCSid = "$Id: rxstack.c,v 1.34 2006/02/21 11:22:24 mark Exp $";
 #endif
 
 /*
@@ -152,8 +152,10 @@ static char *RCSid = "$Id: rxstack.c,v 1.31 2004/04/18 02:54:34 florian Exp $";
 # ifdef HAVE_NETINET_IN_H
 #  include <netinet/in.h>
 #  endif
-# if defined(HAVE_POLL_H)
+# if defined(HAVE_POLL_H) && defined(HAVE_POLL)
 #  include <poll.h>
+# elif defined(HAVE_SYS_POLL_H) && defined(HAVE_POLL)
+#  include <sys/poll.h>
 # elif defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
 # endif
@@ -787,7 +789,7 @@ char *get_unspecified_queue( void )
    {
       char *h ;
 
-      if ( ( h = malloc( strlen( rxq ) + 2 ) ) != NULL )
+      if ( ( h = (char *)malloc( strlen( rxq ) + 2 ) ) != NULL )
       {
          strcpy( h, rxq ) ;
          strcat( h, "@" ) ;
@@ -919,7 +921,7 @@ void rxstack_signal_handler( int sig )
  */
 Client *get_new_client( )
 {
-   Client *retval = malloc( sizeof( Client ) ) ;
+   Client *retval = (Client *)malloc( sizeof( Client ) ) ;
 
    if ( retval == NULL )
       return NULL ;
@@ -956,7 +958,7 @@ RxQueue *find_queue( const streng *queue_name )
  */
 RxQueue *get_new_queue( void )
 {
-   RxQueue *retval = malloc( sizeof( RxQueue ) ) ;
+   RxQueue *retval = (RxQueue *)malloc( sizeof( RxQueue ) ) ;
 
    if ( retval == NULL )
       return NULL ;
@@ -1860,11 +1862,15 @@ int rxstack_doit( )
    RxTime timeout ;
    int listen_sock,msgsock;
    struct sockaddr_in server,client;
+#ifdef HAVE_SOCKLEN_T
+   socklen_t client_size ;
+#else
    int client_size ;
+#endif
    int portno,rc;
    Client *c, *ch ;
    RxQueue *q, *qh ;
-#ifdef HAVE_POLL_H
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
 # define POLL_INCR 16
    struct pollfd *pd = NULL ;
    unsigned poll_max = 0 ;
@@ -1901,6 +1907,9 @@ int rxstack_doit( )
 #ifdef SIGINT
    signal( SIGINT, rxstack_signal_handler );
 #endif
+#ifdef SIGBREAK
+   signal( SIGBREAK, rxstack_signal_handler );
+#endif
 #ifdef SIGPIPE
    signal( SIGPIPE, SIG_IGN );
 #endif
@@ -1918,8 +1927,8 @@ int rxstack_doit( )
    SESSION->name = Str_cre_or_exit( "SESSION", 7 ) ;
    SESSION->isReal = 1;
 
-#ifdef HAVE_POLL_H
-   pd = malloc( ( poll_max = POLL_INCR ) * sizeof( struct pollfd ) );
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
+   pd = (struct pollfd *)malloc( ( poll_max = POLL_INCR ) * sizeof( struct pollfd ) );
    if ( pd == NULL )
    {
       showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
@@ -1990,7 +1999,7 @@ int rxstack_doit( )
    time_add( &queue_deadline, QUEUE_TIMEOUT ) ;
    while ( running )
    {
-#ifdef HAVE_POLL_H
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
       poll_cnt = 0 ;
       pd[ poll_cnt   ].events = POLLIN ;
       pd[ poll_cnt++ ].fd = listen_sock ;
@@ -2004,7 +2013,7 @@ int rxstack_doit( )
 
          if ( poll_cnt == poll_max )
          {
-            pd = realloc( pd, ( poll_max += POLL_INCR ) * sizeof( struct pollfd ) );
+            pd = (struct pollfd *)realloc( pd, ( poll_max += POLL_INCR ) * sizeof( struct pollfd ) );
             if ( pd == NULL )
             {
                showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
@@ -2043,7 +2052,7 @@ int rxstack_doit( )
       if ( ( rc == -1 ) || ( rc > DEFAULT_WAKEUP ) )
          rc = DEFAULT_WAKEUP ;
       DEBUGDUMP(printf("), to=%d) ms at %ld,%03d\n", rc, now.seconds, now.milli ););
-#ifdef HAVE_POLL_H
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
       rc = poll( pd, poll_cnt, rc ) ;
 #else
       to.tv_usec = ( rc % 1000 ) * 1000 ; /* microseconds fraction */
@@ -2063,13 +2072,13 @@ int rxstack_doit( )
       }
       if ( rc )
       {
-#ifdef HAVE_POLL_H
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
          if ( pd[ 0 ].revents )
 #else
          if ( FD_ISSET(listen_sock, &ready ) )
 #endif
          {
-            msgsock = accept(listen_sock, (struct  sockaddr *)&client, (int *)&client_size);
+            msgsock = accept(listen_sock, (struct  sockaddr *)&client, &client_size);
             if (msgsock == -1)
             {
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_GENERAL, ERR_RXSTACK_GENERAL_TMPL, "Calling listen", errno_str( os_errno ) );
@@ -2092,7 +2101,7 @@ int rxstack_doit( )
          }
          else
          {
-#ifdef HAVE_POLL_H
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
             for ( c = clients, poll_cnt = 1; c != NULL; poll_cnt++ )
 #else
             for ( c = clients; c != NULL; )
@@ -2105,7 +2114,7 @@ int rxstack_doit( )
                 */
                ch = c ;
                c = c->next ;
-#ifdef HAVE_POLL_H
+#if defined(HAVE_POLL) && (defined(HAVE_POLL_H) || defined(HAVE_SYS_POLL_H))
                if ( pd[ poll_cnt ].revents )
 #else
                if ( FD_ISSET( ch->socket, &ready ) )

@@ -15,17 +15,21 @@ BINDIR = $(TOPDIR)/bin
 LIBDIR = $(TOPDIR)/lib
 MANEXT = l
 MANDIR = $(TOPDIR)/man/man$(MANEXT)
-VER=31
-VERDOT=3.2
+
+include $(SRCDIR)\regina.ver
+VERDOT = $(VER_DOT)
+VERDATE = $(VER_DATE)
+
+MYCEXTRA = $(CEXTRA) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\"
 
 MISCDEFS = -I$(SRCDIR) #-DR2PERL
 #DEBUG	  = #-g	-DNDEBUG #-Dlint
 PROF	 = #-p #g
 #OPTIMIZE = -O -DNDEBUG
 
-COPT = $(DEBUGFLAG) $(CEXTRA) $(OPTIMIZE) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
-LINKOPT	= $(DEBUGFLAG) $(OPTIMIZE) $(PROF) $(EEXTRA)
-OTHERCOPT = $(DEBUGFLAG) $(OPTIMIZE) $(PROF) $(CEXTRA) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
+COPT = $(DEBUGFLAG) $(MYCEXTRA) $(OPTIMIZE) $(PROF) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
+LINKOPT	= $(DEBUGFLAG) $(LDOPT) $(PROF) $(EEXTRA)
+OTHERCOPT = $(DEBUGFLAG) $(OPTIMIZE) $(PROF) $(MYCEXTRA) $(MISCDEFS) $(MEMTRACE) $(USEFLISTS) $(THREADING)
 
 YACC = yacc
 #YACC =	bison -ly #-d #-lyt
@@ -39,21 +43,14 @@ README = $(SRCDIR)/README.* COPYING-LIB
 #FILES =	funcs builtin error variable interprt debug dbgfuncs \
 #	memory parsing files misc os2funcs unxfuncs cmsfuncs shell rexxext stack \
 #	tracing	interp cmath convert strings library strmath signals \
-#	macros envir wrappers options doscmd extstack rexxbif #r2perl
-
-CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/variable.c \
-	$(SRCDIR)/interprt.c $(SRCDIR)/debug.c $(SRCDIR)/dbgfuncs.c $(SRCDIR)/memory.c $(SRCDIR)/parsing.c $(SRCDIR)/files.c \
-	$(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/os2funcs.c	$(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c	\
-	$(SRCDIR)/tracing.c $(SRCDIR)/interp.c $(SRCDIR)/cmath.c $(SRCDIR)/convert.c $(SRCDIR)/strings.c $(SRCDIR)/library.c \
-	$(SRCDIR)/strmath.c $(SRCDIR)/signals.c	$(SRCDIR)/macros.c $(SRCDIR)/envir.c $(SRCDIR)/expr.c \
-	$(SRCDIR)/wrappers.c	$(SRCDIR)/options.c $(SRCDIR)/doscmd.c #$(SRCDIR)/r2perl.c
+#	macros envir wrappers options $(OS_FILE) extstack rexxbif
 
 OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	interprt.$(OBJ)	debug.$(OBJ) dbgfuncs.$(OBJ) memory.$(OBJ) parsing.$(OBJ) files.$(OBJ) \
 	misc.$(OBJ) unxfuncs.$(OBJ) arxfuncs.$(OBJ) cmsfuncs.$(OBJ) os2funcs.$(OBJ) shell.$(OBJ) rexxext.$(OBJ) stack.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ)	library.$(OBJ) \
 	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) $(MT_FILE).$(OBJ) instore.$(OBJ) \
-	yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) doscmd.$(OBJ)	wrappers.$(OBJ) \
+	yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) $(OS_FILE).$(OBJ) wrappers.$(OBJ) \
 	$(EXTQUEUE_OBJS)
 
 SHOFILES = funcs.sho builtin.sho error.sho variable.sho	\
@@ -61,7 +58,7 @@ SHOFILES = funcs.sho builtin.sho error.sho variable.sho	\
 	misc.sho unxfuncs.sho arxfuncs.sho cmsfuncs.sho shell.sho os2funcs.sho rexxext.sho stack.sho	\
 	tracing.sho interp.sho cmath.sho convert.sho strings.sho library.sho \
 	strmath.sho signals.sho	macros.sho envir.sho expr.sho $(MT_FILE).sho instore.sho \
-	yaccsrc.sho lexsrc.sho wrappers.sho options.sho doscmd.sho \
+	yaccsrc.sho lexsrc.sho wrappers.sho options.sho $(OS_FILE).sho \
 	drexx.sho client.sho rexxsaa.sho \
 	$(EXTQUEUE_SHOBJS)
 
@@ -81,7 +78,8 @@ CFILES = $(SRCDIR)/yaccsrc.c $(SRCDIR)/lexsrc.c	$(CSRCFILES) $(SRCDIR)/execiser.
 		$(SRCDIR)/r2perl.c $(SRCDIR)/test1.c $(SRCDIR)/test2.c
 
 MTSSRC = $(SRCDIR)/en.mts $(SRCDIR)/pt.mts $(SRCDIR)/no.mts \
-	$(SRCDIR)/de.mts $(SRCDIR)/es.mts $(SRCDIR)/pl.mts
+	$(SRCDIR)/de.mts $(SRCDIR)/es.mts $(SRCDIR)/pl.mts \
+	$(SRCDIR)/tr.mts
 
 #.SUFFIXES: .sho $(SUFFIXES)
 #
@@ -98,31 +96,31 @@ $(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRC
 $(SRCDIR)/mt.h : $(SRCDIR)/$(MT_FILE).h
 
 rexx$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rexx$(EXE) $(OBJECTS) rexx.$(OBJ) nosaa.$(OBJ) $(OS2LIBA) $(LIBS) $(TCPLIBS)
+	$(PURIFY) $(LD) $(LINKOPT) $(STATIC_LDFLAGS) -o rexx$(EXE) $(OBJECTS) rexx.$(OBJ) nosaa.$(OBJ) $(OS2LIBA) $(LIBS) $(TCPLIBS)
 	$(LDEXTRA)
 	$(LDEXTRA1)
 
 regina$(EXE) : $(LIBPRE)$(SHLFILE).$(SHL) regina.$(OBJ)	$(SHLIMPLIB) $(OS2LIBA)
-	$(PURIFY) $(CC)	$(LINKOPT) $(DYNAMIC_LDFLAGS) -o regina$(EXE) regina.$(OBJ) $(LINKSHL) $(LIBS) $(SHLIBS) $(OS2LIBA)
+	$(PURIFY) $(LD)	$(LINKOPT) $(DYNAMIC_LDFLAGS) -o regina$(EXE) regina.$(OBJ) $(LINKSHL) $(LIBS) $(SHLIBS) $(OS2LIBA)
 	$(LDEXTRA)
 
 execiser$(EXE) : execiser.$(OBJ) $(LIBPRE)$(LIBFILE).$(LIBPST) $(OS2LIBA)
-	$(PURIFY) $(CC)	$(LINKOPT) -o execiser$(EXE) execiser.$(OBJ) $(LIBLINK) $(OS2LIBA) $(TCPLIBS)
+	$(PURIFY) $(LD)	$(LINKOPT) -o execiser$(EXE) execiser.$(OBJ) $(LIBLINK) $(OS2LIBA) $(TCPLIBS)
 	$(LDEXTRA)
 	$(LDEXTRA1)
 
 threader$(EXE) : threader.$(OBJ) $(LIBPRE)$(LIBFILE).$(LIBPST) $(OS2LIBA)
-	$(PURIFY) $(CC)	$(LINKOPT) -o threader$(EXE) threader.$(OBJ) $(LIBLINK) $(OS2LIBA)
+	$(PURIFY) $(LD)	$(LINKOPT) -o threader$(EXE) threader.$(OBJ) $(LIBLINK) $(OS2LIBA)
 	$(LDEXTRA)
 	$(LDEXTRA1)
 
 rxstack$(EXE) : rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxstack$(EXE) rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(LIBS) $(TCPLIBS)
+	$(PURIFY) $(LD) $(LINKOPT) $(STATIC_LDFLAGS) -o rxstack$(EXE) rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(LIBS) $(TCPLIBS)
 	$(LDEXTRA)
 	$(LDEXTRA1)
 
 rxqueue$(EXE) : rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxqueue$(EXE) rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(LIBS) $(TCPLIBS)
+	$(PURIFY) $(LD) $(LINKOPT) $(STATIC_LDFLAGS) -o rxqueue$(EXE) rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(LIBS) $(TCPLIBS)
 	$(LDEXTRA)
 	$(LDEXTRA1)
 
@@ -137,11 +135,11 @@ $(LIBPRE)$(SHLFILE).$(SHL): $(SHOFILES) $(SHLDEF) $(OS2LIB)
 	$(SHL3)
 	$(SHL4)
 
-$(LIBPRE)test1.$(SHL): $(LIBPRE)$(SHLFILE).$(SHL) $(TEST1DEF) test1.sho
+$(LIBPRE)rxtest1.$(SHL): $(LIBPRE)$(SHLFILE).$(SHL) $(TEST1DEF) test1.sho
 	$(TEST1_LD)
 	$(TEST1_SHL1)
 
-$(LIBPRE)test2.$(SHL): $(LIBPRE)$(SHLFILE).$(SHL) $(TEST2DEF) test2.sho
+$(LIBPRE)rxtest2.$(SHL): $(LIBPRE)$(SHLFILE).$(SHL) $(TEST2DEF) test2.sho
 	$(TEST2_LD)
 	$(TEST2_SHL1)
 
@@ -157,10 +155,10 @@ $(OS2LIBA):
 # Convert .mts to .mtb
 #
 mtb_files: msgcmp$(EXE) $(MTSSRC)
-	msgcmp$(EXE) $(MTSSRC)
+	-msgcmp$(EXE) $(MTSSRC)
 
 msgcmp$(EXE): msgcmp.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o msgcmp$(EXE) msgcmp.$(OBJ) $(OS2LIBA) $(LIBS)
+	$(PURIFY) $(LD) $(LINKOPT) $(STATIC_LDFLAGS) -o msgcmp$(EXE) msgcmp.$(OBJ) $(OS2LIBA) $(LIBS)
 	$(LDEXTRA)
 	$(LDEXTRA1)
 
@@ -275,8 +273,8 @@ wrappers.$(OBJ)	:$(SRCDIR)/wrappers.c	 $(SRCDIR)/rexx.h
 options.$(OBJ) : $(SRCDIR)/options.c	 $(SRCDIR)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/options.c
 
-doscmd.$(OBJ) :	 $(SRCDIR)/doscmd.c	 $(SRCDIR)/rexx.h
-	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/doscmd.c
+$(OS_FILE).$(OBJ) :	 $(SRCDIR)/$(OS_FILE).c $(SRCDIR)/rexx.h
+	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/$(OS_FILE).c
 
 rexx.$(OBJ) :	 $(SRCDIR)/rexx.c	 $(SRCDIR)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(SRCDIR)/rexx.c
@@ -539,9 +537,9 @@ options.sho : $(SRCDIR)/options.c	 $(SRCDIR)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
-doscmd.sho :  $(SRCDIR)/doscmd.c	 $(SRCDIR)/rexx.h
+$(OS_FILE).sho :  $(SRCDIR)/$(OS_FILE).c $(SRCDIR)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/doscmd.c
+	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/$(OS_FILE).c
 	$(O2SHO)
 	$(SAVE2O)
 
@@ -605,7 +603,7 @@ test1.$(OBJ): $(SRCDIR)/test1.c
 test1.sho: $(SRCDIR)/test1.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/test1.c
 
-test1.$(RXLIB):	test1.$(OBJ) $(LIBPRE)$(SHLFILE).$(SHL)
+rxtest1.$(RXLIB):	test1.$(OBJ) $(LIBPRE)$(SHLFILE).$(SHL)
 	$(LD_RXLIB_PRE)	test1.$(OBJ) $(LD_RXLIB1)
 
 test2.$(OBJ): $(SRCDIR)/test2.c
@@ -614,7 +612,7 @@ test2.$(OBJ): $(SRCDIR)/test2.c
 test2.sho: $(SRCDIR)/test2.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/test2.c
 
-test2.$(RXLIB):	test2.$(OBJ) $(LIBPRE)$(SHLFILE).$(SHL)
+rxtest2.$(RXLIB):	test2.$(OBJ) $(LIBPRE)$(SHLFILE).$(SHL)
 	$(LD_RXLIB_PRE)	test2.$(OBJ) $(LD_RXLIB2)
 
 depend:

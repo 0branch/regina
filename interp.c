@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: interp.c,v 1.9 2004/03/04 11:14:44 mark Exp $";
+static char *RCSid = "$Id: interp.c,v 1.11 2005/08/16 07:39:09 mark Exp $";
 #endif
 
 /*
@@ -26,7 +26,7 @@ static char *RCSid = "$Id: interp.c,v 1.9 2004/03/04 11:14:44 mark Exp $";
 
 static void set_line_nos( treenode *ptr, int lineno, int charno )
 {
-   int i=0 ;
+   unsigned i=0 ;
 
    if (!ptr)
       return ;
@@ -55,13 +55,20 @@ streng *dointerpret( tsd_t *TSD, streng *string )
    nodeptr savecurrentnode ;
    streng *ptr;
    internal_parser_type parsing;
+   int errpos;
 
    fetch_string( TSD, string, &parsing );
 
    if (parsing.result != 0)
    {
       Free_stringTSD(string) ;
-      exiterror( ERR_YACC_SYNTAX, 1, parsing.tline ) ;
+      /*
+       * get position from parent script if available and add it.
+       * fixes bug 658542.
+       */
+      errpos = TSD->currentnode->lineno;
+      errpos = ( errpos > 0 ) ? errpos - 1 : 0 ;
+      exiterror( ERR_YACC_SYNTAX, 1, parsing.tline + errpos ) ;
       return NULL ;
    }
 

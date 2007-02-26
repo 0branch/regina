@@ -1,4 +1,4 @@
-                        Regina 3.3
+                        Regina 3.4
                        for DOS/VCPI
 
 This file contains 32 bit executables of the Regina Rexx interpreter for
@@ -32,7 +32,7 @@ a directory specified in your PATH environment variable.
 
 If you want to have Regina error messages displayed in you native
 language, set the environment variable; REGINA_LANG to the two-character
-language abbreviation (the first two chracters of a file in the NLS 
+language abbreviation (the first two chracters of a file in the NLS
 directory), and set REGINA_LANG_DIR to the directory containing the
 *.mtb files.
 

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexx.c,v 1.48 2004/04/12 01:59:54 mark Exp $";
+static char *RCSid = "$Id: rexx.c,v 1.54 2005/08/16 07:41:44 mark Exp $";
 #endif
 
 /*
@@ -153,24 +153,34 @@ static void usage( char * );
 #ifdef TRACEMEM
 void marksubtree( nodeptr ptr )
 {
-   int i=0 ;
-   if ( ptr )
+   unsigned i;
+
+   while ( ptr )
    {
-      markmemory(ptr,TRC_TREENODE) ;
-      if (ptr->name) markmemory(ptr->name, TRC_TREENODE) ;
-      for (i=0;i<sizeof(ptr->p)/sizeof(ptr->p[0]);marksubtree(ptr->p[i++])) ;
-      if (ptr->next) marksubtree( ptr->next ) ;
+      markmemory( ptr, TRC_TREENODE );
 
-      if (ptr->type == X_STRING || ptr->type == X_CON_SYMBOL)
-         if (ptr->u.number)
+      if ( ptr->name )
+         markmemory( ptr->name, TRC_TREENODE );
+
+      for ( i = 0; i < sizeof( ptr->p ) / sizeof( ptr->p[0] ); i++ )
+         marksubtree( ptr->p[i] );
+
+
+      if ( ( ptr->type == X_STRING ) || ( ptr->type == X_CON_SYMBOL ) )
+      {
+         if ( ptr->u.number )
          {
-            markmemory( ptr->u.number, TRC_TREENODE ) ;
-            markmemory( ptr->u.number->num, TRC_TREENODE ) ;
+            markmemory( ptr->u.number, TRC_TREENODE );
+            markmemory( ptr->u.number->num, TRC_TREENODE );
          }
+      }
+      else if ( ptr->type == X_CEXPRLIST )
+      {
+         if ( ptr->u.strng )
+            markmemory( ptr->u.strng, TRC_TREENODE );
+      }
 
-      if (ptr->type == X_CEXPRLIST)
-         if (ptr->u.strng)
-            markmemory( ptr->u.strng, TRC_TREENODE ) ;
+      ptr = ptr->next;
    }
 }
 #endif /* TRACEMEM */
@@ -190,6 +200,11 @@ static const char *GetArgv0(const char *argv0)
    char buf[512];
 
    if (GetModuleFileName(NULL, buf, sizeof(buf)) != 0)
+      return(strdup(buf)); /* never freed up */
+#elif defined(__QNX__) && defined(__WATCOMC__)
+   char buffer[PATH_MAX];
+   char *buf;
+   if ( (buf = _cmdname(buffer) ) != NULL )
       return(strdup(buf)); /* never freed up */
 #elif defined(OS2)
    char buf[512];
@@ -215,7 +230,7 @@ static const char *GetArgv0(const char *argv0)
       char buf[1024];
       int result;
       result = readlink("/proc/self/exe", buf, sizeof( buf ) );
-      if ( ( result > 0 ) && ( result < sizeof( buf ) ) && ( buf[0] != '[' ) )
+      if ( ( result > 0 ) && ( result < (int) sizeof( buf ) ) && ( buf[0] != '[' ) )
       {
          buf[result] = '\0';
          return strdup( buf );
@@ -304,6 +319,12 @@ static int check_args( tsd_t *TSD, int argc, char **argv,
 
                case 'v':
                   fprintf( stderr, "%s\n", PARSE_VERSION_STRING );
+                  /*
+                   * Also display any staticall linked packages
+                   */
+#if defined( DYNAMIC_STATIC )
+                  static_list_packages();
+#endif
                   return 0;
 
                case 'y':
@@ -462,7 +483,7 @@ static void assign_args( tsd_t *TSD, int argc, int next_arg, char **argv )
       prev = NULL;
       for ( i = next_arg; i < argc; i++ )
       {
-         args = MallocTSD( sizeof( parambox ) );
+         args = (paramboxptr)MallocTSD( sizeof( parambox ) );
          memset( args, 0, sizeof( parambox ) );
 
          if ( i == next_arg )
@@ -479,7 +500,10 @@ static void assign_args( tsd_t *TSD, int argc, int next_arg, char **argv )
    for ( i = next_arg, len = 0; i < argc; i++ )
       len += strlen( argv[i] ) + 1; /* delimiter or terminator */
 
-   TSD->currlevel->args = args = MallocTSD( sizeof( parambox ) );
+   TSD->currlevel->args = (paramboxptr)MallocTSD( sizeof( parambox ) );
+   if ( TSD->currlevel->args == NULL )
+      exiterror( ERR_STORAGE_EXHAUSTED, 0 );
+   args = TSD->currlevel->args;
    memset( args, 0, sizeof(parambox) );
    args->value = string = Str_makeTSD( len );
 
@@ -549,7 +573,7 @@ static int execute_tokenized( tsd_t *TSD )
    /*
     * Check if the file being read is a valid tokenised file.
     */
-   if ( !IsValidTin( TinnedTree, TinnedTreeLen ) )
+   if ( !IsValidTin( (const external_parser_type *)TinnedTree, TinnedTreeLen ) )
       exiterror( ERR_PROG_UNREADABLE,
                  1,
                  "The supplied file is not a valid Regina tokenised file" );
@@ -622,23 +646,21 @@ static int execute_file( tsd_t *TSD )
    else
       TSD->systeminfo->tree = parsing;
 
-#if !defined(R2PERL) && !defined(MINIMAL) && !defined(VMS) && !defined(DOS) && !defined(_MSC_VER) && !defined(__IBMC__) && !defined(MAC)
+#if !defined(MINIMAL) && !defined(VMS) && !defined(DOS) && !defined(_MSC_VER) && !defined(__IBMC__) && !defined(MAC)
    if ( !fptr )
    {
       struct stat buffer;
       int rc;
 
-      /*
-       * The following line is likely to give a warning when compiled
-       * under Ultrix, this can be safely ignored, since it is just a
-       * result of Digital not defining their include files properly.
-       *
-       * FIXME, FGC: What does the comment above mean? Either ignore it or
-       * don't, ehmm, what?
-       */
       rc = fstat( fileno( stdin ), &buffer );
       if ( ( rc == 0 ) && S_ISCHR( buffer.st_mode ) )
       {
+         /*
+          * FIXME. MH and FGC.
+          * When does this happen. Add debugging code to determine this, because
+          * after 2 glasses of rocket fuel it seems silly to have this code!
+          * 13-5-2004.
+          */
          printf( "  \b\b" );
          fflush( stdout );
          rewind( stdin );
@@ -895,6 +917,28 @@ void mark_systeminfo( const tsd_t *TSD )
          markmemory( llptr->line, TRC_SYSINFO ) ;
       }
    }
+
+   markmemory( TSD->mem_tsd, TRC_SYSINFO );
+   markmemory( TSD->var_tsd, TRC_SYSINFO );
+   markmemory( TSD->stk_tsd, TRC_SYSINFO );
+   markmemory( TSD->fil_tsd, TRC_SYSINFO );
+   markmemory( TSD->itp_tsd, TRC_SYSINFO );
+   markmemory( TSD->tra_tsd, TRC_SYSINFO );
+   markmemory( TSD->err_tsd, TRC_SYSINFO );
+   if (TSD->vms_tsd )
+      markmemory( TSD->vms_tsd, TRC_SYSINFO );
+   markmemory( TSD->bui_tsd, TRC_SYSINFO );
+   if (TSD->vmf_tsd )
+      markmemory( TSD->vmf_tsd, TRC_SYSINFO );
+   markmemory( TSD->lib_tsd, TRC_SYSINFO );
+   if (TSD->rex_tsd )
+      markmemory( TSD->rex_tsd, TRC_SYSINFO );
+   markmemory( TSD->shl_tsd, TRC_SYSINFO );
+   markmemory( TSD->mat_tsd, TRC_SYSINFO );
+   if (TSD->cli_tsd )
+      markmemory( TSD->cli_tsd, TRC_SYSINFO );
+   markmemory( TSD->arx_tsd, TRC_SYSINFO );
+   markmemory( TSD->mt_tsd, TRC_SYSINFO );
 }
 #endif
 
@@ -903,7 +947,7 @@ sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir )
 {
    sysinfobox *sinfo;
 
-   sinfo = MallocTSD( sizeof(sysinfobox) );
+   sinfo = (sysinfobox *)MallocTSD( sizeof(sysinfobox) );
    sinfo->environment = envir;
    sinfo->tracing = DEFAULT_TRACING;
    sinfo->interactive = DEFAULT_INT_TRACING;
@@ -913,7 +957,7 @@ sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir )
    sinfo->input_fp = NULL;
    sinfo->script_exit = NULL ;
    sinfo->hooks = 0;
-   sinfo->callstack = MallocTSD( sizeof( nodeptr ) * 10 );
+   sinfo->callstack = (nodeptr *)MallocTSD( sizeof( nodeptr ) * 10 );
    sinfo->result = NULL;
    sinfo->cstackcnt = 0;
    sinfo->cstackmax = 10;
@@ -924,7 +968,7 @@ sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir )
    return sinfo;
 }
 
-#if !defined(RXLIB)
+#if !defined(RXLIB) && !defined(VMS)
 
 static void NoAPI( void )
 {

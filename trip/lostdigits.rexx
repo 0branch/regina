@@ -8,13 +8,15 @@
  * Return codes: 0 on success, 1 otherwise
  */
 errors = 0
+written = 0
 
+call notify 'digits 5'
 numeric digits 5
 call doTest
+call notify 'digits 4'
 numeric digits 4
 call doTest
 if errors = 0 then do
-   say "test passed successfully"
    exit 0
    end
 exit 1
@@ -108,4 +110,14 @@ doTest:
 error:
    call lineout "<stderr>", arg(1)
    errors = errors + 1
+   return
+
+notify:
+   parse arg word
+   written = written + length(word) + 2
+   if written>75 then do
+      written = length(word)
+      say ' '
+   end
+   call charout , word || ', '
    return

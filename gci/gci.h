@@ -77,6 +77,7 @@ typedef enum {
    GCI_float,
    GCI_char,
    GCI_string,
+   GCI_raw,
    GCI_container,
    GCI_array
 } GCI_basetype;
@@ -181,14 +182,14 @@ char * GCI_content( GCI_str *str );
 const char * GCI_ccontent( const GCI_str *str );
 int GCI_streq( const GCI_str *s1,
                const GCI_str *s2 );
-int GCI_strcat( GCI_str *first,
-                const GCI_str *second );
-int GCI_strcats( GCI_str *first,
-                 const char *second );
+GCI_result GCI_strcat( GCI_str *first,
+                       const GCI_str *second );
+GCI_result GCI_strcats( GCI_str *first,
+                        const char *second );
 void GCI_strsetlen( GCI_str *str,
                     int max );
-int GCI_strcpy( GCI_str *first,
-                const GCI_str *second );
+GCI_result GCI_strcpy( GCI_str *first,
+                       const GCI_str *second );
 GCI_str *GCI_strfromascii( GCI_str *str,
                            char *ptr,
                            int max );
@@ -204,10 +205,12 @@ GCI_result GCI_strdup( void *hidden,
                        const GCI_str *second );
 char *GCI_strtoascii( void *hidden,
                       const GCI_str *str );
-void GCI_uppercase( GCI_str *str );
+void GCI_uppercase( void *hidden,
+                    GCI_str *str );
 void GCI_describe( GCI_str *description,
                    GCI_result rc );
-void GCI_strswap( GCI_str *first, GCI_str *second );
+void GCI_strswap( GCI_str *first,
+                  GCI_str *second );
 
 /*
  * gci_prepare.c
@@ -216,7 +219,8 @@ GCI_result GCI_parsenodes( void *hidden,
                            GCI_str *base,
                            GCI_treeinfo *ti,
                            unsigned argc,
-                           unsigned return_valid );
+                           unsigned return_valid,
+                           const char *prefixChar );
 
 /*
  * gci_rexxbridge.c
@@ -251,13 +255,15 @@ void GCI_remove_structure( void *hidden,
 GCI_result GCI_ParseTree( void *hidden,
                           const GCI_str *stem,
                           GCI_treeinfo *gci_info,
-                          GCI_str *error_disposition );
+                          GCI_str *error_disposition,
+                          const char *prefixChar );
 GCI_result GCI_RxFuncDefine( void *hidden,
                              const GCI_str *internal,
                              const GCI_str *library,
                              const GCI_str *external,
                              const GCI_str *stem,
-                             GCI_str *error_disposition );
+                             GCI_str *error_disposition,
+                             const char *prefixChar );
 
 /*
  * gci_tree.c
@@ -268,7 +274,8 @@ GCI_result GCI_parsetree( void *hidden,
                                                  int itemnumber,
                                                  void *arg,
                                                  const GCI_parseinfo *info),
-                          void *arg );
+                          void *arg,
+                          const char *prefixChar );
 
 /*
  * gci_execute.c
@@ -279,7 +286,8 @@ GCI_result GCI_execute( void *hidden,
                         int argc,
                         const GCI_str *args,
                         GCI_str *error_disposition,
-                        GCI_str *retval );
+                        GCI_str *retval,
+                        const char *prefixChar );
 
 /*
  * gci_call.c

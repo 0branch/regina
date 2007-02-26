@@ -3,6 +3,8 @@
 
 #include <setjmp.h>
 
+struct _OS_Dep_funcs;
+
 /* tsd_t holds all global vars which may change between threads as expected.*/
 typedef struct _tsd_t {
    void *                  mem_tsd ;           /* local variables of memory.c */
@@ -56,9 +58,7 @@ typedef struct _tsd_t {
    int                     in_protected;
    jmp_buf                 protect_return;
    jmp_buf                 gci_jump;
-   volatile enum           { PROTECTED_DelayedScriptExit,
-                             PROTECTED_DelayedInterpreterExit,
-                             PROTECTED_DelayedRexxSignal } delayed_error_type;
+   volatile delayed_error_type_t delayed_error_type;
    volatile int            expected_exit_error;
                             /* call exit() with this value if
                              * delayed_error_type is PROTECTED_DelayedScriptExit
@@ -67,6 +67,10 @@ typedef struct _tsd_t {
    void *                  (*MTMalloc)(const struct _tsd_t *TSD,size_t size);
    void                    (*MTFree)(const struct _tsd_t *TSD,void *chunk);
    void                    (*MTExit)(int code);
+   char                    gci_prefix[2];
+   const char             *BIFname;
+   void                   *BIFfunc;
+   struct _OS_Dep_funcs   *OS;
 } tsd_t;
 
 #if (defined(POSIX) || defined(_POSIX_SOURCE) || defined(_PTHREAD_SEMANTICS)) && (defined(_REENTRANT) || defined(REENTRANT))

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: variable.c,v 1.33 2004/04/24 09:32:58 florian Exp $";
+static char *RCSid = "$Id: variable.c,v 1.42 2006/09/15 04:06:09 mark Exp $";
 #endif
 
 /*
@@ -25,7 +25,8 @@ static char *RCSid = "$Id: variable.c,v 1.33 2004/04/24 09:32:58 florian Exp $";
  * Concept: Each REXX procedure (the top - or main - by default) has
  *  an array of hash-pointers. Routines that don't keep local
  *  variables (i.e hasn't seen a PROCEDURE) are using the hashpointers
- *  of the routine above them. The size of the array is HASHTABLENGTH.
+ *  of the routine above them. The initial size of the array is
+ *  vt->initialHashTableLength
  *
  * Each cell in this array is a pointer to a single-linked list of
  *  boxes. In common for all these boxes is that their name returns
@@ -61,14 +62,10 @@ static char *RCSid = "$Id: variable.c,v 1.33 2004/04/24 09:32:58 florian Exp $";
  * Major performance improvements without much to do which should be
  * implemented (FIXME):
  *
- * 1) Reuse the hashvalue_var's return value without mapping it to the
- *    HASHTABLENGTH size. The original return value can be used for
- *    cheap comparisions until the hashvalues match. Then the expensive
- *    comparison may happen.
- *
- * 2) Introduce a comparison function which uppercases the second argument
+ * 1) Introduce a comparison function which uppercases the second argument
  *    only. The variable box itself always has the correct case. Just the
  *    script's name of the variable may have the "wrong" case.
+ *    Check for contents when uppercasing numbers as well.
  */
 
 #include "rexx.h"
@@ -84,19 +81,20 @@ typedef struct {
 
 typedef struct { /* var_tsd: static variables of this module (thread-safe) */
 #ifdef TRACEMEM
-   variableptr   first_invalid;
+   variableptr    first_invalid;
 #endif
 #ifdef DEBUG
-   int           DoDebug;
-   char          PoolNameBuf[20];
-   Pool          NamePool;
-   Pool          ValuePool;
-   Pool          NumPool;
-   Pool          VarPool;
+   int            DoDebug;
+   FILE *         DebugFile;
+   char           PoolNameBuf[20];
+   Pool           NamePool;
+   Pool           ValuePool;
+   Pool           NumPool;
+   Pool           VarPool;
 #endif
-   int           foundflag;
-   variableptr   thespot;
-   long          current_valid;
+   int            foundflag;
+   variableptr    thespot;
+   long           current_valid;
    /* We CAN'T increment current_valid on each new procedure (which results
     * into create_new_varpool) and decrement it in procedure exit (which
     * executes kill_variables). Imagine the following:
@@ -128,28 +126,32 @@ typedef struct { /* var_tsd: static variables of this module (thread-safe) */
     * Former releases uses stupid generation counter mechanisms.
     * FGC 27.09.98 (09/27/98)
     */
-   long          next_current_valid;
-   int           subst;
-   int           hashval;
-   int           ignore_novalue;
-   int           notrace;
-   streng *      tmpindex;
-   streng *      ovalue;
-   streng *      xvalue;
-   num_descr *   odescr;
-   variableptr   pstem;
-   variableptr   ptail;
-   variableptr   rstem;
-   variableptr   rtail;
-   int           stemidx;
-   int           tailidx;
-   variableptr * var_table;
-   variableptr * pool0;
-   treenode      pool0nodes[POOL0_CNT][2];
+   long           next_current_valid;
+   int            subst;
+   unsigned       hashval;
+   unsigned       fullhash;
+   int            ignore_novalue;
+   int            notrace;
+   streng *       tmpindex;
+   streng *       ovalue;
+   streng *       xvalue;
+   num_descr *    odescr;
+   variableptr    pstem;
+   variableptr    ptail;
+   variableptr    rstem;
+   variableptr    rtail;
+   unsigned       stemidx;
+   unsigned       tailidx;
+   var_hashtable *var_table;
+   var_hashtable *pool0;
+   treenode       pool0nodes[POOL0_CNT][2];
+   int            initialHashTableLength;
 } var_tsd_t;
 
-#define GET_REAL_BOX(ptr) { for ( ; ptr->realbox; ptr = ptr->realbox ) \
-                               ;                                       \
+#define SEEK_EXPOSED(ptr) if (ptr)                                          \
+                          {                                                 \
+                             for ( ; (ptr)->realbox; ptr = (ptr)->realbox ) \
+                                ;                                           \
                           }
 #define REPLACE_VALUE(val,p) { if ( p->value )                             \
                                   Free_stringTSD( p->value );              \
@@ -165,31 +167,37 @@ typedef struct { /* var_tsd: static variables of this module (thread-safe) */
                                 }                                         \
                                 p->num = val;                             \
                                 p->guard = 0;                             \
-                                p->flag = (val) ? VFLAG_NUM : VFLAG_NONE; \
+                                p->flag = ( val ) ? VFLAG_NUM : VFLAG_NONE; \
                               }
 
 #ifdef DEBUG
 static void regina_dprintf( const tsd_t *TSD, const char *fmt, ... )
 {
    va_list marker;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->DoDebug )
       return;
    va_start( marker, fmt );
-   vfprintf( stderr, fmt, marker );
-   fflush( stderr );
+   vfprintf( vt->DebugFile, fmt, marker );
+   fflush( vt->DebugFile );
    va_end( marker );
 }
-#  define DPRINT(x) if ( vt->DoDebug ) regina_dprintf x
+#  define DPRINT(x) if ( vt->DoDebug & 1) regina_dprintf x
+#  define DPRINT_2(x) if ( vt->DoDebug & 2 ) regina_dprintf x
+#  define DPRINT_3(x) if ( vt->DoDebug & 4 ) regina_dprintf x
 #  define DSTART DPRINT(( TSD, "%2u %4d ", TSD->thread_id, __LINE__ ))
+#  define DSTART_2 DPRINT_2(( TSD, "%2u %4d ", TSD->thread_id, __LINE__ ))
+#  define DSTART_3 DPRINT_3(( TSD, "%2u %4d ", TSD->thread_id, __LINE__ ))
 #  define DEND DPRINT(( TSD, "\n" ))
+#  define DEND_2 DPRINT_2(( TSD, "\n" ))
+#  define DEND_3 DPRINT_3(( TSD, "\n" ))
 
 static const volatile char *PoolName( const tsd_t *TSD, Pool *pool,
                                       const void *elem )
 {
    unsigned i;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->DoDebug ) /* PoolName's return value isn't really used if */
       return NULL;     /* debugging is turned off. */
@@ -210,22 +218,21 @@ static const volatile char *PoolName( const tsd_t *TSD, Pool *pool,
                                                          i + 1 );
    if ( i >= pool->size )
    {
-         pool->size++;
-         if ( ( pool->Elems = realloc( pool->Elems,
-                                       pool->size * sizeof( void * ) ) ) ==
-                                                                         NULL )
-         {
-            exiterror( ERR_STORAGE_EXHAUSTED, 0 ) ;
-         }
+      pool->size++;
+      if ( ( pool->Elems = (void **)realloc( pool->Elems,
+                                    pool->size * sizeof( void * ) ) ) == NULL )
+      {
+         exiterror( ERR_STORAGE_EXHAUSTED, 0 ) ;
+      }
    }
    pool->Elems[i] = (void *) elem;
    return vt->PoolNameBuf;
 }
 
-#define DNAME(TSD,name,n) if ( vt->DoDebug ) DNAME2( TSD, name, n )
+#define DNAME(TSD,name,n) if ( vt->DoDebug & 1 ) DNAME2( TSD, name, n )
 static void DNAME2( const tsd_t *TSD, const char *name, const streng* n )
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->DoDebug )
       return;
@@ -244,10 +251,10 @@ static void DNAME2( const tsd_t *TSD, const char *name, const streng* n )
                         PoolName( TSD, &vt->NamePool, n ) );
 }
 
-#define DVALUE(TSD,name,v) if ( vt->DoDebug ) DVALUE2( TSD, name, v )
+#define DVALUE(TSD,name,v) if ( vt->DoDebug & 1 ) DVALUE2( TSD, name, v )
 static void DVALUE2( const tsd_t *TSD, const char *name, const streng* v )
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->DoDebug )
       return;
@@ -266,10 +273,10 @@ static void DVALUE2( const tsd_t *TSD, const char *name, const streng* v )
                         PoolName( TSD, &vt->ValuePool, v ) );
 }
 
-#define DNUM(TSD,name,n) if ( vt->DoDebug ) DNUM2( TSD, name, n )
+#define DNUM(TSD,name,n) if ( vt->DoDebug & 1 ) DNUM2( TSD, name, n )
 static void DNUM2( const tsd_t *TSD, const char *name, const num_descr* n)
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->DoDebug )
       return;
@@ -288,20 +295,21 @@ static void DNUM2( const tsd_t *TSD, const char *name, const num_descr* n)
                         PoolName( TSD, &vt->NumPool, n ) );
 }
 
-static int Dfindlevel(const tsd_t *TSD,cvariableptr v)
+static int Dfindlevel(const tsd_t *TSD, cvariableptr v)
 {
    proclevel curr;
-   int i, lvl=0;
+   int lvl=0;
+   unsigned i;
 
    curr = TSD->currlevel;
 
    while ( curr )
    {
-      if ( curr->vars )
+      if (curr->vars)
       {
-         for ( i = 0; i < HASHTABLENGTH; i++ )
+         for ( i = 0; i < curr->vars->size; i++ )
          {
-            if ( curr->vars[i] == v )
+            if ( curr->vars->tbl[i] == v )
                goto found;
          }
       }
@@ -318,10 +326,10 @@ found:
    return lvl;
 }
 
-#define DVAR(TSD,name,v) if ( vt->DoDebug ) DVAR2( TSD, name, v )
+#define DVAR(TSD,name,v) if ( vt->DoDebug & 1 ) DVAR2( TSD, name, v )
 static void DVAR2( const tsd_t *TSD, const char *name, cvariableptr v )
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->DoDebug )
       return;
@@ -357,38 +365,127 @@ static void DVAR2( const tsd_t *TSD, const char *name, cvariableptr v )
    regina_dprintf( TSD, ")" );
 }
 #  define DPRINTF(x) DSTART;DPRINT(x);DEND
+#  define DPRINTF_2(x) DSTART_2;DPRINT_2(x);DEND_2
+#  define DPRINTF_3(x) DSTART_3;DPRINT_3(x);DEND_3
 #  define DARG(x,y) x
 #else /* !define(DEBUG) */
 #  define DPRINT(x)
+#  define DPRINT_2(x)
+#  define DPRINT_3(x)
 #  define DSTART
+#  define DSTART_2
+#  define DSTART_3
 #  define DEND
+#  define DEND_2
+#  define DEND_3
 #  define DNAME(t,n,v)
 #  define DVALUE(t,n,v)
 #  define DNUM(t,n,v)
 #  define DVAR(t,n,v)
 #  define DPRINTF(x)
+#  define DPRINTF_2(x)
+#  define DPRINTF_3(x)
 #  define DARG(x,y) y
 #endif /* DEBUG */
 
-static const streng *getdirvalue_compound( tsd_t *TSD, variableptr *vars,
+/*
+ * NEW_HASHTABLE_CHECK is invoked after a new entry has been added to the
+ * hashtable. Do a check for this special condition and set flag to 1 if
+ * a hashtable reorganisation should happen.
+ * One (maybe wrong) idea is to increase the table if 100% has been filled.
+ * NEVER EVER USE LESS THAN 40% CAPACITY! THIS MAY BE THE LOW WATER MARK!
+ */
+#define NEW_HASHTABLE_CHECK(tbl,flag) /* */          \
+   (flag |= (((tbl)->e * 1 > (tbl)->size * 1) ? 1 : 0)) /* set to 5/4 for 80%*/
+
+/*
+ * COLLISION_CHECK is invoked after a collision has been detected.
+ * The check may happen rather often. KEEP IT SIMPLE!
+ * A hashtable reorganisation should/may happen in this case; this must be
+ * indicated by setting flag to 1.
+ * One (maybe wrong) idea is to increase the table if the number of collisions
+ * is bigger than two time of the number of read/write accesses.
+ */
+#define COLLISION_CHECK(tbl,flag) /* */                  \
+   (flag |= (((tbl)->w + (tbl)->r < (tbl)->c / 2) ? 1 : 0))
+
+
+/*
+ * The SEEK_VAR_... functions walk through the list of variable candidates
+ * in the bucket of the found hash with more or less help by other informations
+ * to minimize expensive comparisons.
+ */
+#define SEEK_VAR_CMP(run,var,fullhash,tbl,flag) /* */                         \
+   for ( ; (run); (run) = (run)->next )                                       \
+   {                                                                          \
+      if ( ( (run)->hash == (fullhash) ) &&                                   \
+           ( (run)->name->len == (var)->len ) &&                              \
+           ( Str_cmp( run->name, var ) == 0 ) )                               \
+         break;                                                               \
+                                                                              \
+      (tbl)->c++;                                                             \
+      COLLISION_CHECK(tbl, flag);                                             \
+   }
+
+#define SEEK_VAR_CCMP(run,var,fullhash,tbl,flag) /* */                        \
+   for ( ; (run); (run) = (run)->next )                                       \
+   {                                                                          \
+      if ( ( (run)->hash == (fullhash) ) &&                                   \
+           ( (run)->name->len == (var)->len ) &&                              \
+           ( Str_ccmp( run->name, var ) == 0 ) )                              \
+         break;                                                               \
+                                                                              \
+      (tbl)->c++;                                                             \
+      COLLISION_CHECK(tbl, flag);                                             \
+   }
+
+#define SEEK_VAR_CNCMP(run,var,fullhash,tbl,l,flag) /* */                     \
+   for ( ; (run); (run) = (run)->next )                                       \
+   {                                                                          \
+      if ( ( (run)->hash == (fullhash) ) &&                                   \
+           ( (run)->name->len == (l) ) &&                                     \
+           ( Str_cncmp( run->name, var, l ) == 0 ) )                          \
+         break;                                                               \
+                                                                              \
+      (tbl)->c++;                                                             \
+      COLLISION_CHECK(tbl, flag);                                             \
+   }
+
+#define SEEK_VAR_CNOCMP(run,var,fullhash,tbl,l,off,flag) /* */                \
+   for ( ; (run); (run) = (run)->next )                                       \
+   {                                                                          \
+      if ( ( (run)->hash == (fullhash) ) &&                                   \
+           ( (run)->name->len == (l) ) &&                                     \
+           ( Str_cnocmp( run->name, var, l, off ) == 0 ) )                    \
+         break;                                                               \
+                                                                              \
+      (tbl)->c++;                                                             \
+      COLLISION_CHECK(tbl, flag);                                             \
+   }
+
+static const streng *getdirvalue_compound( tsd_t *TSD, var_hashtable *vars,
                                            const streng *name );
 
 /*
  * Allocates and initializes a hashtable for the variables. Can be used
  * both for the main variable hash table, or for an compound variable.
  */
-static variableptr *make_hash_table( const tsd_t *TSD )
+static var_hashtable *make_hash_table( const tsd_t *TSD, int size )
 {
-   variableptr *retval;
-   int size;
+   var_hashtable *tab = (var_hashtable *)MallocTSD( sizeof( var_hashtable ) );
 
-   size = ( HASHTABLENGTH + 1 ) * sizeof( variableptr );
+   tab->size = size;
+   tab->r = 0;
+   tab->w = 0;
+   tab->c = 0;
+   tab->e = 0;
+   size = ( size + 1 ) * sizeof( variableptr );
    /* Last element needed to save current_valid */
 
-   retval = MallocTSD( size );
-   memset( retval, 0, size );
+   tab->tbl = (variableptr *)MallocTSD( size );
+   memset( tab->tbl, 0, size );
 
-   return retval;
+   return tab;
 }
 
 /*
@@ -427,6 +524,7 @@ int known_reserved_variable( const char *name, unsigned length )
    RET_IF( SIGL );
    RET_IF( RS );
    RET_IF( MN );
+   RET_IF( LINE );
 #undef REF_IF
 
    return POOL0_NOT_RESERVED;
@@ -435,57 +533,74 @@ int known_reserved_variable( const char *name, unsigned length )
 void detach( const tsd_t *TSD, variableptr ptr )
 {
 #ifdef DEBUG
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 #else
    TSD = TSD; /* keep compiler happy */
 #endif
 
    assert( ptr->hwired > 0 );
-/*
-#ifdef TRACEMEM
-   if ( ptr->valid )
-   {
-      if ( ptr->value )
-         Free_stringTSD( ptr->value );
-      if ( ptr->name )
-         Free_stringTSD( ptr->name );
-      if ( ptr->num )
-      {
-         FreeTSD( ptr->num->num );
-         FreeTSD( ptr->num );
-      }
-      ptr->value = ptr->name = ptr->num = NULL;
-      ptr->flag = VFLAG_NONE;
-      ptr->valid = 0;
-   }
-
-   if ( --ptr->hwired == 0 )
-   {
-      if ( ptr->prev )
-         ptr->prev->next = ptr->next;
-      if ( ptr->next )
-         ptr->next->prev = ptr->prev;
-      else
-         vt->first_invalid = ptr->prev;
-
-      FreeTSD( ptr );
-   }
-#endif
- */
 
    ptr->hwired--;
    DSTART;DPRINT((TSD,"detach:            "));DVAR(TSD,NULL,ptr);DEND;
 }
 
 #ifdef TRACEMEM
-void markvariables( const tsd_t *TSD, cproclevel procptr )
+static void mark_ht( var_hashtable *tab )
 {
    variableptr vvptr, vptr;
+   unsigned i, j;
+
+   if ( !tab )
+      return;
+
+   markmemory( (char*)tab->tbl, TRC_HASHTAB );
+   for ( i = 0; i < tab->size; i++ )
+   {
+      for ( vptr = tab->tbl[i]; vptr; vptr = vptr->next )
+      {
+         markmemory( (char*)vptr, TRC_VARBOX );
+         if ( vptr->name )
+            markmemory( (char*)vptr->name, TRC_VARNAME );
+         if ( vptr->num )
+         {
+            markmemory( vptr->num, TRC_VARVALUE );
+            markmemory( vptr->num->num, TRC_VARVALUE );
+         }
+         if ( vptr->value )
+            markmemory( (char*)vptr->value, TRC_VARVALUE );
+         if ( vptr->index )
+         {
+            markmemory( vptr->index, TRC_VARNAME );
+            for ( j = 0; j < vptr->index->size; j++ )
+            {
+               for ( vvptr = (vptr->index->tbl)[j]; vvptr; vvptr = vvptr->next )
+               {
+                  markmemory( (char*)vvptr, TRC_VARBOX );
+                  if ( vvptr->name )
+                     markmemory( (char*)vvptr->name, TRC_VARNAME );
+                  if ( vvptr->num )
+                  {
+                      markmemory( vvptr->num, TRC_VARVALUE );
+                      markmemory( vvptr->num->num, TRC_VARVALUE );
+                  }
+                  if ( vvptr->value )
+                     markmemory( (char*)vvptr->value, TRC_VARVALUE );
+               }
+            }
+         }
+      }
+   }
+
+}
+
+void markvariables( const tsd_t *TSD, cproclevel procptr )
+{
+   variableptr vptr;
    paramboxptr pptr;
-   int i, j;
+   int i;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    for ( ; procptr; procptr = procptr->next )
    {
@@ -513,42 +628,7 @@ void markvariables( const tsd_t *TSD, cproclevel procptr )
          }
       }
 
-      for ( i = 0; i < HASHTABLENGTH; i++ )
-      {
-         for ( vptr = (procptr->vars)[i]; vptr; vptr = vptr->next )
-         {
-            markmemory( (char*)vptr, TRC_VARBOX );
-            if ( vptr->name )
-               markmemory( (char*)vptr->name, TRC_VARNAME );
-            if ( vptr->num )
-            {
-               markmemory( vptr->num, TRC_VARVALUE );
-               markmemory( vptr->num->num, TRC_VARVALUE );
-            }
-            if ( vptr->value )
-               markmemory( (char*)vptr->value, TRC_VARVALUE );
-            if ( vptr->index )
-            {
-               markmemory( vptr->index, TRC_VARNAME );
-               for ( j = 0; j < HASHTABLENGTH; j++ )
-               {
-                  for ( vvptr = (vptr->index)[j]; vvptr; vvptr = vvptr->next )
-                  {
-                     markmemory( (char*)vvptr, TRC_VARBOX );
-                     if ( vvptr->name )
-                        markmemory( (char*)vvptr->name, TRC_VARNAME );
-                     if ( vvptr->num )
-                     {
-                         markmemory( vvptr->num, TRC_VARVALUE );
-                         markmemory( vvptr->num->num, TRC_VARVALUE );
-                     }
-                     if ( vvptr->value )
-                        markmemory( (char*)vvptr->value, TRC_VARVALUE );
-                  }
-               }
-            }
-         }
-      }
+      mark_ht( procptr->vars );
       markmemory( (char*)procptr,TRC_PROCBOX );
 
       markmemory( (char*)procptr->vars, TRC_HASHTAB );
@@ -563,6 +643,9 @@ void markvariables( const tsd_t *TSD, cproclevel procptr )
       }
    }
 
+   mark_ht( vt->pool0 );
+   markmemory( (char*)vt->pool0, TRC_HASHTAB );
+
    for ( vptr = vt->first_invalid; vptr; vptr = vptr->prev )
    {
       markmemory( vptr, TRC_VARBOX );
@@ -571,47 +654,48 @@ void markvariables( const tsd_t *TSD, cproclevel procptr )
 #endif /* TRACEMEM */
 
 static variableptr newbox( const tsd_t *TSD, const streng *name,
-                           streng *value, variableptr *oldptr )
+                           streng *value, variableptr *oldptr, unsigned hash)
 {
    variableptr newptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    DSTART;DPRINT((TSD,"newbox:            "));DNAME(TSD,NULL,name);DPRINT((TSD," replaces "));
           DVAR(TSD,NULL,*oldptr);DEND;
-   newptr = MallocTSD( sizeof( variable ) );
+   newptr = (variableptr)MallocTSD( sizeof( variable ) );
+
+   newptr->index = NULL;
    newptr->next = *oldptr;
    newptr->prev = NULL;
    newptr->realbox = NULL;
-   newptr->index = NULL;
-   newptr->stem = NULL;
-   newptr->num = NULL;
-   newptr->flag = value ? VFLAG_STR : VFLAG_NONE;
-   newptr->guard = 0;
-   newptr->hwired = 0;
-   newptr->valid = (long) vt->current_valid;
-
-   *oldptr = newptr;
-   newptr->value = value;
    if ( name )
       newptr->name = Str_dupTSD( name );
    else
       newptr->name = NULL;
+   newptr->value = value;
+   newptr->guard = 0;
+   newptr->num = NULL;
+   newptr->flag = value ? VFLAG_STR : VFLAG_NONE;
+   newptr->hash = hash;
+   newptr->hwired = 0;
+   newptr->valid = (long) vt->current_valid;
+   newptr->stem = NULL;
+
+   *oldptr = newptr;
    DSTART;DPRINT((TSD,"newbox:            "));DVAR(TSD,"rc",newptr);DEND;
    return newptr;
 }
 
 static variableptr make_stem( const tsd_t *TSD, const streng *name,
-                              streng *value, variableptr *oldptr, int len )
+                              streng *value, variableptr *oldptr, int len,
+                              unsigned hash )
 {
    variableptr ptr;
-#ifdef DEBUG
-   var_tsd_t *vt = TSD->var_tsd;
-#endif
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   ptr = newbox( TSD, NULL, value, oldptr );
-   ptr->index = make_hash_table( TSD );
+   ptr = newbox( TSD, NULL, value, oldptr, hash );
+   ptr->index = make_hash_table( TSD, vt->initialHashTableLength );
    DPRINTF((TSD,"make_hash_table:   rc=%p",ptr->index));
    ptr->name = Str_ndupTSD( name, len );
    DSTART;DPRINT((TSD,"makestem:          "));DVAR(TSD,"rc",ptr);DEND;
@@ -866,21 +950,31 @@ int valid_var_symbol( const streng *name )
  * Note: This is one of the most time-consuming routines. Be careful.
  * It is a define to remove one time-consuming function call.
  */
-#define hashfunc(vt,name,start,stop) (vt->hashval = ( hashvalue_var( name, \
-                                      start, stop ) & ( HASHTABLENGTH - 1 ) ) )
+#define hashfunc(vt,name,start,stop,mod) /**/ \
+      (vt->hashval = ( (vt->fullhash = hashvalue_var( name, start, stop )) % \
+                       (mod) ) )
 
-variableptr *create_new_varpool( const tsd_t *TSD )
+/*
+ * create a standard sized variable pool in a hash table.
+ */
+var_hashtable *create_new_varpool( const tsd_t *TSD, int size )
 {
-   variableptr *retval = make_hash_table( TSD );
    var_tsd_t *vt;
+   var_hashtable *retval;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
+   if (size <= 10)
+   {
+      size = vt->initialHashTableLength;
+   }
+   retval = make_hash_table( TSD, size );
 
-   DPRINTF((TSD,"make_hash_table:   rc=%p",retval));
+   DPRINTF((TSD,"make_hash_table:   rc=%p", retval));
    DPRINTF((TSD,"create_new_varpool:current_valid:new=%d, old=%d",
              vt->next_current_valid,vt->current_valid));
-   retval[HASHTABLENGTH] = (variableptr) vt->current_valid;
+   retval->tbl[size] = (variableptr) vt->current_valid;
    vt->current_valid = vt->next_current_valid++;
+
    return retval;
 }
 
@@ -888,7 +982,7 @@ void set_ignore_novalue( const tsd_t *TSD )
 {
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    vt->ignore_novalue = 1;
    DPRINTF((TSD,"set_ignore_novalue"));
 }
@@ -897,7 +991,7 @@ void clear_ignore_novalue( const tsd_t *TSD )
 {
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    vt->ignore_novalue = 0;
    DPRINTF((TSD,"clear_ignore_novalue"));
 }
@@ -912,7 +1006,7 @@ void clear_ignore_novalue( const tsd_t *TSD )
 int variables_per_SAA( tsd_t *TSD )
 {
    int retval;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    retval = vt->notrace ? 2 : 0;
    retval |= vt->ignore_novalue ? 1 : 0;
@@ -928,7 +1022,7 @@ int variables_per_SAA( tsd_t *TSD )
  */
 void restore_variable_state( const tsd_t *TSD, int state )
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    vt->notrace = ( state >> 1 ) & 1;
    vt->ignore_novalue = state & 1;
@@ -940,11 +1034,11 @@ const streng *get_it_anyway( tsd_t *TSD, const streng *str, int pool )
    const streng *ptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    vt->notrace = 1;
    vt->ignore_novalue = 1;
-   ptr = getvalue( TSD, str, pool );
+   ptr = getvalue( TSD, str, pool ); /* changes the pool */
    vt->ignore_novalue = 0;
    vt->notrace = 0;
 
@@ -961,7 +1055,7 @@ const streng *get_it_anyway_compound( tsd_t *TSD, const streng *str )
    const streng *ptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    vt->notrace = 1;
    vt->ignore_novalue = 1;
@@ -980,7 +1074,7 @@ int var_was_found( const tsd_t *TSD )
 {
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    DPRINTF((TSD,"var_was_found:     rc=%d",vt->foundflag));
    return vt->foundflag;
 }
@@ -990,9 +1084,9 @@ const streng *isvariable( tsd_t *TSD, const streng *str )
    const streng *ptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    vt->ignore_novalue = 1 ;
-   ptr = getvalue( TSD, str, -1 );
+   ptr = getvalue( TSD, str, -1 ); /* changes the pool */
    vt->ignore_novalue = 0;
    DSTART;DPRINT((TSD,"isvariable:        "));DNAME(TSD,"str",str);
           DVALUE(TSD,", rc",(vt->foundflag)?ptr:NULL);DEND;
@@ -1005,9 +1099,10 @@ const streng *isvariable( tsd_t *TSD, const streng *str )
 #ifdef TRACEMEM
 static void mark_variables( const tsd_t *TSD )
 {
+   unsigned i,j;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    markmemory( vt->tmpindex, TRC_STATIC );
    if ( vt->ovalue )
       markmemory( vt->ovalue, TRC_STATIC );
@@ -1017,6 +1112,17 @@ static void mark_variables( const tsd_t *TSD )
    {
       markmemory( vt->odescr, TRC_STATIC );
       markmemory( vt->odescr->num, TRC_STATIC );
+   }
+   for ( i = 0; i < POOL0_CNT; i++ )
+   {
+      for ( j = 0; j < 2; j++ )
+      {
+         if ( vt->pool0nodes[i][j].name != NULL )
+         {
+            markmemory( vt->pool0nodes[i][j].name, TRC_SPCV_NAME );
+
+         }
+      }
    }
 }
 #endif
@@ -1034,15 +1140,42 @@ int init_vars( tsd_t *TSD )
    if ( TSD->var_tsd != NULL )
       return 1;
 
-   if ( ( vt = TSD->var_tsd = MallocTSD( sizeof( var_tsd_t ) ) ) == NULL )
+   if ( ( TSD->var_tsd = MallocTSD( sizeof( var_tsd_t ) ) ) == NULL )
       return 0;
+   vt = (var_tsd_t *)TSD->var_tsd;
    memset( vt, 0, sizeof( var_tsd_t ) );
+   vt->initialHashTableLength = 71;
 
 #ifdef DEBUG
    {
       char junk[100];
       if ( mygetenv( TSD, "DEBUG_VARIABLE", junk, sizeof( junk ) ) != NULL )
+      {
          vt->DoDebug = 1;
+         if (rx_isdigit(junk[0]) && ((junk[1] == ',') || (junk[1] == '\0'))) {
+            vt->DoDebug = junk[0] - '0';
+         }
+         vt->DebugFile = stderr;
+         if (junk[0] && (junk[1] == ',')) {
+            if ((vt->DebugFile = fopen(junk + 2, "ab")) == NULL)
+            {
+               vt->DebugFile = stderr;
+            }
+         }
+      }
+      if ( mygetenv( TSD, "DEBUG_HASHTABLENGTH", junk, sizeof( junk ) ) != NULL )
+      {
+         int v;
+         char c;
+
+         if (sscanf(junk, "%d %c", &v, &c) == 1)
+         {
+            if ((v >= 4) && (v <= 10000))
+            {
+               vt->initialHashTableLength = v;
+            }
+         }
+      }
    }
 #endif
 
@@ -1052,7 +1185,10 @@ int init_vars( tsd_t *TSD )
    vt->current_valid = 1;
    vt->next_current_valid = 2;
    vt->tmpindex = Str_makeTSD( MAX_INDEX_LENGTH );
-   vt->pool0 = create_new_varpool( TSD );
+   /*
+    * pool 0 is not used by the user in most cases. Keep it small.
+    */
+   vt->pool0 = create_new_varpool( TSD, 17 );
 
    /*
     * .RC, .RESULT, and .SIGL have dotless counterparts.
@@ -1065,6 +1201,7 @@ int init_vars( tsd_t *TSD )
    vt->pool0nodes[POOL0_SIGL][1].name   = Str_creTSD(  "SIGL" );
    vt->pool0nodes[POOL0_RS][0].name     = Str_creTSD( ".RS" );
    vt->pool0nodes[POOL0_MN][0].name     = Str_creTSD( ".MN" );
+   vt->pool0nodes[POOL0_LINE][0].name   = Str_creTSD( ".LINE" );
    for ( i = 0; i < POOL0_CNT; i++ )
    {
       for ( j = 0; j < 2; j++ )
@@ -1084,49 +1221,32 @@ int init_vars( tsd_t *TSD )
  * will eventually be cached, since they are retrieved through the
  * shortcut() routine.
  */
-static streng *fix_index( tsd_t *TSD, nodeptr this )
+static streng *fix_index( tsd_t *TSD, nodeptr thisptr )
 {
    char *cptr;
    const streng *value;
    int osetting;
    int freespc;
    streng *large;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   assert( this ) ;
+   assert( thisptr ) ;
    osetting = vt->ignore_novalue ;
    vt->ignore_novalue = 1 ;
 
-   DPRINTF((TSD,"fix_index, start:  this=%p",this));
+   DPRINTF((TSD,"fix_index, start:  thisptr=%p",thisptr));
    freespc = vt->tmpindex->max ;
    cptr = vt->tmpindex->value ;
 
-#ifdef FANCY
-   if ( !this->p[0] )
-   {
-      assert( this->type==X_CTAIL_SYMBOL || this->type==X_VTAIL_SYMBOL) ;
-      if ( this->type == X_CTAIL_SYMBOL )
-         value = this->name ;
-      else
-      {
-         vt->subst = 1 ;
-         value = shortcut( vt->TSD, this ) ;
-      }
-
-      vt->ignore_novalue = osetting ;
-      return value ;
-   }
-#endif
-
    for ( ; ; )
    {
-      assert( this->type==X_CTAIL_SYMBOL || this->type==X_VTAIL_SYMBOL) ;
-      if ( this->type == X_CTAIL_SYMBOL )
-         value = this->name ;
+      assert( thisptr->type==X_CTAIL_SYMBOL || thisptr->type==X_VTAIL_SYMBOL) ;
+      if ( thisptr->type == X_CTAIL_SYMBOL )
+         value = thisptr->name ;
       else
       {
          vt->subst = 1 ;
-         value = shortcut( TSD, this ) ;
+         value = shortcut( TSD, thisptr ) ;
       }
 
       freespc -= value->len;
@@ -1144,8 +1264,8 @@ static streng *fix_index( tsd_t *TSD, nodeptr this )
 
       memcpy( cptr, value->value, value->len ) ;
       cptr += value->len ;
-      this = this->p[0] ;
-      if ( this )
+      thisptr = thisptr->p[0] ;
+      if ( thisptr )
          *(cptr++) = '.' ;
       else
          break ;
@@ -1153,7 +1273,7 @@ static streng *fix_index( tsd_t *TSD, nodeptr this )
    vt->tmpindex->len = cptr - vt->tmpindex->value ;
    assert( vt->tmpindex->len <= vt->tmpindex->max ) ;
    vt->ignore_novalue = osetting ;
-   DSTART;DPRINT((TSD,"fix_index, end:    this=%p, "));DVALUE(TSD,"rc",vt->tmpindex);DEND;
+   DSTART;DPRINT((TSD,"fix_index, end:    thisptr=%p, "));DVALUE(TSD,"rc",vt->tmpindex);DEND;
    return vt->tmpindex ;
 }
 
@@ -1161,7 +1281,7 @@ void expand_to_str( const tsd_t *TSD, variableptr ptr )
 {
    int flag;
 #ifdef DEBUG
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 #endif
 
    flag = ptr->flag;
@@ -1179,13 +1299,14 @@ void expand_to_str( const tsd_t *TSD, variableptr ptr )
    DSTART;DPRINT((TSD,"expand_to_str:     "));DVAR(TSD,"ptr",ptr);DEND;
 }
 
-static streng *subst_index( const tsd_t *TSD, const streng *name, int start, variableptr *vars )
+static streng *subst_index( const tsd_t *TSD, const streng *name, int start,
+                            var_hashtable *vars, int *expand )
 {
    int i=0, length=0 ;
    variableptr nptr;
    int stop;
    char *cptr=NULL ;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    assert( start < name->len ) ;
 
@@ -1195,23 +1316,12 @@ static streng *subst_index( const tsd_t *TSD, const streng *name, int start, var
 
    for ( ; ; )
    {
-      nptr = vars[hashfunc( vt, name, start, &stop )];
+      nptr = vars->tbl[hashfunc( vt, name, start, &stop, vars->size )];
+      vars->r++;
 
       length = stop - start;
-      for ( ; nptr; nptr = nptr->next )
-      {
-         if ( nptr->name->len != length )  /* lengths differ */
-            continue;
-
-         if ( Str_cnocmp( nptr->name, name, length, start ) ) /* contents differ */
-            continue;
-
-         break;
-      }
-
-      if ( nptr )
-         for ( ; nptr->realbox; nptr = nptr->realbox )
-            ;
+      SEEK_VAR_CNOCMP( nptr, name, vt->fullhash, vars, length, start, *expand );
+      SEEK_EXPOSED( nptr );
 
       if ( nptr )
          expand_to_str( TSD, nptr );
@@ -1256,8 +1366,11 @@ static streng *subst_index( const tsd_t *TSD, const streng *name, int start, var
 
 /*
  * REMOVE_ELEMENT deletes the content of a variableptr.
+ * The variable itself is NOT freed in most cases. The hollow body of the
+ * variable persists. As far as I understood my old stuff, this prevents a
+ * new variable lookup.
  */
-#define REMOVE_ELEMENT(ptr) {                                                 \
+#define REMOVE_ELEMENT(ptr, hashtbl) {                                        \
     DSTART;DPRINT((TSD,"                   "));DVAR(TSD,"ptr(del)",ptr);DEND; \
     Free_stringTSD( ptr->name );                                              \
     if ( ptr->value )                                                         \
@@ -1275,7 +1388,10 @@ static streng *subst_index( const tsd_t *TSD, const streng *name, int start, var
        TRACEMEM_RELINK( ptr );                                                \
     }                                                                         \
     else                                                                      \
+    {                                                                         \
        FreeTSD( ptr );                                                        \
+       (hashtbl)->e--;                                                        \
+    }                                                                         \
  }
 
 /*
@@ -1284,19 +1400,22 @@ static streng *subst_index( const tsd_t *TSD, const streng *name, int start, var
  * to, are not affected.
  * The stem's index itself is freed, too.
  */
-static void remove_foliage( const tsd_t *TSD, variableptr *index )
+static void remove_foliage( const tsd_t *TSD, var_hashtable *index )
 {
 #if defined(DEBUG) || defined(TRACEMEM)
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
+   unsigned start = index->e;
 #endif
-   int i;
+   unsigned i;
    variableptr ptr, tptr;
 
    DPRINTF((TSD,"remove_foliage:    ?"));
 
-   for ( i = 0; i < HASHTABLENGTH; i++ )
+   assert(index);
+
+   for ( i = 0; i < index->size; i++ )
    {
-      if ( ( ptr = index[i] ) == NULL )
+      if ( ( ptr = index->tbl[i] ) == NULL )
          continue;
 
       do {
@@ -1317,12 +1436,16 @@ static void remove_foliage( const tsd_t *TSD, variableptr *index )
             remove_foliage( TSD, ptr->index );
          }
 
-         REMOVE_ELEMENT( ptr );
+         REMOVE_ELEMENT( ptr, index );
 
          ptr = tptr;
       } while ( ptr != NULL );
    }
-   DSTART;DPRINT((TSD,"                   kill=%p",index));DEND;
+   FreeTSD( index->tbl );
+   DPRINTF((TSD,"                   kill=%p",index));
+   DPRINTF_2((TSD,"STATISTICS:        %u(%u) in %u buckets, %u r, %u w, %u colls",
+                          index->e, start, index->size, index->r,
+                          index->w, index->c));
    FreeTSD( index );
 }
 
@@ -1342,24 +1465,27 @@ static void remove_foliage( const tsd_t *TSD, variableptr *index )
  * technique which allows us to lookup such values (we don't delete the realbox
  * chain). On the other hand we really remove local variables to save space.
  */
-static void assign_foliage( const tsd_t *TSD, variableptr *index,
+static void assign_foliage( const tsd_t *TSD, var_hashtable *index,
                             const streng *val )
 {
 #if defined(DEBUG) || defined(TRACEMEM)
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 #endif
-   int i;
+   unsigned i;
    streng *copy;
    variableptr ptr, tptr, *queue, real;
+   streng *nullptr = NULL; /* allow REPLACE_VALUE macro to pass NULL value under C++ */
 
    DPRINTF((TSD,"assign_foliage:    ?"));
 
-   for ( i = 0; i < HASHTABLENGTH; i++ )
+   assert(index);
+
+   for ( i = 0; i < index->size; i++ )
    {
-      if ( ( ptr = index[i] ) == NULL )
+      if ( ( ptr = index->tbl[i] ) == NULL )
          continue;
 
-      queue = &(index[i]);
+      queue = &index->tbl[i];
 
       do {
          /*
@@ -1376,8 +1502,8 @@ static void assign_foliage( const tsd_t *TSD, variableptr *index,
 
          if ( ptr->realbox )
          {
-            for ( real = ptr; real->realbox; real = real->realbox )
-                  ;
+            real = ptr;
+            SEEK_EXPOSED(real);
             if ( val )
             {
                copy = Str_dupTSD( val );
@@ -1386,7 +1512,7 @@ static void assign_foliage( const tsd_t *TSD, variableptr *index,
             }
             else if ( real->value )
             {
-               REPLACE_VALUE( NULL, real );
+               REPLACE_VALUE( nullptr, real );
                DSTART;DPRINT((TSD,"                   "));DVAR(TSD,"real(now)",real);DEND;
             }
 
@@ -1397,7 +1523,7 @@ static void assign_foliage( const tsd_t *TSD, variableptr *index,
          {
             if ( val == NULL )
             {
-               REMOVE_ELEMENT( ptr );
+               REMOVE_ELEMENT( ptr, index );
             }
             else
             {
@@ -1418,35 +1544,114 @@ static void assign_foliage( const tsd_t *TSD, variableptr *index,
 #undef REMOVE_ELEMENT
 #undef TRACEMEM_RELINK
 
-static variableptr findsimple( const tsd_t *TSD, const variableptr *vars,
-                               const streng *name )
+/*
+ * reorgHashtable reorganises the hash table vars if a potential for better
+ * results in the future is seen.
+ * returns 0 if the table has its original structure.
+ * returns 1 if the table has been reorganised.
+ */
+static int reorgHashtable( const tsd_t *TSD, var_hashtable *vars )
+{
+   int f1 = 0, f2 = 0;
+   unsigned newSize, i;
+   variableptr *newTbl, *dest;
+   variableptr thisptr, run;
+#ifdef DEBUG
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
+#endif
+
+   NEW_HASHTABLE_CHECK( vars, f1 );
+   COLLISION_CHECK( vars, f2 );
+   if ( !(f1 | f2 ) )
+   {
+      /*
+       * May happen in case of f2 where a ->r or ->w is set after the
+       * collision detection. Ignore it. That is no bug.
+       */
+      DPRINTF_2((TSD,"reorgHashtable:    %p/%p: BLIND ALERT", vars, vars->tbl));
+      return 0;
+   }
+
+   /*
+    * Try to use a low water mark of 33% capacity. If the collisions are
+    * the reason, go below 25% capacity.
+    */
+   newSize = vars->e * ( ( f2 ) ? 4 : 3 );
+   if ( vars->size >= newSize )
+   {
+      /*
+       * We can't help. Check the stupid hashfunc() in this case.
+       */
+      DPRINTF_2((TSD,"reorgHashtable:    %p/%p: heavy collisions %u",
+                     vars, vars->tbl, vars->c));
+      vars->r = 0;
+      vars->w = 0;
+      vars->c = 0;
+      return 0;
+   }
+
+   newTbl = (variableptr *)MallocTSD( sizeof(variableptr) * newSize );
+   memset( newTbl, 0, sizeof(variableptr) * newSize );
+   DPRINTF((TSD,"reorgHashtable:    %p -> %p (%u)",
+                vars->tbl,newTbl,newSize));
+   DPRINTF_2((TSD,"reorgHashtable:    changing size of %p/%p (%u) to %p/%p (%u), c=%u(%d)",
+                  vars,vars->tbl,vars->size,vars,newTbl,newSize, vars->c,f2));
+
+   for ( i = 0; i < vars->size; i++ )
+   {
+      run = vars->tbl[i];
+
+      while ( run )
+      {
+         thisptr = run;
+         run = run->next;
+
+         dest = newTbl + (thisptr->hash % newSize);
+         if (*dest)
+         {
+            (*dest)->prev = thisptr;
+         }
+         thisptr->next = *dest;
+         *dest = thisptr;
+         thisptr->prev = NULL;
+      }
+   }
+
+   FreeTSD( vars->tbl );
+   vars->tbl = newTbl;
+   vars->size = newSize;
+   vars->r = 0;
+   vars->w = 0;
+   vars->c = 0;
+   return 1;
+}
+
+static variableptr findsimple( const tsd_t *TSD, var_hashtable *vars,
+                               const streng *name, int *expand )
 {
    variableptr ptr;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   ptr = vars[hashfunc( vt, name, 0, NULL)];
-   for ( ; ptr && Str_ccmp(ptr->name,name); ptr = ptr->next )
-      ;
-   DSTART;DPRINT((TSD,"findsimple(1):     "));DNAME(TSD,"name",name);DVAR(TSD,", ptr",ptr);DEND;
-   if ( ( vt->thespot = ptr ) != NULL )
-   {
-      for ( ; ptr->realbox; ptr = ptr->realbox )
-         ;
-   }
+   ptr = vars->tbl[hashfunc( vt, name, 0, NULL, vars->size)];
+   SEEK_VAR_CCMP( ptr, name, vt->fullhash, vars, *expand );
+   SEEK_EXPOSED( ptr );
+
    vt->thespot = ptr;
-   DSTART;DPRINT((TSD,"findsimple(2):     "));DNAME(TSD,"name",name);
+   DSTART;DPRINT((TSD,"findsimple:        "));DNAME(TSD,"name",name);
           DVAR(TSD,", vt->thespot=ptr",ptr);DEND;
 
    return ptr;
 }
 
-static void setvalue_simple( const tsd_t *TSD, variableptr *vars,
-                             const streng *name, streng *value )
+static int setvalue_simple( const tsd_t *TSD, var_hashtable *vars,
+                            const streng *name, streng *value )
 {
    variableptr ptr;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   ptr = findsimple( TSD, vars, name );
+   vars->w++;
+   ptr = findsimple( TSD, vars, name, &rehash );
    if ( ptr )
    {
       vt->foundflag = ptr->flag & VFLAG_BOTH;
@@ -1456,19 +1661,33 @@ static void setvalue_simple( const tsd_t *TSD, variableptr *vars,
    else
    {
       vt->foundflag = 0;
-      vt->thespot = newbox( TSD, name, value, &vars[vt->hashval] );
+      vt->thespot = newbox( TSD, name, value, &vars->tbl[vt->hashval],
+                            vt->fullhash );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
       DSTART;DPRINT((TSD,"setvalue_simple:   "));DVAR(TSD,"new, vt->thespot",ptr);DEND;
    }
+   if ( rehash )
+   {
+      return reorgHashtable( TSD, vars );
+   }
+   return 0;
 }
 
-static const streng *getvalue_simple( tsd_t *TSD, variableptr *vars,
+static const streng *getvalue_simple( tsd_t *TSD, var_hashtable *vars,
                                       const streng *name )
 {
    variableptr ptr;
    const streng *value;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   ptr = findsimple( TSD, vars, name );
+   vars->r++;
+   ptr = findsimple( TSD, vars, name, &rehash );
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+   }
 
    vt->foundflag =  ptr && ( ptr->flag & VFLAG_BOTH );
 
@@ -1493,15 +1712,17 @@ static const streng *getvalue_simple( tsd_t *TSD, variableptr *vars,
    return value;
 }
 
-static void setvalue_stem( const tsd_t *TSD, variableptr *vars,
-                           const streng *name, streng *value )
+static int setvalue_stem( const tsd_t *TSD, var_hashtable *vars,
+                          const streng *name, streng *value )
 {
    variableptr ptr;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"setvalue_stem:     ?"));
 
-   ptr = findsimple( TSD, vars, name );
+   vars->w++;
+   ptr = findsimple( TSD, vars, name, &rehash );
 
    if ( ptr )
    {
@@ -1513,54 +1734,82 @@ static void setvalue_stem( const tsd_t *TSD, variableptr *vars,
    else
    {
       vt->foundflag = 0;
-      make_stem( TSD, name, value, &vars[vt->hashval], name->len );
+      make_stem( TSD, name, value, &vars->tbl[vt->hashval], name->len,
+                 vt->fullhash );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
    }
    vt->thespot = NULL;
+   if ( rehash )
+   {
+      return reorgHashtable( TSD, vars );
+   }
+   return 0;
 }
 
-static void setvalue_compound( tsd_t *TSD, variableptr *vars,
-                               const streng *name, streng *value )
+static int setvalue_compound( tsd_t *TSD, var_hashtable *vars,
+                              const streng *name, streng *value )
 {
    variableptr ptr, nptr, *nnptr, *pptr;
-   int stop;
+   int stop, rehash = 0, rehashIdx = 0;
    streng *indexstr;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"setvalue_compound: ?"));
    vt->foundflag = 0 ;
-   pptr = &vars[hashfunc( vt, name, 0, &stop )];
+   pptr = &vars->tbl[hashfunc( vt, name, 0, &stop, vars->size )];
    stop++;
-   for ( ptr = *pptr;  ptr && Str_cncmp( ptr->name, name, stop ); ptr = ptr->next )
-      ;
+   ptr = *pptr;
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, stop, rehash );
+   SEEK_EXPOSED( ptr );
 
    if ( !ptr )
-      ptr = make_stem( TSD, name, NULL, pptr, stop );
+   {
+      ptr = make_stem( TSD, name, NULL, pptr, stop, vt->fullhash );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
+      vars->w++;
+   }
+   else
+   {
+      vars->r++;
+   }
 
-   for ( ; ptr->realbox; ptr = ptr->realbox )
-      ;
-   indexstr = subst_index( TSD, name, stop, vars );
+   indexstr = subst_index( TSD, name, stop, vars, &rehash );
+
+   if ( rehash )
+   {
+      rehash = reorgHashtable( TSD, vars );
+   }
 
    if ( vt->subst )   /* trace it */
       tracecompound( TSD, name, stop - 1, indexstr, 'C' );
 
-   nnptr = &((ptr->index)[hashfunc( vt, indexstr, 0, NULL )]);
-   for ( nptr = *nnptr; nptr && Str_cmp( nptr->name, indexstr ); nptr = nptr->next )
-      ;
+   vars->w++;
+   nnptr = &(ptr->index->tbl[hashfunc( vt, indexstr, 0, NULL, ptr->index->size )]);
+   nptr = *nnptr;
+   SEEK_VAR_CMP( nptr, indexstr, vt->fullhash, ptr->index, rehashIdx );
+   SEEK_EXPOSED( nptr );
 
    if ( nptr )
    {
-      for ( ; nptr->realbox; nptr = nptr->realbox )
-         ;
       vt->foundflag = nptr && ( nptr->flag & VFLAG_BOTH ) ;
       REPLACE_VALUE( value, nptr );
    }
    else
    {
-      newbox( TSD, indexstr, value, nnptr );
+      newbox( TSD, indexstr, value, nnptr, vt->fullhash );
+      ptr->index->e++;
+      NEW_HASHTABLE_CHECK( ptr->index, rehashIdx );
       (*nnptr)->stem = ptr;
    }
 
-   vt->thespot = NULL ;
+   vt->thespot = NULL;
+   if ( rehashIdx )
+   {
+      rehashIdx = reorgHashtable( TSD, ptr->index );
+   }
+   return rehash | rehashIdx;
 }
 
 /* JH 20-10-99 */  /* To make Direct setting of stems Direct and not Symbolic. */
@@ -1578,12 +1827,13 @@ static void setvalue_compound( tsd_t *TSD, variableptr *vars,
  *
  *
  ****************************************************************************/
-static void setdirvalue_compound( tsd_t *TSD, variableptr *vars,
-                                  const streng *name, streng *value )
+static int setdirvalue_compound( tsd_t *TSD, var_hashtable *vars,
+                                 const streng *name, streng *value )
 {
    variableptr ptr, nptr, *nnptr, *pptr;
+   int rehash = 0, rehashIdx = 0;
    int stop;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"setdirvalue_compound: ?"));
    vt->foundflag = 0;
@@ -1591,118 +1841,163 @@ static void setdirvalue_compound( tsd_t *TSD, variableptr *vars,
    /*
     * Get a good starting point, and find the stem/index separater.
     */
-   pptr = &vars[hashfunc( vt, name, 0, &stop )];
+   pptr = &vars->tbl[hashfunc( vt, name, 0, &stop, vars->size )];
    stop++;
 
    /*
     * Find the stem in the variable pool.
     */
-   for ( ptr = *pptr; ptr && Str_cncmp( ptr->name, name, stop ); ptr = ptr->next )
-      ;
+   ptr = *pptr;
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, stop, rehash );
+   SEEK_EXPOSED( ptr );
 
    /*
     * If the stem does not exist, make one.
     */
    if ( !ptr )
-      ptr = make_stem( TSD, name, NULL, pptr, stop );
+   {
+      ptr = make_stem( TSD, name, NULL, pptr, stop, vt->fullhash );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
+      vars->w++;
+   }
+   else
+   {
+      vars->r++;
+   }
 
-   /*
-    * Back up through the EXPOSE chain 'til get to the real variable.
-    */
-   for ( ; ptr->realbox; ptr = ptr->realbox )
-      ;
+   if ( rehash )
+   {
+      rehash = reorgHashtable( TSD, vars );
+   }
 
    vt->tmpindex->len = 0;
    vt->tmpindex = Str_nocatTSD( vt->tmpindex, name, name->len - stop, stop );
 
    /*
-    * FIXME, FGC: vt->subst from "if" removed, but wat shall we do here really?
+    * FIXME, FGC: vt->subst from "if" removed, but what shall we do here really?
     */
    if ( !vt->notrace )   /* trace it */
       tracecompound( TSD, name, stop - 1, vt->tmpindex, 'C' );
 
-   nnptr = &((ptr->index)[hashfunc( vt, vt->tmpindex, 0, NULL)]);
-   for ( nptr = *nnptr; nptr && Str_cmp( nptr->name, vt->tmpindex ); nptr = nptr->next )
-      ;
+   nnptr = &((ptr->index->tbl)[hashfunc( vt, vt->tmpindex, 0, NULL,
+                                         ptr->index->size)]);
+   vars->r++;
+   nptr = *nnptr;
+   SEEK_VAR_CMP( nptr, vt->tmpindex, vt->fullhash, ptr->index, rehashIdx );
+   SEEK_EXPOSED( nptr );
 
    if ( nptr )
    {
-      for ( ; nptr->realbox; nptr = nptr->realbox )
-         ;
       vt->foundflag = nptr && ( nptr->flag & VFLAG_BOTH );
       REPLACE_VALUE( value, nptr );
    }
    else
    {
-      newbox( TSD, vt->tmpindex, value, nnptr );
+      newbox( TSD, vt->tmpindex, value, nnptr, vt->fullhash );
+      ptr->index->e++;
+      NEW_HASHTABLE_CHECK( ptr->index, rehashIdx );
       (*nnptr)->stem = ptr;
    }
 
    vt->thespot = NULL;
+   if ( rehashIdx )
+   {
+      rehashIdx = reorgHashtable( TSD, ptr->index );
+   }
+   return rehash | rehashIdx;
 }
 
-static void expose_simple( const tsd_t *TSD, variableptr *vars,
+static void expose_simple( const tsd_t *TSD, var_hashtable *vars,
                            const streng *name )
 {
-   int hashv;
+   unsigned hashv, hashn;
    variableptr ptr;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   hashv = hashfunc( vt, name, 0, NULL );
-   ptr = vt->var_table[hashv];
-   for ( ; ptr && Str_ccmp( ptr->name, name ); ptr = ptr->next )
-      ;
+   hashv = hashfunc( vt, name, 0, NULL, vt->var_table->size );
+   ptr = vt->var_table->tbl[hashv];
+   vt->var_table->r++;
+   SEEK_VAR_CCMP( ptr, name, vt->fullhash, vt->var_table, rehash );
+
    if ( ptr )  /* hey, you just exposed that one! */
       return;
 
-   ptr = vars[hashv];
-   for ( ; ptr && Str_ccmp( ptr->name, name ); ptr = ptr->next )
-      ;
-   for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-      ;
+   rehash = 0; /* ignore here */
+   hashn = vt->fullhash % vars->size;
+   ptr = vars->tbl[hashn];
+   vars->w++;
+   SEEK_VAR_CCMP( ptr, name, vt->fullhash, vars, rehash );
+   SEEK_EXPOSED( ptr );
 
    if ( !ptr )
    {
-      newbox( TSD, name, NULL, &vars[hashv] );
+      newbox( TSD, name, NULL, &vars->tbl[hashn], vt->fullhash );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
+      ptr = vars->tbl[hashn];
    }
 
-   newbox( TSD, name, NULL, &vt->var_table[hashv] );
-   vt->var_table[hashv]->realbox = ( ptr ) ? ptr : vars[hashv];
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
+
+   newbox( TSD, name, NULL, &vt->var_table->tbl[hashv], vt->fullhash );
+   vt->var_table->e++;
+   NEW_HASHTABLE_CHECK( vt->var_table, rehash );
+   vt->var_table->tbl[hashv]->realbox = ptr;
    /*
     * exposing is done after create_new_varpool/assignment of current_valid:
     */
-   vt->var_table[hashv]->realbox->valid = vt->current_valid;
+   vt->var_table->tbl[hashv]->realbox->valid = vt->current_valid;
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vt->var_table );
+   }
 
    DSTART;DPRINT((TSD,"expose_simple:     "));DNAME(TSD,"name",name);DEND;
 }
 
-static void expose_stem( const tsd_t *TSD, variableptr *vars,
+static void expose_stem( const tsd_t *TSD, var_hashtable *vars,
                          const streng *name )
 {
    variableptr ptr,tptr;
-   int hashv,junk;
-   var_tsd_t *vt = TSD->var_tsd;
+   unsigned hashv, hashn;
+   int junk, rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"expose_stem:       ?"));
-   hashv = hashfunc(vt, name, 0, &junk );
-   ptr = vt->var_table[hashv];
-   for ( ; ptr && Str_ccmp( ptr->name, name ); ptr = ptr->next )
-      ;
+   hashv = hashfunc(vt, name, 0, &junk, vt->var_table->size );
+   ptr = vt->var_table->tbl[hashv];
+   vt->var_table->r++;
+   SEEK_VAR_CCMP( ptr, name, vt->fullhash, vt->var_table, rehash );
+
    if ( ptr && ptr->realbox )
       return; /* once is enough !!! */
 
-   tptr = vars[hashv];
-   for ( ; tptr && Str_ccmp( tptr->name, name ); tptr = tptr->next )
-      ;
-   for ( ; tptr && tptr->realbox; tptr = tptr->realbox )
-      ;
+   rehash = 0;
+   hashn = vt->fullhash % vars->size;
+   tptr = vars->tbl[hashn];
+   vars->w++;
+   SEEK_VAR_CCMP( tptr, name, vt->fullhash, vars, rehash );
+   SEEK_EXPOSED( tptr );
 
    if ( !tptr )
    {
-      newbox( TSD, name, NULL, &vars[hashv] );
-      tptr = vars[hashv];
-      tptr->index = make_hash_table( TSD );
+      newbox( TSD, name, NULL, &vars->tbl[hashn], vt->fullhash );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
+      tptr = vars->tbl[hashn];
+      tptr->index = make_hash_table( TSD, vt->initialHashTableLength );
       DPRINTF((TSD,"make_hash_table:   rc=%p",tptr->index));
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
    }
 
    if ( ptr )
@@ -1721,110 +2016,161 @@ static void expose_stem( const tsd_t *TSD, variableptr *vars,
    }
    else
    {
-      newbox( TSD, name, NULL, &vt->var_table[hashv] );
-      vt->var_table[hashv]->realbox = tptr; /* dont need ->index */
+      newbox( TSD, name, NULL, &vt->var_table->tbl[hashv], vt->fullhash );
+      vt->var_table->e++;
+      NEW_HASHTABLE_CHECK( vt->var_table, rehash );
+      vt->var_table->tbl[hashv]->realbox = tptr; /* dont need ->index */
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vt->var_table );
    }
 }
 
-static void expose_compound( tsd_t *TSD, variableptr *vars,
+static void expose_compound( tsd_t *TSD, var_hashtable *vars,
                              const streng *name )
 {
-   int hashv, length, hashval2;
+   unsigned hashv, hashn, fh, hashv2, hashn2;
+   int length, rehash = 0;
+
    variableptr ptr, nptr, tptr, tiptr;
    int cptr;
    streng *indexstr;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"expose_compound:   ?"));
-   hashv = hashfunc( vt, name, 0, &cptr );
-   ptr = vt->var_table[hashv];
+   hashv = hashfunc( vt, name, 0, &cptr, vt->var_table->size );
+   ptr = vt->var_table->tbl[hashv];
    length = ++cptr;
-   for ( ; ptr && Str_cncmp( ptr->name, name, length ); ptr = ptr->next )
-      ;
+   vt->var_table->r++;
+   fh = vt->fullhash;
+   SEEK_VAR_CNCMP( ptr, name, fh, vt->var_table, length, rehash );
    if ( ptr && ptr->realbox )
       return; /* whole array already exposed */
 
+   hashn = fh % vars->size;
    if ( !ptr ) /* array does not exist */
    {
-      make_stem( TSD, name, NULL, &vt->var_table[hashv], length );
-      ptr = vt->var_table[hashv];
+      make_stem( TSD, name, NULL, &vt->var_table->tbl[hashv], length, fh );
+      vt->var_table->e++;
+      NEW_HASHTABLE_CHECK( vt->var_table, rehash );
+      ptr = vt->var_table->tbl[hashv];
    }
 
-   indexstr = subst_index( TSD, name, cptr, vt->var_table );
+   indexstr = subst_index( TSD, name, cptr, vt->var_table, &rehash );
+
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vt->var_table );
+      rehash = 0;
+   }
 
    if ( vt->subst )   /* trace it */
       tracecompound( TSD, name, cptr - 1, indexstr, 'C');
 
-   hashval2 = hashfunc( vt, indexstr, 0, NULL );
-   nptr = ptr->index[hashval2];
-   for ( ; nptr && Str_cmp( nptr->name, indexstr ); nptr = nptr->next )
-      ;
+   hashv2 = hashfunc( vt, indexstr, 0, NULL, ptr->index->size );
+   nptr = ptr->index->tbl[hashv2];
+   ptr->index->r++;
+   SEEK_VAR_CMP( nptr, indexstr, vt->fullhash, ptr->index, rehash );
+
    if ( nptr && nptr->realbox )
-      return; /* can't your remember *anything* !!! */
+      return;
    else
    {
-      newbox( TSD, indexstr, NULL, &ptr->index[hashval2] );
-      nptr = ptr->index[hashval2];
+      newbox( TSD, indexstr, NULL, &ptr->index->tbl[hashv2], vt->fullhash );
+      ptr->index->e++;
+      NEW_HASHTABLE_CHECK( ptr->index, rehash );
+      nptr = ptr->index->tbl[hashv2];
       nptr->stem = ptr;
    }
-
-   tptr = vars[hashv];
-   for ( ; tptr && Str_cncmp( tptr->name, name, length ); tptr = tptr->next )
-      ;
-   for ( ; tptr && tptr->realbox; tptr = tptr->realbox )
-      ;
-   if ( !tptr )
+   if ( rehash )
    {
-      make_stem( TSD, name, NULL, &vars[hashv], length );
-      tptr = vars[hashv];
+      reorgHashtable( TSD, ptr->index );
+      rehash = 0;
    }
 
-   tiptr = tptr->index[hashval2];
-   for ( ; tiptr && Str_cmp( tiptr->name, indexstr ); tiptr = tiptr->next )
-      ;
-   for ( ; tiptr && tiptr->realbox; tiptr = tiptr->realbox )
-      ;
+   tptr = vars->tbl[hashn];
+   vars->w++;
+   SEEK_VAR_CNCMP( tptr, name, fh, vars, length, rehash );
+   SEEK_EXPOSED( tptr );
+
+   if ( !tptr )
+   {
+      make_stem( TSD, name, NULL, &vars->tbl[hashn], length, fh );
+      vars->e++;
+      NEW_HASHTABLE_CHECK( vars, rehash );
+      tptr = vars->tbl[hashn];
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
+
+   hashn2 = vt->fullhash % tptr->index->size;
+   tiptr = tptr->index->tbl[hashn2];
+   tptr->index->w++;
+   SEEK_VAR_CMP( tiptr, indexstr, vt->fullhash, tptr->index, rehash );
+   SEEK_EXPOSED( tiptr );
+
    if ( !tiptr )
    {
-      newbox( TSD, indexstr, NULL, &tptr->index[hashval2] );
-      tiptr = tptr->index[hashval2];
+      /*
+       * hopefully no new setting of vt->fullhash has happened during the last
+       * lines.
+       */
+      newbox( TSD, indexstr, NULL, &tptr->index->tbl[hashn2], vt->fullhash );
+      tptr->index->e++;
+      NEW_HASHTABLE_CHECK( tptr->index, rehash );
+      tiptr = tptr->index->tbl[hashn2];
       tiptr->stem = tptr;
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, tptr->index );
    }
 
    nptr->realbox = tiptr;
 }
 
-static const streng *getvalue_compound( tsd_t *TSD, variableptr *vars,
+static const streng *getvalue_compound( tsd_t *TSD, var_hashtable *vars,
                                         const streng *name )
 {
-   int hashv, baselength;
+   int baselength;
+   int rehash = 0;
+   unsigned hashv;
    variableptr ptr, nptr;
    streng *value;
    streng *indexstr;
    int stop;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"getvalue_compound: ?"));
-   hashv = hashfunc( vt, name, 0, &stop );
-   ptr = vars[hashv];
+   hashv = hashfunc( vt, name, 0, &stop, vars->size );
+   ptr = vars->tbl[hashv];
    baselength = ++stop;
-   for ( ; ptr && Str_cncmp( ptr->name, name, baselength ); ptr = ptr->next )
-      ;
-   for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-      ;
-   indexstr = subst_index( TSD, name, stop, vars );
-   hashv = hashfunc( vt, indexstr, 0, NULL );
+   vars->r++;
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, baselength, rehash );
+   SEEK_EXPOSED( ptr );
+
+   indexstr = subst_index( TSD, name, stop, vars, &rehash );
+
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
 
    if ( vt->subst && !vt->notrace )   /* trace it */
       tracecompound( TSD, name, baselength - 1, indexstr, 'C' );
 
    if ( ptr )
-   {   /* find specific value */
-      nptr = ((variableptr *)(ptr->index))[hashv];
-      for ( ; nptr && Str_cmp( nptr->name, indexstr ); nptr = nptr->next )
-         ;
-      for ( ; nptr && nptr->realbox; nptr = nptr->realbox )
-         ;
+   {
+      hashv = hashfunc( vt, indexstr, 0, NULL, ptr->index->size );
+      nptr = ptr->index->tbl[hashv];
+      ptr->index->r++;
+      SEEK_VAR_CMP( nptr, indexstr, vt->fullhash, ptr->index, rehash );
+      SEEK_EXPOSED( nptr );
 
       if ( !nptr )   /* find default value */
          nptr = ptr;
@@ -1836,6 +2182,10 @@ static const streng *getvalue_compound( tsd_t *TSD, variableptr *vars,
    {
       vt->foundflag = 0;
       nptr = NULL;
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, ptr->index );
    }
 
    if ( vt->foundflag )
@@ -1872,61 +2222,55 @@ static const streng *getvalue_compound( tsd_t *TSD, variableptr *vars,
  *
  *
  ****************************************************************************/
-static const streng *getdirvalue_compound( tsd_t *TSD, variableptr *vars,
+static const streng *getdirvalue_compound( tsd_t *TSD, var_hashtable *vars,
                                            const streng *name )
 {
-   int hashv, baselength;
+   int baselength, rehash = 0;
+   unsigned hashv;
    variableptr ptr, nptr;
    streng *value;
    int stop;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"getdirvalue_compound: ?"));
    /*
     * Get a good starting point, and find the stem/index separater.
     */
-   hashv = hashfunc( vt, name, 0, &stop );
-   ptr = vars[hashv];
+   hashv = hashfunc( vt, name, 0, &stop, vars->size );
+   ptr = vars->tbl[hashv];
    baselength = ++stop;
+   vars->r++;
    /*
     * Find the stem in the variable pool.
     */
-   for ( ; ptr && Str_cncmp( ptr->name, name, baselength ); ptr = ptr->next )
-      ;
-   /*
-    * Back up through the EXPOSE chain 'til get to the real variable.
-    */
-   for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-      ;
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, baselength, rehash );
+   SEEK_EXPOSED( ptr );
+
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
+
    vt->tmpindex->len = 0;
    vt->tmpindex = Str_nocatTSD( vt->tmpindex, name, name->len - stop, stop );
-   /*
-    * Set up to look for this name in the stem's variable pool.
-    */
-   hashv = hashfunc( vt, vt->tmpindex, 0, NULL );
 
    /*
-    * FIXME, FGC: vt->subst from "if" removed, but wat shall we do here really?
+    * FIXME, FGC: vt->subst from "if" removed, but what shall we do here really?
     */
    if ( !vt->notrace )   /* trace it */
       tracecompound( TSD, name, baselength - 1, vt->tmpindex, 'C' );
 
    if ( ptr )
    {
-      /*
-       * Get a good starting place for the index name.
-       */
-      nptr = ((variableptr *)(ptr->index))[hashv];
+      hashv = hashfunc( vt, vt->tmpindex, 0, NULL, ptr->index->size );
+      nptr = ptr->index->tbl[hashv];
+      ptr->index->r++;
       /*
        * Find the index in the variable pool.
        */
-      for ( ; nptr && Str_cmp( nptr->name, vt->tmpindex ); nptr = nptr->next )
-         ;
-      /*
-       * Back up through the EXPOSE chain 'til get to the real variable.
-       */
-      for ( ; nptr && nptr->realbox; nptr = nptr->realbox )
-         ;
+      SEEK_VAR_CMP( nptr, vt->tmpindex, vt->fullhash, ptr->index, rehash );
+      SEEK_EXPOSED( nptr );
 
       /*
        * If the stem exists, but the index doesn't, this counts as found.
@@ -1941,6 +2285,10 @@ static const streng *getdirvalue_compound( tsd_t *TSD, variableptr *vars,
    {
       vt->foundflag = 0;
       nptr = NULL;
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, ptr->index );
    }
 
 
@@ -1966,10 +2314,10 @@ static const streng *getdirvalue_compound( tsd_t *TSD, variableptr *vars,
  * may be -1 for "autoselect". *isRes is set to 1 if the name is a reserved
  * variable, 0 otherwise.
  */
-static variableptr *getPool( const tsd_t *TSD, const streng *name, int pool,
-                             int *isRes )
+static var_hashtable *getPool( const tsd_t *TSD, const streng *name, int pool,
+                               int *isRes )
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
    sysinfo s;
    proclevel p;
 
@@ -2037,7 +2385,7 @@ static variableptr *getPool( const tsd_t *TSD, const streng *name, int pool,
 void setvalue( tsd_t *TSD, const streng *name, streng *value, int pool )
 {
    int i, isRes, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    assert( value->len <= value->max );
 
@@ -2081,13 +2429,13 @@ void setdirvalue( tsd_t *TSD, const streng *name, streng *value )
 {
    var_tsd_t *vt;
    int i, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    assert( value->len <= value->max );
 
    if ( KNOWN_RESERVED( name->value, len ) )
    {
-      vt = TSD->var_tsd;
+      vt = (var_tsd_t *)TSD->var_tsd;
       setvalue_simple( TSD, vt->pool0, name, value );
    }
    else
@@ -2109,8 +2457,8 @@ void setdirvalue( tsd_t *TSD, const streng *name, streng *value )
 void expose_var( tsd_t *TSD, const streng *name )
 {
    int i, len;
-   variableptr *vars;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_hashtable *vars;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    if ( !vt->var_table )
    {
@@ -2118,7 +2466,7 @@ void expose_var( tsd_t *TSD, const streng *name )
        * First call to expose_var of X_PROC in interpret().
        * Open a new table.
        */
-      vt->var_table = create_new_varpool( TSD );
+      vt->var_table = create_new_varpool( TSD, 0 );
    }
 
    if ( !name )
@@ -2155,7 +2503,7 @@ void expose_var( tsd_t *TSD, const streng *name )
 const streng *getvalue( tsd_t *TSD, const streng *name, int pool )
 {
    int i, isRes, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    vars = getPool( TSD, name, pool, &isRes );
 
@@ -2189,11 +2537,11 @@ const streng *getdirvalue( tsd_t *TSD, const streng *name )
 {
    var_tsd_t *vt;
    int i, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    if ( ( i = KNOWN_RESERVED( name->value, len ) ) != 0 )
    {
-      vt = TSD->var_tsd;
+      vt = (var_tsd_t *)TSD->var_tsd;
       return getvalue_simple( TSD, vt->pool0, name );
    }
 
@@ -2208,13 +2556,15 @@ const streng *getdirvalue( tsd_t *TSD, const streng *name )
    return getdirvalue_compound( TSD, vars, name );
 }
 
-static void drop_var_simple( const tsd_t *TSD, variableptr *vars,
+static void drop_var_simple( const tsd_t *TSD, var_hashtable *vars,
                              const streng *name )
 {
    variableptr ptr;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   ptr = findsimple( TSD, vars, name );
+   vars->w++;
+   ptr = findsimple( TSD, vars, name, &rehash );
    DSTART;DPRINT((TSD,"drop_var_simple:   "));DNAME(TSD,"name",name);DVAR(TSD,", var",ptr);
           DEND;
 
@@ -2235,16 +2585,22 @@ static void drop_var_simple( const tsd_t *TSD, variableptr *vars,
          ptr->num = NULL;
       }
    }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+   }
 }
 
-static void drop_var_stem( const tsd_t *TSD, variableptr *vars,
+static void drop_var_stem( const tsd_t *TSD, var_hashtable *vars,
                            const streng *name )
 {
    variableptr ptr;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"drop_var_stem:     ?"));
-   ptr = findsimple( TSD, vars, name );
+   vars->w++;
+   ptr = findsimple( TSD, vars, name, &rehash );
 
    vt->foundflag = 0;
    if ( ptr )
@@ -2267,40 +2623,54 @@ static void drop_var_stem( const tsd_t *TSD, variableptr *vars,
       if ( ptr->index )
          assign_foliage( TSD, ptr->index, NULL );
    }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+   }
 }
 
-static void drop_var_compound( tsd_t *TSD, variableptr *vars,
+static void drop_var_compound( tsd_t *TSD, var_hashtable *vars,
                                const streng *name )
 {
-   int hashv, baselength;
+   int baselength;
+   unsigned hashv;
    variableptr ptr, nptr=NULL;
    streng *indexstr;
-   int stop;
-   var_tsd_t *vt = TSD->var_tsd;
+   int stop, rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"drop_var_compound: ?"));
-   hashv = hashfunc( vt, name, 0, &stop );
-   ptr = vars[hashv];
+   hashv = hashfunc( vt, name, 0, &stop, vars->size );
+   ptr = vars->tbl[hashv];
    baselength = ++stop;
+   vars->r++;
 
-   for ( ; ptr && Str_cncmp( ptr->name, name, baselength ); ptr = ptr->next )
-      ;
-   for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-      ;
-   indexstr = subst_index( TSD, name, stop, vars );
-   hashv = hashfunc( vt, indexstr, 0, NULL );
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, baselength, rehash );
+   SEEK_EXPOSED( ptr );
+
+   indexstr = subst_index( TSD, name, stop, vars, &rehash );
+
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
 
    if ( vt->subst && !vt->notrace )   /* trace it */
       tracecompound( TSD, name, baselength - 1, indexstr, 'C' );
 
    if ( ptr )
    {
-      nptr = ((variableptr *)(ptr->index))[hashv];
-      for ( ; nptr && Str_cmp( nptr->name, indexstr ); nptr = nptr->next )
-         ;
-      for ( ; nptr && nptr->realbox; nptr = nptr->realbox )
-         ;
+      hashv = hashfunc( vt, indexstr, 0, NULL, ptr->index->size );
+      nptr = ptr->index->tbl[hashv];
+      ptr->index->w++;
+      SEEK_VAR_CMP( nptr, indexstr, vt->fullhash, ptr->index, rehash );
+      SEEK_EXPOSED( nptr );
 
+      if ( rehash )
+      {
+         reorgHashtable( TSD, ptr->index );
+      }
    }
 
    vt->foundflag = nptr && ( nptr->flag & VFLAG_BOTH );
@@ -2346,25 +2716,32 @@ static void drop_var_compound( tsd_t *TSD, variableptr *vars,
  *
  *
  ****************************************************************************/
-static void drop_dirvar_compound( tsd_t *TSD, variableptr *vars,
+static void drop_dirvar_compound( tsd_t *TSD, var_hashtable *vars,
                                   const streng *name )
 {
-   int hashv, baselength;
+   int baselength;
+   unsigned hashv;
    variableptr ptr, nptr=NULL;
-   int stop;
-   var_tsd_t *vt = TSD->var_tsd;
+   int stop, rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"drop_dirvar_compound: ?"));
-   hashv = hashfunc( vt, name, 0, &stop );
-   ptr = vars[hashv];
+   hashv = hashfunc( vt, name, 0, &stop, vars->size );
+   ptr = vars->tbl[hashv];
    baselength = ++stop;
-   for ( ; ptr && Str_cncmp( ptr->name, name, baselength ); ptr = ptr->next )
-      ;
-   for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-      ;
+   vars->r++;
+
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, baselength, rehash );
+   SEEK_EXPOSED( ptr );
+
    vt->tmpindex->len = 0;
    vt->tmpindex = Str_nocatTSD( vt->tmpindex, name, name->len - stop, stop );
-   hashv = hashfunc( vt, vt->tmpindex, 0, NULL );
+
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
 
    /*
     * FIXME, FGC: vt->subst isn't set anywhere.
@@ -2373,12 +2750,17 @@ static void drop_dirvar_compound( tsd_t *TSD, variableptr *vars,
       tracecompound( TSD, name, baselength - 1, vt->tmpindex, 'C' );
 
    if ( ptr )
-   {   /* find specific value */
-      nptr = ((variableptr *)(ptr->index))[hashv];
-      for ( ; nptr && Str_cmp( nptr->name, vt->tmpindex ); nptr = nptr->next )
-         ;
-      for ( ; nptr && nptr->realbox; nptr = nptr->realbox )
-         ;
+   {
+      hashv = hashfunc( vt, vt->tmpindex, 0, NULL, ptr->index->size );
+      nptr = ptr->index->tbl[hashv];
+      ptr->index->w++;
+      SEEK_VAR_CMP( nptr, vt->tmpindex, vt->fullhash, ptr->index, rehash );
+      SEEK_EXPOSED( nptr );
+
+      if ( rehash )
+      {
+         reorgHashtable( TSD, ptr->index );
+      }
    }
 
    vt->foundflag = nptr && ( nptr->flag & VFLAG_BOTH );
@@ -2412,11 +2794,11 @@ void drop_var( tsd_t *TSD, const streng *name )
 {
    var_tsd_t *vt;
    int i, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    if ( ( i = KNOWN_RESERVED( name->value, len ) ) != 0 )
    {
-      vt = TSD->var_tsd;
+      vt = (var_tsd_t *)TSD->var_tsd;
       drop_var_simple( TSD, vt->pool0, name );
    }
    else
@@ -2449,11 +2831,11 @@ void drop_dirvar( tsd_t *TSD, const streng *name )
 {
    var_tsd_t *vt;
    int i, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    if ( ( i = KNOWN_RESERVED( name->value, len ) ) != 0 )
    {
-      vt = TSD->var_tsd;
+      vt = (var_tsd_t *)TSD->var_tsd;
       drop_var_simple( TSD, vt->pool0, name );
    }
    else
@@ -2472,25 +2854,25 @@ void drop_dirvar( tsd_t *TSD, const streng *name )
    }
 }
 
-static void upper_var_simple( tsd_t *TSD, variableptr *vars,
+static void upper_var_simple( tsd_t *TSD, var_hashtable *vars,
                               const streng *name )
 {
    variableptr ptr;
    streng *value=NULL;
-   var_tsd_t *vt = TSD->var_tsd;
+   int rehash = 0;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
-   ptr = findsimple( TSD, vars, name );
+   vars->w++;
+   ptr = findsimple( TSD, vars, name, &rehash );
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+   }
 
    vt->foundflag = ptr && (ptr->flag & VFLAG_BOTH );
 
    if ( ptr )
    {
-      /*
-       * If its a number, don't try and uppercase it! TBD
-       * FGC, FIXME: Why? Can't understand the comment. Last checked on
-       *             12.12.2003, if response until end 2004 delete this
-       *             comments both!
-       */
       expand_to_str( TSD, ptr );
    }
 
@@ -2514,38 +2896,49 @@ static void upper_var_simple( tsd_t *TSD, variableptr *vars,
           DVALUE(TSD," rc",value);DEND;
 }
 
-static void upper_var_compound( tsd_t *TSD, variableptr *vars,
+static void upper_var_compound( tsd_t *TSD, var_hashtable *vars,
                                 const streng *name )
 {
-   int hashv, baselength;
+   int baselength, rehash = 0;
+   unsigned hashv;
    variableptr ptr, nptr;
    streng *indexstr;
    streng *value;
    int stop;
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"upper_var_compound: ?"));
 
-   hashv = hashfunc( vt, name, 0, &stop );
-   ptr = vars[hashv];
+   hashv = hashfunc( vt, name, 0, &stop, vars->size );
+   ptr = vars->tbl[hashv];
    baselength = ++stop;
-   for ( ; ptr && Str_cncmp( ptr->name, name, baselength ); ptr = ptr->next )
-      ;
-   for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-      ;
-   indexstr = subst_index( TSD, name, stop, vars );
-   hashv = hashfunc( vt, indexstr, 0, NULL );
+   vars->r++;
+   SEEK_VAR_CNCMP( ptr, name, vt->fullhash, vars, baselength, rehash );
+   SEEK_EXPOSED( ptr);
+
+   indexstr = subst_index( TSD, name, stop, vars, &rehash );
+
+   if ( rehash )
+   {
+      reorgHashtable( TSD, vars );
+      rehash = 0;
+   }
 
    if ( vt->subst && !vt->notrace )   /* trace it */
       tracecompound( TSD, name, baselength - 1, indexstr, 'C' );
 
    if ( ptr )
    {
-      nptr = ((variableptr *)(ptr->index))[hashv];
-      for ( ; nptr && Str_cmp( nptr->name, indexstr ); nptr = nptr->next )
-         ;
-      for ( ; nptr && nptr->realbox; nptr = nptr->realbox )
-         ;
+      hashv = hashfunc( vt, indexstr, 0, NULL, ptr->index->size );
+      nptr = ptr->index->tbl[hashv];
+      ptr->index->w++;
+      SEEK_VAR_CMP( nptr, indexstr, vt->fullhash, ptr->index, rehash );
+      SEEK_EXPOSED( nptr );
+
+      if ( rehash )
+      {
+         reorgHashtable( TSD, ptr->index );
+      }
    }
    else
       nptr = NULL;
@@ -2553,12 +2946,6 @@ static void upper_var_compound( tsd_t *TSD, variableptr *vars,
    vt->foundflag = nptr && ( nptr->flag & VFLAG_BOTH );
    if ( nptr )
    {
-      /*
-       * If its a number, don't try and uppercase it! TBD
-       * FGC, FIXME: Why? Can't understand the comment. Last checked on
-       *             12.12.2003, if response until end 2004 delete this
-       *             comments both!
-       */
       expand_to_str( TSD, nptr );
    }
    if ( vt->foundflag )
@@ -2577,18 +2964,17 @@ static void upper_var_compound( tsd_t *TSD, variableptr *vars,
    }
 
    vt->thespot = NULL;
-   return;
 }
 
 void upper_var( tsd_t *TSD, const streng *name )
 {
    var_tsd_t *vt;
    int i, len=Str_len( name );
-   variableptr *vars;
+   var_hashtable *vars;
 
    if ( ( i = KNOWN_RESERVED( name->value, len ) ) != 0 )
    {
-      vt = TSD->var_tsd;
+      vt = (var_tsd_t *)TSD->var_tsd;
       upper_var_simple( TSD, vt->pool0, name );
    }
    else
@@ -2603,19 +2989,23 @@ void upper_var( tsd_t *TSD, const streng *name )
       else if ( i + 1 == len )
          exiterror( ERR_INVALID_STEM, 0 );
       else
+      {
+         set_ignore_novalue( TSD );
          upper_var_compound( TSD, vars, name );
+         clear_ignore_novalue( TSD );
+      }
    }
 }
 
-void kill_variables( const tsd_t *TSD, variableptr *array )
+void kill_variables( const tsd_t *TSD, var_hashtable *array )
 {
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    DPRINTF((TSD,"kill_variables:    current_valid:old=%ld, new=%ld",
-            vt->current_valid,(long) array[HASHTABLENGTH]));
+            vt->current_valid,(long) array->tbl[array->size]));
 
-   vt->current_valid = (long) array[HASHTABLENGTH];
+   vt->current_valid = (long) array->tbl[array->size];
 
    remove_foliage( TSD, array );
 
@@ -2631,25 +3021,24 @@ void kill_variables( const tsd_t *TSD, variableptr *array )
  * established, if possible.
  * Note: This is one of the most time-consuming routines. Be careful.
  */
-const streng *shortcut( tsd_t *TSD, nodeptr this )
+const streng *shortcut( tsd_t *TSD, nodeptr thisptr )
 {
    const streng *result;
    char ch;
    variableptr vptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
-   DSTART;DPRINT((TSD,"shortcut:          "));DNAME(TSD,"this->name",this->name);DEND;
-   if ( ( vptr = this->u.varbx ) != NULL )
+   DSTART;DPRINT((TSD,"shortcut:          "));DNAME(TSD,"thisptr->name",thisptr->name);DEND;
+   if ( ( vptr = thisptr->u.varbx ) != NULL )
    {
       if ( vptr->valid == vt->current_valid )
       {
          DSTART;DPRINT((TSD,"shortcut:          "));DVAR(TSD,"valid vptr",vptr);
                 DPRINT((TSD," on start"));DEND;
          ch = 'V';
-         for ( ; vptr && vptr->realbox; vptr = vptr->realbox )
-            ;
+         SEEK_EXPOSED( vptr );
          if ( vptr->flag & VFLAG_STR )
             result = vptr->value;
          else if ( vptr->flag & VFLAG_NUM )
@@ -2689,17 +3078,20 @@ const streng *shortcut( tsd_t *TSD, nodeptr this )
                else
                   vt->first_invalid = vptr->prev;
 #endif
+               /*
+                * See comment on REMOVE_ELEMENT why we just remove the body
+                */
                FreeTSD( vptr );
             }
-         this->u.varbx = NULL;
+         thisptr->u.varbx = NULL;
       }
    }
 
-   result = getvalue( TSD, this->name, -1 );
+   result = getvalue( TSD, thisptr->name, -1 ); /* changes the pool */
    if ( vt->thespot )
    {
       vt->thespot->hwired++;
-      this->u.varbx = vt->thespot;
+      thisptr->u.varbx = vt->thespot;
    }
 
    DSTART;DPRINT((TSD,"shortcut:          "));DVAR(TSD,"new vt->thespot",vt->thespot);DEND;
@@ -2708,7 +3100,7 @@ const streng *shortcut( tsd_t *TSD, nodeptr this )
    return result;
 }
 
-num_descr *shortcutnum( tsd_t *TSD, nodeptr this )
+num_descr *shortcutnum( tsd_t *TSD, nodeptr thisptr )
 {
    variableptr vptr;
    num_descr *result;
@@ -2716,17 +3108,16 @@ num_descr *shortcutnum( tsd_t *TSD, nodeptr this )
    char ch;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
-   DSTART;DPRINT((TSD,"shortcutnum:       "));DNAME(TSD,"this->name",this->name);DEND;
-   if ( ( vptr = this->u.varbx ) != NULL )
+   DSTART;DPRINT((TSD,"shortcutnum:       "));DNAME(TSD,"thisptr->name",thisptr->name);DEND;
+   if ( ( vptr = thisptr->u.varbx ) != NULL )
    {
       if ( vptr->valid == vt->current_valid )
       {
          DSTART;DPRINT((TSD,"shortcutnum:       "));DVAR(TSD,"valid vptr",vptr);
                 DPRINT((TSD," on start"));DEND;
-         for ( ; vptr && vptr->realbox; vptr = vptr->realbox )
-            ;
+         SEEK_EXPOSED( vptr );
          ch = 'V';
          if ( vptr->flag & VFLAG_NUM )
          {
@@ -2752,9 +3143,9 @@ num_descr *shortcutnum( tsd_t *TSD, nodeptr this )
          {
             result = NULL;
             if ( TSD->trace_stat == 'I' )
-               tracevalue( TSD, this->name, 'L' );
+               tracevalue( TSD, thisptr->name, 'L' );
             if ( !vt->ignore_novalue )
-               condition_hook( TSD, SIGNAL_NOVALUE, 0, 0, -1, Str_dupTSD( this->name ), NULL );
+               condition_hook( TSD, SIGNAL_NOVALUE, 0, 0, -1, Str_dupTSD( thisptr->name ), NULL );
          }
          DSTART;DPRINT((TSD,"shortcutnum:       "));DVAR(TSD,"valid vptr",vptr);
                 DPRINT((TSD," on end"));DEND;
@@ -2776,17 +3167,20 @@ num_descr *shortcutnum( tsd_t *TSD, nodeptr this )
                else
                   vt->first_invalid = vptr->prev;
 #endif
-               FreeTSD( this->u.varbx );
+               /*
+                * See comment on REMOVE_ELEMENT why we just remove the body
+                */
+               FreeTSD( thisptr->u.varbx );
             }
-         this->u.varbx = NULL;
+         thisptr->u.varbx = NULL;
       }
    }
 
-   resstr = getvalue( TSD, this->name, -1 );
+   resstr = getvalue( TSD, thisptr->name, -1 ); /* changes the pool */
    if ( vt->thespot )
    {
       vt->thespot->hwired++;
-      this->u.varbx = vt->thespot;
+      thisptr->u.varbx = vt->thespot;
       if ( vt->thespot->num )
       {
          if ( vt->thespot->flag & VFLAG_NUM )
@@ -2820,25 +3214,24 @@ num_descr *shortcutnum( tsd_t *TSD, nodeptr this )
 /*
  * Note: This is one of the most time-consuming routines. Be careful.
  */
-void setshortcut( tsd_t *TSD, nodeptr this, streng *value )
+void setshortcut( tsd_t *TSD, nodeptr thisptr, streng *value )
 {
    variableptr vptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    assert( !value || value->len <= value->max );
-   DSTART;DPRINT((TSD,"setshortcut:       "));DNAME(TSD,"this->name",this->name);
+   DSTART;DPRINT((TSD,"setshortcut:       "));DNAME(TSD,"thisptr->name",thisptr->name);
           DVALUE(TSD,", value",value);DEND;
 
-   if ( ( vptr = this->u.varbx ) != NULL )
+   if ( ( vptr = thisptr->u.varbx ) != NULL )
    {
       if ( vptr->valid == vt->current_valid )
       {
          DSTART;DPRINT((TSD,"setshortcut:       "));DVAR(TSD,"valid vptr",vptr);
                 DPRINT((TSD," on start"));DEND;
-         for ( ; vptr && vptr->realbox; vptr = vptr->realbox )
-            ;
+         SEEK_EXPOSED( vptr );
          if ( vptr->value )
             Free_stringTSD( vptr->value );
          if ( vptr->num )
@@ -2868,17 +3261,20 @@ void setshortcut( tsd_t *TSD, nodeptr this, streng *value )
                else
                   vt->first_invalid = vptr->prev;
 #endif
-               FreeTSD( this->u.varbx );
+               /*
+                * See comment on REMOVE_ELEMENT why we just remove the body
+                */
+               FreeTSD( thisptr->u.varbx );
             }
-         this->u.varbx = NULL;
+         thisptr->u.varbx = NULL;
       }
    }
 
-   setvalue( TSD, this->name, value, -1 );
+   setvalue( TSD, thisptr->name, value, -1 );
    if ( vt->thespot )
    {
       vt->thespot->hwired++;
-      this->u.varbx = vt->thespot;
+      thisptr->u.varbx = vt->thespot;
    }
    DSTART;DPRINT((TSD,"setshortcut:       "));DVAR(TSD,"vt->thespot",vt->thespot);
           DPRINT((TSD," on end"));DEND;
@@ -2890,25 +3286,24 @@ void setshortcut( tsd_t *TSD, nodeptr this, streng *value )
  * string_val is non-NULL, string_val is used instead. string_val must not
  * be used later.
  */
-void setshortcutnum( tsd_t *TSD, nodeptr this, num_descr *value,
+void setshortcutnum( tsd_t *TSD, nodeptr thisptr, num_descr *value,
                      streng *string_val )
 {
    variableptr vptr;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    assert( value->size );
 
-   DSTART;DPRINT((TSD,"setshortcutnum:    "));DNAME(TSD,"this->name",this->name);
+   DSTART;DPRINT((TSD,"setshortcutnum:    "));DNAME(TSD,"thisptr->name",thisptr->name);
           DNUM(TSD,", value",value);DEND;
-   if ( ( vptr = this->u.varbx ) != NULL )
+   if ( ( vptr = thisptr->u.varbx ) != NULL )
    {
       if ( vptr->valid == vt->current_valid )
       {
          DSTART;DPRINT((TSD,"setshortcutnum:    "));DVAR(TSD,"valid vptr",vptr);
                 DPRINT((TSD," on start"));DEND;
-         for ( ; vptr && vptr->realbox; vptr = vptr->realbox )
-            ;
+         SEEK_EXPOSED( vptr );
          if ( vptr->num )
          {
             FreeTSD( vptr->num->num );
@@ -2940,15 +3335,18 @@ void setshortcutnum( tsd_t *TSD, nodeptr this, num_descr *value,
                else
                   vt->first_invalid = vptr->prev;
 #endif
-               FreeTSD( this->u.varbx );
+               /*
+                * See comment on REMOVE_ELEMENT why we just remove the body
+                */
+               FreeTSD( thisptr->u.varbx );
              }
-         this->u.varbx = NULL;
+         thisptr->u.varbx = NULL;
       }
    }
 
    if ( string_val == NULL )
       string_val = str_norm( TSD, value, NULL );
-   setvalue( TSD, this->name, string_val, -1 );
+   setvalue( TSD, thisptr->name, string_val, -1 );
    if ( vt->thespot )
    {
       vt->thespot->hwired++;
@@ -2962,7 +3360,7 @@ void setshortcutnum( tsd_t *TSD, nodeptr this, num_descr *value,
          vt->thespot->num = value;
          vt->thespot->flag |= VFLAG_NUM;
       }
-      this->u.varbx = vt->thespot;
+      thisptr->u.varbx = vt->thespot;
    }
    else
    {
@@ -2970,26 +3368,27 @@ void setshortcutnum( tsd_t *TSD, nodeptr this, num_descr *value,
       FreeTSD( value );
    }
    DSTART;DPRINT((TSD,"setshortcutnum:    "));DVAR(TSD,"vt->thespot",vt->thespot);DEND;
-   DSTART;DPRINT((TSD,"setshortcutnum:    "));DVAR(TSD,"this->u.varbx",this->u.varbx);
+   DSTART;DPRINT((TSD,"setshortcutnum:    "));DVAR(TSD,"thisptr->u.varbx",thisptr->u.varbx);
           DPRINT((TSD," on end"));DEND;
 }
 
-streng *fix_compound( tsd_t *TSD, nodeptr this, streng *new )
+streng *fix_compound( tsd_t *TSD, nodeptr thisptr, streng *newstr )
 {
    variableptr iptr,ptr;
    streng *value=NULL;
    streng *indeks;
-   int hhash,thash;
+   unsigned hhash, thash, hfh = 0;
+   int rehash = 0, rehashIdx = 0;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    DPRINTF((TSD,"fix_compound:      ?"));
    value = NULL;
-   hhash = -400000;   /* Intentionally erroneous */
+   hhash = (unsigned) -1;   /* Intentionally erroneous */
 
-   assert( !new || new->len <= new->max );
+   assert( !newstr || newstr->len <= newstr->max );
 
-   iptr = this->u.varbx;
+   iptr = thisptr->u.varbx;
    if ( iptr )
    {
       if ( iptr->valid != vt->current_valid )
@@ -2999,70 +3398,79 @@ streng *fix_compound( tsd_t *TSD, nodeptr this, streng *new )
 #ifdef TRACEMEM
             if ( iptr->prev )
                iptr->prev->next = iptr->next;
-            if ( this->u.varbx->next )
+            if ( thisptr->u.varbx->next )
                iptr->next->prev = iptr->prev;
             else
                vt->first_invalid = iptr->prev;
 #endif
+            /*
+             * See comment on REMOVE_ELEMENT why we just remove the body
+             */
             FreeTSD( iptr );
          }
-         iptr = this->u.varbx = NULL;
+         iptr = thisptr->u.varbx = NULL;
       }
    }
 
    if ( !iptr )
    {
-      hhash = hashfunc( vt, this->name, 0, NULL );
-      iptr = TSD->currlevel->vars[hhash];
+      hhash = hashfunc( vt, thisptr->name, 0, NULL, TSD->currlevel->vars->size );
+      iptr = TSD->currlevel->vars->tbl[hhash];
+      hfh = vt->fullhash;
+      TSD->currlevel->vars->r++;
       /*
        * The stem's name is uppercased both in the parsing tree as in our
        * variable pool --> no need to Str_ccmp the elements.
        */
-      for ( ; iptr && Str_cmp( iptr->name, this->name ); iptr = iptr->next )
-         ;
-      for ( ; iptr && iptr->realbox; iptr = iptr->realbox )
-         ;
+      SEEK_VAR_CMP( iptr, thisptr->name, hfh, TSD->currlevel->vars, rehash );
+      SEEK_EXPOSED( iptr );
 
       if ( iptr )
       {
-         this->u.varbx = iptr;
+         thisptr->u.varbx = iptr;
          iptr->hwired++;
       }
-      else if ( new && this->p[0] )
+      else if ( newstr && thisptr->p[0] )
       {
-         setvalue_simple( TSD, TSD->currlevel->vars, this->name, NULL );
+         if ( setvalue_simple( TSD, TSD->currlevel->vars, thisptr->name, NULL ) )
+         {
+            rehash = 0;
+            hhash = hfh % TSD->currlevel->vars->size;
+         }
          iptr = vt->thespot;
-         iptr->index = make_hash_table( TSD );
+         iptr->index = make_hash_table( TSD, vt->initialHashTableLength );
          DPRINTF((TSD,"make_hash_table:   rc=%p",iptr->index));
       }
+
    }
 
-   assert( this->p[0] );
-   indeks = fix_index( TSD, this->p[0] );
+   assert( thisptr->p[0] );
+   indeks = fix_index( TSD, thisptr->p[0] );
 
    if ( vt->subst )
-      tracecompound( TSD, this->name, this->name->len - 1, indeks, 'C' );
+      tracecompound( TSD, thisptr->name, thisptr->name->len - 1, indeks, 'C' );
 
    if ( iptr )
    {
-      thash = hashfunc( vt, indeks, 0, NULL );
-      ptr = iptr->index[thash];
-      for ( ; ptr && Str_cmp( ptr->name, indeks ); ptr = ptr->next )
-         ;
-      for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-         ;
+      thash = hashfunc( vt, indeks, 0, NULL, iptr->index->size );
+      ptr = iptr->index->tbl[thash];
+      iptr->index->w++;
+      SEEK_VAR_CMP( ptr, indeks, vt->fullhash, iptr->index, rehashIdx );
+      SEEK_EXPOSED( ptr );
 
-      if ( new )
+      if ( newstr )
       {
          vt->foundflag = ptr != NULL;
          if ( vt->foundflag )
          {
-            REPLACE_VALUE( new, ptr );
+            REPLACE_VALUE( newstr, ptr );
          }
          else
          {
-            newbox( TSD, indeks, new, &iptr->index[thash] );
-            iptr->index[thash]->stem = iptr;
+            newbox( TSD, indeks, newstr, &iptr->index->tbl[thash], vt->fullhash );
+            iptr->index->e++;
+            NEW_HASHTABLE_CHECK( iptr->index, rehashIdx );
+            iptr->index->tbl[thash]->stem = iptr;
          }
       }
       else
@@ -3095,28 +3503,43 @@ streng *fix_compound( tsd_t *TSD, nodeptr this, streng *new )
    }
    else
    {
-      if ( new )
+      if ( newstr )
       {
-         iptr = newbox( TSD, this->name, NULL, &TSD->currlevel->vars[hhash] );
-         iptr->index = make_hash_table( TSD );
+         iptr = newbox( TSD, thisptr->name, NULL,
+                        &TSD->currlevel->vars->tbl[hhash], hfh );
+         TSD->currlevel->vars->e++;
+         NEW_HASHTABLE_CHECK( TSD->currlevel->vars, rehash );
+         iptr->index = make_hash_table( TSD, vt->initialHashTableLength );
          DPRINTF((TSD,"make_hash_table:   rc=%p",iptr->index));
-         thash = hashfunc( vt, indeks, 0, NULL );
-         newbox( TSD, indeks, new, &iptr->index[thash] );
-         iptr->index[thash]->stem = iptr;
+         thash = hashfunc( vt, indeks, 0, NULL, iptr->index->size );
+         iptr->index->w++;
+         newbox( TSD, indeks, newstr, &iptr->index->tbl[thash], vt->fullhash );
+         iptr->index->e++;
+         NEW_HASHTABLE_CHECK( iptr->index, rehashIdx );
+         iptr->index->tbl[thash]->stem = iptr;
       }
       else
       {
 the_default:
          if ( vt->xvalue )
             Free_stringTSD( vt->xvalue );
-         vt->xvalue = Str_makeTSD( this->name->len + indeks->len );
-         vt->xvalue = Str_catTSD( vt->xvalue, this->name );
+         vt->xvalue = Str_makeTSD( thisptr->name->len + indeks->len );
+         vt->xvalue = Str_catTSD( vt->xvalue, thisptr->name );
          vt->xvalue = Str_catTSD( vt->xvalue, indeks );
          tracevalue( TSD, vt->xvalue, 'L' );
          if ( !vt->ignore_novalue )
             condition_hook( TSD, SIGNAL_NOVALUE, 0, 0, -1, Str_dupTSD( vt->xvalue ), NULL ) ;
          value = vt->xvalue;
       }
+   }
+
+   if ( rehashIdx )
+   {
+      reorgHashtable( TSD, iptr->index );
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, TSD->currlevel->vars );
    }
 
    assert( !value || value->len <= value->max );
@@ -3132,21 +3555,22 @@ the_default:
  * The current or new value of the variable is returned in all cases, it may
  * be NULL.
  */
-num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
+num_descr *fix_compoundnum( tsd_t *TSD, nodeptr thisptr, num_descr *newdescr,
                             streng *string_val )
 {
    variableptr iptr, ptr;
    num_descr *value;
    streng *indeks;
-   int hhash, thash;
+   int rehash = 0, rehashIdx = 0;
+   unsigned hhash, hfh = 0, thash;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
    DPRINTF((TSD,"fix_compoundnum:   ?"));
    value = NULL;
-   thash = hhash = -400000;   /* Intentionally erroneous */
+   thash = hhash = 0x12345678;   /* Intentionally errorneous */
 
-   iptr = this->u.varbx;
+   iptr = thisptr->u.varbx;
    if ( iptr )
    {
       if ( iptr->valid != vt->current_valid )
@@ -3156,72 +3580,80 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
 #ifdef TRACEMEM
             if ( iptr->prev )
                iptr->prev->next = iptr->next;
-            if ( this->u.varbx->next )
+            if ( thisptr->u.varbx->next )
                iptr->next->prev = iptr->prev;
             else
                vt->first_invalid = iptr->prev;
 #endif
+            /*
+             * See comment on REMOVE_ELEMENT why we just remove the body
+             */
             FreeTSD( iptr );
          }
-         iptr = this->u.varbx = NULL;
+         iptr = thisptr->u.varbx = NULL;
       }
    }
 
    if ( !iptr )
    {
-      hhash = hashfunc( vt, this->name, 0, NULL );
-      iptr = TSD->currlevel->vars[hhash];
+      hhash = hashfunc( vt, thisptr->name, 0, NULL, TSD->currlevel->vars->size );
+      iptr = TSD->currlevel->vars->tbl[hhash];
+      hfh = vt->fullhash;
+      TSD->currlevel->vars->r++;
       /*
        * The stem's name is uppercased both in the parsing tree as in our
        * variable pool --> no need to Str_ccmp the elements.
        */
-      for ( ; iptr && Str_cmp( iptr->name, this->name ); iptr = iptr->next )
-         ;
-      for ( ; iptr && iptr->realbox; iptr = iptr->realbox )
-         ;
+      SEEK_VAR_CMP( iptr, thisptr->name, hfh, TSD->currlevel->vars, rehash );
+      SEEK_EXPOSED( iptr );
 
       if ( iptr )
       {
-         this->u.varbx = iptr;
+         thisptr->u.varbx = iptr;
          iptr->hwired++;
       }
-      if ( !iptr && new && this->p[0] )
+      else if ( newdescr && thisptr->p[0] )
       {
-         setvalue_simple( TSD, TSD->currlevel->vars, this->name, NULL );
+         if ( setvalue_simple( TSD, TSD->currlevel->vars, thisptr->name, NULL ) )
+         {
+            rehash = 0;
+            hhash = hfh % TSD->currlevel->vars->size;
+         }
          iptr = vt->thespot;
-         iptr->index = make_hash_table( TSD );
+         iptr->index = make_hash_table( TSD, vt->initialHashTableLength );
          DPRINTF((TSD,"make_hash_table:   rc=%p",iptr->index));
       }
    }
 
-   assert( this->p[0] );
-   indeks = fix_index( TSD, this->p[0] );
+   assert( thisptr->p[0] );
+   indeks = fix_index( TSD, thisptr->p[0] );
 
    if ( vt->subst )
-      tracecompound( TSD, this->name, this->name->len - 1, indeks, 'C' );
+      tracecompound( TSD, thisptr->name, thisptr->name->len - 1, indeks, 'C' );
 
    if ( iptr )
    {
-      thash = hashfunc( vt, indeks, 0, NULL );
-      ptr = iptr->index[thash];
-      for ( ; ptr && Str_cmp( ptr->name, indeks ); ptr = ptr->next )
-         ;
-      for ( ; ptr && ptr->realbox; ptr = ptr->realbox )
-         ;
+      thash = hashfunc( vt, indeks, 0, NULL, iptr->index->size );
+      ptr = iptr->index->tbl[thash];
+      iptr->index->w++;
+      SEEK_VAR_CMP( ptr, indeks, vt->fullhash, iptr->index, rehashIdx );
+      SEEK_EXPOSED( ptr );
 
-      if ( new )
+      if ( newdescr )
       {
          vt->foundflag = ptr != NULL;
          if ( vt->foundflag )
          {
-            REPLACE_NUMBER( new, ptr );
+            REPLACE_NUMBER( newdescr, ptr );
          }
          else
          {
-            newbox( TSD, indeks, NULL, &iptr->index[thash] );
-            ptr = iptr->index[thash];
+            newbox( TSD, indeks, NULL, &iptr->index->tbl[thash], vt->fullhash );
+            iptr->index->e++;
+            NEW_HASHTABLE_CHECK( iptr->index, rehashIdx );
+            ptr = iptr->index->tbl[thash];
             ptr->stem = iptr;
-            ptr->num = new;
+            ptr->num = newdescr;
             ptr->flag = VFLAG_NUM;
          }
          if ( ptr->value != NULL )
@@ -3286,17 +3718,17 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
    }
    else
    {
-      if ( new )
+      if ( newdescr )
       {
          /*
           * Happens on:
           * a) first access
           * b) left part of X_NASSIGN
-          * c) this->p[0] is NULL
+          * c) thisptr->p[0] is NULL
           * according to this function, interprt.c and yaccsrc.y.
           *
           * We have to be a X_HEAD_SYMBOL. X_HEAD_SYMBOL are created by
-          * create_head in yaccsrc.y only if this->p[0] != NULL.
+          * create_head in yaccsrc.y only if thisptr->p[0] != NULL.
           *
           * --> This code will never be executed!
           * Reenable this only if you check the presence of stringval and
@@ -3311,14 +3743,20 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
                           __FILE__, __LINE__ );
       }
 #else
-         iptr = newbox( TSD, this->name, NULL, &TSD->currlevel->vars[hhash] );
-         iptr->index = make_hash_table( TSD );
+         iptr = newbox( TSD, thisptr->name, NULL, &TSD->currlevel->vars[hhash],
+                        hfh );
+         TSD->currlevel->vars->e++;
+         NEW_HASHTABLE_CHECK( TSD->currlevel->vars, rehash );
+         iptr->index = make_hash_table( TSD, vt->initialHashTableLength );
          DPRINTF((TSD,"make_hash_table:   rc=%p",iptr->index));
          thash = hashfunc( vt, indeks, 0, NULL );
-         newbox( TSD, indeks, NULL, &iptr->index[thash] );
+         iptr->index->r++;
+         newbox( TSD, indeks, NULL, &iptr->index->tbl[thash], vt->fullhash );
+         iptr->index->e++;
+         NEW_HASHTABLE_CHECK( iptr->index, rehashIdx );
          ptr = iptr->index[thash];
          ptr->stem = iptr;
-         ptr->num = new;
+         ptr->num = newdescr;
          ptr->flag = VFLAG_NUM;
          if ( string_val != NULL )
             ptr->flag |= VFLAG_STR;
@@ -3328,10 +3766,19 @@ num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
 #endif
       {
 the_default:
-         tracecompound( TSD, this->name, this->name->len - 1, indeks, 'L' );
+         tracecompound( TSD, thisptr->name, thisptr->name->len - 1, indeks, 'L' );
          return NULL;
       }
    }
+   if ( rehashIdx )
+   {
+      reorgHashtable( TSD, iptr->index );
+   }
+   if ( rehash )
+   {
+      reorgHashtable( TSD, TSD->currlevel->vars );
+   }
+
    return value;
 }
 
@@ -3365,7 +3812,7 @@ variableptr get_next_variable( tsd_t *TSD, int reset )
    variableptr retval;
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"get_next_variable: ?"));
    if ( reset )
@@ -3411,10 +3858,10 @@ variableptr get_next_variable( tsd_t *TSD, int reset )
                   return retval;
                }
 
-               if ( vt->tailidx >= HASHTABLENGTH )
+               if ( vt->tailidx >= vt->rstem->index->size )
                   break;
 
-               vt->ptail = vt->rstem->index[vt->tailidx++];
+               vt->ptail = vt->rstem->index->tbl[vt->tailidx++];
                vt->rtail = get_realbox( vt->ptail );
             }
          }
@@ -3428,10 +3875,10 @@ variableptr get_next_variable( tsd_t *TSD, int reset )
          return retval;
       }
 
-      if ( vt->stemidx >= HASHTABLENGTH )
+      if ( vt->stemidx >= TSD->currlevel->vars->size )
          break;
 
-      vt->pstem = TSD->currlevel->vars[vt->stemidx++];
+      vt->pstem = TSD->currlevel->vars->tbl[vt->stemidx++];
       vt->rstem = get_realbox( vt->pstem );
       vt->ptail = NULL;
       vt->tailidx = 0;
@@ -3447,6 +3894,7 @@ variableptr get_next_variable( tsd_t *TSD, int reset )
  */
 void copy_stem( tsd_t *TSD, nodeptr dststem, cnodeptr srcstem )
 {
+Changed too much, never try to use it anyway! FGC
    /*
     * Drop dststem
     * set default value of dststem to default value of srcstem
@@ -3456,7 +3904,7 @@ void copy_stem( tsd_t *TSD, nodeptr dststem, cnodeptr srcstem )
 
    var_tsd_t *vt;
 
-   vt = TSD->var_tsd;
+   vt = (var_tsd_t *)TSD->var_tsd;
 
    DPRINTF((TSD,"copy_stem:         ?"));
    drop_var( dststem->name );
@@ -3549,7 +3997,7 @@ void copy_stem( tsd_t *TSD, nodeptr dststem, cnodeptr srcstem )
 void set_reserved_value( tsd_t *TSD, int poolid, streng *val_str, int val_int,
                          int vflag )
 {
-   var_tsd_t *vt = TSD->var_tsd;
+   var_tsd_t *vt = (var_tsd_t *)TSD->var_tsd;
    int cv;
 
    assert( ( poolid > 0 ) && ( poolid < POOL0_CNT ) );

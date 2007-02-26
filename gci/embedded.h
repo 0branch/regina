@@ -47,6 +47,17 @@
 #include <string.h>
 
 /*
+ * Define some little helpers to those functions that are available.
+ * The "hidden" parameter is available in all cases where runtime assistance
+ * is needed. Thus, the following is possible:
+ * #define GCI_isspace(c) z(hidden,c)
+ */
+#define GCI_isspace(c) rx_isspace(c)
+#define GCI_isdigit(c) rx_isdigit(c)
+#define GCI_isprint(c) rx_isprint(c)
+#define GCI_toupper(c) rx_toupper(c)
+
+/*
  * Though we have RXSTRING, GCI_str has its own implementation for speedup
  * or usage in a direct implementation.
  * We don't use or check for a terminator.

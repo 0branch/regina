@@ -5,7 +5,7 @@
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version. 
+ *  (at your option) any later version.
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,7 +24,7 @@
 trace o
 parse source os .
 call time 'R'
-written = 0 
+written = 0
 signal on notready
 
    simple = 'simple'
@@ -86,12 +86,12 @@ test002:
 /* === 002 : simple reading ======================================== */
    call notify 'read'
    call stream file, 'c', 'close'
-   res = linein( file ) 
+   res = linein( file )
    if (res\=='This is the first line') then
       call complain 'didnt position at start after reopening after close'
 
-   res = linein( file ) 
-   res = linein( file ) 
+   res = linein( file )
+   res = linein( file )
    if (res \== "that will be used") then
       call complain 'Didnt position properly after several reads'
 
@@ -104,33 +104,33 @@ test003:
    call notify 'eof'
 
    res = linein( file, 3 )
-   res = linein( file ) 
+   res = linein( file )
    if (res\=='in this trip test') then
       call complain 'did not manage to read last line'
 
    signal off notready
-   res = linein( file ) 
+   res = linein( file )
    if res\=='' then
       call complain 'nullstring not returned at EOF'
 
    call stream file, 'c', 'close'
    signal on notready
-   
+
 signal test004
 
 test004:
 /* === 004 : are we able to read zero lines ======================== */
    call notify 'zero_line'
 
-   res = linein( file, 3, 0 ) 
+   res = linein( file, 3, 0 )
    if (res\=='') then
       call complain 'Could not position without reading anything'
 
-   res = linein( file ) 
-   if (res\=='that will be used') then 
+   res = linein( file )
+   if (res\=='that will be used') then
       call complain 'Did not position correctly in the file'
 
-   res = linein( file, 2 ) 
+   res = linein( file, 2 )
    if (res\=='of a very little file') then
       call complain 'Could not position and read simultaneously'
 
@@ -147,16 +147,16 @@ test005:
    if (res\=='0') then
       call complain 'non-zero result from when just positioning'
 
-   res = linein( file'.tmp', 1 ) 
+   res = linein( file'.tmp', 1 )
    if (res\=='This is the first line') then
       call complain 'first line was corrupted'
 
-   res = linein( file'.tmp' ) 
+   res = linein( file'.tmp' )
    if (res\=='<<<foobar>>>') then
       call complain 'second line not properly written'
 
    signal off notready
-   res = linein( file'.tmp' ) 
+   res = linein( file'.tmp' )
    if (res\=="") then
       call complain 'file was not truncated'
    signal on notready
@@ -164,7 +164,7 @@ test005:
    call lineout file'.tmp'
    signal test006
 
-   
+
 
 test006:
 /* === 006 : Can we read characters =================================== */
@@ -177,7 +177,7 @@ test006:
        resstr1 = 'rst line'||'0a'x||'of a v'
        resstr2 = 'ery little file'||'0a'x||'t'
      end
-   else 
+   else
      do
        resstr1 = 'rst line'||'0d'x||'0a'x||'of a v'
        resstr2 = 'ery little file'||'0d'x||'0a'x||'t'
@@ -192,7 +192,7 @@ test006:
    if (res \== resstr2) then
       call complain 'charin cant position right'
 
-   res = linein( file ) 
+   res = linein( file )
    if (res\=='hat will be used') then
       call complain 'character and line based io does not share read pointer'
 
@@ -201,7 +201,7 @@ test006:
 
 
 
-test007:   
+test007:
 /* === 007 : Is I/O faked when a file is in error? ==================== */
 
    if regina = 0 then signal test009 /* following tests only valid for Regina */
@@ -211,14 +211,14 @@ test007:
    exist = 'existent'
    nonexist = 'nonexistent'
    oslsl_root '>' exist
-   foo = 0 
+   foo = 0
 
    osdel1 nonexist tonul
 
    call on notready name trap007
    res = length(charin(nonexist,,10)) + length('cp'(exist,nonexist)) + foo +,
          length(charin(nonexist,,10)) + foo + length(linein(nonexist)) + foo +,
-         length(charin(nonexist,,10)) + foo + length(linein(nonexist)) + foo 
+         length(charin(nonexist,,10)) + foo + length(linein(nonexist)) + foo
    if res\==0 then
       call complain "Condition NOTREADY don't fake further I/O properly"
 
@@ -253,7 +253,7 @@ test008:
    exist = 'existent'
    nonexist = 'nonexistent'
    oslsl_root '>' exist
-   foo = 0 
+   foo = 0
 
    sum = 20 + length(linein(exist)) + length(linein(exist))
    call stream exist,    'c', 'close'
@@ -264,7 +264,7 @@ test008:
          length(charin(exist,,10))    + foo + length(linein(exist,1))  + foo +,
          length(charin(nonexist,,10)) + foo + length(linein(nonexist)) + foo +,
          length(charin(exist,,10))    + foo + length(linein(exist,2))  + foo +,
-         length(charin(nonexist,,10)) + foo + length(linein(nonexist)) + foo 
+         length(charin(nonexist,,10)) + foo + length(linein(nonexist)) + foo
 
    if res\==sum then
       call complain "Condition NOTREADY fake other files too"
@@ -310,11 +310,11 @@ test009:
    if res\=='' then
       call complain "Linein() didn't return '' when next char was EOL; got["res"]"
 
-   res = charin( file, 1, 10 ) 
+   res = charin( file, 1, 10 )
    if res\=='First line' then
       call complain "Simple use of charin() does not work; got["res"] expected [First line]"
 
-   res = linein( file, 1 ) 
+   res = linein( file, 1 )
    if res\=='First line' then
       call complain "Linein() didn't read whole line after positioning; got["res"] expected [First line]"
 
@@ -334,7 +334,7 @@ test010:
       call complain "Simple use of charin() failed"
 
    res = charout(file,"IRST FIL",2)
-   if res\==0 then 
+   if res\==0 then
       call complain "Simple use of charout() failed"
 
    res = charin(file,,5)
@@ -367,7 +367,7 @@ test011:
 
    if eol = 'CRLF' then none = '\no\such\file'
    else none = '/no/such/file'
-   foo = 0 
+   foo = 0
 
    call stream none, 'c', 'close'
    osdel1 none tonul
@@ -395,7 +395,7 @@ test011:
 
    call on notready name trap011
    call stream none, 'c', 'close'
-   foo = 0 
+   foo = 0
    res = charout(none,"Foobar") + charout(none,"HeppHepp")
    if res\==0 then
       call complain "Don't fake char output after error output"
@@ -415,7 +415,7 @@ test011:
 
 
    call stream none, 'c', 'close'
-   call off notready 
+   call off notready
 
    res = lineout(none,"Foobar") + lineout(none,"HeppHepp")
    if res\==2 then
@@ -435,7 +435,7 @@ test011:
 
 trap011:
    foo = foo + 1
-   return 
+   return
 
 
 test012:
@@ -451,7 +451,7 @@ test012:
 
    call stream file, 'c', 'close'
    lines = lines( file )
-   chars = 0 
+   chars = 0
    if (lines>1) then
       do lines
          chars = chars + length(linein(file)) + num_eol_chars
@@ -466,7 +466,7 @@ test012:
 
    signal on notready name trap012a
    signal on syntax name trap012a
-   foo = 0 
+   foo = 0
    call charin file, chars, 0   /* at last char */
    foo = 1
 trap012a:
@@ -501,14 +501,14 @@ trap012c:
 
    signal on notready name trap012d
    signal on syntax name trap012d
-   foo = 0 
+   foo = 0
    call charout file,, chars+2   /* not legal */
    foo = 1
 trap012d:
    call stream file, 'c', 'reset'
    if foo\==0 then
       call complain "Not trapped when positioning write beyond EOF+1"
-   
+
    'cmp' simple file tonul
    if rc\==0 then
       call complain "File changed when positioning beyond EOF+1"
@@ -525,7 +525,7 @@ trap012e:
       call complain "Trapped when positioning at EOF"
 
    'cmp' simple file tonul
-   if rc\==0  then 
+   if rc\==0  then
       call complain "File was changed when char positioning in file"
 
    call lineout file
@@ -537,7 +537,7 @@ trap012e:
 
 
 test013:
-/* === 013 : A line written to the middle of a file gets a ============ */ 
+/* === 013 : A line written to the middle of a file gets a ============ */
 /*           trailing, but not leading EOF ============================ */
    call notify 'linecnt'
 
@@ -577,11 +577,11 @@ test014:
    call stream file, 'c', 'close'
    call stream file, 'c', 'open write replace'
    call stream file, 'c', 'close'
- 
-   junk = charout(file, "<<<--->>>"'0a'x) 
-   
+
+   junk = charout(file, "<<<--->>>"'0a'x)
+
    address system 'rc 0'
-   call stream file, 'c', 'close' 
+   call stream file, 'c', 'close'
 
    if lines(file)\==1 | chars(file)\==10 then
       call complain "Possibly double flushing during file output"
@@ -638,7 +638,7 @@ test016:
    call on notready name trap016
    foo = 0
    res = charin(file,28+(num_eol_chars*2),10)
-   if (foo\==1) then       
+   if (foo\==1) then
       call complain "Didn't raise NOTREADY when reading beyond EOF"
 
    call lineout file
@@ -646,10 +646,10 @@ test016:
    signal test017
 
 trap016:
-   foo = 1 
+   foo = 1
    if res\=='line'eol_chars then
       call complain "Data not correct when reading beyond EOF"
-   return 
+   return
 
 
 
@@ -661,7 +661,7 @@ test017:
    call notify 'stdio'
 
    signal on notready name trap017a
-   call lineout 'stdin', 'foobar' 
+   call lineout 'stdin', 'foobar'
    call complain "Didn't trap writing to default input stream"
 
 trap017a:
@@ -674,7 +674,7 @@ trap017b:
 
    signal on notready
    signal test018
-   
+
 
 test018:
 /* === 018 : Let's read some really long lines ======================== */
@@ -685,13 +685,13 @@ test018:
 
    do while len<maxlen
       call stream file, 'c', 'open write replace'
-      hipp = copies('x',len) 
+      hipp = copies('x',len)
       written = lineout( file, copies('x', len))
-      if written\=0 then 
-         call complain "Didn't manage to write out all the data" 
+      if written\=0 then
+         call complain "Didn't manage to write out all the data"
       hopp = copies('x',len)
       line = linein( file, 1 )
-      if line\==copies('x',len) | len\=length(line) then 
+      if line\==copies('x',len) | len\=length(line) then
          call complain "Data read don't equal data written"
       len = trunc(len * 1.5, 0) - 10
       end
@@ -707,8 +707,8 @@ test019:
    call notify 'many'
 
    osdel1 'a*.tmp' tonul
-   
-   mf = 130 
+
+   mf = 130
    do i=1 to mf
       res1 = lineout( "a" || i || ".tmp", "line 1 in file" i "of test")
       res2 = lineout( "a" || i || ".tmp", "line 2 in file" i "of test")
@@ -718,9 +718,9 @@ test019:
          end
       end
 
-   do i=1 to 30 
+   do i=1 to 30
       fileno = 1 + (i*5) // (mf-1)
-      lineno = random( 1, 2 ) 
+      lineno = random( 1, 2 )
 
       res = linein( "a" || fileno || ".tmp", lineno ) ;
       if (res\=="line" lineno "in file" fileno "of test") then do
@@ -744,15 +744,15 @@ test020:
 /*           in the rexx file table? ==================================== */
 call notify 'stick'
 
-   time = '1'   
+   time = '1'
 
    first020:
       signal on notready name notr020a
-      call stream 'hepp', 'c', 'close' 
+      call stream 'hepp', 'c', 'close'
       oscopy 'simple hepp' tonul
-   
+
       if time==2 then
-         call linein 'hepp', 1, 0 
+         call linein 'hepp', 1, 0
 
       signal on syntax name trap020
       if lines('hepp','C')\==3 then
@@ -784,14 +784,14 @@ notr020a:
 
 /* Then, repeat for charin() */
 
-   time = '1'   
+   time = '1'
    second020:
       signal on notready name notr020b
-      call stream 'hepp', 'c', 'close' 
+      call stream 'hepp', 'c', 'close'
       oscopy 'simple hepp' tonul
-   
+
       if time==2 then
-         call lineout 'hepp', "hepp"   /* opens for read and write */ 
+         call lineout 'hepp', "hepp"   /* opens for read and write */
 
       hepp_size = 31 + (num_eol_chars * 3)
       line_size = 4 + num_eol_chars
@@ -829,7 +829,7 @@ trap020:
 
 test021:
 /* === 021 : Test that close *always* close a file, even if ============= */
-/*           the file in error is in error state ======================== */   
+/*           the file in error is in error state ======================== */
 call notify 'close'
    call on notready name notr021
 
@@ -858,8 +858,8 @@ notr021:
 
 test022:
 /* === 022 : Does empty output without repositioning close the file? ===== */
-call notify 'empty_out'
-   signal off notready 
+call notify 'empty_out(default)'
+   signal off notready
 
    call stream simple, 'c', 'close'
    line = linein( simple ) ;
@@ -867,13 +867,36 @@ call notify 'empty_out'
    if line\=="First line" then
       call complain "STREAM(fn,'C','CLOSE') doesn't seem to have closed file"
 
-   call lineout simple 
-   line = linein( simple ) 
+   call lineout simple
+   line = linein( simple )
 
    if line\=="First line" then
-      call complain "LINEOUT(fn) doesn't seem to have closed file. This is allowed under ANSI"
+      call complain "LINEOUT(fn) should be the same as 'CLOSE'."
 
    call stream simple, 'c', 'close'
+   signal on notready
+   signal test022a
+
+test022a:
+/* === 022 : Does empty output without repositioning close the file? STRICT_ANSI ===== */
+call notify 'empty_out(STRICT_ANSI)'
+   signal off notready
+   OPTIONS STRICT_ANSI
+
+   call stream simple, 'c', 'close'
+   line = linein( simple ) ;
+
+   if line\=="First line" then
+      call complain "STREAM(fn,'C','CLOSE') doesn't seem to have closed file"
+
+   call lineout simple
+   line = linein( simple )
+
+   if line\=="Second line" then
+      call complain "LINEOUT(fn) should be different to 'CLOSE' according to STRICT_ANSI."
+
+   call stream simple, 'c', 'close'
+   OPTIONS NOSTRICT_ANSI
    signal on notready
    signal test023
 
@@ -881,7 +904,7 @@ call notify 'empty_out'
 test023:
 /* === 023 : Line positioning of file using STREAM ===== */
 call notify 'line_pos'
-   signal off notready 
+   signal off notready
 
    call stream simple, 'c', 'close'
    call stream simple, 'c', 'open write replace'
@@ -980,9 +1003,9 @@ call notify 'line_pos'
    * Dersom det er sjanse for at flere tegn blir tilgjengelig
      (transiente) er I/O blokket.
    * EOF paa persistent filer gir NOTREADY
-   
+
    CHAROUT():
-   
+
    * Returnerer remaining chars
    * Hvis string=nullstring, => rc=0
    * Default write=\= default read position
@@ -994,12 +1017,12 @@ call notify 'line_pos'
    * Utskrift er blokket, eller gir feil paa persistent files
 
    CHARS()
-  
+
    * Antallet inkluderer lkinjeskift
    * Returnerer 1 dersom ukjent
 
    LINEIN():
-  
+
    * Kan returnere delvise linjer i kombinasjon med charing
    * Dersom start er oppgitt, starter read alltid paa starten av en
      linje, selv om start er current linje, og current er paa
@@ -1009,16 +1032,16 @@ call notify 'line_pos'
      paa persistent files
 
    LINEOUT():
-   
+
    * String='' skriver ut ebn EOL
    * Ved skriving til en file, terminerer lionjer *etter* nu linje,
      ikke foran
- 
+
    LINES():
-   
+
    * Antall hele linjher som er igjen: a) halv linje paa slutten teller
      ikke, mens b) halv linje paa starten telles
-   
+
    * Pull/linein og say/lineout bruker samme interface.
 
    * Status for en stream lagres ikke over subroutine kall
@@ -1035,13 +1058,13 @@ call notify 'line_pos'
    * Apne tom filer for lesing
    * La lesepos vaere langt ute i fila, trunker paa et tidligere punkt
    * Forsoek posisjonering paa standard input og output
-   * Test at lesing/skriving avc ASCII NUL fungerer baade for 
+   * Test at lesing/skriving avc ASCII NUL fungerer baade for
      character og linje basert I/O
    * Klarer vi aa lang kroell med /dev/null?  Vi skal ikke kunne lese,
      og ved skriving skal det bli kroell i linjetellingen
    * Har leseaccess; proever aa skrive, mistes leseakksess?
    * Omvendt, dersom vi starter med leseaccess.
-   * Har leseaccess, denne fjernes (Av eksternt program), forsoeker aa 
+   * Har leseaccess, denne fjernes (Av eksternt program), forsoeker aa
      faa skriveaksess, mistes leseacckess
    * samme for skriveaccess
    * Aapner fil for leseakses, flytter fila, aapner for skriveakksess
@@ -1049,7 +1072,7 @@ call notify 'line_pos'
 
    * Kan vi bruke cd() til aa faa den til aa operere paa en annen fil?
 
-   * Naa trigger syntax dersom vi proever aa positionere oss til et 
+   * Naa trigger syntax dersom vi proever aa positionere oss til et
      punkt etter eof.
 
 */
@@ -1069,8 +1092,8 @@ notready:
    return
 
 
-ch: procedure expose sigl 
-   trace off 
+ch: procedure expose sigl
+   trace off
    parse arg first, second
    if first \== second then do
       say
@@ -1080,7 +1103,7 @@ ch: procedure expose sigl
    return
 
 
-complain: 
+complain:
    trace off
    say ' ...'
    if arg() = 2 then lineno = arg(2)

@@ -6,7 +6,6 @@ DESCRIPTION 'Regina Rexx Interpreter'
 DATA    MULTIPLE NONSHARED
 
 STACKSIZE   81920
-HEAPSIZE    81920
 
 EXPORTS
        RexxAllocateMemory

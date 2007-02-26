@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: regina_t.h,v 1.5 2004/01/17 00:21:20 florian Exp $
+ * $Id: regina_t.h,v 1.12 2005/09/05 10:52:02 mark Exp $
  */
 
 #ifndef REGINA_TYPES_H_INCLUDED
@@ -26,12 +26,34 @@
 
 typedef struct varbox *variableptr ;
 typedef const struct varbox *cvariableptr ;
+
+/*
+ * var_hashtable is a table with size entries. The entries are added according
+ * to their hash value.
+ * r is the number of read accesses.
+ * w is the number of write accesses.
+ * c is the number of collisions on access or while creating/copying the table.
+ * e is the number of true elements in the tbl, hashed to size buckets.
+ * Note that tbl contains one more hidden element used for variable
+ * maintenance if size > 0.
+ */
+typedef struct {
+   variableptr    *tbl;
+   unsigned        r;  /* read       */
+   unsigned        w;  /* write      */
+   unsigned        c;  /* collisions */
+   unsigned        e;  /* elements   */
+   unsigned        size;
+} var_hashtable;
+
 typedef struct varbox {
-   variableptr next, prev, realbox, *index ;
+   var_hashtable *index;
+   variableptr next, prev, realbox ;
    struct strengtype *name, *value ;
    int guard ;
    num_descr *num ;
    int flag ;
+   unsigned hash ;
    long hwired, valid ; /* FGC: at least valid may be too small for many
                                 recursions with short instead of long.
                                 27.09.98 (09/27/98). */
@@ -41,12 +63,12 @@ typedef struct varbox {
 /* typedef int bool ; */
 
 typedef struct {
-   unsigned int lnum:1 ;
-   unsigned int rnum:1 ;
-   unsigned int lsvar:1 ;
-   unsigned int rsvar:1 ;
-   unsigned int lcvar:1 ;
-   unsigned int rcvar:1 ;
+   unsigned int lnum:1 ;    /* left side of comparison is a number or string constant */
+   unsigned int rnum:1 ;    /* right side of comparison is a number or string constant */
+   unsigned int lsvar:1 ;   /* left side of comparison is a simple variable */
+   unsigned int rsvar:1 ;   /* right side of comparison is a simple variable */
+   unsigned int lcvar:1 ;   /* left side of comparison is a compound variable */
+   unsigned int rcvar:1 ;   /* right side of comparison is a compound variable */
 } compflags ;
 
 typedef enum {
@@ -63,6 +85,11 @@ typedef enum {
    antSIMSYMBOL = 2
 } AddressNameType;
 
+typedef enum {
+   fpdRETAIN = 0,
+   fpdCLEAR = 1
+} FilePtrDisposition;
+
 typedef struct {
    unsigned int append:1;
    unsigned int isinput:1;
@@ -71,9 +98,23 @@ typedef struct {
    unsigned int ant:2; /* overlay with AddressNameType */
 } outputflags; /* used by ADDRESS WITH resourceo */
 
+typedef enum {
+   PROTECTED_DelayedScriptExit,
+   PROTECTED_DelayedInterpreterExit,
+   PROTECTED_DelayedRexxSignal
+} delayed_error_type_t;
+
+typedef enum {
+   QisUnused,
+   QisSESSION,
+   QisInternal,
+   QisExternal,
+   QisTemp
+} queue_type_t ;
+
 typedef struct  {
-   long sec ;
-   long usec ;
+   time_t sec ;
+   time_t usec ;
 } rexx_time;
 
 struct _tsd_t; /* If this won't work change "struct _tsd_t *" to "void *"
@@ -197,7 +238,7 @@ typedef struct {
    /* A queue is one of different implementations of queue types.
     * See the picture and the description at the beginning of stack.c.
     */
-   enum { QisUnused, QisSESSION, QisInternal, QisExternal, QisTemp } type ;
+   queue_type_t type;
    union {
       struct { /* internal or SESSION: i */
          /* name is the uppercased name of the queue. In rare cases this
@@ -279,6 +320,7 @@ typedef struct { /* one for each redirection in environment */
 typedef struct {
    struct strengtype *name; /* stemname or streamname if any */
    int subtype;             /* SUBENVIR_... */
+   int subcomed;            /* has this environment been redirected to an API program via RexxRegistreSubcom???() */
    environpart input;
    environpart output;
    environpart error;
@@ -289,9 +331,9 @@ typedef const struct proclevelbox *cproclevel ;
 typedef struct proclevelbox {
    int numfuzz, currnumsize, numform ;
    int mathtype ;
-   rexx_time time ;
+   rexx_time rx_time ;
    proclevel prev, next ;
-   variableptr *vars ;
+   var_hashtable *vars ;
    paramboxptr args ;
    struct strengtype *environment, *prev_env ;
    char tracestat, traceint, varflag ; /* MDW 30012002 */
@@ -466,6 +508,40 @@ struct entry_point {
    struct library *lib;
    struct entry_point *next, *prev;
 };
+
+/*
+ * Every major OS has some functionality that isn't shared with others.
+ * Most functions relate to the command execution/redirection stuff.
+ * The global function collection *OS_Dep will point to this structure.
+ * Some systems, Win9x and OS/2-EMX, even use the DOS entry table because
+ * they can't take advantage of the performance functions the system
+ * usually provides.
+ * init() may map some "stupid" function on advanced function, as for
+ * instance Win9x doesn't support redirection correctly.
+ */
+struct _tsd_t;
+struct regina_utsname;
+typedef struct _OS_Dep_funcs {
+   void   (*init)                       (void);
+   int    (*setenv)                     (const char *name, const char *value);
+   int    (*fork_exec)                  (struct _tsd_t *TSD, environment *env, const char *cmdline, int *rc);
+   int    (*wait)                       (int process);
+   int    (*open_subprocess_connection) (const struct _tsd_t *TSD, environpart *ep);
+   void   (*unblock_handle)             (int *handle, void *async_info);
+   void   (*restart_file)               (int hdl);
+   int    (*close)                      (int handle, void *async_info);
+   void   (*close_special)              (int handle);
+   int    (*read)                       (int hdl, void *buf, unsigned size, void *async_info) ;
+   int    (*write)                      (int hdl, const void *buf, unsigned size, void *async_info);
+   void*  (*create_async_info)          (const struct _tsd_t *TSD);
+   void   (*delete_async_info)          (void *async_info);
+   void   (*reset_async_info)           (void *async_info);
+   void   (*add_async_waiter)           (void *async_info, int handle, int add_as_read_handle);
+   void   (*wait_async_info)            (void *async_info);
+   int    (*uname)                      (struct regina_utsname *name);
+} OS_Dep_funcs;
+
+#include "regina64.h"
 
 
 #endif /* REGINA_TYPES_H_INCLUDED */

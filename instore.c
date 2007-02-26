@@ -95,13 +95,13 @@ nodeptr FreshNode(void)
 
    if (CurrentT == NULL) /* First call */
    {
-      parser_data.nodes = Malloc_TSD(parser_data.TSD, sizeof(ttree));
+      parser_data.nodes = (ttree *)Malloc_TSD(parser_data.TSD, sizeof(ttree));
       CurrentT = parser_data.nodes;
       CurrentT->sum = 0;
    }
    else /* current bucket is full */
    {
-      CurrentT->next = Malloc_TSD(parser_data.TSD, sizeof(ttree));
+      CurrentT->next = (ttree *)Malloc_TSD(parser_data.TSD, sizeof(ttree));
       CurrentT->next->sum = CurrentT->sum + CurrentT->num;
       CurrentT = CurrentT->next;
    }
@@ -110,7 +110,7 @@ nodeptr FreshNode(void)
    CurrentT->next = NULL;
    CurrentT->max = DEFAULT_TTREE_ELEMS;
    CurrentT->num = 1;
-   CurrentT->elems = Malloc_TSD(parser_data.TSD,
+   CurrentT->elems = (treenode *)Malloc_TSD(parser_data.TSD,
                                 CurrentT->max * sizeof(treenode));
 
    memset(CurrentT->elems, 0, sizeof(treenode));
@@ -158,13 +158,13 @@ offsrcline *FreshLine(void)
 
    if (CurrentO == NULL) /* First call */
    {
-      parser_data.nodes = Malloc_TSD(parser_data.TSD, sizeof(otree));
+      parser_data.srclines = (otree *)Malloc_TSD(parser_data.TSD, sizeof(otree));
       CurrentO = parser_data.srclines;
       CurrentO->sum = 0;
    }
    else /* current bucket is full */
    {
-      CurrentO->next = Malloc_TSD(parser_data.TSD, sizeof(otree));
+      CurrentO->next = (otree *)Malloc_TSD(parser_data.TSD, sizeof(otree));
       CurrentO->next->sum = CurrentO->sum + CurrentO->num;
       CurrentO = CurrentO->next;
    }
@@ -173,7 +173,7 @@ offsrcline *FreshLine(void)
    CurrentO->next = NULL;
    CurrentO->max = DEFAULT_OTREE_ELEMS;
    CurrentO->num = 1;
-   CurrentO->elems = Malloc_TSD(parser_data.TSD,
+   CurrentO->elems = (offsrcline *)Malloc_TSD(parser_data.TSD,
                                 CurrentO->max * sizeof(offsrcline));
 
    memset(CurrentO->elems, 0, sizeof(offsrcline));
@@ -231,7 +231,7 @@ static void DestroyNode(const tsd_t *TSD, nodeptr p)
 void DestroyInternalParsingTree(const tsd_t *TSD, internal_parser_type *ipt)
 {
    ttree *tr, *th;
-   otree *or, *oh;
+   otree *otr, *oh;
    lineboxptr lr, lh;
    labelboxptr ar, ah;
    unsigned long i;
@@ -300,14 +300,14 @@ void DestroyInternalParsingTree(const tsd_t *TSD, internal_parser_type *ipt)
    /* Cleanup all the nodes */
    if (ipt->srclines != NULL)
    {
-      or = ipt->srclines;
+      otr = ipt->srclines;
 
-      while (or)
+      while (otr)
       {
-         oh = or->next;
-         FreeTSD(or->elems);
-         FreeTSD(or);
-         or = oh;
+         oh = otr->next;
+         FreeTSD(otr->elems);
+         FreeTSD(otr);
+         otr = oh;
       }
 
       ipt->srclines = NULL;
@@ -334,7 +334,7 @@ internal_parser_type ExpandTinnedTree(const tsd_t *TSD,
    unsigned long i,j;
    const extstring *es;
    const offsrcline *lastsrcline;
-   nodeptr this;
+   nodeptr thisptr;
 
    memset(&ipt, 0, sizeof(ipt));
 
@@ -360,12 +360,12 @@ internal_parser_type ExpandTinnedTree(const tsd_t *TSD,
    if (incore_source) /* We are sure enough to use the source string */
    {
       ipt.incore_source = incore_source;
-      ipt.srclines = MallocTSD(sizeof(otree));
+      ipt.srclines = (otree *)MallocTSD(sizeof(otree));
       ipt.srclines->sum = 0;
       ipt.srclines->next = NULL;
       ipt.srclines->max = ept->NumberOfSourceLines;
-      ipt.srclines->num = ipt.nodes->max;
-      ipt.srclines->elems = MallocTSD(ipt.srclines->num * sizeof(offsrcline));
+      ipt.srclines->num = ipt.srclines->max;
+      ipt.srclines->elems = (offsrcline *)MallocTSD(ipt.srclines->num * sizeof(offsrcline));
       memcpy(ipt.srclines->elems,
              (char *) ept + ept->source,
              ipt.srclines->num * sizeof(offsrcline));
@@ -379,12 +379,12 @@ internal_parser_type ExpandTinnedTree(const tsd_t *TSD,
    ipt.numlabels = 0; /* initialize it for newlabel() */
    ipt.sort_labels = NULL; /* initialize it for newlabel() */
 
-   ipt.nodes = MallocTSD(sizeof(ttree));
+   ipt.nodes = (ttree *)MallocTSD(sizeof(ttree));
    ipt.nodes->sum = 0;
    ipt.nodes->next = NULL;
    ipt.nodes->max = ept->NumberOfTreeElements;
    ipt.nodes->num = ipt.nodes->max;
-   ipt.nodes->elems = MallocTSD(ipt.nodes->num * sizeof(treenode));
+   ipt.nodes->elems = (treenode *)MallocTSD(ipt.nodes->num * sizeof(treenode));
 
    memcpy(ipt.nodes->elems,
           (char *) ept + ept->tree,
@@ -396,19 +396,19 @@ internal_parser_type ExpandTinnedTree(const tsd_t *TSD,
     */
    for (i = 0;i < ept->NumberOfTreeElements;i++)
    {
-      this = ipt.nodes->elems + i;
-      if (this->name)
+      thisptr = ipt.nodes->elems + i;
+      if (thisptr->name)
       {
-         es = (extstring *) ((char *) ept + (unsigned long) this->name);
-         this->name = Str_makeTSD(es->length);
-         this->name->len = es->length;
-         memcpy(this->name->value,
+         es = (extstring *) ((char *) ept + (unsigned long) thisptr->name);
+         thisptr->name = Str_makeTSD(es->length);
+         thisptr->name->len = es->length;
+         memcpy(thisptr->name->value,
                 es + 1 /* position of string content */,
                 es->length);
       }
 
       /*
-       * Do things the parsing step would have do. Simple values in this->u
+       * Do things the parsing step would have do. Simple values in thisptr->u
        * are copied already.
        */
 
@@ -416,38 +416,38 @@ internal_parser_type ExpandTinnedTree(const tsd_t *TSD,
        * See also several places in this file and in debug.c where this
        * switch list must be changed. Seek for X_CEXPRLIST.
        */
-      switch ( this->type )
+      switch ( thisptr->type )
       {
          case X_CEXPRLIST:
-            if ( this->u.strng )
+            if ( thisptr->u.strng )
             {
-               es = (extstring *) ((char *) ept + (unsigned long) this->u.strng);
-               this->u.strng = Str_makeTSD( es->length );
-               this->u.strng->len = es->length;
-               memcpy( this->u.strng->value,
+               es = (extstring *) ((char *) ept + (unsigned long) thisptr->u.strng);
+               thisptr->u.strng = Str_makeTSD( es->length );
+               thisptr->u.strng->len = es->length;
+               memcpy( thisptr->u.strng->value,
                        es + 1 /* position of string content */,
                        es->length);
             }
             break;
 
          case X_LABEL:
-            newlabel(TSD, &ipt, this);
+            newlabel(TSD, &ipt, thisptr);
             break;
 
          default:
             break;
       }
 
-      if (this->next == (nodeptr) (unsigned long) -1)
-         this->next = NULL;
+      if (thisptr->next == (nodeptr) (unsigned long) -1)
+         thisptr->next = NULL;
       else
-         this->next = ipt.nodes->elems + (unsigned long) this->next;
-      for (j = 0;j < sizeof(this->p) / sizeof(this->p[0]);j++)
+         thisptr->next = ipt.nodes->elems + (unsigned long) thisptr->next;
+      for (j = 0;j < sizeof(thisptr->p) / sizeof(thisptr->p[0]);j++)
       {
-         if (this->p[j] == (nodeptr) (unsigned long) -1)
-            this->p[j] = NULL;
+         if (thisptr->p[j] == (nodeptr) (unsigned long) -1)
+            thisptr->p[j] = NULL;
          else
-            this->p[j] = ipt.nodes->elems + (unsigned long) this->p[j];
+            thisptr->p[j] = ipt.nodes->elems + (unsigned long) thisptr->p[j];
       }
    }
    size = size; /* keep compiler happy */
@@ -477,11 +477,18 @@ static unsigned long ComputeExternalSize(const internal_parser_type *ipt,
 
    /* sourceline table */
    elems = 0;
-   otp = ipt->srclines;
-   while (otp != NULL)
+   if ((otp = ipt->srclines) == NULL)
    {
-      elems += otp->sum;
-      otp = otp->next;
+      if (ipt->last_source_line)
+      {
+         elems = ipt->last_source_line->lineno;
+      }
+   }
+   else
+   {
+      while (otp->next)
+         otp = otp->next;
+      elems = otp->sum + otp->num;
    }
    *SourceLines = elems;
    size += elems * sizeof(offsrcline); /* the table */
@@ -532,13 +539,17 @@ static unsigned long ComputeExternalSize(const internal_parser_type *ipt,
  * consecutively.
  * The index just beyond the last copied byte is returned.
  */
-static unsigned long FillStrings(char *base, unsigned long start, const otree *otp)
+static unsigned long FillStrings(char *base, unsigned long start,
+                                 const otree *otp)
 {
-   while (otp != NULL) 
+   if (otp != NULL)
    {
-      memcpy(base + start, otp->elems, otp->num * sizeof(offsrcline));
-      start += otp->num * sizeof(offsrcline);
-      otp = otp->next;
+      while (otp != NULL)
+      {
+         memcpy(base + start, otp->elems, otp->num * sizeof(offsrcline));
+         start += otp->num * sizeof(offsrcline);
+         otp = otp->next;
+      }
    }
    return(start);
 }
@@ -551,13 +562,13 @@ static unsigned long FillStrings(char *base, unsigned long start, const otree *o
  * The index just beyond the last copied character is returned.
  */
 static unsigned long FillTree(treenode *table, char *base, unsigned long start,
-                         const ttree *ttp)
+                              const ttree *ttp)
 {
    cnodeptr np;
    unsigned long i,j;
    extstring *e;
 
-   while (ttp) 
+   while (ttp)
    {
       for (i = 0;i < ttp->num;i++)
       {
@@ -592,6 +603,13 @@ static unsigned long FillTree(treenode *table, char *base, unsigned long start,
             case X_LT:
             case X_LTE:
                table->u.flags = np->u.flags;
+               break;
+
+            case X_PARSE:
+               /*
+                * fixes 972850
+                */
+               table->u.parseflags = np->u.parseflags;
                break;
 
             case X_ADDR_V:
@@ -656,7 +674,7 @@ external_parser_type *TinTree(const tsd_t *TSD,
 
    *length = ComputeExternalSize(ipt, &srclines, &nodecount);
 
-   retval = IfcAllocateMemory(*length);
+   retval = (external_parser_type *)IfcAllocateMemory(*length);
    if (retval == NULL)
       return(NULL);
    memset(retval, 0, sizeof(external_parser_type));

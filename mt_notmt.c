@@ -26,25 +26,25 @@ tsd_t __regina_tsd = {0,}; /* Be sure the var is initialized here   */
 static void *MTMalloc(const tsd_t *TSD,size_t size)
 {
    mt_tsd_t *mt;
-   MT_mem *new = malloc(size + sizeof(MT_mem));
+   MT_mem *newptr = (MT_mem *)malloc(size + sizeof(MT_mem));
 
-   if (new == NULL) /* may happen. errors are detected in the above layers */
+   if (newptr == NULL) /* may happen. errors are detected in the above layers */
       return(NULL);
 
-   mt = TSD->mt_tsd;
-   new->prev = NULL;
-   new->next = mt->mem_base;
+   mt = (mt_tsd_t *)TSD->mt_tsd;
+   newptr->prev = NULL;
+   newptr->next = mt->mem_base;
    if (mt->mem_base)
-      mt->mem_base->prev = new;
-   mt->mem_base = new;
-   return(new + 1); /* jump over the head */
+      mt->mem_base->prev = newptr;
+   mt->mem_base = newptr;
+   return(newptr + 1); /* jump over the head */
 }
 
 /* Lowest level memory deallocation function for normal circumstances. */
 static void MTFree(const tsd_t *TSD,void *chunk)
 {
-   mt_tsd_t *mt = TSD->mt_tsd;
-   MT_mem *this;
+   mt_tsd_t *mt = (mt_tsd_t *)TSD->mt_tsd;
+   MT_mem *thisptr;
 
    /*
     * Just in case...
@@ -52,32 +52,32 @@ static void MTFree(const tsd_t *TSD,void *chunk)
    if ( chunk == NULL)
       return;
 
-   this = chunk;
-   this--; /* Go to the header of the chunk */
+   thisptr = (MT_mem *)chunk;
+   thisptr--; /* Go to the header of the chunk */
 
-   if (this->prev)
+   if (thisptr->prev)
    {
-      if (this->prev->next != this)
+      if (thisptr->prev->next != thisptr)
          return;
    }
-   if (this->next)
+   if (thisptr->next)
    {
-      if (this->next->prev != this)
+      if (thisptr->next->prev != thisptr)
          return;
    }
 
    /* This is a chunk allocated by MTMalloc */
-   if (this->prev)
-      this->prev->next = this->next;
-   if (this->next)
-      this->next->prev = this->prev;
-   if (this == mt->mem_base)
-      mt->mem_base = this->next;
+   if (thisptr->prev)
+      thisptr->prev->next = thisptr->next;
+   if (thisptr->next)
+      thisptr->next->prev = thisptr->prev;
+   if (thisptr == mt->mem_base)
+      mt->mem_base = thisptr->next;
 
    /* Last not least we set the pointers to NULL. This prevents a double-free*/
-   this->next = NULL;
-   this->prev = NULL;
-   free(this);
+   thisptr->next = NULL;
+   thisptr->prev = NULL;
+   free(thisptr);
 }
 
 /* Lowest level exit handler. Use this indirection to prevent errors. */
@@ -99,7 +99,7 @@ int IfcReginaCleanup( VOID )
 
    deinit_rexxsaa(TSD);
 
-   mt = TSD->mt_tsd;
+   mt = (mt_tsd_t *)TSD->mt_tsd;
    if (mt)
    {
       while ((chunk = mt->mem_base) != NULL)
@@ -143,6 +143,37 @@ tsd_t *ReginaInitializeProcess(void)
    if (!OK)
       return(NULL);
 
+   /*
+    * Some systems with an own MT file don't compile in MT mode. But they
+    * still are systems of that kind.
+    */
+#if defined(WIN32) || defined(__WIN32__)
+   {
+      extern OS_Dep_funcs __regina_OS_Win;
+      __regina_tsd.OS = &__regina_OS_Win;
+   }
+#elif defined(OS2) && !defined(DOS)
+   {
+      extern OS_Dep_funcs __regina_OS_Os2;
+      __regina_tsd.OS = &__regina_OS_Os2;
+   }
+#elif defined(GO32)
+   {
+      extern OS_Dep_funcs __regina_OS_Other;
+      __regina_tsd.OS = &__regina_OS_Other;
+   }
+#elif defined(unix) || defined(__unix__) || defined(__unix) || defined(__QNX__) || defined(__BEOS__) || defined(SKYOS) || ( defined( __APPLE_CC__ ) && defined( __MACH__ ) )
+   {
+      extern OS_Dep_funcs __regina_OS_Unx;
+      __regina_tsd.OS = &__regina_OS_Unx;
+   }
+#else
+   {
+      extern OS_Dep_funcs __regina_OS_Other;
+      __regina_tsd.OS = &__regina_OS_Other;
+   }
+#endif
+   __regina_tsd.OS->init();
    OK |= init_vars(&__regina_tsd);      /* Initialize the variable module    */
    OK |= init_stacks(&__regina_tsd);    /* Initialize the stack module       */
    OK |= init_filetable(&__regina_tsd); /* Initialize the files module       */

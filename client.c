@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: client.c,v 1.51 2004/04/24 09:32:58 florian Exp $";
+static char *RCSid = "$Id: client.c,v 1.54 2005/08/04 09:03:34 mark Exp $";
 #endif
 
 /*
@@ -113,12 +113,13 @@ int init_client( tsd_t *TSD )
 {
    cli_tsd_t *ct;
 
-   if (TSD->cli_tsd != NULL)
+   if ( TSD->cli_tsd != NULL )
       return(1);
 
-   if ((ct = TSD->cli_tsd = MallocTSD(sizeof(cli_tsd_t))) == NULL)
+   if ( ( TSD->cli_tsd = MallocTSD( sizeof(cli_tsd_t) ) ) == NULL )
       return(0);
-   memset(ct,0,sizeof(cli_tsd_t));
+   ct = (cli_tsd_t *)TSD->cli_tsd;
+   memset( ct, 0, sizeof(cli_tsd_t) );
    ct->StringsCount = -1;
    return(1);
 }
@@ -169,11 +170,11 @@ static paramboxptr parametrize( const tsd_t *TSD, int ArgCount, const int *ParLe
    {
       if (parms)
       {
-         parms->next = MallocTSD( sizeof(parambox)) ;
+         parms->next = (paramboxptr)MallocTSD( sizeof(parambox)) ;
          parms = parms->next ;
       }
       else
-         parms = root = MallocTSD( sizeof(parambox )) ;
+         parms = root = (paramboxptr)MallocTSD( sizeof(parambox )) ;
 
       parms->value = wrapstring( TSD, ParStrings[i], ParLengths[i] ) ;
    }
@@ -216,7 +217,7 @@ static void IfcPrepareReturnString( const streng *src, int *targetlen,
    len = Str_len( src );
    if ( *targetlen < len + 1 )
    {
-      if ( ( *targetbuf = IfcAllocateMemory( len + 1 ) ) == NULL )
+      if ( ( *targetbuf = (char *)IfcAllocateMemory( len + 1 ) ) == NULL )
       {
          /*
           * Better idea?
@@ -246,6 +247,8 @@ static void ScriptSetup( tsd_t *TSD,
                          streng **environment, int EnvLen, const char *EnvName )
 {
    int i;
+   char c;
+   streng *h;
 
    *instore_buf = NULL;
    *instore_length = 0;
@@ -266,14 +269,53 @@ static void ScriptSetup( tsd_t *TSD,
    }
 
    *environment = wrapstring( TSD, EnvName, EnvLen );
-   /*
-    * FIXME: "DEFAULT" is a bad idea! We have to use the extension of the file.
-    */
    if ( *environment == NULL )
-      *environment = Str_creTSD( "DEFAULT" );
+   {
+      /*
+       * We have to use the extension of the file. That is what the REXX API
+       * documentations says and we have been called by the API in this case!
+       */
+      h = TSD->systeminfo->input_file;
 
-   if ( !envir_exists( TSD, *environment ) )
+      for ( i = Str_len( h ) - 1; i >= 0; i-- )
+      {
+         c = Str_val( h )[i];
+         if ( c == '.' )
+         {
+            i++;
+            break;
+         }
+         else if ( strchr( FILE_SEPARATORS, c ) != NULL )
+         {
+            i = -1;
+            break;
+         }
+      }
+      /*
+       * i == -1: no suffix
+       * i otherwise: position after dot (may lead to empty string, too)
+       */
+      if ( i == -1 )
+         i = Str_len( h );
+
+      *environment = Str_nodupTSD( h, i, Str_len( h ) - i );
+   }
+
+   /*
+    * When executing a script, check if the environment we are running under exists
+    * and has been "redirected" by a call to RexxRegisterSubcom???()
+    */
+   if ( envir_exists( TSD, *environment ) )
+   {
+      if ( get_subcomed_envir( TSD, *environment ) )
+      {
+         add_envir( TSD, Str_dupTSD( *environment ), ENVIR_PIPE, 0 );
+      }
+   }
+   else
+   {
       add_envir( TSD, Str_dupTSD( *environment ), ENVIR_PIPE, 0 );
+   }
 }
 
 /*
@@ -485,7 +527,7 @@ static int handle_source( const tsd_t *TSD, int *Length, char **String,
    invoked = strlen(invo_strings[TSD->systeminfo->invoked]) ;
    total = sleng + 1 + invoked + 1 + infile ;
 
-   ctmp = *String = MallocTSD( (*Length=total)+2 ) ;
+   ctmp = *String = (char *)MallocTSD( (*Length=total)+2 ) ;
    sprintf( ctmp, "%s %s ", stype, invo_strings[TSD->systeminfo->invoked]) ;
    strncat( ctmp, TSD->systeminfo->input_file->value, infile ) ;
 
@@ -522,7 +564,7 @@ static int handle_no_of_params( const tsd_t *TSD, int *Length, char **String )
    int count=0 ;
    cli_tsd_t *ct;
 
-   ct = TSD->cli_tsd;
+   ct = (cli_tsd_t *)TSD->cli_tsd;
    ptr = TSD->systeminfo->currlevel0->args ;
    count = count_params( ptr, PARAM_TYPE_HARD ) ;
 
@@ -590,7 +632,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings,
       {
          *allocated |= 1;
          l = Lengths[0] = rval->stem->name->len + rval->name->len ;
-         Strings[0] = MallocTSD( (l < 1) ? 1 : l ) ;
+         Strings[0] = (char *)MallocTSD( (l < 1) ? 1 : l ) ;
          memcpy(Strings[0], rval->stem->name->value, rval->stem->name->len);
          memcpy(Strings[0]+rval->stem->name->len,
                                       rval->name->value, rval->name->len ) ;
@@ -611,7 +653,7 @@ static int get_next_var( tsd_t *TSD, int *Lengths, char **Strings,
          *allocated |= 2;
          assert( rval->stem && rrval->value ) ;
          l = Lengths[1] = rval->stem->name->len + rval->name->len ;
-         Strings[1] = MallocTSD( (l < 1) ? 1 : l ) ;
+         Strings[1] = (char *)MallocTSD( (l < 1) ? 1 : l ) ;
          memcpy( Strings[1], rval->stem->name->value, value->stem->name->len );
          memcpy( Strings[1]+value->stem->name->len,
                                         rval->name->value, rval->name->len ) ;
@@ -720,7 +762,7 @@ int hookup_output( tsd_t *TSD, int hook, const streng *outdata )
    }
    else
    {
-      str = MallocTSD( 1 ) ;
+      str = (char *)MallocTSD( 1 ) ;
       str[0] = '\0' ;
       len = 0 ;
    }
@@ -754,7 +796,7 @@ int hookup_output2( tsd_t *TSD, int hook, const streng *outdata1, const streng *
    }
    else
    {
-      str1 = MallocTSD( 1 ) ;
+      str1 = (char *)MallocTSD( 1 ) ;
       str1[0] = '\0' ;
       len1 = 0 ;
    }
@@ -765,7 +807,7 @@ int hookup_output2( tsd_t *TSD, int hook, const streng *outdata1, const streng *
    }
    else
    {
-      str2 = MallocTSD( 1 ) ;
+      str2 = (char *)MallocTSD( 1 ) ;
       str2[0] = '\0' ;
       len2 = 0 ;
    }
@@ -842,7 +884,7 @@ int hookup_input_output( tsd_t *TSD, int hook, const streng *outdata, streng **i
    }
    else
    {
-      str = MallocTSD( 1 ) ;
+      str = (char *)MallocTSD( 1 ) ;
       str[0] = '\0' ;
       len = 0 ;
    }
@@ -947,7 +989,7 @@ static int GetVariable( tsd_t *TSD, int Code, int *Lengths, char *Strings[],
    }
 
    Lengths[1] = len = value->len;
-   Strings[1] = retval = MallocTSD( len );
+   Strings[1] = retval = (char *)MallocTSD( len );
    memcpy( retval, value->value, len );
    *allocated = 2;
    Free_stringTSD( varbl );
@@ -1116,7 +1158,7 @@ static void RemoveParams(const tsd_t *TSD)
    int i;
    cli_tsd_t *ct;
 
-   ct = TSD->cli_tsd;
+   ct = (cli_tsd_t *)TSD->cli_tsd;
 
    if ( ct->Strings && ct->Lengths )
    {
@@ -1150,7 +1192,7 @@ static void MakeParams(const tsd_t *TSD, cparamboxptr parms)
    cparamboxptr p=NULL ;
    cli_tsd_t *ct;
 
-   ct = TSD->cli_tsd;
+   ct = (cli_tsd_t *)TSD->cli_tsd;
 
    /* Cleanup the old parameters before we set StringsCount */
    RemoveParams(TSD);
@@ -1164,8 +1206,8 @@ static void MakeParams(const tsd_t *TSD, cparamboxptr parms)
    }
 
    /* add one NULL string at the end */
-   ct->Lengths = MallocTSD( sizeof(int) * (ct->StringsCount+1) ) ;
-   ct->Strings = MallocTSD( sizeof(char*) * (ct->StringsCount+1) ) ;
+   ct->Lengths = (int *)MallocTSD( sizeof(int) * (ct->StringsCount+1) ) ;
+   ct->Strings = (char **)MallocTSD( sizeof(char*) * (ct->StringsCount+1) ) ;
 
    for (i=0,p=parms; i < ct->StringsCount; p=p->next,i++)
    {
@@ -1208,7 +1250,7 @@ static streng *do_an_external( tsd_t *TSD,
    volatile char *tmpExternalName; /* used to save ct->ExternalName */
                                    /* when erroring                 */
 
-   ct = TSD->cli_tsd;
+   ct = (cli_tsd_t *)TSD->cli_tsd;
 
    MakeParams( TSD, parms ) ;
    if (ExeName)
@@ -1397,7 +1439,7 @@ int IfcPullQueue( tsd_t *TSD, const char *qname, const int qlen, char **data, un
          len = strdata->len;
 
          if ( ( *data == NULL ) || ( *datalen <= (unsigned long) len ) )
-            p = IfcAllocateMemory( len + 1 );
+            p = (char *)IfcAllocateMemory( len + 1 );
          else
             p = *data;
          if ( p == NULL )

@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: wrappers.c,v 1.32 2004/04/24 09:25:03 mark Exp $
+ * $Id: wrappers.c,v 1.38 2005/08/04 09:03:51 mark Exp $
  */
 
 /*
@@ -128,7 +128,7 @@
 
 # elif defined(DYNAMIC_SKYOS)
    typedef sDllHandle * handle_type ;
-#  define DYNLIBPRE "/boot/programs/Regina/extensions/lib"
+#  define DYNLIBPRE "/boot/programs/rexx/extensions/lib"
 #  define DYNLIBPST ".dll"
 #  define DYNLIBLEN 40
 
@@ -188,12 +188,15 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
 #if defined(DYNAMIC_HPSHLOAD) || defined(DYNAMIC_BEOS)
    char buf[1024];
 #endif
+#ifdef DYNAMIC_SKYOS
+   sDllHandle tmp_handle;
+#endif
    char *file_name, *module_name, *udpart, *postfix, *orig_module;
 
    orig_module = str_ofTSD( module );
 #ifdef DYNLIBLEN
-   module_name = MallocTSD( Str_len( module ) + strlen(DYNLIBPRE) +
-                           strlen(DYNLIBPST) + 1 ) ;
+   module_name = (char *)MallocTSD( Str_len( module ) + strlen(DYNLIBPRE) +
+                                    strlen(DYNLIBPST) + 1 ) ;
    strcpy(module_name, DYNLIBPRE );
    udpart = module_name + strlen(DYNLIBPRE);
    memcpy(udpart, module->value, Str_len(module) );
@@ -319,8 +322,10 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    handle = LoadLibrary( file_name ) ;
    if (handle==NULL)
    {
+      char buf[150];
       FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT), LoadError, 256, NULL ) ;
-      set_err_message(TSD, "LoadLibrary() failed: ", LoadError);
+      sprintf( buf, "Failed to load \"%s\" library: LoadLibrary() failed: ", file_name );
+      set_err_message(TSD, buf, LoadError);
    }
 #elif defined(DYNAMIC_BEOS)
    handle = load_add_on( orig_module );
@@ -336,15 +341,22 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    }
 #elif defined(DYNAMIC_SKYOS)
    handle = (handle_type)MallocTSD( sizeof( sDllHandle ) );
-   if ( DllLoad( orig_module, handle ) != 0 )
+   /*
+    * Don't try and load the module without the trimmings.
+    * You get a binary popup window otherwise!
+    */
+fprintf(stderr,"%s %d %x %s:\n",__FILE__,__LINE__,handle,file_name);
+   if ( DllLoad( file_name, &tmp_handle ) != 0 )
    {
-      if ( DllLoad( file_name, handle ) != 0 )
-      {
-         set_err_message(TSD, "DLLLoad() failed loading:", file_name );
-         FreeTSD( handle );
-         handle = (handle_type)NULL;
-      }
+      char buf[150];
+      sprintf( buf, "Failed to load \"%s\" library: DllLoad() failed: ", file_name );
+      set_err_message(TSD, buf, strerror( errno ) );
+      FreeTSD( handle );
+      handle = (handle_type)NULL;
    }
+fprintf(stderr,"%s %d:\n",__FILE__,__LINE__);
+   memcpy( handle, &tmp_handle, sizeof( sDllHandle ) );
+fprintf(stderr,"%s %d:\n",__FILE__,__LINE__);
 #endif
 
    FreeTSD( module_name );
@@ -357,7 +369,7 @@ void wrapper_unload( const tsd_t *TSD, void *libhandle )
 {
 #ifdef DYNAMIC_STATIC
 
-   (libhandle = libhandle);
+   libhandle = libhandle;
 
 #elif defined(DYNAMIC_DLOPEN)
 
@@ -385,6 +397,7 @@ void wrapper_unload( const tsd_t *TSD, void *libhandle )
 
 #elif defined(DYNAMIC_SKYOS)
 
+fprintf(stderr,"%s %d:\n",__FILE__,__LINE__);
    FreeTSD( libhandle );
 
 #else
@@ -537,8 +550,10 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    }
    if (addr == NULL)
    {
+      char buf[150];
       FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT), LoadError, 256, NULL );
-      set_err_message( TSD, "GetProcAddress() failed: ", LoadError );
+      sprintf( buf, "Failed to find \"%s\" in external library: GetProcAddress() failed: ", funcname );
+      set_err_message( TSD, buf, LoadError );
    }
 
 #elif defined(DYNAMIC_BEOS)
@@ -552,6 +567,7 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    }
 
 #elif defined(DYNAMIC_SKYOS)
+fprintf(stderr,"%s %d:\n",__FILE__,__LINE__);
    addr = (PFN)GetDllFunction( handle, funcname );
    if ( addr == NULL )
    {
@@ -560,6 +576,7 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
       set_err_message( TSD,  buf, "" );
       addr = NULL;
    }
+fprintf(stderr,"%s %d:\n",__FILE__,__LINE__);
 #endif
 
    FreeTSD( funcname );

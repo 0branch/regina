@@ -12,3 +12,4 @@ General fixes. For a list of specific known bugs and errors see BUGS file.
 
 o Check the code where a string "FIXME" is visible.
 o The documentation of the code is very poor.
+o Error text for 26.5 need to have "zero or" removed

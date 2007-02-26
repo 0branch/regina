@@ -2,85 +2,128 @@
 !include "WinMessages.NSH"
 !verbose 4
 
-;====================================================
 ; AddToPath - Adds the given dir to the search path.
-;             Only adds dir if not already in PATH
-;             NOTE: Not robust; if c:\bindir;c:\winnt are
-;                   PATH, and you specify c:\bin, then
-;                   it WILL be found!
 ;        Input - head of the stack
 ;        Note - Win9x systems requires reboot
-;====================================================
+; Usage:
+; Push "directory" or ".ext"
+; Push "true" or "false"
+; Push "PATH" or "PATHEXT"
+; Call AddToPath
+
 Function AddToPath
+  Pop $R8 ; env variable; PATH or PATHEXT
+  Pop $R7 ; "true" or "false" if admin user
   Exch $0
   Push $1
-  
+  Push $2
+  Push $3
+
+  StrCpy $4 "$0" ;save install directory in $4
+  ; don't add if the new item already exists in the registry value
+  StrCmp $R7 "true" ReadPath_AllUsers
+  ReadRegStr $1 HKCU "Environment" "$R8"
+  Goto ReadPath_UserCont
+  ReadPath_AllUsers:
+  ReadRegStr $1 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "$R8"
+  ReadPath_UserCont:
+  Push "$1;"
+  Push "$0;"
+  Call StrStr
+  Pop $2
+  StrCmp $2 "" "" AddToPath_done
+  Push "$1;"
+  Push "$0\;"
+  Call StrStr
+  Pop $2
+  StrCmp $2 "" "" AddToPath_done
+  ;
+  ; Only compare shortpath if PATH env variable
+  ;
+  StrCmp $R8 "PATH" "" AddToPath_Not_PATH
+  GetFullPathName /SHORT $3 $0
+  Push "$1;"
+  Push "$3;"
+  Call StrStr
+  Pop $2
+  StrCmp $2 "" "" AddToPath_done
+  Push "$1;"
+  Push "$3\;"
+  Call StrStr
+  Pop $2
+  StrCmp $2 "" "" AddToPath_done
+  Goto AddToPath_cont
+  AddToPath_Not_PATH:
+  StrCpy $3 $0
+  AddToPath_cont:
   Call IsNT
   Pop $1
   StrCmp $1 1 AddToPath_NT
     ; Not on NT
-    ; $0 has the directory to add
-    StrCpy $1 $WINDIR 2 ;get the drive letter and colon into $1
-    GetFullPathName /SHORT $6 $0
-    StrCpy $6 "SET PATH=%PATH%;$6" ; $6 has the string we would have written when installing (except for leading CRLF)
-    ; Determine if the dir entry is already there (and written by us)
-    FileOpen $5 "$1\autoexec.bat" r ; $5 has autoexec.bat handle
-    
-    InPath_dosLoop:
-      FileRead $5 $3 ; $3 has 1 line from autoexec.bat
-      StrCmp $3 "$6$\r$\n" InPath_dosLoopFound ; get out if we found our string
-      StrCmp $3 "$6$\n" InPath_dosLoopFound    ; get out if we found our string
-      StrCmp $3 "$6" InPath_dosLoopFound       ; get out if we found our string
-      StrCmp $3 "" InPath_dosLoopEnd
-      Goto InPath_dosLoop
-
-    ; we found our string, so dir is already in PATH, don't do any more
-    InPath_dosLoopFound:
-      FileClose $5
-      Goto AddToPath_done
-    
-    InPath_dosLoopEnd:
-      FileClose $5
-
-    FileOpen $1 "$1\autoexec.bat" a ; $1 now has autoexec.bat handle
-    FileSeek $1 0 END
-    GetFullPathName /SHORT $0 $0
-    FileWrite $1 "$\r$\nSET PATH=%PATH%;$0$\r$\n"
+    StrCpy $1 $WINDIR 2
+    FileOpen $1 "$1\autoexec.bat" a
+    FileSeek $1 -1 END
+    FileReadByte $1 $2
+    IntCmp $2 26 0 +2 +2 # DOS EOF
+      FileSeek $1 -1 END # write over EOF
+    FileWrite $1 "$\r$\nSET $R8=%$R8%;$3$\r$\n"
     FileClose $1
     SetRebootFlag true
     Goto AddToPath_done
 
   AddToPath_NT:
-    ReadRegStr $1 HKCU "Environment" "PATH"
-    StrCmp $1 "" AddToPath_NTdoIt
-    Push $1 ; push the current PATH value onto the stack
-    Push $0 ; push the new PATH item onto the stack
-    Call StrStr ; Find $0 in $1
-    Pop $2 ; pos of the new PATH item in current PATH (-1 if not found)
-    IntCmp $2 -1 AddToPath_NTdoIt
-    Goto AddToPath_done
-
+    StrCmp $R7 "true" AddToPath_AllUsers
+    ReadRegStr $1 HKCU "Environment" "$R8"
+    Goto AddToPath_UserCont
+  AddToPath_AllUsers:
+    ReadRegStr $1 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "$R8"
+  AddToPath_UserCont:
+    StrCpy $2 $1 1 -1 # copy last char
+    StrCmp $2 ";" 0 +2 # if last char == ;
+    StrCpy $1 $1 -1 # remove last char
+    StrCmp $1 "" AddToPath_NTdoIt ; if current value is blank, do not prepend existing value
+    StrCpy $0 "$1;$0"
     AddToPath_NTdoIt:
-      StrCpy $0 "$1;$0"
-      WriteRegStr HKCU "Environment" "PATH" $0
-      SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
-  
+      StrCmp $R7 "true" AddToPath_AllUsers_doit
+      ; writing registry for current user
+      WriteRegExpandStr HKCU "Environment" "$R8" $0
+      DetailPrint "$4 added to $R8 for Current User"
+      Goto AddToPath_UserCont_doit
+    AddToPath_AllUsers_doit:
+      ; writing registry for all users
+      WriteRegExpandStr HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "$R8" $0
+      DetailPrint "$4 added to $R8 for All Users"
+    AddToPath_UserCont_doit:
+      SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=10000
+
   AddToPath_done:
+    Pop $3
+    Pop $2
     Pop $1
     Pop $0
 FunctionEnd
 
-;====================================================
 ; RemoveFromPath - Remove a given dir from the path
 ;     Input: head of the stack
-;====================================================
+; Usage:
+; Push "directory" or ".ext"
+; Push "true" or "false"
+; Push "PATH" or "PATHEXT"
+; Call un.RemoveFromPath
+
 Function un.RemoveFromPath
+  Pop $R8 ; env variable; PATH or PATHEXT
+  Pop $R7 ; "true" or "false" if admin user
   Exch $0
   Push $1
   Push $2
   Push $3
   Push $4
-  
+  Push $5
+  Push $6
+
+  IntFmt $6 "%c" 26 # DOS EOF
+
   Call un.IsNT
   Pop $1
   StrCmp $1 1 unRemoveFromPath_NT
@@ -89,20 +132,30 @@ Function un.RemoveFromPath
     FileOpen $1 "$1\autoexec.bat" r
     GetTempFileName $4
     FileOpen $2 $4 w
+    ;
+    ; Only compare shortpath if PATH env variable
+    ;
+    StrCmp $R8 "PATH" "" unRemoveFromPath_Not_PATH
     GetFullPathName /SHORT $0 $0
-    StrCpy $0 "SET PATH=%PATH%;$0"
-    SetRebootFlag true
+    unRemoveFromPath_Not_PATH:
+    StrCpy $0 "SET $R8=%$R8%;$0"
     Goto unRemoveFromPath_dosLoop
-    
+
     unRemoveFromPath_dosLoop:
       FileRead $1 $3
-      StrCmp $3 "$0$\r$\n" unRemoveFromPath_dosLoop
-      StrCmp $3 "$0$\n" unRemoveFromPath_dosLoop
-      StrCmp $3 "$0" unRemoveFromPath_dosLoop
+      StrCpy $5 $3 1 -1 # read last char
+      StrCmp $5 $6 0 +2 # if DOS EOF
+        StrCpy $3 $3 -1 # remove DOS EOF so we can compare
+      StrCmp $3 "$0$\r$\n" unRemoveFromPath_dosLoopRemoveLine
+      StrCmp $3 "$0$\n" unRemoveFromPath_dosLoopRemoveLine
+      StrCmp $3 "$0" unRemoveFromPath_dosLoopRemoveLine
       StrCmp $3 "" unRemoveFromPath_dosLoopEnd
       FileWrite $2 $3
       Goto unRemoveFromPath_dosLoop
-    
+      unRemoveFromPath_dosLoopRemoveLine:
+        SetRebootFlag true
+        Goto unRemoveFromPath_dosLoop
+
     unRemoveFromPath_dosLoopEnd:
       FileClose $2
       FileClose $1
@@ -113,26 +166,59 @@ Function un.RemoveFromPath
       Goto unRemoveFromPath_done
 
   unRemoveFromPath_NT:
-    StrCpy $0 ";$0"
-    StrLen $2 $0
-    ReadRegStr $1 HKCU "Environment" "PATH"
+    StrCmp $R7 "true" unRemoveFromPath_AllUsers
+    ReadRegStr $1 HKCU "Environment" "$R8"
+    Goto unRemoveFromPath_UserCont
+  unRemoveFromPath_AllUsers:
+    ReadRegStr $1 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "$R8"
+  unRemoveFromPath_UserCont:
+    StrCpy $5 $1 1 -1 # copy last char
+    StrCmp $5 ";" +2 # if last char != ;
+      StrCpy $1 "$1;" # append ;
     Push $1
-    Push $0
-    Call un.StrStr ; Find $0 in $1
-    Pop $0 ; pos of our dir
-    IntCmp $0 -1 unRemoveFromPath_done
+    Push "$0;"
+    Call un.StrStr ; Find `$0;` in $1
+    Pop $2 ; pos of our dir
+    StrCmp $2 "" unRemoveFromPath_done
       ; else, it is in path
-      StrCpy $3 $1 $0 ; $3 now has the part of the path before our dir
-      IntOp $2 $2 + $0 ; $2 now contains the pos after our dir in the path (';')
-;      IntOp $2 $2 + 1 ; $2 now containts the pos after our dir and the semicolon.
-      StrLen $0 $1
-      StrCpy $1 $1 $0 $2
-      StrCpy $3 "$3$1"
+      # $0 - path to add
+      # $1 - path var
+      StrLen $3 "$0;"
+      StrLen $4 $2
+      StrCpy $5 $1 -$4 # $5 is now the part before the path to remove
+      StrCpy $6 $2 "" $3 # $6 is now the part after the path to remove
+      StrCpy $3 $5$6
 
-      WriteRegStr HKCU "Environment" "PATH" $3
-      SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
-  
+      StrCpy $5 $3 1 -1 # copy last char
+      StrCmp $5 ";" 0 +2 # if last char == ;
+        StrCpy $3 $3 -1 # remove last char
+      ;
+      ; If the value is now empty, delete it
+      ;
+      StrCmp $3 "" "" unRemoveFromPath_rewrite
+      ; we need to delete the value
+      StrCmp $R7 "true" unRemoveFromPath_AllUsers_delete
+      DeleteRegValue HKCU "Environment" "$R8"
+      DetailPrint "$0 removed from $R8 for Current User"
+      Goto unRemoveFromPath_UserCont_doit
+    unRemoveFromPath_AllUsers_delete:
+      DeleteRegValue HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "$R8"
+      DetailPrint "$0 removed from $R8 for All Users"
+      Goto unRemoveFromPath_UserCont_doit
+    unRemoveFromPath_rewrite:
+      StrCmp $R7 "true" unRemoveFromPath_AllUsers_rewrite
+      WriteRegExpandStr HKCU "Environment" "$R8" $3
+      DetailPrint "$0 removed from $R8 for Current User"
+      Goto unRemoveFromPath_UserCont_doit
+    unRemoveFromPath_AllUsers_rewrite:
+      WriteRegExpandStr HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "$R8" $3
+      DetailPrint "$0 removed from $R8 for All Users"
+    unRemoveFromPath_UserCont_doit:
+      SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=10000
+
   unRemoveFromPath_done:
+    Pop $6
+    Pop $5
     Pop $4
     Pop $3
     Pop $2
@@ -141,106 +227,15 @@ Function un.RemoveFromPath
 FunctionEnd
 
 ;====================================================
-; StrStr - Finds a given string in another given string.
-;               Returns -1 if not found and the pos if found.
-;          Input: head of the stack - string to find
-;                      second in the stack - string to find in
-;          Output: head of the stack
-;====================================================
-Function StrStr
-  Push $0
-  Exch
-  Pop $0 ; $0 now have the string to find
-  Push $1
-  Exch 2
-  Pop $1 ; $1 now have the string to find in
-  Exch
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-
-  StrCpy $2 -1
-  StrLen $3 $0
-  StrLen $4 $1
-  IntOp $4 $4 - $3
-
-  StrStr_loop:
-    IntOp $2 $2 + 1
-    IntCmp $2 $4 0 0 StrStrReturn_notFound
-    StrCpy $5 $1 $3 $2
-    StrCmp $5 $0 StrStr_done StrStr_loop
-
-  StrStrReturn_notFound:
-    StrCpy $2 -1
-
-  StrStr_done:
-    Pop $5
-    Pop $4
-    Pop $3
-    Exch $2
-    Exch 2
-    Pop $0
-    Pop $1
-FunctionEnd
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Uninstall stuff
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-;====================================================
-; StrStr - Finds a given string in another given string.
-;               Returns -1 if not found and the pos if found.
-;          Input: head of the stack - string to find
-;                      second in the stack - string to find in
-;          Output: head of the stack
-;====================================================
-Function un.StrStr
-  Push $0
-  Exch
-  Pop $0 ; $0 now have the string to find
-  Push $1
-  Exch 2
-  Pop $1 ; $1 now have the string to find in
-  Exch
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-
-  StrCpy $2 -1
-  StrLen $3 $0
-  StrLen $4 $1
-  IntOp $4 $4 - $3
-
-  unStrStr_loop:
-    IntOp $2 $2 + 1
-    IntCmp $2 $4 0 0 unStrStrReturn_notFound
-    StrCpy $5 $1 $3 $2
-    StrCmp $5 $0 unStrStr_done unStrStr_loop
-
-  unStrStrReturn_notFound:
-    StrCpy $2 -1
-
-  unStrStr_done:
-    Pop $5
-    Pop $4
-    Pop $3
-    Exch $2
-    Exch 2
-    Pop $0
-    Pop $1
-FunctionEnd
-
-;====================================================
 ; EmptyDirectory - Determines if directory passed is empty
 ;                  and deletes it and from PATH if not empty
 ;          Returns: nothing
-;          Input: full path name
+;          Input - PATH
+;                - "true" or "false"
 ;====================================================
 Function un.EmptyDirectory
-  Pop $5
+  Pop $R7 ; "true" or "false" if admin user
+  Pop $R5
   FindFirst $2 $1 "$5\*.*"
   StrCmp $1 "" empty
   StrCmp $1 "." cont
@@ -256,8 +251,61 @@ cont:
   Goto done
 empty:
   ; Remove the directory from PATH
-  Push $5
+  Push $R5
+  Push $R7
+  Push "PATH"
   Call un.RemoveFromPath
 done:
   FindClose $2
 FunctionEnd
+
+###########################################
+#            Utility Functions            #
+###########################################
+
+
+; StrStr
+; input, top of stack = string to search for
+;        top of stack-1 = string to search in
+; output, top of stack (replaces with the portion of the string remaining)
+; modifies no other variables.
+;
+; Usage:
+;   Push "this is a long ass string"
+;   Push "ass"
+;   Call StrStr
+;   Pop $R0
+;  ($R0 at this point is "ass string")
+
+!macro StrStr un
+Function ${un}StrStr
+Exch $R1 ; st=haystack,old$R1, $R1=needle
+  Exch    ; st=old$R1,haystack
+  Exch $R2 ; st=old$R1,old$R2, $R2=haystack
+  Push $R3
+  Push $R4
+  Push $R5
+  StrLen $R3 $R1
+  StrCpy $R4 0
+  ; $R1=needle
+  ; $R2=haystack
+  ; $R3=len(needle)
+  ; $R4=cnt
+  ; $R5=tmp
+  loop:
+    StrCpy $R5 $R2 $R3 $R4
+    StrCmp $R5 $R1 done
+    StrCmp $R5 "" done
+    IntOp $R4 $R4 + 1
+    Goto loop
+done:
+  StrCpy $R1 $R2 "" $R4
+  Pop $R5
+  Pop $R4
+  Pop $R3
+  Pop $R2
+  Exch $R1
+FunctionEnd
+!macroend
+!insertmacro StrStr ""
+!insertmacro StrStr "un."

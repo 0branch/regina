@@ -12,14 +12,15 @@
                 "Processing DESCRIP.MMS (Regina) concludes at", 0)
 !
 .IFDEF DEBUGGING
-CC=CC/DECC
-CFLAGS=/NOOPTIMIZE/STANDARD=RELAXED_ANSI89/WARNINGS=DISABLE=(IMPLICITFUNC) -
-        /INCLUDE_DIRECTORY=[]/NAMES=SHORTENED/DEFINE=VMS/DEBUG/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
+CC=CC/DECC/DEBUG
+CFLAGS=/NOOPTIMIZE/STANDARD=RELAXED_ANSI89/WARNINGS=DISABLE=(IMPLICITFUNC,cvtdiftypes) -
+        /INCLUDE_DIRECTORY=[]/NAMES=SHORTENED/DEFINE=(VMS,HAVE_DIV,HAVE_ARPA_INET_H)/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
 LINK=LINK/DEBUG
 .ELSE
-CC=CC/DECC
+CC=CC/DECC/NODEBUG
 CFLAGS=/OPTIMIZE/STANDARD=RELAXED_ANSI89/WARNINGS=DISABLE=(IMPLICITFUNC) -
-        /INCLUDE_DIRECTORY=[]/NAMES=SHORTENED/DEFINE=VMS/NOLIST/OBJECT=$(MMS$TARGET_NAME).OBJ
+        /INCLUDE_DIRECTORY=[]/NAMES=SHORTENED/DEFINE=(VMS,HAVE_DIV,HAVE_ARPA_INET_H)/OBJECT=$(MMS$TARGET_NAME).OBJ
+LINK=LINK/NODEBUG
 .ENDIF
 !
 ! platform dependant, ...
@@ -29,22 +30,24 @@ CFLAGS=/OPTIMIZE/STANDARD=RELAXED_ANSI89/WARNINGS=DISABLE=(IMPLICITFUNC) -
 !
 .IFDEF VAX
 .ENDIF
+LINKFLAGS=/MAP
 !
-OBJ1=builtin.obj,cmath.obj,cmsfuncs.obj,convert.obj,
-!OBJ1=builtin.obj,client.obj,cmath.obj,cmsfuncs.obj,convert.obj,
+!OBJ1=builtin.obj,cmath.obj,cmsfuncs.obj,convert.obj,
+OBJ1=builtin.obj,client.obj,cmath.obj,cmsfuncs.obj,convert.obj,
 OBJ2=dbgfuncs.obj,debug.obj,doscmd.obj,envir.obj,error.obj,expr.obj,
-OBJ3=extlib.obj,files.obj,funcs.obj,
+!OBJ3=extlib.obj,files.obj,funcs.obj,
+OBJ3=files.obj,funcs.obj,
 OBJ4=mt_notmt.obj,rexxbif.obj,instore.obj,extstack.obj,os2funcs.obj,
 OBJ5=interp.obj,interprt.obj,lexsrc.obj,library.obj,macros.obj,memory.obj,
-!OBJ6=misc.obj,options.obj,parsing.obj,rexxext.obj,rexxsaa.obj,shell.obj,
-OBJ6=misc.obj,options.obj,parsing.obj,rexxext.obj,shell.obj,
+OBJ6=misc.obj,options.obj,parsing.obj,rexxext.obj,rexxsaa.obj,shell.obj,
+!OBJ6=misc.obj,options.obj,parsing.obj,rexxext.obj,shell.obj,
 OBJ7=signals.obj,stack.obj,strings.obj,strmath.obj,tracing.obj,unxfuncs.obj,
 .IFDEF DOESNT_HAVE_UNAME
 OBJ8=uname.obj,
 .ELSE
 OBJ8=
 .ENDIF
-OBJ9=vmsfuncs.obj,vmscmd.obj,variable.obj,wrappers.obj,yaccsrc.obj,alloca.obj
+OBJ9=vmsfuncs.obj,vmscmd.obj,variable.obj,wrappers.obj,yaccsrc.obj,alloca.obj,arxfuncs.obj
 
 LIB=LIBRARY
 LIBFLAGS=/CREATE regina.olb

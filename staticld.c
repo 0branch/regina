@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: staticld.c,v 1.5 2004/04/21 07:16:19 mark Exp $
+ * $Id: staticld.c,v 1.7 2004/05/26 03:50:43 mark Exp $
  */
 
 #include "rexx.h"
@@ -153,5 +153,15 @@ int static_dlsym( void *addr, char *name, void **faddr )
       return 1;
    else
       return 0;
+}
+
+void static_list_packages()
+{
+   int i, num_packages ;
+   num_packages = ( sizeof( RexxPackages ) / sizeof( *RexxPackages ) ) - 1;
+   for ( i = 0; i < num_packages; i++)
+   {
+      fprintf( stderr, " Statically loaded: %s\n", RexxPackages[i].name );
+   }
 }
 #endif

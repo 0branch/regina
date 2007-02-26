@@ -265,6 +265,11 @@ tsd_t *ReginaInitializeThread(void)
    if (!OK)
       return(NULL);
 
+   {
+      extern OS_Dep_funcs __regina_OS_Os2;
+      retval->OS = &__regina_OS_Os2;
+   }
+
    OK &= init_vars(retval);             /* Initialize the variable module    */
    OK &= init_stacks(retval);           /* Initialize the stack module       */
    OK &= init_filetable(retval);        /* Initialize the files module       */

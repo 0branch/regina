@@ -2,7 +2,7 @@
 # Regina error messages - Norwegian (Bokmål)
 # Written by Mark Hessling <M.Hessling@qut.edu.au>
 #
-# norwegian (bokmal) - Vidar Tysse <vtsystem@bgnett.no>
+# norwegian (bokmal) - Vidar Tysse <vtysse@broadpark.no>
 #
   0,  1,Feil %s under kjøring av %s, linje %d:|<value>,<source>,<linenumber>
   0,  2,Feil %s i interaktiv sporing:|<value>
@@ -146,8 +146,8 @@
  39,  0,[Overflyt i evalueringsstakk]
  40,  0,Uriktig kall til rutine
  40,  1,Ekstern rutine "%s" feilet|<name>
- 40,  3,For få argumenter i kall av "%s"; minst %d forventet|<bif>,<argnumber>
- 40,  4,For mange argumenter i kall av "%s"; maksimalt %d forventet|<bif>,<argnumber>
+ 40,  3,For få argumenter i kall av "%s"; ventet minst %d|<bif>,<argnumber>
+ 40,  4,For mange argumenter i kall av "%s"; ventet maksimalt %d|<bif>,<argnumber>
  40,  5,Argument mangler i kall av "%s"; argument %d er påkrevet|<bif>,<argnumber>
  40,  9,%s-argument %d eksponent overskrider %d sifre; fant "%s"|<bif>,<argnumber>,#Limit_ExponentDigits,<value>
  40, 11,%s-argument %d må være et tall; fant "%s"|<bif>,<argnumber>,<value>
@@ -179,24 +179,24 @@
  40,914,[%s-argument %d, må være en av "%s"; fant "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: lavnivå I/O-feil i strøm; %s]|<bif>,<description>
  40,921,[%s-argument %d, posisjoneringsmodus "%s"; ikke kompatibel med åpnemodus for aktuell strøm]|<bif>,<argnumber>,<value>
- 40,922,[%s-argument %d, for få underkommandoer; minst %d forventet; fant %d]|<bif>,<argnumber>,<value>,<value>
- 40,923,[%s-argument %d, for mange underkommandoer; maksimalt %d forventet; fant %d]|<bif>,<argnumber>,<value>,<value>
+ 40,922,[%s-argument %d, for få underkommandoer; ventet minst %d; fant %d]|<bif>,<argnumber>,<value>,<value>
+ 40,923,[%s-argument %d, for mange underkommandoer; ventet maksimalt %d; fant %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s-argument %d, ugyldig posisjonsspesifikasjon; ventet en av "%s"; fant "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>
- 40,980,Unexpected input, either unknown type or illegal data%s%s|: ,<location>
- 40,981,Number out of the allowed range%s%s|: ,<location>
- 40,982,String too big for the defined buffer%s%s|: ,<location>
- 40,983,Illegal combination of type/size%s%s|: ,<location>
- 40,984,Unsupported number like NAN, +INF, -INF%s%s|: ,<location>
- 40,985,Structure too complex for static internal buffer%s%s|: ,<location>
- 40,986,An element of the structure is missing%s%s|: ,<location>
- 40,987,A value of the structure is missing%s%s|: ,<location>
- 40,988,The name or part of the name is illegal for the interpreter%s%s|: ,<location>
- 40,989,A problem raises at the interface between Regina and GCI%s%s|: ,<location>
- 40,990,The type won't fit the requirements for basic types (arguments/return value)%s%s|: ,<location>
- 40,991,The number of arguments is wrong or an argument is missing%s%s|: ,<location>
- 40,992,GCI's internal stack for arguments got an overflow%s%s|: ,<location>
- 40,993,GCI counted too many nested LIKE containers%s%s|: ,<location>
+ 40,930,[RXQUEUE, funksjon TIMEOUT, ventet et heltall mellom -1 og %d; fant \"%s\"]|<value>,<value>
+ 40,980,Uventet input, enten ukjent type eller ugyldige data%s%s|: ,<location>
+ 40,981,Tall utenfor tillatt område%s%s|: ,<location>
+ 40,982,Streng for stor for det definerte bufferet%s%s|: ,<location>
+ 40,983,Ugyldig kombinasjon av type/størrelse%s%s|: ,<location>
+ 40,984,Ikke-støttet tall som NAN, +INF, -INF%s%s|: ,<location>
+ 40,985,For kompleks struktur for statisk internbuffer%s%s|: ,<location>
+ 40,986,Et element mangler i strukturen%s%s|: ,<location>
+ 40,987,En verdi mangler i strukturen%s%s|: ,<location>
+ 40,988,Navnet eller en del av navnet er ugyldig for tolkeren%s%s|: ,<location>
+ 40,989,Det oppstod et problem i grensesnittet mellom Regina og GCI%s%s|: ,<location>
+ 40,990,Typen fyller ikke kravene for grunntyper (argumenter/returverdi)%s%s|: ,<location>
+ 40,991,Antall argumenter er feil eller et argument mangler%s%s|: ,<location>
+ 40,992,GCIs interne stakk for argumenter fikk en overflyt%s%s|: ,<location>
+ 40,993,GCI telte for mange nøstede LIKE-containere%s%s|: ,<location>
  41,  0,Feil i aritmetisk konvertering
  41,  1,Ikke-numerisk verdi ("%s") til venstre for aritmetisk operasjon "%s"|<value>,<operator>
  41,  2,Ikke-numerisk verdi ("%s") til høyre for aritmetisk operasjon "%s"|<value>,<operator>
@@ -245,7 +245,7 @@
  64,  0,[Syntaksfeil under analysering]
  64,  1,[Syntaksfeil på linje %d]
  64,  2,[Generell syntaksfeil på linje %d, kolonne %d]|<linenumber>,<columnnumber>
- 90,  0,[Ikke-ANSI-trekk brukt med "OPTIONS STRICT_ANSI"]
+ 90,  0,[Ikke-ANSI-feature brukt med "OPTIONS STRICT_ANSI"]
  90,  1,[BIF %s er en Regina-utvidelse]|<bif>
  90,  2,[Instruksjon %s er en Regina-utvidelse]|<token>
  90,  3,[%s argument %d, opsjon må starte med en av "%s" med "OPTIONS STRICT_ANSI"; fant "%s"; en Regina-utvidelse]|<bif>,<argnumber>,<optionslist>,<value>
@@ -263,15 +263,15 @@
  94,106,[Maksimalt antall eksterne køer overskredet: %d]|<maxqueues>
  94,107,[Feil oppstod under lesing av socket: %s]|<systemerror>
  94,108,[Ugyldig bryter oversendt. Må være en av "%s"]|<switch>
- 94,109,[Queue \"%s\" not found]|<queuename>
- 94,110,[%s invalid for external queues]|<bif>
- 94,111,[RXQUEUE function %s invalid for internal queues]|<functionname>
- 95,  0,[Restricted feature used in "safe" mode]
- 95,  1,[%s invalid in "safe" mode]|<token>
- 95,  2,[%s argument %d invalid in "safe" mode]|<bif>,<argnumber>
- 95,  3,[%s argument %d: "%s", invalid in "safe" mode]|<bif>,<argnumber>,<token>
- 95,  4,[STREAM argument 3: Opening files for WRITE access invalid in "safe" mode]
- 95,  5,[Running external commands invalid in "safe" mode]
+ 94,109,[Finner ikke køen \"%s\"]|<queuename>
+ 94,110,[%s ugyldig for eksterne køer]|<bif>
+ 94,111,[RXQUEUE-funksjon %s ugyldig for interne køer]|<functionname>
+ 95,  0,[Begrenset feature ble brukt i "sikker" modus]
+ 95,  1,[%s ugyldig i "sikker" modus]|<token>
+ 95,  2,[%s argument %d ugyldig i "sikker" modus]|<bif>,<argnumber>
+ 95,  3,[%s argument %d: "%s", ugyldig i "sikker" modus]|<bif>,<argnumber>,<token>
+ 95,  4,[STREAM-argument 3: Å åpne filer for WRITE-tilgang er ulovlig i "sikker" modus]
+ 95,  5,[Det er ulovlig å kjøre eksterne kommandoer i "sikker" modus]
 100,  0,[Ukjent filsystemfeil]
 #
 # Extra general phrases requiring translation:

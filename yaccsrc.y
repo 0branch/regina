@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.30 2004/02/10 10:44:30 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.39 2006/09/15 05:41:01 mark Exp $";
 #endif
 
 /*
@@ -66,6 +66,8 @@ static int parendepth;
 
 static nodeptr current, with = NULL;
 
+static char *nullptr = NULL; /* for C++ compilation */
+
 typedef enum { IS_UNKNOWN,
                IS_A_NUMBER,
                IS_NO_NUMBER,
@@ -77,14 +79,14 @@ typedef enum { REDUCE_CALL,
                REDUCE_RIGHT,
                REDUCE_SUBEXPR } reduce_mode;
 
-static node_type gettypeof( nodeptr this ) ;
-static void checkconst( nodeptr this ) ;
-static nodeptr reduce_expr_list( nodeptr this, reduce_mode mode );
-static void transform( nodeptr this ) ;
+static node_type gettypeof( nodeptr thisptr ) ;
+static void checkconst( nodeptr thisptr ) ;
+static nodeptr reduce_expr_list( nodeptr thisptr, reduce_mode mode );
+static void transform( nodeptr thisptr ) ;
 static nodeptr create_head( const char *name ) ;
 static nodeptr makenode( int type, int numb, ... ) ;
-static void checkdosyntax( cnodeptr this ) ;
-void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this ) ;
+static void checkdosyntax( cnodeptr thisptr ) ;
+void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr thisptr ) ;
 static nodeptr optgluelast( nodeptr p1, nodeptr p2 );
 static void move_labels( nodeptr front, nodeptr end, int level );
 
@@ -132,13 +134,12 @@ static void move_labels( nodeptr front, nodeptr end, int level );
 
 %left '|' XOR
 %left '&'
-%nonassoc '=' DIFFERENT GTE GT LT LTE EQUALEQUAL NOTEQUALEQUAL GTGT LTLT NOTGTGT NOTLTLT GTGTE LTLTE
+%left '=' DIFFERENT GTE GT LT LTE EQUALEQUAL NOTEQUALEQUAL GTGT LTLT NOTGTGT NOTLTLT GTGTE LTLTE
 %left CONCATENATE SPACE CCAT
 %left '+' '-'
 %left '*' '/' '%' MODULUS
 %left EXP
-%left UMINUS UPLUSS NOT
-%nonassoc SYNTOP
+%left UMINUS UPLUS NOT /*UPLUS and UMINUS are locally used to assign precedence*/
 
 %nonassoc THEN
 %nonassoc ELSE
@@ -478,23 +479,24 @@ do_stat      : do repetitor conditional ncl nxstats end
                                        }
              ;
 
-repetitor    : dovar '=' expr tobyfor tobyfor tobyfor
-                                       { $$ =makenode(X_REP,4,$3,$4,$5,$6) ;
+repetitor    : dovar '=' expr nspace tobyfor tobyfor tobyfor
+                                       { $$ =makenode(X_REP,4,$3,$5,$6,$7) ;
                                          $$->name = (streng *)$1 ;
                                          checkdosyntax($$) ; }
-             | dovar '=' expr tobyfor tobyfor
-                                       { $$ =makenode(X_REP,3,$3,$4,$5) ;
+             | dovar '=' expr nspace tobyfor tobyfor
+                                       { $$ =makenode(X_REP,3,$3,$5,$6) ;
                                          $$->name = (streng *)$1 ;
                                          checkdosyntax($$) ; }
-             | dovar '=' expr tobyfor  { $$ =makenode(X_REP,2,$3,$4) ;
+             | dovar '=' expr nspace tobyfor
+                                       { $$ = makenode(X_REP,2,$3,$5) ;
                                          $$->name = (streng *)$1 ;
                                          checkdosyntax($$) ; }
-             | dovar '=' expr          { $$ =makenode(X_REP,1,$3) ;
+             | dovar '=' expr nspace   { $$ = makenode(X_REP,1,$3) ;
                                          $$->name = (streng *)$1 ;
                                          checkdosyntax($$) ; }
-             | FOREVER                 { $$ = makenode(X_REP_FOREVER,0) ; }
+             | FOREVER nspace          { $$ = makenode(X_REP_FOREVER,0) ; }
              | FOREVER error { exiterror( ERR_INV_SUBKEYWORD, 16, "WHILE UNTIL", __reginatext ) ; }
-             | expr                    { $1 = makenode(X_DO_EXPR,1,$1) ;
+             | expr nspace             { $1 = makenode(X_DO_EXPR,1,$1) ;
                                          $$ = makenode(X_REP,2,NULL,$1) ; }
              |                         { $$ = NULL ; }
              ;
@@ -602,7 +604,7 @@ resources    : STREAM nnvir            { /* ANSI extension: nsimsymb is
                                          /*
                                           * expect a single dot as the last character
                                           */
-                                         p = memchr( tmp->value, '.', tmp->len );
+                                         p = (char *)memchr( tmp->value, '.', tmp->len );
                                          if ( p != tmp->value + tmp->len - 1 )
                                             exiterror( ERR_INVALID_OPTION, 3, __reginatext );
                                          $$ = $2 ;
@@ -656,13 +658,13 @@ addrString   : string                  { $$ = makenode(X_ADDR_WITH, 0) ;
 dovar        : DOVARIABLE              { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
              ;
 
-tobyfor      : TO expr                 { $$ = makenode(X_DO_TO,1,$2) ; }
-             | FOR expr                { $$ = makenode(X_DO_FOR,1,$2) ; }
-             | BY expr                 { $$ = makenode(X_DO_BY,1,$2) ; }
+tobyfor      : TO expr  nspace         { $$ = makenode(X_DO_TO,1,$2) ; }
+             | FOR expr nspace         { $$ = makenode(X_DO_FOR,1,$2) ; }
+             | BY expr  nspace         { $$ = makenode(X_DO_BY,1,$2) ; }
              ;
 
-conditional  : WHILE expr              { $$ = makenode(X_WHILE,1,$2) ; }
-             | UNTIL expr              { $$ = makenode(X_UNTIL,1,$2) ; }
+conditional  : WHILE expr nspace       { $$ = makenode(X_WHILE,1,$2) ; }
+             | UNTIL expr nspace       { $$ = makenode(X_UNTIL,1,$2) ; }
              |                         { $$ = NULL ; }
              ;
 
@@ -930,6 +932,7 @@ signal_stat : signal VALUE expr        { $$ = $1 ;
             ;
 
 signal_name  : asymbol                 { $$ = $1; }
+             | STRING                  { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
              | error                   { exiterror( ERR_STRING_EXPECTED, 4, __reginatext );}
              ;
 
@@ -1153,12 +1156,12 @@ expr        : '('                      { /* We have to accept exprs here even
             | STRING                   { $$ = makenode( X_STRING, 0 );
                                          $$->name = Str_cre_TSD(parser_data.TSD,retvalue) ; }
             | function                 { $$ = $1 ; }
-            | '+' expr %prec UPLUSS    { AUTO_REDUCE( $2, NULL );
+            | '+' expr %prec UPLUS     { AUTO_REDUCE( $2, nullptr );
                                          $$ = makenode( X_U_PLUSS, 1, $2 ); }
-            | '-' expr %prec UMINUS    { AUTO_REDUCE( $2, NULL );
+            | '-' expr %prec UMINUS    { AUTO_REDUCE( $2, nullptr );
                                          $$ = makenode( X_U_MINUS, 1, $2 ); }
-            | '+'      %prec SYNTOP    { exiterror( ERR_INVALID_EXPRESSION, 0 ); }
-            | '-'      %prec SYNTOP    { exiterror( ERR_INVALID_EXPRESSION, 0 ); }
+            | '+' error                { exiterror( ERR_INVALID_EXPRESSION, 1, __reginatext ); } /* fixes bug 1107760 */
+            | '-' error                { exiterror( ERR_INVALID_EXPRESSION, 1, __reginatext ); } /* fixes bug 1107760 */
             ;
 
 exprs_sub   : exprs ')'                { $$ = $1; }
@@ -1216,7 +1219,7 @@ solid       : '-' offset               { $$ = makenode(X_NEG_OFFS,0) ;
 
 offset      : OFFSET                   { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
             | CONSYMBOL                { streng *sptr = Str_cre_TSD(parser_data.TSD,retvalue) ;
-                                          if (myisnumber(sptr))
+                                          if (myisnumber(parser_data.TSD, sptr))
                                           {
                                              exiterror( ERR_INVALID_INTEGER, 4, sptr->value ) ;
                                           }
@@ -1290,7 +1293,12 @@ exprs       : nexpr ','                { /* detect
                                          $1 = reduce_expr_list( $1,
                                                               REDUCE_SUBEXPR );
                                        }
-                        exprs          { assert( IS_EXPRLIST( $4 ) );
+                        exprs          { /*
+                                          * Fixes bug 961301.
+                                          */
+                                         nodeptr curr;
+
+                                         assert( IS_EXPRLIST( $4 ) );
 
                                          /* detect ",()." */
                                          if ( IS_EXPRLIST( $4->p[0] )
@@ -1312,12 +1320,12 @@ exprs       : nexpr ','                { /* detect
 
                                          /* Detect something like
                                           * "call s (a,b)+1"                 */
-                                         current = $4->p[0];
-                                         if ( ( current != NULL )
-                                           && !IS_EXPRLIST( current )
-                                           && !IS_FUNCTION( current )
-                                           && ( IS_EXPRLIST( current->p[0] )
-                                             || IS_EXPRLIST( current->p[1] ) ) )
+                                         curr = $4->p[0];
+                                         if ( ( curr != NULL )
+                                           && !IS_EXPRLIST( curr )
+                                           && !IS_FUNCTION( curr )
+                                           && ( IS_EXPRLIST( curr->p[0] )
+                                             || IS_EXPRLIST( curr->p[1] ) ) )
                                             exiterror( ERR_INVALID_EXPRESSION, 0 );
 
                                          $$ = makenode( X_EXPRLIST, 2, $1, $4 );
@@ -1395,7 +1403,7 @@ static nodeptr makenode( int type, int numb, ... )
    va_list argptr ;
    int i ;
 
-   assert(numb <= sizeof(thisleave->p)/sizeof(thisleave->p[0]));
+   assert(numb <= (int) (sizeof(thisleave->p)/sizeof(thisleave->p[0])));
 #ifdef REXXDEBUG
    printf("makenode: making new node, type: %d\n",type) ;
 #endif /* REXXDEBUG */
@@ -1427,52 +1435,52 @@ static char *getdokeyword( int type )
    return ptr;
 }
 
-static void checkdosyntax( cnodeptr this )
+static void checkdosyntax( cnodeptr thisptr )
 {
-   if ((this->p[1]!=NULL)&&(this->p[2]!=NULL))
+   if ((thisptr->p[1]!=NULL)&&(thisptr->p[2]!=NULL))
    {
-      if ((this->p[1]->type)==(this->p[2]->type))
+      if ((thisptr->p[1]->type)==(thisptr->p[2]->type))
       {
-         exiterror( ERR_INVALID_DO_SYNTAX, 1, getdokeyword(this->p[1]->type) )  ;
+         exiterror( ERR_INVALID_DO_SYNTAX, 1, getdokeyword(thisptr->p[1]->type) )  ;
       }
    }
-   if ((this->p[2]!=NULL)&&(this->p[3]!=NULL))
+   if ((thisptr->p[2]!=NULL)&&(thisptr->p[3]!=NULL))
    {
-      if ((this->p[2]->type)==(this->p[3]->type))
+      if ((thisptr->p[2]->type)==(thisptr->p[3]->type))
       {
-         exiterror( ERR_INVALID_DO_SYNTAX, 1, getdokeyword(this->p[2]->type) )  ;
+         exiterror( ERR_INVALID_DO_SYNTAX, 1, getdokeyword(thisptr->p[2]->type) )  ;
       }
    }
-   if ((this->p[1]!=NULL)&&(this->p[3]!=NULL))
+   if ((thisptr->p[1]!=NULL)&&(thisptr->p[3]!=NULL))
    {
-      if ((this->p[1]->type)==(this->p[3]->type))
+      if ((thisptr->p[1]->type)==(thisptr->p[3]->type))
       {
-         exiterror( ERR_INVALID_DO_SYNTAX, 1, getdokeyword(this->p[1]->type) )  ;
+         exiterror( ERR_INVALID_DO_SYNTAX, 1, getdokeyword(thisptr->p[1]->type) )  ;
       }
    }
    return ;
 }
 
 
-void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this )
+void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr thisptr )
 {
-   labelboxptr new ;
+   labelboxptr newptr ;
 
-   assert( this ) ;
+   assert( thisptr ) ;
 
-   new = MallocTSD(sizeof(labelbox)) ;
+   newptr = (labelboxptr)MallocTSD(sizeof(labelbox)) ;
 
-   new->next = NULL ;
-   new->entry = this ;
+   newptr->next = NULL ;
+   newptr->entry = thisptr ;
    if (ipt->first_label == NULL)
    {
-      ipt->first_label = new ;
-      ipt->last_label = new ; /* must be NULL, too */
+      ipt->first_label = newptr ;
+      ipt->last_label = newptr ; /* must be NULL, too */
    }
    else
    {
-      ipt->last_label->next = new ;
-      ipt->last_label = new ;
+      ipt->last_label->next = newptr ;
+      ipt->last_label = newptr ;
    }
    ipt->numlabels++;
 }
@@ -1554,11 +1562,11 @@ static nodeptr create_head( const char *name )
 }
 
 
-static node_type gettypeof( nodeptr this )
+static node_type gettypeof( nodeptr thisptr )
 {
    tsd_t *TSD = parser_data.TSD;
 
-   switch(this->type)
+   switch(thisptr->type)
    {
       case X_PLUSS:
       case X_MINUS:
@@ -1598,10 +1606,23 @@ static node_type gettypeof( nodeptr this )
       case X_STRING:
       case X_CON_SYMBOL:
       {
-         if (this->u.number)      /* FIXME: When does this happen? */
+         if (thisptr->u.number)
+         {
+            fprintf( stderr, "Found an internal spot of investigation of the Regina interpreter.\n"
+                             "Please inform Mark Hessling or Florian Coosmann about the\n"
+                             "circumstances and this script.\n"
+                             "\n"
+                             "Many thanks!\n"
+                             "email addresses:\n"
+                             "m.hessling@qut.edu.au\n"
+                             "florian@grosse-coosmann.de\n");
+            /* FIXME: When does this happen?
+             * It doesn't happen if no feedback is send until end of 2005.
+             */
             return IS_A_NUMBER ;
+         }
 
-         if ( ( this->u.number = is_a_descr( TSD, this->name ) ) != NULL )
+         if ( ( thisptr->u.number = is_a_descr( TSD, thisptr->name ) ) != NULL )
             return IS_A_NUMBER;
          return IS_NO_NUMBER;
       }
@@ -1611,74 +1632,74 @@ static node_type gettypeof( nodeptr this )
 
 
 
-static void transform( nodeptr this )
+static void transform( nodeptr thisptr )
 {
    int type ;
    node_type left,rght;
 
-   left = gettypeof( this->p[0] ) ;
-   rght = gettypeof( this->p[1] ) ;
-   type = this->type ;
+   left = gettypeof( thisptr->p[0] ) ;
+   rght = gettypeof( thisptr->p[1] ) ;
+   type = thisptr->type ;
 
    if ( ( left == IS_A_NUMBER ) && ( rght == IS_A_NUMBER ) )
    {
       if (type==X_EQUAL)
-         this->type = X_NEQUAL ;
+         thisptr->type = X_NEQUAL ;
       else if (type==X_DIFF)
-         this->type = X_NDIFF ;
+         thisptr->type = X_NDIFF ;
       else if (type==X_GTE)
-         this->type = X_NGTE ;
+         thisptr->type = X_NGTE ;
       else if (type==X_GT)
-         this->type = X_NGT ;
+         thisptr->type = X_NGT ;
       else if (type==X_LTE)
-         this->type = X_NLTE ;
+         thisptr->type = X_NLTE ;
       else if (type==X_LT)
-         this->type = X_NLT ;
+         thisptr->type = X_NLT ;
    }
    else if ( ( left == IS_NO_NUMBER ) || ( rght == IS_NO_NUMBER ) )
    {
       if (type==X_EQUAL)
-         this->type = X_SEQUAL ;
+         thisptr->type = X_SEQUAL ;
       else if (type==X_DIFF)
-         this->type = X_SDIFF ;
+         thisptr->type = X_SDIFF ;
       else if (type==X_GTE)
-         this->type = X_SGTE ;
+         thisptr->type = X_SGTE ;
       else if (type==X_GT)
-         this->type = X_SGT ;
+         thisptr->type = X_SGT ;
       else if (type==X_LTE)
-         this->type = X_SLTE ;
+         thisptr->type = X_SLTE ;
       else if (type==X_LT)
-         this->type = X_SLT ;
+         thisptr->type = X_SLT ;
    }
    else
    {
-      type = this->p[0]->type ;
+      type = thisptr->p[0]->type ;
       if ( ( left == IS_A_NUMBER )
         && ( ( type == X_STRING ) || ( type == X_CON_SYMBOL ) ) )
-         this->u.flags.lnum = 1 ;
+         thisptr->u.flags.lnum = 1 ;
       else if ( left == IS_SIM_SYMBOL )
-         this->u.flags.lsvar = 1 ;
+         thisptr->u.flags.lsvar = 1 ;
       else if ( left == IS_COMP_SYMBOL )
-         this->u.flags.lcvar = 1 ;
+         thisptr->u.flags.lcvar = 1 ;
 
-      type = this->p[1]->type ;
+      type = thisptr->p[1]->type ;
       if ( ( rght == IS_A_NUMBER )
         && ( ( type == X_STRING ) || ( type == X_CON_SYMBOL ) ) )
-         this->u.flags.rnum = 1 ;
+         thisptr->u.flags.rnum = 1 ;
       else if ( rght == IS_SIM_SYMBOL )
-         this->u.flags.rsvar = 1 ;
+         thisptr->u.flags.rsvar = 1 ;
       else if ( rght == IS_COMP_SYMBOL )
-         this->u.flags.rcvar = 1 ;
+         thisptr->u.flags.rcvar = 1 ;
    }
 }
 
 
-static int is_const( cnodeptr this )
+static int is_const( cnodeptr thisptr )
 {
-   if (!this)
+   if (!thisptr)
       return 1 ;
 
-   switch (this->type)
+   switch (thisptr->type)
    {
       case X_STRING:
       case X_CON_SYMBOL:
@@ -1693,7 +1714,7 @@ static int is_const( cnodeptr this )
 
       case X_U_PLUSS:
       case X_U_MINUS:
-         return is_const( this->p[0] ) ;
+         return is_const( thisptr->p[0] ) ;
 
       case X_PLUSS:
       case X_MINUS:
@@ -1723,25 +1744,25 @@ static int is_const( cnodeptr this )
 
       case X_SPACE:
       case X_CONCAT:
-         return is_const( this->p[0] ) && is_const( this->p[1] ) ;
+         return is_const( thisptr->p[0] ) && is_const( thisptr->p[1] ) ;
    }
    return 0 ;
 }
 
 
-static void checkconst( nodeptr this )
+static void checkconst( nodeptr thisptr )
 {
    tsd_t *TSD = parser_data.TSD;
 
-   assert( this->type == X_EXPRLIST ) ;
-   if (is_const(this->p[0]))
+   assert( thisptr->type == X_EXPRLIST ) ;
+   if (is_const(thisptr->p[0]))
    {
-      if (this->p[0])
-         this->u.strng = evaluate( TSD, this->p[0], NULL ) ;
+      if (thisptr->p[0])
+         thisptr->u.strng = evaluate( TSD, thisptr->p[0], NULL ) ;
       else
-         this->u.strng = NULL ;
+         thisptr->u.strng = NULL ;
 
-      this->type = X_CEXPRLIST ;
+      thisptr->type = X_CEXPRLIST ;
    }
 }
 
@@ -1757,46 +1778,46 @@ static void checkconst( nodeptr this )
  * Furthermore it detects "call s ()+1", "call s 1+()", "call s 1+(a,b)",
  * "call s (a,b)+1" and raises an error in this case.
  */
-static nodeptr reduce_expr_list( nodeptr this, reduce_mode mode )
+static nodeptr reduce_expr_list( nodeptr thisptr, reduce_mode mode )
 {
-   nodeptr h, retval = this;
+   nodeptr h, retval = thisptr;
 
-   if ( !this )
+   if ( !thisptr )
       return retval;
 
    if ( mode == REDUCE_SUBEXPR )
    {
-      if ( ( parendepth == 1 ) && !IS_FUNCTION( this ) && !IS_EXPRLIST( this ) )
+      if ( ( parendepth == 1 ) && !IS_FUNCTION( thisptr ) && !IS_EXPRLIST( thisptr ) )
       {
-         if ( IS_EXPRLIST( this->p[0] ) )
+         if ( IS_EXPRLIST( thisptr->p[0] ) )
          {
-            h = this->p[0];
+            h = thisptr->p[0];
             if ( ( h->p[0] == NULL ) || ( h->p[1] != NULL ) )
                exiterror( ERR_INVALID_EXPRESSION, 0 );
-            this->p[0] = h->p[0];
+            thisptr->p[0] = h->p[0];
             RejectNode( h );
          }
-         if ( IS_EXPRLIST( this->p[1] ) )
+         if ( IS_EXPRLIST( thisptr->p[1] ) )
          {
-            h = this->p[1];
+            h = thisptr->p[1];
             if ( ( h->p[0] == NULL ) || ( h->p[1] != NULL ) )
                exiterror( ERR_INVALID_EXPRESSION, 0 );
-            this->p[1] = h->p[0];
+            thisptr->p[1] = h->p[0];
             RejectNode( h );
          }
       }
       return retval;
    }
 
-   if ( !IS_EXPRLIST( this ) )
+   if ( !IS_EXPRLIST( thisptr ) )
       return retval;
 
    if ( ( mode == REDUCE_CALL ) || ( mode == REDUCE_RIGHT ) )
    {
-      if ( IS_EXPRLIST( this->p[0] ) && ( this->p[1] == NULL ) )
+      if ( IS_EXPRLIST( thisptr->p[0] ) && ( thisptr->p[1] == NULL ) )
       {
-         retval = this->p[0];
-         RejectNode( this );
+         retval = thisptr->p[0];
+         RejectNode( thisptr );
       }
    }
    else
@@ -1804,12 +1825,12 @@ static nodeptr reduce_expr_list( nodeptr this, reduce_mode mode )
       /*
        * mode == REDUCE_EXPR
        */
-      if ( ( this->p[0] != NULL ) && ( this->p[1] == NULL ) )
+      if ( ( thisptr->p[0] != NULL ) && ( thisptr->p[1] == NULL ) )
       {
-         if ( !IS_EXPRLIST( this->p[0] ) )
+         if ( !IS_EXPRLIST( thisptr->p[0] ) )
          {
-            retval = this->p[0];
-            RejectNode( this );
+            retval = thisptr->p[0];
+            RejectNode( thisptr );
          }
       }
    }

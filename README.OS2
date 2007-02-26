@@ -1,4 +1,4 @@
-                        Regina 3.3
+                        Regina 3.4
                        for OS/2 2.0+
 
 This file contains 32 bit executables of the Regina Rexx interpreter for
@@ -31,14 +31,18 @@ test2.dll
 demo\*.rexx  - Sample Rexx programs
 nls\*.mtb    - Native Language message files
 
-Copy the .EXE files into a directory in your PATH and copy the .DLL 
+Copy the .EXE files into a directory in your PATH and copy the .DLL
 files into a directory in your LIBPATH.
 
 If you want to have Regina error messages displayed in you native
 language, set the environment variable; REGINA_LANG to the two-character
-language abbreviation (the first two chracters of a file in the NLS 
+language abbreviation (the first two chracters of a file in the NLS
 directory), and set REGINA_LANG_DIR to the directory containing the
 *.mtb files.
+
+If building Regina from source, always unzip the source to convert the
+Unix end of line characters to OS/2 carriage return/end of line characters.
+With InfoZip, this is "unzip -a".
 
 Cheers, Mark.
 ------------------------------------------------------------------------

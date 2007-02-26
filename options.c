@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: options.c,v 1.14 2004/02/22 09:25:29 florian Exp $";
+static char *RCSid = "$Id: options.c,v 1.17 2006/02/20 07:54:17 mark Exp $";
 #endif
 
 /*
@@ -32,6 +32,7 @@ static char *RCSid = "$Id: options.c,v 1.14 2004/02/22 09:25:29 florian Exp $";
 
 
 static const struct __regina_option all_options[] = {  /* Must be alphabetically sorted! */
+   METAOP( ANSI, "NOCALLS_AS_FUNCS NOEXT_COMMANDS_AS_FUNCS FAST_LINES_BIF_DEFAULT STRICT_ANSI STRICT_WHITE_SPACE_COMPARISONS" ),
    OPTION( AREXX_BIFS ),
    OPTION( AREXX_SEMANTICS ),
    OPTION( BROKEN_ADDRESS_COMMAND ),
@@ -44,16 +45,21 @@ static const struct __regina_option all_options[] = {  /* Must be alphabetically
    OPTION( EXT_COMMANDS_AS_FUNCS ),
    OPTION( FAST_LINES_BIF_DEFAULT ),
    OPTION( FLUSHSTACK ),
+   OPTION( HALT_ON_EXT_CALL_FAIL ),
    OPTION( INTERNAL_QUEUES ),
    OPTION( LINEOUTTRUNC ),
    OPTION( MAKEBUF_BIF ),
    OPTION( PRUNE_TRACE ),
    OPTION( QUEUES_301 ),
+   METAOP( REGINA, "NOCALLS_AS_FUNCS EXT_COMMANDS_AS_FUNCS FAST_LINES_BIF_DEFAULT, NOHALT_ON_EXT_CALL_FAIL " ),
    OPTION( REGINA_BIFS ),
+   METAOP( SAA, "NOCALLS_AS_FUNCS NOEXT_COMMANDS_AS_FUNCS" ),
    OPTION( STDOUT_FOR_STDERR ),
    OPTION( STRICT_ANSI ),
    OPTION( STRICT_WHITE_SPACE_COMPARISONS ),
    OPTION( TRACE_HTML ),
+   METAOP( TRL1, "NOCALLS_AS_FUNCS NOEXT_COMMANDS_AS_FUNCS" ),
+   METAOP( TRL2, "NOCALLS_AS_FUNCS NOEXT_COMMANDS_AS_FUNCS" ),
    { NULL, 0 }
 } ;
 

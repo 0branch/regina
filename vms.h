@@ -39,6 +39,8 @@
 # endif
 # ifdef DYNAMIC
 #   define DYNAMIC_VMS
+# define HAVE_DIV
+# define HAVE_RAISE
 # endif
 
 #endif

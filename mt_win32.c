@@ -38,10 +38,7 @@ static DWORD ThreadIndex = 0xFFFFFFFF; /* index of the TSD, not yet got */
  */
 static CRITICAL_SECTION cs = {0,};
 
-#ifdef DYNAMIC
-#define AcquireCriticalSection(cs) EnterCriticalSection(cs)
-#define AcquireThreadIndex() ThreadIndex
-
+#if defined(DYNAMIC) || (defined(__MINGW32__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)))
 static void DestroyHeap(tsd_t *TSD)
 {
    mt_tsd_t *mt = TSD->mt_tsd;
@@ -53,7 +50,6 @@ static void DestroyHeap(tsd_t *TSD)
    free(mt);
    free(TSD);
 }
-
 
 int IfcReginaCleanup( VOID )
 {
@@ -68,6 +64,11 @@ int IfcReginaCleanup( VOID )
 
    return 1;
 }
+#endif
+
+#ifdef DYNAMIC
+#define AcquireCriticalSection(cs) EnterCriticalSection(cs)
+#define AcquireThreadIndex() ThreadIndex
 
 /* We provide a DLL entry function. Look at the standard documentation */
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD Reason, LPVOID reserved)
@@ -225,6 +226,11 @@ tsd_t *ReginaInitializeThread(void)
    if (!OK)
       return(NULL);
 
+   {
+      extern OS_Dep_funcs __regina_OS_Win;
+      retval->OS = &__regina_OS_Win;
+   }
+   retval->OS->init();
    OK &= init_vars(retval);             /* Initialize the variable module    */
    OK &= init_stacks(retval);           /* Initialize the stack module       */
    OK &= init_filetable(retval);        /* Initialize the files module       */

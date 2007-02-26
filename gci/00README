@@ -54,7 +54,7 @@ implementations.
 
 The Rexx variable GCI_RC will hold informations about the success of the
 execution of the call. The variable is resetted on each call to RxDefineFunc,
-GciDropFunc and the called functions. Its format is
+GciFuncDrop and the called functions. Its format is
 <error code> ": " <description> [ ": " <error location> ]
 
 Using GCI as an external package has the disadvantage of a restricted

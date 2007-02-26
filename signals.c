@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: signals.c,v 1.17 2003/12/19 07:16:01 florian Exp $";
+static char *RCSid = "$Id: signals.c,v 1.19 2005/08/03 09:18:05 mark Exp $";
 #endif
 
 /*
@@ -65,10 +65,10 @@ static trap *dupltraps( const tsd_t *TSD, const trap *traps )
    trap *ptr=NULL ;
    int i=0 ;
 
-   ptr = MallocTSD(sizeof(trap) * SIGNALS) ;
+   ptr = (trap *)MallocTSD( sizeof(trap) * SIGNALS ) ;
    /* Stupid SunOS acc gives incorrect warning for the next line */
-   memcpy( ptr, traps, sizeof(trap) * SIGNALS) ;
-   for ( i=0; i<SIGNALS; i++ )
+   memcpy( ptr, traps, sizeof(trap) * SIGNALS ) ;
+   for ( i = 0; i < SIGNALS; i++ )
       if (traps[i].name)
          ptr[i].name = Str_dupTSD( traps[i].name ) ;
 
@@ -136,7 +136,7 @@ int condition_hook( tsd_t *TSD, int type, int errorno, int suberrorno, int linen
          return 0 ;
       }
 
-      sigptr = MallocTSD( sizeof( sigtype )) ;
+      sigptr = (sigtype *)MallocTSD( sizeof( sigtype )) ;
 
       sigptr->type = type ;
       sigptr->info = NULL ;   /* BUG: I don't really think this is used */
@@ -202,7 +202,7 @@ int identify_trap( int type )
 static const char *signals_names[] = {
      "", "SIGHUP", "SIGINT", "", "", "", "", "", "", "",
      "", "", "", "", "", "SIGTERM", "", "", "", "", "",
-     "", "", "", "", "", "", "", "", "", "",
+     "SIGBREAK", "", "", "", "", "", "", "", "", "",
      "", ""
 } ;
 
@@ -316,6 +316,10 @@ void signal_setup( const tsd_t *TSD )
 # endif
 # if defined(SIGINT)
    if (regina_signal( SIGINT, halt_handler) == SIG_ERR)
+      exiterror( ERR_SYSTEM_FAILURE, 0 )  ;
+# endif
+# if defined(SIGBREAK)
+   if (regina_signal( SIGBREAK, halt_handler) == SIG_ERR)
       exiterror( ERR_SYSTEM_FAILURE, 0 )  ;
 # endif
 # if defined(SIGHUP)

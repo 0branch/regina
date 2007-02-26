@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rexx.h,v 1.86 2004/04/23 22:48:35 mark Exp $
+ * $Id: rexx.h,v 1.95 2005/02/09 07:43:13 mark Exp $
  */
 #ifndef __REXX_H_INCLUDED
 #define __REXX_H_INCLUDED
@@ -206,11 +206,26 @@
 # include <string.h>
 #endif
 
+#if defined(HAVE_SIGNAL_H)
+# include <signal.h>
+#endif
+
+#if !defined(HAVE_RAISE)
+# define raise(_s) kill(getpid(), (_s))
+#endif
+
 #if defined(WIN32) && defined(__BORLANDC__)
 # include <mem.h>
 #endif
+
 #include "strings.h"            /* definitions of REXX strings */
+
+#if defined(_MSC_VER) && !defined(__WINS__)
+# include "contrib/time64.h"
+#endif
+
 #include "regina_t.h"           /* various Regina types */
+
 #include "mt.h"                 /* multi-threading support */
 #include "extern.h"             /* function prototypes */
 
@@ -236,21 +251,27 @@
 #define NOFUNC ((streng *) (void *) -1l)
 
 #if defined(MULTI_THREADED)
-# define REGINA_VERSION_THREAD "(MT)"
+# ifdef __MINGW32__
+#  define REGINA_VERSION_THREAD "(MT MINGW)"
+# else
+#  define REGINA_VERSION_THREAD "(MT)"
+# endif
 #else
 # define REGINA_VERSION_THREAD ""
 #endif
 
+/*
 #define REGINA_VERSION_MAJOR "3"
-#define REGINA_VERSION_MINOR "3"
-#define REGINA_VERSION_SUPP  ""
+#define REGINA_VERSION_MINOR "4"
+#define REGINA_VERSION_SUPP  "beta1"
+*/
 
 #define PARSE_VERSION_STRING    "REXX-Regina_" REGINA_VERSION_MAJOR "." \
                                 REGINA_VERSION_MINOR REGINA_VERSION_SUPP \
                                 REGINA_VERSION_THREAD \
-                                " 5.00 25 Apr 2004"
+                                " 5.00 " REGINA_VERSION_DATE
 
-#define INSTORE_VERSION 9 /* Must be incremented each time the parser/lexer
+#define INSTORE_VERSION 10 /* Must be incremented each time the parser/lexer
                            * or data structure changes something.
                            */
 

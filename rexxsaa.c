@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexxsaa.c,v 1.45 2004/04/05 10:26:42 mark Exp $";
+static char *RCSid = "$Id: rexxsaa.c,v 1.54 2005/08/22 08:14:26 mark Exp $";
 #endif
 /*
  *  The Regina Rexx Interpreter
@@ -108,12 +108,14 @@ static char *RCSid = "$Id: rexxsaa.c,v 1.45 2004/04/05 10:26:42 mark Exp $";
 #define INCL_RXSYSEXIT
 #define INCL_RXARI
 #define INCL_RXQUEUE
+#define INCL_RXMACRO
 
 #include "regina_c.h"
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+
 /*
  * The rexxsaa.h header file defines the interface between this file and
  * the client program which uses SAA API. The rxiface.h header file
@@ -201,12 +203,12 @@ struct ExitHandlers
 } ;
 
 /*
- * The following MAP_TYPE() macro maps from the SAA API macros holding
+ * The following RXMAP_TYPE() macro maps from the SAA API macros holding
  * the type of an invocation (function, subroutine or command), to its
  * equivalent value in the internal interface of Regina (as defined in
  * the file rxiface.h
  */
-#define MAP_TYPE(a) ((a)==RXCOMMAND ? RX_TYPE_COMMAND : \
+#define RXMAP_TYPE(a) ((a)==RXCOMMAND ? RX_TYPE_COMMAND : \
               (a)==RXFUNCTION ? RX_TYPE_FUNCTION : RX_TYPE_SUBROUTINE)
 
 
@@ -221,9 +223,10 @@ int init_rexxsaa( tsd_t *TSD )
    if (TSD->rex_tsd != NULL)
       return(1);
 
-   if ((rt = TSD->rex_tsd = MallocTSD(sizeof(rex_tsd_t))) == NULL)
+   if ( ( TSD->rex_tsd = MallocTSD( sizeof(rex_tsd_t) ) ) == NULL )
       return(0);
-   memset(rt,0,sizeof(rex_tsd_t));  /* correct for all values */
+   rt = (rex_tsd_t *)TSD->rex_tsd;
+   memset( rt, 0, sizeof(rex_tsd_t) );  /* correct for all values */
    return(1);
 }
 
@@ -235,7 +238,7 @@ void deinit_rexxsaa( tsd_t *TSD )
 }
 
 
-/* StartupInterface initializes the Rexx system once per thread. Values like
+/* StartupInterface initializes the Rexx system once per thread. Values
  * like __regina_get_tsd()->systeminfo are set. The true purpose of this
  * function is to create an environment which allows the run of the
  * interpreter. This is exactly the case when systeminfo exists. The last
@@ -309,7 +312,7 @@ static void FillReq( PSHVBLOCK Req, ULONG Length, const char *String, int name )
     * shvnamelen and shvvaluelen are read-only values describing the maximum
     * size of the destination buffer, but see above at SAA DOCUMENTATION.
     */
-   if ( Length == RX_NO_STRING )
+   if ( (LONG)Length == RX_NO_STRING )
    {
       MAKERXSTRING( *string, NULL, 0 );
       *strlen = 0;
@@ -400,9 +403,9 @@ int IfcSubCmd( tsd_t *TSD, int EnvLen, const char *EnvStr,
    PUCHAR parm=NULL;
    rex_tsd_t *rt;
 
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
 
-   Command = MallocTSD( CmdLen + 1);
+   Command = (char *)MallocTSD( CmdLen + 1);
    memcpy(Command,CmdStr,CmdLen);
    Command[CmdLen] = '\0';
    memset( subcmd_result, 0, sizeof( subcmd_result ) ) ;
@@ -415,7 +418,7 @@ int IfcSubCmd( tsd_t *TSD, int EnvLen, const char *EnvStr,
    Envir = subcom_hook( TSD, EnvStr , EnvLen ) ;
    if ( rt->CurrentHandlers && rt->CurrentHandlers->Handlers[RXCMD] )
    {
-      EnvNam = MallocTSD( EnvLen + 1 ) ;
+      EnvNam = (char *)MallocTSD( EnvLen + 1 ) ;
       memcpy(EnvNam, EnvStr, EnvLen ) ;
       EnvNam[EnvLen] = '\0';
       cmdhst.rxcmd_flags.rxfcfail = 0;
@@ -430,7 +433,7 @@ int IfcSubCmd( tsd_t *TSD, int EnvLen, const char *EnvStr,
       {
          if ( Envir->lib != NULL )
          {
-            cmdhst.rxcmd_dll = Str_val( Envir->lib->name );
+            cmdhst.rxcmd_dll = (unsigned char*) Str_val( Envir->lib->name ) ;
             cmdhst.rxcmd_dll_len = Str_len( Envir->lib->name );
          }
       }
@@ -480,13 +483,13 @@ int IfcSubCmd( tsd_t *TSD, int EnvLen, const char *EnvStr,
    if (Ret.strlength)
    {
       *RetLen = Ret.strlength ;
-      *RetStr = MallocTSD( Ret.strlength ) ;
+      *RetStr = (char *)MallocTSD( Ret.strlength ) ;
       memcpy( *RetStr, Ret.strptr, Ret.strlength ) ;
    }
    else
    {
       *RetLen = 1 ;
-      *RetStr = MallocTSD( 1 ) ;
+      *RetStr = (char *)MallocTSD( 1 ) ;
       (*RetStr)[0] = '0' ;
    }
 
@@ -544,7 +547,7 @@ int IfcDoExit( tsd_t *TSD, int Code,
    PEXIT parm=NULL;
    rex_tsd_t *rt;
 
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
 
    MAKERXSTRING( siodtr.rxsiodtr_retc, NULL, 0) ; /* Make compiler happy */
    MAKERXSTRING( siotrd.rxsiotrd_retc, NULL, 0) ; /* Make compiler happy */
@@ -744,7 +747,7 @@ int IfcDoExit( tsd_t *TSD, int Code,
       }
 
       /* Make a fresh copy, the user may change the value very fast. */
-      *InputString = MallocTSD( (retlen < 1) ? 1 : retlen );
+      *InputString = (char *)MallocTSD( (retlen < 1) ? 1 : retlen );
       memcpy(*InputString, retstr, retlen);
       *InputLength = retlen;
    }
@@ -807,7 +810,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
    int restricted = 0;
 
    TSD = GLOBAL_ENTRY_POINT();
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
    StartupInterface( TSD );
 
    if ( ( ArgCount < 0 ) || ( ( ArgCount > 0 ) && ( ArgList == NULL ) ) )
@@ -828,7 +831,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
       return RXFUNC_BADTYPE;
    if ( ( CallType == RXCOMMAND ) && ( ArgCount > 1 ) )
       return RX_START_TOOMANYP;
-   if ( ArgCount > sizeof( ParLengths ) / sizeof( ParLengths[0] ) )
+   if ( ArgCount > (int) ( sizeof( ParLengths ) / sizeof( ParLengths[0] ) ) )
       return RX_START_TOOMANYP;
 
    if ( Instore )
@@ -837,8 +840,6 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
          return RX_START_BADP;
    }
 
-   if ( ArgCount > sizeof( ParLengths ) / sizeof( ParLengths[0] ) )
-      ArgCount = sizeof( ParLengths ) / sizeof( ParLengths[0] );
    for ( cnt = 0; cnt < ArgCount; cnt++ )
    {
       ParLengths[cnt] = ArgList[cnt].strlength;
@@ -858,7 +859,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
       RLength = RX_NO_STRING;
    }
 
-   Handlers = TSD->MTMalloc( TSD, sizeof( struct ExitHandlers ) );
+   Handlers = (struct ExitHandlers *)TSD->MTMalloc( TSD, sizeof( struct ExitHandlers ) );
    Handlers->prev = rt->CurrentHandlers;
    rt->CurrentHandlers = Handlers;
    for ( cnt = 0; cnt < RXNOOFEXITS; cnt++ )
@@ -954,7 +955,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
 
    rc = IfcExecScript( TSD, strlen(ProgramName), ProgramName,
                        ArgCount, ParLengths, (const char **) ParStrings,
-                       MAP_TYPE( CallType ), ExitFlags, EnvNamLen, EnvNamStr,
+                       RXMAP_TYPE( CallType ), ExitFlags, EnvNamLen, EnvNamStr,
                        WhereCode, restricted, SourcePtr, SourceLen,
                        TinPtr, TinLen, &RLength, &RString,
                        &instore_buf, &instore_length);
@@ -964,7 +965,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
 
    if ( WhereCode == RX_TYPE_SOURCE )
    {
-      Instore[1].strptr = instore_buf;
+      Instore[1].strptr = (char *)instore_buf;
       Instore[1].strlength = instore_length;
    }
 
@@ -989,7 +990,7 @@ EXPORT_C APIRET APIENTRY RexxStart(LONG       ArgCount,
    /*
     * Close all open files.
     */
-   CloseOpenFiles( TSD );
+   CloseOpenFiles( TSD, fpdCLEAR );
    if ( TSD->systeminfo->input_file != NULL )
    {
       Free_stringTSD( TSD->systeminfo->input_file );
@@ -1029,7 +1030,7 @@ EXPORT_C APIRET APIENTRY RexxCallBack( PCSZ       ProcedureName,
    if ( !ProcedureName )
       return RX_CB_BADP;
 
-   if (ArgCount > sizeof( ParLengths ) / sizeof( ParLengths[0] ) )
+   if (ArgCount > (int) (sizeof( ParLengths ) / sizeof( ParLengths[0] ) ) )
       return RX_CB_TOOMANYP;
 
    for ( cnt = 0; cnt < ArgCount; cnt++ )
@@ -1090,7 +1091,11 @@ EXPORT_C APIRET APIENTRY RexxCallBack( PCSZ       ProcedureName,
 /* subcom handler subsystem */
 
 EXPORT_C APIRET APIENTRY RexxRegisterSubcomExe(PCSZ EnvName,
-                                      PFN EntryPoint,
+#ifdef RX_WEAKTYPING
+                                      PFN              EntryPoint,
+#else
+                                      RexxSubcomHandler *EntryPoint,
+#endif
                                       PUCHAR UserArea )
 {
    tsd_t *TSD;
@@ -1104,7 +1109,7 @@ EXPORT_C APIRET APIENTRY RexxRegisterSubcomExe(PCSZ EnvName,
    if ( !EnvName || !EntryPoint )
       return RXSUBCOM_BADTYPE;
 
-   return IfcRegSubcom( TSD, EnvName, NULL, NULL, EntryPoint, UserArea );
+   return IfcRegSubcom( TSD, EnvName, NULL, NULL, (PFN)EntryPoint, UserArea );
 }
 
 
@@ -1202,7 +1207,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
    rex_tsd_t *rt;
 
    TSD = GLOBAL_ENTRY_POINT();
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
    StartupInterface(TSD);
 
    if (!RequestBlockList) /* FGC: I assume we must have at least one param */
@@ -1366,8 +1371,12 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
 /* system exit handler subsystem */
 
 EXPORT_C APIRET APIENTRY RexxRegisterExitExe(PCSZ EnvName,
-                                    PFN EntryPoint,
-                                    PUCHAR UserArea )
+#ifdef RX_WEAKTYPING
+                                             PFN              EntryPoint,
+#else
+                                             RexxExitHandler *EntryPoint,
+#endif
+                                             PUCHAR UserArea )
 {
    tsd_t *TSD;
 
@@ -1380,7 +1389,7 @@ EXPORT_C APIRET APIENTRY RexxRegisterExitExe(PCSZ EnvName,
    if ( !EnvName || !EntryPoint )
       return RXEXIT_BADTYPE;
 
-   return IfcRegExit( TSD, EnvName, NULL, NULL, EntryPoint, UserArea );
+   return IfcRegExit( TSD, EnvName, NULL, NULL, (PFN)EntryPoint, UserArea );
 }
 
 EXPORT_C APIRET APIENTRY RexxRegisterExitDll(PCSZ EnvName,
@@ -1447,7 +1456,11 @@ EXPORT_C APIRET APIENTRY RexxQueryExit(PCSZ EnvName,
  */
 
 EXPORT_C APIRET APIENTRY RexxRegisterFunctionExe( PCSZ Name,
-                                                  PFN EntryPoint )
+#ifdef RX_WEAKTYPING
+                                                  PFN                  EntryPoint )
+#else
+                                                  RexxFunctionHandler *EntryPoint )
+#endif
 {
    tsd_t *TSD;
 
@@ -1457,7 +1470,7 @@ EXPORT_C APIRET APIENTRY RexxRegisterFunctionExe( PCSZ Name,
    if ( !Name || !EntryPoint )
       return RXFUNC_BADTYPE;
 
-   return IfcRegFunc( TSD, Name, NULL, NULL, EntryPoint );
+   return IfcRegFunc( TSD, Name, NULL, NULL, (PFN)EntryPoint );
 }
 
 EXPORT_C APIRET APIENTRY RexxRegisterFunctionDll( PCSZ ExternalName,
@@ -1520,7 +1533,7 @@ static int IfcFunctionExit( tsd_t *TSD,
    PUCHAR parm=NULL;
    rex_tsd_t *rt;
 
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
 
    if ( rt->CurrentHandlers && rt->CurrentHandlers->Handlers[RXFNC] )
    {
@@ -1563,7 +1576,9 @@ static int IfcFunctionExit( tsd_t *TSD,
  * RetLength and RetString should point to {0,NULL}. They will be filled with
  * freshly allocated values if there are some.
  */
-int IfcExecFunc( tsd_t *TSD, PFN Func, char *Name, int Params,
+int IfcExecFunc( tsd_t *TSD,
+                 PFN Func,
+                 char *Name, int Params,
                  int *Lengths, char **Strings,
                  int queue_name_len, char *queue_name,
                  int *RetLength, char **RetString,
@@ -1573,12 +1588,14 @@ int IfcExecFunc( tsd_t *TSD, PFN Func, char *Name, int Params,
    RXSTRING *params, retstr ;
    rex_tsd_t *rt;
    char execfunc_result[ILLEGAL_USE_SIZE+RXAUTOBUFLEN] ;
+   RexxFunctionHandler *FullFunc;
 
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
    assert( Name ) ;
    assert( Params >= 0 ) ;
+   FullFunc = (RexxFunctionHandler *)Func;
 
-   params = MallocTSD( sizeof(RXSTRING)*Params ) ;
+   params = (RXSTRING *)MallocTSD( sizeof(RXSTRING)*Params ) ;
    for (i=0; i<Params; i++)
    {
       length = Lengths[i] ;
@@ -1609,21 +1626,16 @@ int IfcExecFunc( tsd_t *TSD, PFN Func, char *Name, int Params,
          }
          else
          {
+#if defined(DYNAMIC) && defined(HAVE_GCI)
+            if ( gci_info != NULL )
+               rc = GCI_Dispatcher( TSD, (PFN)Func, gci_info, Params, params, &retstr );
+            else
+#endif
             /* Func will inherit a possible return value in
              * retstr. This might be a problem, expect suspicious results
              * if the called functions are not error free.
              */
-            if (Func == NULL)
-            {
-               FreeTSD( params );
-               return RX_CODE_NOSUCH ;
-            }
-#if defined(DYNAMIC) && defined(HAVE_GCI)
-            else if ( gci_info != NULL )
-               rc = GCI_Dispatcher( TSD, Func, gci_info, Params, params, &retstr );
-#endif
-            else
-               rc = (*(Func))( Name, Params, params, queue_name, &retstr ) ;
+               rc = (*(FullFunc))( Name, Params, params, queue_name, &retstr ) ;
 
             if (rc)
                *RC = ERR_INCORRECT_CALL;
@@ -1649,7 +1661,7 @@ int IfcExecFunc( tsd_t *TSD, PFN Func, char *Name, int Params,
 
    if (!(*RC) && retstr.strptr)
    {
-      *RetString = MallocTSD( (retstr.strlength < 1) ? 1 : retstr.strlength ) ;
+      *RetString = (char *)MallocTSD( (retstr.strlength < 1) ? 1 : retstr.strlength ) ;
       memcpy( *RetString, retstr.strptr, retstr.strlength ) ;
       *RetLength = retstr.strlength ;
    }
@@ -1666,7 +1678,7 @@ int IfcHaveFunctionExit(const tsd_t *TSD)
 {
    rex_tsd_t *rt;
 
-   rt = TSD->rex_tsd;
+   rt = (rex_tsd_t *)TSD->rex_tsd;
    if ( rt->CurrentHandlers && rt->CurrentHandlers->Handlers[RXFNC] )
       return 1;
    else
@@ -1861,12 +1873,11 @@ EXPORT_C APIRET APIENTRY ReginaVersion( PRXSTRING VersionString )
    if (!VersionString)
       goto fastexit;
 
-   if (VersionString->strlength == 0)
+   if ( VersionString->strlength == 0 )
    {
-      if ((VersionString->strptr =
-                      IfcAllocateMemory(sizeof(PARSE_VERSION_STRING))) == NULL)
+      if ( ( VersionString->strptr = (char *)IfcAllocateMemory( sizeof(PARSE_VERSION_STRING) ) ) == NULL )
          goto fastexit;
-       VersionString->strlength = sizeof(PARSE_VERSION_STRING);
+      VersionString->strlength = sizeof(PARSE_VERSION_STRING);
    }
 
    if ((len = VersionString->strlength) > sizeof(PARSE_VERSION_STRING))

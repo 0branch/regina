@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: stack.c,v 1.29 2004/04/24 09:32:58 florian Exp $";
+static char *RCSid = "$Id: stack.c,v 1.33 2005/08/03 09:18:07 mark Exp $";
 #endif
 
 /*
@@ -119,7 +119,7 @@ static char *RCSid = "$Id: stack.c,v 1.29 2004/04/24 09:32:58 florian Exp $";
     */                                                                    \
    if ( (iq)->u.i.top == NULL )                                           \
    {                                                                      \
-      (iq)->u.i.top = (iq)->u.i.bottom = MallocTSD( sizeof( Buffer ) ) ;  \
+      (iq)->u.i.top = (iq)->u.i.bottom = (Buffer *)MallocTSD( sizeof( Buffer ) ) ;  \
       memset( (iq)->u.i.top, 0, sizeof( Buffer ) ) ;                      \
       assert( (iq)->u.i.elements == 0 ) ;                                 \
       assert( (iq)->u.i.buffers == 0 ) ;                                  \
@@ -168,9 +168,10 @@ int init_stacks( tsd_t *TSD )
    if (TSD->stk_tsd != NULL)
       return(1);
 
-   if ((st = TSD->stk_tsd = MallocTSD(sizeof(stk_tsd_t))) == NULL)
+   if ( ( TSD->stk_tsd = MallocTSD( sizeof(stk_tsd_t) ) ) == NULL )
       return(0);
-   memset(st,0,sizeof(stk_tsd_t));  /* correct for all values */
+   st = (stk_tsd_t *)TSD->stk_tsd;
+   memset( st, 0, sizeof(stk_tsd_t) );  /* correct for all values */
    /*
     * Create the default internal SESSION queue on demand. purge_stacks()
     * deletes the queuename very often.
@@ -306,7 +307,7 @@ void purge_stacks( const tsd_t *TSD )
    stk_tsd_t *st;
    int i;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    for ( i = 0; i < NUMBER_QUEUES; i++ )
       delete_a_queue( TSD, st, &st->queue[i] );
    st->current_queue = &st->queue[0];
@@ -355,7 +356,7 @@ static Queue *find_queue( const tsd_t *TSD, stk_tsd_t *st, const streng *queue_n
 Queue *find_free_slot( const tsd_t *TSD )
 {
    int i;
-   stk_tsd_t *st = TSD->stk_tsd ;
+   stk_tsd_t *st = (stk_tsd_t *)TSD->stk_tsd ;
 
    for ( i = 1; i < NUMBER_QUEUES; i++ ) /* never ever select SESSION */
    {
@@ -383,7 +384,13 @@ void flush_stack( const tsd_t *TSD, Queue *src, Queue *dst, int is_fifo )
 
    if ( src == NULL ) /* no temporary stack? may happen */
       return ;
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
+   /*
+    * I think this is never used. Let's verify it. Florian, 06.01.2005
+    */
+   fprintf( stderr, "Regina internal error detected in %s, line %u.\n"
+                    "Please, send an email to M.Hessling@qut.edu.au.\n",
+                    __FILE__, __LINE__ );
 
    assert( src->type == QisTemp ) ;
    assert( dst->type == QisSESSION
@@ -412,7 +419,7 @@ void flush_stack( const tsd_t *TSD, Queue *src, Queue *dst, int is_fifo )
 
          h = ptr ;
          ptr = ptr->lower ;
-         FreeTSD( h->contents ) ;
+         Free_stringTSD( h->contents ) ;
          FreeTSD( h ) ;
       }
       src->u.t.top = src->u.t.bottom = NULL ; /* allow safe cleanup */
@@ -449,7 +456,7 @@ streng *stack_to_line( const tsd_t *TSD, Queue *q )
    stk_tsd_t *st;
    streng *retval;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
 
    if (q->type == QisUnused )
       return(nullstringptr());
@@ -512,7 +519,7 @@ streng *stack_to_line( const tsd_t *TSD, Queue *q )
 Queue *fill_input_queue_stem(tsd_t *TSD, streng *stemname, int stem0)
 {
    int i,stemlen = Str_len( stemname ) ;
-   streng *stem, *new ;
+   streng *stem, *newstr ;
    StackLine *line ;
    Queue *q = find_free_slot( TSD ) ;
 
@@ -524,10 +531,10 @@ Queue *fill_input_queue_stem(tsd_t *TSD, streng *stemname, int stem0)
    for (i = 1; i <= stem0; i++)
    {                                    /* Fetch the value:                  */
       stem->len = stemlen + sprintf(stem->value + stemlen, "%d", i);
-      new = Str_dupTSD(get_it_anyway_compound(TSD, stem));
+      newstr = Str_dupTSD(get_it_anyway_compound(TSD, stem));
 
       line = (StackLine *) MallocTSD( sizeof( StackLine ) ) ;
-      line->contents = new ;
+      line->contents = newstr ;
       FIFO_LINE( &q->u.t, line ) ;
    }
 
@@ -579,7 +586,7 @@ Queue *fill_input_queue_stream( tsd_t *TSD, void *fileptr )
  */
 static int use_external( const tsd_t *TSD, const streng *queue_name )
 {
-   stk_tsd_t *st = TSD->stk_tsd;
+   stk_tsd_t *st = (stk_tsd_t *)TSD->stk_tsd;
 
    /* A little bit off topic, but purge_stacks() may kill "SESSION" at the
     * end of RexxStart() and we need a working "SESSION" always. Not deleting
@@ -647,7 +654,7 @@ int stack_lifo( tsd_t *TSD, streng *line, const streng *queue_name )
    Queue *q ;
    int rc=0;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
 
    assert( line != NULL ) ;
 
@@ -707,7 +714,7 @@ int stack_fifo( tsd_t *TSD, streng *line, const streng *queue_name )
    Buffer *b ;
    int rc=0;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
 
    assert( line != NULL ) ;
 
@@ -771,7 +778,7 @@ int drop_buffer( const tsd_t *TSD, int number )
    stk_tsd_t *st;
    Queue *curr ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    curr = st->current_queue ;
    if ( curr->type == QisExternal )
       exiterror( ERR_EXTERNAL_QUEUE, 110, "DROPBUF" ) ;
@@ -836,7 +843,7 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
    Queue *q ;
    Buffer *b ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
 
    if ( !use_external( TSD, queue_name ) )
    {
@@ -868,6 +875,8 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
          /* buffer is empty, fetch the next one and drop the empty one
           */
          q->u.i.top = b->lower ;
+         if ( q->u.i.top )
+            q->u.i.top->higher = NULL ; /* fixes bug 1068204 */
          q->u.i.buffers-- ;
          FreeTSD( b ) ;
       }
@@ -954,7 +963,7 @@ int lines_in_stack( tsd_t *TSD, const streng *queue_name )
    int lines ;
    Queue *q ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
    {
       if ( queue_name )
@@ -1011,7 +1020,7 @@ void mark_stack( const tsd_t *TSD )
    stk_tsd_t *st;
    int i;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    q = st->current_queue ;
    for ( i = 0; i < NUMBER_QUEUES; i++ )
    {
@@ -1059,7 +1068,7 @@ int make_buffer( tsd_t *TSD )
    Buffer *b ;
    Queue *q ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    q = st->current_queue ;
    if ( q->type == QisExternal )
       exiterror( ERR_EXTERNAL_QUEUE, 110, "MAKEBUF" ) ;
@@ -1069,7 +1078,7 @@ int make_buffer( tsd_t *TSD )
    ENSURE_BUFFER( q ) ; /* Possibly create the zeroth buffer */
 
    /* Make a *new* buffer */
-   b = MallocTSD( sizeof( Buffer ) ) ;
+   b = (Buffer *)MallocTSD( sizeof( Buffer ) ) ;
    memset( b, 0, sizeof( Buffer ) ) ;
 
    b->lower = q->u.i.top ; /* The zeroth buffer exists */
@@ -1097,7 +1106,7 @@ void type_buffer( tsd_t *TSD )
 
    if (TSD->stddump == NULL)
       return;
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    q = st->current_queue ;
    name = get_queue( TSD ) ;
    fprintf(TSD->stddump,"==> Name: %.*s\n", Str_len(name), name->value ) ;
@@ -1139,7 +1148,7 @@ static int get_socket_details_and_connect( tsd_t *TSD, Queue *q )
 {
    stk_tsd_t *st;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    assert( q->type == QisExternal ) ;
 
    /* Fill in default values. Missing values are rarely used but it may
@@ -1172,7 +1181,7 @@ static int get_socket_details_and_connect( tsd_t *TSD, Queue *q )
 static int save_parse_queue( tsd_t *TSD, streng *queue, Queue *q,
                                                                int ignore_name)
 {
-   stk_tsd_t *st = TSD->stk_tsd;
+   stk_tsd_t *st = (stk_tsd_t *)TSD->stk_tsd;
    Queue *curr ;
    int rc;
 
@@ -1207,7 +1216,7 @@ static int save_parse_queue( tsd_t *TSD, streng *queue, Queue *q,
 static Queue *open_external( tsd_t *TSD, const streng *queue, Queue *q,
                                   int *rc, int ignore_name, streng **basename )
 {
-   stk_tsd_t *st = TSD->stk_tsd;
+   stk_tsd_t *st = (stk_tsd_t *)TSD->stk_tsd;
    streng *qn;
    int h;
    Queue *retval;
@@ -1297,7 +1306,7 @@ int create_queue( tsd_t *TSD, const streng *queue_name, streng **result )
    Queue *q = NULL ;
    int rc = 0 ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
    {
       if ( queue_name == NULL )
@@ -1396,7 +1405,7 @@ int delete_queue( tsd_t *TSD, const streng *queue_name )
    Queue *q;
    streng *h;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
    {
       if ( ( queue_name == NULL ) || ( PSTRENGLEN( queue_name ) == 0 ) )
@@ -1467,7 +1476,7 @@ int timeout_queue( tsd_t *TSD, const streng *timeout, const streng *queue_name )
    stk_tsd_t *st;
    int rc = 0 ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
    {
       exiterror( ERR_EXTERNAL_QUEUE, 111, "TIMEOUT" ) ;
@@ -1508,7 +1517,7 @@ streng *get_queue( tsd_t *TSD )
    int l;
    char *p;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( st->queue[0].u.i.name == NULL )
       SetSessionName( TSD, st ) ;
 
@@ -1532,7 +1541,7 @@ void fill_queue_name( const tsd_t *TSD, int *len, char **name )
 {
    stk_tsd_t *st;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( st->queue[0].u.i.name == NULL )
       SetSessionName( TSD, st ) ;
 
@@ -1556,7 +1565,7 @@ streng *set_queue( tsd_t *TSD, const streng *queue_name )
    stk_tsd_t *st ;
    Queue *q ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
    {
       if ( ( q = find_queue( TSD, st, queue_name ) ) == NULL )
@@ -1633,7 +1642,7 @@ Queue *addr_reopen_queue( tsd_t *TSD, const streng *queuename, char code )
    Queue *q ;
    streng *name ;
 
-   st = TSD->stk_tsd ;
+   st = (stk_tsd_t *)TSD->stk_tsd ;
 
    if ( ( queuename == NULL ) || ( PSTRENGLEN( queuename ) == 0 ) )
       return st->current_queue ;
@@ -1676,10 +1685,6 @@ Queue *addr_reopen_queue( tsd_t *TSD, const streng *queuename, char code )
    }
    set_queue_in_rxstack( TSD, q->u.e.socket, name );
 
-   /* We can't be sure using a real queue at this place.
-    * FIXME: But we can't determine any difference at this stage.
-    * Thus, continue and that's it.
-    */
    return q ;
 #else
    return NULL ;
@@ -1740,7 +1745,7 @@ Queue *addr_redir_queue( const tsd_t *TSD, Queue *q )
    StackLine *ptr ;
 #endif
 
-   st = TSD->stk_tsd ;
+   st = (stk_tsd_t *)TSD->stk_tsd ;
    assert( ( q->type == QisSESSION )
         || ( q->type == QisInternal )
         || ( q->type == QisExternal ) ) ;
@@ -1788,7 +1793,7 @@ void addr_purge_queue( const tsd_t *TSD, Queue *q )
    stk_tsd_t *st ;
    Buffer *b ;
 
-   st = TSD->stk_tsd ;
+   st = (stk_tsd_t *)TSD->stk_tsd ;
    assert( ( q->type == QisSESSION )
         || ( q->type == QisInternal )
         || ( q->type == QisExternal ) ) ;
@@ -1934,7 +1939,7 @@ void addr_close_queue( const tsd_t *TSD, Queue *q )
 {
    stk_tsd_t *st ;
 
-   st = TSD->stk_tsd;
+   st = (stk_tsd_t *)TSD->stk_tsd;
    if ( q->type == QisTemp )
    {
       delete_a_temp_queue( TSD, st, q ) ;

@@ -1,7 +1,13 @@
 #ifndef lint
-static char *RCSid = "$Id: memory.c,v 1.10 2004/03/17 09:26:31 mark Exp $";
+static char *RCSid = "$Id: memory.c,v 1.14 2005/08/16 07:40:59 mark Exp $";
 #endif
 
+#if 0
+#define REGINA_DEBUG_MEMORY
+#define REGINA_DEBUG_MEMORY1
+#define REGINA_DEBUG_MEMORY2
+#define REGINA_DEBUG_MEMORY3
+#endif
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -134,6 +140,7 @@ typedef struct memhead
    unsigned short seqv ;          /* Sequential counter */
    unsigned char flag ;           /* What is this memory used for */
    unsigned char magic ;          /* Not really used */
+   void *addr;
 } memheader;
 
 # ifdef PATTERN_MEMORY
@@ -166,7 +173,7 @@ typedef struct memhead
  * memory is wasted, and vice versa. The 'right' size is dependent on
  * your machine, rexx scripts and your personal taste.
  */
-#define CHUNK_SIZE (8192)
+#define CHUNK_SIZE (8192*4) /* JO - was 8192 */
 
 /*
  * MAX_INTERNAL_SIZE is the max size of individual pieces of memory
@@ -174,7 +181,7 @@ typedef struct memhead
  * it will just forward the request to malloc()/free(). Note that
  * this value should be less than or equal to CHUNK_SIZE.
  */
-#define MAX_INTERNAL_SIZE (4096)
+#define MAX_INTERNAL_SIZE (8192*3) /* JO - was 4096 */
 
 /*
  * MEMINFO_HASHSIZE is the size of the 'hashtable' used to find the size
@@ -213,8 +220,10 @@ typedef struct memhead
  * a number equal to a binary 'round' number (e.g. 512). There is no
  * need to keep the size a prime number, since the elements in the
  * table *will* be well distributed.
+ * 8192*4 == 1<<15
+ * JO was 13
  */
-#define mem_hash_func(a) (((a)>>13)%MEMINFO_HASHSIZE)
+#define mem_hash_func(a) (((a)>>15)%MEMINFO_HASHSIZE)
 
 /*
  * Here are the list of the 'approved' sizes. Memory is only allocatable
@@ -228,11 +237,14 @@ typedef struct memhead
  * into consideration that all these sizes should be aligned according
  * to the size of ints and pointers, so don't make them too small.
  */
-#define NUMBER_SIZES 19
+#define NUMBER_SIZES 25 /* JO - was 19 */
 static const int sizes[NUMBER_SIZES] =
                            {    8,   12,   16,   24,   32,   48,   64,   96,
                               128,  192 , 256,  384,  512,  768, 1024, 1536,
-                             2048, 3072, 4096 } ;
+                             2048, 3072, 4096,
+                             4096+2048, 8192,
+                             8192+4096, 16384,
+                             16384+8192,32768 };
 /*
  * The type meminfo holds the info about the connection between the
  * address of allocated memory and the size of that memory. When new
@@ -362,9 +374,10 @@ int init_memory( tsd_t *TSD )
    if (TSD->mem_tsd != NULL)
       return(1);
 
-   if ((mt = TSD->mem_tsd = TSD->MTMalloc(TSD,sizeof(mem_tsd_t))) == NULL)
+   if ( ( TSD->mem_tsd = TSD->MTMalloc( TSD, sizeof(mem_tsd_t) ) ) == NULL )
       return(0);
-   memset(mt,0,sizeof(mem_tsd_t));
+   mt = (mem_tsd_t *)TSD->mem_tsd;
+   memset( mt, 0, sizeof(mem_tsd_t) );
    /*
     * Don't register this chunk of memory! It contains the list of all
     * other blocks of memory to be freed!
@@ -488,11 +501,11 @@ static void init_hash_table( mem_tsd_t *mt )
 static int register_mem( const tsd_t *TSD, void *chunk )
 {
    meminfo *mem=NULL;
-   mem_tsd_t *mt=TSD->mem_tsd;
+   mem_tsd_t *mt=(mem_tsd_t *)TSD->mem_tsd;
 
-   if ((mem = (meminfo *)TSD->MTMalloc( TSD, sizeof( meminfo ))) == NULL )
+   if ( ( mem = (meminfo *)TSD->MTMalloc( TSD, sizeof(meminfo) ) ) == NULL )
       return(1);
-   mem->start = chunk;
+   mem->start = (char *)chunk;
    mem->next = NULL;
    if (mt->curr_entry)
    {
@@ -542,7 +555,7 @@ static int register_mem( const tsd_t *TSD, void *chunk )
  */
 static void add_entry( const tsd_t *TSD, char *start, const char *addr, int bin_no )
 {
-   mem_tsd_t *mt = TSD->mem_tsd;
+   mem_tsd_t *mt = (mem_tsd_t *)TSD->mem_tsd;
    meminfo *ptr ;              /* work ptr */
    int tmp ;                   /* tmp storage for mem_hash_func() */
 
@@ -554,7 +567,7 @@ static void add_entry( const tsd_t *TSD, char *start, const char *addr, int bin_
    if (mt->mem_ctl_idx>=FLIST_ARRAY_SIZE)
    {
       /* Stupid SunOS acc gives incorrect warning for the next line */
-      if  ((mt->mem_ctl = TSD->MTMalloc( TSD, sizeof( meminfo) * FLIST_ARRAY_SIZE )) == NULL)
+      if  ( ( mt->mem_ctl = (meminfo *)TSD->MTMalloc( TSD, sizeof( meminfo) * FLIST_ARRAY_SIZE ) ) == NULL )
           exiterror( ERR_STORAGE_EXHAUSTED, 0 )  ;
       mt->mem_ctl_idx = 0 ;
       if ( register_mem( TSD, mt->mem_ctl ) )
@@ -601,7 +614,7 @@ void *get_a_chunkTSD( const tsd_t *TSD, int size )
    fprintf(stderr,"get_a_chunkTSD(): want %d bytes...",size);
 #endif
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
 
    /*
     * If memory is too big, let malloc() handle the problem.
@@ -614,7 +627,7 @@ void *get_a_chunkTSD( const tsd_t *TSD, int size )
          fprintf(stderr,"got %d at %x (after allocating with malloc)\n",size,result);
 #endif
 /*
- * removing this fixes memory leak in 908114 - MHES 08-Mark-2004
+ * removing this fixes memory leak in 908114 - MHES 08-March-2004
          if ( register_mem( TSD, result ) )
             exiterror( ERR_STORAGE_EXHAUSTED, 0 )  ;
  */
@@ -638,7 +651,7 @@ void *get_a_chunkTSD( const tsd_t *TSD, int size )
        * 'incremented' later, so it must be set to the value which now
        * is to be allocated.
        */
-      vptr = TSD->MTMalloc( TSD, CHUNK_SIZE ) ;
+      vptr = (char *)TSD->MTMalloc( TSD, CHUNK_SIZE ) ;
       if (!vptr)
           exiterror( ERR_STORAGE_EXHAUSTED, 0 )  ;
 
@@ -729,7 +742,7 @@ streng *get_a_strengTSD( const tsd_t *TSD, int size )
 #endif
    if (size>MAX_INTERNAL_SIZE)
    {
-      if ((result=TSD->MTMalloc( TSD, size )) != NULL)
+      if ( ( result = (streng *)TSD->MTMalloc( TSD, size ) ) != NULL )
       {
          result->len = 0 ;
          result->max = size-STRHEAD ;
@@ -744,7 +757,7 @@ streng *get_a_strengTSD( const tsd_t *TSD, int size )
           exiterror( ERR_STORAGE_EXHAUSTED, 0 )  ;
    }
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
 
    /*
     * Get the first item from the appropriate freelist, and let 'vptr'
@@ -760,7 +773,7 @@ streng *get_a_strengTSD( const tsd_t *TSD, int size )
        * 'incremented' later, so it must be set to the value which now
        * is to be allocated.
        */
-      vptr = TSD->MTMalloc( TSD, CHUNK_SIZE ) ;
+      vptr = (char *)TSD->MTMalloc( TSD, CHUNK_SIZE ) ;
       if (!vptr)
           exiterror( ERR_STORAGE_EXHAUSTED, 0 )  ;
       if ( register_mem( TSD, vptr ) )
@@ -864,7 +877,7 @@ void give_a_strengTSD( const tsd_t *TSD, streng *ptr )
       return ;
    }
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
 
    /*
     * First find the right element in flists, then link this piece
@@ -912,7 +925,7 @@ void give_a_chunkTSD( const tsd_t *TSD, void *ptr )
    int before, after;
 #endif
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
    /*
     * initialize a few values, 'cptr' is easy, while 'mptr' is the
     * list of values for this piece of memory, that is in the
@@ -977,7 +990,7 @@ void purge_flists( const tsd_t *TSD )
    meminfo *next;
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
    ptr = mt->first_entry;
 
    while( ptr )
@@ -1019,8 +1032,8 @@ int show_free_lists(const tsd_t *TSD)
    int i;
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
-   for (i=0;i<num_bins;i++)
+   mt = (mem_tsd_t *)TSD->mem_tsd;
+   for ( i = 0; i < num_bins; i++ )
    {
       show_a_free_list( mt, i, "" );
    }
@@ -1087,7 +1100,7 @@ void *mymallocTSD( const tsd_t *TSD, int bytes )
    struct memhead *memptr ;  /* holds the result */
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
 
    /*
     * Increase the size of the memory wanted, so we can put the
@@ -1106,7 +1119,7 @@ void *mymallocTSD( const tsd_t *TSD, int bytes )
 #ifdef FLISTS
    if ((memptr=get_a_chunkTSD(TSD,bytes)) == NULL)
 #else
-   if ((memptr=TSD->MTMalloc(TSD,bytes)) == NULL)
+   if ((memptr = (struct memhead *) TSD->MTMalloc(TSD,bytes)) == NULL)
 #endif
        exiterror( ERR_STORAGE_EXHAUSTED, 0 )  ;
 
@@ -1130,6 +1143,35 @@ void *mymallocTSD( const tsd_t *TSD, int bytes )
    memptr->magic = MAGIC_COOKIE ;
    memptr->seqv = (unsigned short) ++mt->sequence ;
    memptr->prev = NULL ;
+#ifdef HAVE_BUILTIN_RETURN_ADDRESS
+   {
+      void *p;
+
+      p = __builtin_return_address(0);
+
+      if ( ( (unsigned long) p >= (unsigned long) __regina_Str_first ) &&
+           ( (unsigned long) p <= (unsigned long) __regina_Str_last ) )
+      {
+         p = __builtin_return_address(1);
+
+         if ( ( (unsigned long) p >= (unsigned long) __regina_Str_first ) &&
+              ( (unsigned long) p <= (unsigned long) __regina_Str_last ) )
+         {
+            p = __builtin_return_address(2);
+
+            if ( ( (unsigned long) p >= (unsigned long) __regina_Str_first ) &&
+                 ( (unsigned long) p <= (unsigned long) __regina_Str_last ) )
+            {
+               p = __builtin_return_address(3);
+            }
+         }
+      }
+
+      memptr->addr = p;
+   }
+#else
+   memptr->addr = NULL;
+#endif
    memptr->next = mt->header0 ;
    if (mt->header0)
       mt->header0->prev = memptr ;
@@ -1158,7 +1200,7 @@ void myfreeTSD( const tsd_t *TSD, void *cptr )
    struct memhead *memptr ;   /* ptr to memory to be freed */
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
    /*
     * The header part of the memory is prepended to the part of the
     * memory that the user saw, so move the pointer backwards to the
@@ -1224,7 +1266,7 @@ int have_allocated( tsd_t *TSD, int flag )
    int result = -1 ;
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
    switch ( flag )
    {
       case ( MEM_CURRENT ) :
@@ -1251,7 +1293,7 @@ void regmarker( const tsd_t *TSD, void (*marker)(const tsd_t *TSD) )
 {
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
 
    if (mt->max_markers_regd>=MAX_MARKERS)
       exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
@@ -1296,7 +1338,7 @@ int listleaked( const tsd_t *TSD, int pflag )
    char *string ;            /* ptr to the current allocated memory */
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
    /*
     * First, set the status of all pieces of memory to leaked.
     */
@@ -1327,7 +1369,7 @@ int listleaked( const tsd_t *TSD, int pflag )
     * trace the values.
     */
    if (! pflag==MEMTRC_NONE && TSD->stddump != NULL)
-      fprintf(TSD->stddump," Len  Flg Tag      Seqv Address    Contents\n") ;
+      fprintf(TSD->stddump," Len  Flg Tag      Seqv Address    Caller     Contents\n") ;
 
    /*
     * Then, loop through the allocated memory, and for each piece of
@@ -1353,9 +1395,10 @@ int listleaked( const tsd_t *TSD, int pflag )
              * belonging to the flag, and then the sequence number.
              */
             if (TSD->stddump != NULL)
-               fprintf(TSD->stddump, "%5d %3d %-8s %4d 0x%8x \"",
+               fprintf(TSD->stddump, "%5d %3d %-8s %4X %-10p %-10p \"",
                        memptr->count - sizeof(struct memhead),
-                       memptr->flag, allocs[memptr->flag], memptr->seqv, memptr ) ;
+                       memptr->flag, allocs[memptr->flag], memptr->seqv,
+                       memptr, memptr->addr );
 
             /*
              * Dump the contents of the piece of memory. One piece of
@@ -1377,14 +1420,12 @@ int listleaked( const tsd_t *TSD, int pflag )
                   }
                   /*
                    * Write out a byte. If it is not a printable character,
-                   * write out a "?" instead, to indicate this. Perhaps this
-                   * should really be done using isprint() instead of
-                   * testing for a specific range of values?
+                   * write out a "." instead, to indicate this.
                    */
-                  if ((string[i]>=' ')&&(string[i]<0x7f))
+                  if ( rx_isprint( string[i] ) )
                      putc( string[i], TSD->stddump ) ;
                   else
-                     putc( '?', TSD->stddump ) ;
+                     putc( '~', TSD->stddump ) ;
                }
             if (TSD->stddump != NULL)
                fprintf( TSD->stddump, "\"\n" ) ;
@@ -1435,7 +1476,7 @@ void memory_stats(const tsd_t *TSD)
 {
    mem_tsd_t *mt;
 
-   mt = TSD->mem_tsd;
+   mt = (mem_tsd_t *)TSD->mem_tsd;
    if (TSD->stddump == NULL)
       return;
    fprintf(TSD->stddump,

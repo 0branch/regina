@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: funcs.c,v 1.37 2004/04/15 10:08:45 mark Exp $";
+static char *RCSid = "$Id: funcs.c,v 1.44 2006/09/15 03:57:44 mark Exp $";
 #endif
 
 /*
@@ -146,6 +146,9 @@ static const struct function_type functions[] = {
 #endif
   { EXT_AREXX_BIFS, arexx_freespace,       "FREESPACE" },
   { 0,              std_fuzz,              "FUZZ" },
+#ifdef HAVE_GCI
+  { EXT_REGINA_BIFS,rex_gciprefixchar,     "GCIPREFIXCHAR" },
+#endif
   { EXT_REGINA_BIFS,unx_getenv,            "GETENV" },
   { EXT_REGINA_BIFS,unx_getpath,           "GETPATH" },
   { EXT_REGINA_BIFS,unx_getpid,            "GETPID" },
@@ -177,6 +180,7 @@ static const struct function_type functions[] = {
   { EXT_REGINA_BIFS,rex_poolid,            "POOLID" },
   { EXT_REGINA_BIFS,unx_popen,             "POPEN" },
   { 0,              std_pos,               "POS" },
+  { EXT_REGINA_BIFS,unx_putenv,            "PUTENV" },
   { 0,              std_qualify,           "QUALIFY" },
   { 0,              std_queued,            "QUEUED" },
   { 0,              std_random,            "RANDOM" },
@@ -258,17 +262,19 @@ void mark_listleaked_params( const tsd_t *TSD )
 }
 #endif
 
-streng *buildtinfunc( tsd_t *TSD, nodeptr this )
+streng *buildtinfunc( tsd_t *TSD, nodeptr thisptr )
 {
    int low=0, topp=0, mid=0, end=1, up=num_funcs-1, i=0 ;
    streng *ptr;
    struct entry_point *vptr;
    streng *(*func)(tsd_t *,cparamboxptr)=NULL ;
+   const char *BIFname = NULL; /* set to non-NULL only in case of a BIF */
+   void *BIFfunc = NULL; /* set to non-NULL only in case of a BIF */
 
    /*
     * Look for a function registered in a DLL
     */
-   vptr = loaded_lib_func( TSD, this->name ) ;
+   vptr = loaded_lib_func( TSD, thisptr->name ) ;
    if ( vptr )
       func = std_center ; /* e.g. */
 
@@ -277,10 +283,10 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
     */
    if (!func)
    {
-      topp = Str_len( this->name ) ;
+      topp = Str_len( thisptr->name ) ;
 
-      if (this->u.func)
-         func = this->u.func ;
+      if (thisptr->u.func)
+         func = thisptr->u.func ;
       else
       {
          mid = 0 ;  /* to keep the compiler happy */
@@ -288,13 +294,13 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
          {
             mid = (up+low)/2 ;
             for (i=0; i<topp; i++ )
-               if (this->name->value[i] != functions[mid].funcname[i])
+               if (thisptr->name->value[i] != functions[mid].funcname[i])
                   break ;
 
             if (i==topp)
                end = (functions[mid].funcname[i]!=0x00) ;
             else
-               end = ( functions[mid].funcname[i] - this->name->value[i] ) ;
+               end = ( functions[mid].funcname[i] - thisptr->name->value[i] ) ;
 
             if (end>0)
                up = mid-1 ;
@@ -309,6 +315,7 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
              * If the OPTION; STRICT_ANSI is in effect however, this overrides
              * the extension.
              */
+            BIFname = functions[mid].funcname;
             if (functions[mid].compat)
             {
                if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
@@ -319,13 +326,14 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
                {
                   func = functions[mid].function ;
                   if ( get_options_flag( TSD->currlevel, EXT_CACHEEXT ) )
-                     this->u.func = func ;
+                     thisptr->u.func = func ;
                }
             }
             else
-               this->u.func = func = functions[mid].function ;
+               thisptr->u.func = func = functions[mid].function ;
          }
       }
+      BIFfunc = (void *) func;
    }
 
    if (func)
@@ -338,11 +346,15 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
                      * deallocplink. FGC
                      */
 
-      TSD->bif_first = initplist( TSD, this ) ;
+      TSD->bif_first = initplist( TSD, thisptr ) ;
+      TSD->BIFname = BIFname;
+      TSD->BIFfunc = (void *) BIFfunc;
       if (vptr)
-         ptr = call_known_external( TSD, vptr, TSD->bif_first, (char) this->o.called ) ;
+         ptr = call_known_external( TSD, vptr, TSD->bif_first, (char) thisptr->o.called ) ;
       else
          ptr = (*func)(TSD, TSD->bif_first /* ->next */ ) ;
+      TSD->BIFname = NULL;
+      TSD->BIFfunc = NULL;
 
       deallocplink( TSD, TSD->bif_first ) ;
       TSD->bif_first = NULL ;
@@ -361,8 +373,8 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
                                                  */
 
 
-         TSD->bif_first = initplist( TSD, this ) ;
-         ptr = call_unknown_external( TSD, this->name, TSD->bif_first, (char) this->o.called ) ;
+         TSD->bif_first = initplist( TSD, thisptr ) ;
+         ptr = call_unknown_external( TSD, thisptr->name, TSD->bif_first, (char) thisptr->o.called ) ;
          deallocplink( TSD, TSD->bif_first ) ;
          TSD->bif_first = NULL ;
       }
@@ -372,39 +384,39 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
    return ptr;
 }
 
-paramboxptr initplist( tsd_t *TSD, cnodeptr this )
+paramboxptr initplist( tsd_t *TSD, cnodeptr thisptr )
 {
-   paramboxptr first,new,currnt;
+   paramboxptr first,newptr,currnt;
 
    first = currnt = NULL ;
-   for (this=this->p[0]; this; this=this->p[1])
+   for (thisptr=thisptr->p[0]; thisptr; thisptr=thisptr->p[1])
    {
       if (TSD->par_stack)
       {
-         new = TSD->par_stack ;
-         TSD->par_stack = new->next ;
+         newptr = TSD->par_stack ;
+         TSD->par_stack = newptr->next ;
       }
       else
-         new = MallocTSD( sizeof( parambox )) ;
+         newptr = (paramboxptr)MallocTSD( sizeof( parambox )) ;
 
       if (!first)
-         first = currnt = new ;
+         first = currnt = newptr ;
       else
       {
-         currnt->next = new ;
-         currnt = new ;
+         currnt->next = newptr ;
+         currnt = newptr ;
       }
 
-      if (this->type==X_CEXPRLIST && TSD->trace_stat!='I')
+      if (thisptr->type==X_CEXPRLIST && TSD->trace_stat!='I')
       {
-         if (this->u.strng)
-            currnt->value = this->u.strng ;
+         if (thisptr->u.strng)
+            currnt->value = thisptr->u.strng ;
          else
             currnt->value  = NULL ;
 
          currnt->dealloc = 0 ;
       }
-      else if ( !this->p[0] )
+      else if ( !thisptr->p[0] )
       {
          currnt->dealloc = 1;
          currnt->value = NULL;
@@ -422,7 +434,7 @@ paramboxptr initplist( tsd_t *TSD, cnodeptr this )
           *    say arg(1)
           */
          currnt->dealloc = 1;
-         currnt->value = evaluate( TSD, this->p[0], NULL );
+         currnt->value = evaluate( TSD, thisptr->p[0], NULL );
       }
    }
 #ifdef TRACEMEM
@@ -437,7 +449,7 @@ paramboxptr initplist( tsd_t *TSD, cnodeptr this )
 paramboxptr initargs( tsd_t *TSD, int argc, const int *lengths,
                       const char **strings )
 {
-   paramboxptr first,new,currnt;
+   paramboxptr first,newptr,currnt;
    int i;
 
    first = currnt = NULL;
@@ -445,18 +457,18 @@ paramboxptr initargs( tsd_t *TSD, int argc, const int *lengths,
    {
       if ( TSD->par_stack )
       {
-         new = TSD->par_stack;
-         TSD->par_stack = new->next;
+         newptr = TSD->par_stack;
+         TSD->par_stack = newptr->next;
       }
       else
-         new = MallocTSD( sizeof( parambox ) );
+         newptr = (paramboxptr)MallocTSD( sizeof( parambox ) );
 
       if ( !first )
-         first = currnt = new;
+         first = currnt = newptr;
       else
       {
-         currnt->next = new;
-         currnt = new;
+         currnt->next = newptr;
+         currnt = newptr;
       }
 
       if ( lengths[i] == RX_NO_STRING )
@@ -483,24 +495,24 @@ paramboxptr initargs( tsd_t *TSD, int argc, const int *lengths,
 
 void deallocplink( tsd_t *TSD, paramboxptr first )
 {
-   paramboxptr this;
+   paramboxptr thisptr;
 
    for (;first;)
    {
-      this = first ;
+      thisptr = first ;
       first = first->next ;
-      if (this->dealloc && this->value)
+      if (thisptr->dealloc && thisptr->value)
       {
-         Free_stringTSD( this->value ) ;
-         this->value = NULL;
+         Free_stringTSD( thisptr->value ) ;
+         thisptr->value = NULL;
       }
 
 #if defined(CHECK_MEMORY)
-      FreeTSD(this);
+      FreeTSD(thisptr);
 #else
       /* Back to the freed-parbox stack: */
-      this->next = TSD->par_stack ;
-      TSD->par_stack = this ;
+      thisptr->next = TSD->par_stack ;
+      TSD->par_stack = thisptr ;
 #endif
    }
 }
@@ -546,7 +558,8 @@ int atozpos( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 {
    int result=0 ;
 
-   if ( ( result = myintatol( TSD, text, 13, bif, argnum ) ) < 0 )
+   /* fixes bug 1108868 */
+   if ( ( result = myintatol( TSD, text, 12, bif, argnum ) ) < 0 )
       exiterror( ERR_INCORRECT_CALL, 13, bif, argnum, tmpstr_of( TSD, text ) )  ;
 
    return result ;
@@ -612,7 +625,8 @@ int atopos( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 {
    int result=0 ;
 
-   if ( ( result = myintatol( TSD, text, 14, bif, argnum ) ) <= 0 )
+   /* fixes bug 1108868 */
+   if ( ( result = myintatol( TSD, text, 12, bif, argnum ) ) <= 0 )
       exiterror( ERR_INCORRECT_CALL, 14, bif, argnum, tmpstr_of( TSD, text ) ) ;
 
    return result ;
@@ -623,7 +637,7 @@ int atoposorzero( tsd_t *TSD, const streng *text, const char *bif, int argnum )
    int result=0 ;
 
    if ( ( result = myintatol( TSD, text, 11, bif, argnum ) ) < 0 )
-      exiterror( ERR_INCORRECT_CALL, 11, bif, argnum, tmpstr_of( TSD, text ) ) ;
+      exiterror( ERR_INCORRECT_CALL, 17, bif, argnum, tmpstr_of( TSD, text ) ) ;
 
    return result ;
 }
@@ -679,16 +693,6 @@ void checkparam( cparamboxptr params, int min, int max, const char *name )
 }
 
 
-const streng *param( cparamboxptr ptr, int num )
-{
-   int i=0 ;
-   for (i=1;i<num;i++,ptr=ptr->next)
-      if (!ptr)
-         exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
-
-   return ((ptr)&&(ptr->value)) ? ptr->value : NULL ;
-}
-
 /*
  * These functions are rather ugly, but they works :-)
  */
@@ -699,17 +703,18 @@ const streng *param( cparamboxptr ptr, int num )
  */
 int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm *indate)
 {
-   int rc=0,i=0,off=0;
+   int rc,i=0,off=0,save_year=indate->tm_year;
    long num1=0,num2=0,num3=0;
    char buf[20];
    char *ptr=(char*)suppdate->value;
    struct tm *tmpTime;
+   time_t num64;
 
    indate->tm_sec = indate->tm_min = indate->tm_hour = 0;
    switch(suppformat)
    {
-      case 'B':
-      case 'D':
+      case 'B': /* 99999... */
+      case 'D': /* 99999... */
          if (suppdate->len > 19)
             return(1);
          memcpy(buf,ptr,suppdate->len);
@@ -727,20 +732,26 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          else
             base2date(num1+basedays(indate->tm_year)-1,indate);
          break;
-      case 'I':
+#if 0
+      case 'I': /* WHAT IS THIS? */
          if (suppdate->len > 19)
             return(1);
          memcpy(buf,ptr,suppdate->len);
          buf[suppdate->len] = '\0';
          if ((num1 = atol(buf)) == 0)
+         {
             for (i=0;i<suppdate->len;i++)
-         if (buf[i] != '0')
-            return(1);
+            {
+               if (buf[i] != '0')
+                  return(1);
+            }
+         }
          base2date(num1+basedays(1978)-1,indate);
          break;
-      case 'E':
-      case 'O':
-      case 'U':
+#endif
+      case 'E': /* dd/mm/yy */
+      case 'O': /* yy/mm/dd */
+      case 'U': /* mm/dd/yy */
          if (suppdate->len != 8)
             return(1);
          if (*(ptr+2) != '/' && *(ptr+5) != '/')
@@ -784,10 +795,13 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
                indate->tm_year = num3;
                break;
          }
+         /*
+          * Work out the century based on a sliding year
+          */
          if (indate->tm_year < 100)   /* do something with century ... */
-            indate->tm_year += (indate->tm_year < 50) ? 2000 : 1900;
+            indate->tm_year += ( indate->tm_year <= (save_year - 2000 ) + 50 ) ? 2000 : 1900;
          break;
-      case 'N':
+      case 'N': /* dd mmm yyyy */
          if (suppdate->len != 11 && suppdate->len != 10)
             return(1);
          if (suppdate->len == 10)
@@ -820,31 +834,59 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          indate->tm_mon = num2;
          indate->tm_year = num3;
          break;
-      case 'S':
-         if (suppdate->len != 8)
+      case 'S': /* yyyymmdd */
+         if ( suppdate->len != 8 )
             return(1);
-         memcpy(buf,ptr,4);
+         memcpy( buf, ptr, 4 );
          buf[4] = '\0';
-         if ((num1 = atol(buf)) == 0)
+         if ( ( num1 = atol( buf ) ) == 0 )
             return(1);
-         memcpy(buf,(ptr+4),2);
+         memcpy( buf, (ptr+4), 2 );
          buf[2] = '\0';
-         if ((num2 = atol(buf)) == 0)
+         if ( ( num2 = atol( buf ) ) == 0 )
             return(1);
-         memcpy(buf,(ptr+6),2);
+         memcpy( buf, (ptr+6), 2 );
          buf[2] = '\0';
-         if ((num3 = atol(buf)) == 0)
+         if ( ( num3 = atol( buf ) ) == 0 )
             return(1);
          indate->tm_mday = num3;
          indate->tm_mon = num2-1;
          indate->tm_year = num1;
          break;
-      case 'T':
-         num1 = streng_to_int( TSD, suppdate, &rc );
-         if ( rc ) return 1;
-         tmpTime = localtime( (time_t *)&num1 );
-         memcpy( indate, tmpTime, sizeof(struct tm) );
+      case 'I': /* yyyy-mm-dd */
+         if ( suppdate->len != 10 )
+            return(1);
+         if ( ptr[4] != '-' )
+            return(1);
+         if ( ptr[7] != '-' )
+            return(1);
+         memcpy( buf, ptr, 4 );
+         buf[4] = '\0';
+         if ( ( num1 = atol( buf ) ) == 0 )
+            return(1);
+         memcpy( buf, (ptr+5), 2 );
+         buf[2] = '\0';
+         if ( ( num2 = atol( buf ) ) == 0 )
+            return(1);
+         memcpy( buf, (ptr+8), 2 );
+         buf[2] = '\0';
+         if ( ( num3 = atol( buf ) ) == 0 )
+            return(1);
+         indate->tm_mday = num3;
+         indate->tm_mon = num2-1;
+         indate->tm_year = num1;
+         break;
+      case 'T': /* +|-999999... */
+         num64 = streng_to_int( TSD, suppdate, &rc );
+         if ( rc )
+            return 1;
+         tmpTime = gmtime( (time_t *)&num64 );
+         *indate = *tmpTime;
          indate->tm_year += 1900;
+         /*
+          * Reset time to 00:00:00
+          */
+         indate->tm_sec = indate->tm_hour = indate->tm_min = 0;
          break;
       default:
          /* should not get here */
@@ -861,7 +903,7 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
                      ((leapyear(indate->tm_year)&&indate->tm_mon>1)?1:0)+
                      indate->tm_mday - 1;
    indate->tm_wday = (((indate->tm_yday+basedays(indate->tm_year))+8) % 7);
-   return(rc);
+   return(0);
 }
 
 /*
@@ -927,15 +969,16 @@ static void base2date(long basedate,void *conv_tmdata)
  */
 int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, struct tm *intime, time_t *unow)
 {
-   int rc=0,offset;
+   int rc,offset;
    long num1=0,num2=0,num3=0,num4=0;
    char buf[20];
    char *ptr=(char*)supptime->value;
    struct tm *tmpTime;
+   time_t num64;
 
    switch(suppformat)
    {
-      case 'C':
+      case 'C': /* hh:mmXX */
          /*
           * Format of time can be "3:45pm", or "11:45pm"; ie hour can be 1 or
           * two digits. Use of "offset" below fixes bug 742725
@@ -978,16 +1021,16 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
          intime->tm_min = num2;
          *unow = 0;
          break;
-      case 'H':
-      case 'M':
-      case 'S':
+      case 'H': /* 99999... */
+      case 'M': /* 99999... */
+      case 'S': /* 99999... */
          /*
           * Convert supptime to whole number using streng_to_int()
           * rather than atoi(). Bug #20000922-78622
           */
          num1 = streng_to_int( TSD, supptime, &rc );
-         if ( rc ) return 1;
-         if ( num1 < 0 )
+         if ( rc
+         || num1 < 0 )
             return(1);
          switch(suppformat)
          {
@@ -1010,8 +1053,8 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
             return(1);
          *unow = 0;
          break;
-      case 'L':
-      case 'N':
+      case 'L': /* hh:mm:ss.mmmmmm */
+      case 'N': /* hh:mm:ss */
          if (suppformat == 'N' && supptime->len != 8)
             return(1);
          if (suppformat == 'L' && supptime->len != 15)
@@ -1056,11 +1099,12 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
             return(1);
          *unow = num4;
          break;
-      case 'T':
-         num1 = streng_to_int( TSD, supptime, &rc );
-         if ( rc ) return 1;
-         tmpTime = localtime( (time_t *)&num1 );
-         memcpy( intime, tmpTime, sizeof(struct tm) );
+      case 'T': /* +|-999999... */
+         num64 = streng_to_int( TSD, supptime, &rc );
+         if ( rc )
+            return 1;
+         tmpTime = gmtime( (time_t *)&num64 );
+         *intime = *tmpTime;
          *unow = 0;
          break;
       default:
@@ -1068,7 +1112,7 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
          break;
    }
 
-   return(rc);
+   return(0);
 }
 /*
  * The following functions are wrappers for BIFs that are syntactically different
@@ -1097,4 +1141,39 @@ static streng *conflict_open( tsd_t *TSD, cparamboxptr parms )
       return( arexx_open( TSD, parms ) );
    else
       return( unx_open( TSD, parms ) );
+}
+
+/*
+ * BIFname tries to guess the name of the BIF we currently evaluate.
+ * We try to identify cached functions pointers.
+ */
+const char *BIFname( tsd_t *TSD )
+{
+   int i;
+   void *func;
+
+   assert( TSD->currentnode );
+
+   if ( TSD->BIFname != NULL )
+   {
+      return TSD->BIFname;
+   }
+
+   if ( TSD->BIFfunc != NULL )
+   {
+      func = TSD->BIFfunc;
+   }
+   else
+   {
+      func = (void *) TSD->currentnode->u.func;
+
+   }
+   for ( i = 0; i < num_funcs; i++ )
+   {
+      if ( (void *) functions[i].function == func )
+      {
+         return functions[i].funcname;
+      }
+   }
+   return "(internal)";
 }

@@ -1,6 +1,6 @@
 %{
 #ifndef lint
-static char *RCSid = "$Id: lexsrc.l,v 1.23 2004/03/04 11:02:06 florian Exp $";
+static char *RCSid = "$Id: lexsrc.l,v 1.33 2006/09/21 00:59:44 mark Exp $";
 #endif
 
 /*
@@ -125,17 +125,19 @@ static int inEOF=0 ;
 static int singlequote=0, doblequote=0 ;
 static int firstln=0 ;
 static int bufptr=0 ;
-/* Previous bug. 8-bits clean combined with EOF ==> need at least short */
-static short chbuffer[LOOKAHEAD] ;
+/* Previous bug. 8-bits clean combined with EOF ==> need an int */
+static int chbuffer[LOOKAHEAD] ;
 static int ipretflag=0, cch=0 ;
 static const char *interptr=NULL ;
+static const char *last_interptr=NULL ;
 static const char *interptrmax ;
 static int cchmax = 0 ;
 
 static YY_CHAR_TYPE *rmspc( YY_CHAR_TYPE *instr ) ;
 static void set_assignment( void );
 static int process_number_or_const( const char *text, int len );
-static int process_hex_or_bin_string( const char *text, int len, int base );
+static int process_hex_or_bin_string( char *text, int len, int base );
+static void compress_string( char *dest, const char *src );
 static int fill_buffer( char *buf, int max_size ) ;
 #define SET_NEXTSTART() (nextstart += yyleng)
 
@@ -229,6 +231,7 @@ key_call          [cC][aA][lL][lL]
 key_caseless      [cC][aA][sS][eE][lL][eE][sS][sS]
 key_digits        [dD][iI][gG][iI][tT][sS]
 key_do            [dD][oO]
+key_dotline       {dot}[lL][iI][nN][eE]
 key_drop          [dD][rR][oO][pP]
 key_else          [eE][lL][sS][eE]
 key_end           [eE][nN][dD]
@@ -319,7 +322,10 @@ key_with          [wW][iI][tT][hH]
 
 
      if (itflag)
-        in_trace = seek_with = 0 ;
+     {
+        in_trace = 0 ;
+        seek_with = no_seek_with ;
+     }
      itflag = (in_trace) ;
 
      if (extnextline != -1)
@@ -350,7 +356,10 @@ key_with          [wW][iI][tT][hH]
       nextstart = yyleng - (int) (ptr - (char *) yytext) ;
       nextline++ ;
       if (extnextline != -1)
+      {
          extnextline++;
+         extnextstart = nextstart; /* fixes bug 938204 */
+      }
    }
    else
       SET_NEXTSTART() ;
@@ -365,7 +374,8 @@ key_with          [wW][iI][tT][hH]
       exiterror( ERR_INVALID_TEMPLATE, 1, yytext )  ;
    }
    obs_with = in_do = 0 ;
-   in_signal = in_address = in_call = 0 ;
+   in_signal = in_call = 0 ;
+   in_address = not_in_address;
    in_parse = 0 ;
    if ( seek_with == seek_with_from_address )
       seek_with = no_seek_with ;
@@ -374,11 +384,33 @@ key_with          [wW][iI][tT][hH]
       nextstart = yyleng - (int) (ptr - (char *) yytext) ;
       nextline++ ;
       if (extnextline != -1)
+      {
          extnextline++;
+         extnextstart = nextstart; /* fixes bug 938204 */
+      }
    }
    else
       SET_NEXTSTART() ;
    return STATSEP ; }
+
+{key_dotline}/{notGeneralDot} {
+   int  i;
+   char work[16];
+
+   /* support C-like __LINE__ value */
+   /* determine current source line, and create a numeric literal */
+
+   parser_data.tline = linenr - 1 ; /* set tline for exiterror */
+
+   sprintf (work, "%d", parser_data.tline);
+
+   /* copy back work, right-to-left */
+
+   for (i = strlen (work) - 1; i >= 0; i--)
+   {
+      unput (work[i]);
+   }
+}
 
 <comm>{key_address}{between} {
    BEGIN value1 ; /* Allow a following VALUE keyword */
@@ -584,6 +616,11 @@ key_with          [wW][iI][tT][hH]
          yytext[retlength] = '\0';
          exiterror( ERR_RESERVED_SYMBOL, 1, yytext );
       }
+      else
+      {
+         yytext[retlength] = '\0';
+         exiterror( ERR_INVALID_START, 3, yytext );
+      }
    }
    else
    {
@@ -737,6 +774,7 @@ key_with          [wW][iI][tT][hH]
 
 <parse>{key_var}{between} {
    BEGIN other ;
+   in_parse = 2; /* accept a variable and treat func(a) as func (a) */
    SET_NEXTSTART() ;
    return VAR ; }
 
@@ -761,12 +799,15 @@ key_with          [wW][iI][tT][hH]
    return THEN ; }
 
 {between}{key_with}{between} {
-   BEGIN other ;
+   /*
+    * Fixes bug 952380
+    */
    if ((in_do)||(!seek_with))
       REJECT ;
+   BEGIN other ;
    if ( seek_with == seek_with_from_parse )
       in_parse = 1 ;
-   seek_with = 0 ;
+   seek_with = no_seek_with ;
    if (in_address) /* any address state */
       in_address = in_address_with ; /* WITH seen */
    SET_NEXTSTART() ;
@@ -804,7 +845,7 @@ key_with          [wW][iI][tT][hH]
    SET_NEXTSTART() ;
    return FOREVER ; }
 
-{between}{key_to}{between} {
+{key_to}{between} {
    if ( in_do == 2 )
    {
       BEGIN other ;
@@ -818,7 +859,7 @@ key_with          [wW][iI][tT][hH]
    }
    REJECT ; }
 
-{between}{key_by}{between} {
+{key_by}{between} {
    if ( in_do == 2 )
    {
       BEGIN other ;
@@ -832,7 +873,7 @@ key_with          [wW][iI][tT][hH]
    }
    REJECT ; }
 
-{between}{key_for}{between} {
+{key_for}{between} {
    if ( in_do == 2 )
    {
       BEGIN other ;
@@ -846,7 +887,7 @@ key_with          [wW][iI][tT][hH]
    }
    REJECT ; }
 
-{between}{key_while}{between} {
+{key_while}{between} {
    if (in_do)
    {
       if ( in_do == 3 )
@@ -861,7 +902,7 @@ key_with          [wW][iI][tT][hH]
    }
    REJECT ; }
 
-{between}{key_until}{between} {
+{key_until}{between} {
    if (in_do) {
       if ( in_do == 3 )
       {
@@ -912,14 +953,19 @@ key_with          [wW][iI][tT][hH]
    return LABEL ; }
 
 
+<comm>{mintext_string}{between}:{between} {
+   BEGIN comm ;
+
+   compress_string( retvalue, yytext );
+
+   SET_NEXTSTART() ;
+   return LABEL ; }
+
+
 {mintext_string}{comment}*\( {
-   int i;
    BEGIN other ;
 
-   strcpy(retvalue,&yytext[1]) ;
-   for ( i = 3; i <= yyleng && retvalue[yyleng-i] == '`'; i++)
-      ;
-   retvalue[yyleng-i] = '\0' ;
+   compress_string( retvalue, yytext );
 
    kill_next_space = 1 ;
    if ( insert_abuttal ) {
@@ -934,7 +980,7 @@ key_with          [wW][iI][tT][hH]
 
 
 
-('{hex_string}'|\"{hex_string}\")[xX]/{notGeneralParen} {
+('{hex_string}'|\"{hex_string}\")[xX]/{notGeneralDot} {
    /*
     * fixes bug 617225.
     */
@@ -942,7 +988,7 @@ key_with          [wW][iI][tT][hH]
 
 
 
-('{bin_string}'|\"{bin_string}\")[bB]/{notGeneralParen} {
+('{bin_string}'|\"{bin_string}\")[bB]/{notGeneralDot} {
    return process_hex_or_bin_string( yytext, yyleng, 2 ); }
 
 {text_string}[xXbB]/{notGeneralParen} {
@@ -1000,23 +1046,11 @@ key_with          [wW][iI][tT][hH]
    exiterror( ERR_INVALID_HEX_CONST, ( base == 16 ) ? 1 : 2, i ); }
 
 {text_string} {
-   unsigned i,j;
    BEGIN other ;
-   for (i=1; yytext[i+1]; i++)
-   {
-      if ( yytext[i] == '\n' )
-      {
-         parser_data.tline = linenr - 1 ; /* set tline for exiterror */
-         exiterror( ERR_UNMATCHED_QUOTE, 0 ) ;
-      }
 
-      if (yytext[i] == yytext[0] && yytext[i+1] == yytext[0] )
-         for (j=i+1; yytext[j]; j++)
-            yytext[j] = yytext[j+1] ;
-   }
+   compress_string( retvalue, yytext );
 
-   yytext[strlen(yytext)-1] = '\0' ;
-   strcpy(retvalue,&yytext[1]) ;
+   strcpy( yytext, retvalue ); /* proper error display */
 
    if (in_numform)
    {
@@ -1024,7 +1058,8 @@ key_with          [wW][iI][tT][hH]
       exiterror( ERR_INV_SUBKEYWORD, 11, "ENGINEERING SCIENTIFIC", retvalue ) ;
    }
 
-   if ( insert_abuttal && !in_parse && !in_call ) {
+   /* fixes 1109372 */
+   if ( insert_abuttal && !in_parse && !in_signal && !in_call ) {
       delayed_symbol = STRING ;
       SET_NEXTSTART() ;
       return CONCATENATE ; }
@@ -1116,9 +1151,25 @@ key_with          [wW][iI][tT][hH]
       return SIMSYMBOL;
    }
 
+   if ( in_parse == 2 )
+   {
+      /*
+       * This has precedence over checking the parenthesis below.
+       * Fixes bug 1109335.
+       */
+      in_parse = 1;
+      kill_next_space = 1;
+      SET_NEXTSTART();
+      return SIMSYMBOL;
+   }
+
    /* We must check if a '(' follows. Remember the number of eaten chars. */
       j = 1;
+#ifdef __cplusplus
+   for (; ( i = yyinput() ) == '`';)
+#else
    for (; ( i = input() ) == '`';)
+#endif
      j++ ;
    if (i != '(')
    {
@@ -1204,7 +1255,11 @@ key_with          [wW][iI][tT][hH]
       REJECT;
 
    /* We must check if a '(' follows. Remember the number of eaten chars. */
+#ifdef __cplusplus
+   for ( j = 1; ( i = yyinput() ) == '`'; )
+#else
    for ( j = 1; ( i = input() ) == '`'; )
+#endif
      j++;
    if ( i != '(' )
    {
@@ -1491,7 +1546,11 @@ static int process_number_or_const( const char *text, int len )
     * We must check if a '(' follows. Remember the number of eaten chars.
     */
    eaten = 1;
+#ifdef __cplusplus
+   while ( ( c = yyinput() ) == '`' )
+#else
    while ( ( c = input() ) == '`' )
+#endif
    {
      eaten++;
    }
@@ -1529,6 +1588,40 @@ static int process_number_or_const( const char *text, int len )
 }
 
 /*
+ * compress_string removes quotes or double quotes from the src and changes
+ * double delimiter to one. The delimiter should be either ' or ".
+ */
+static void compress_string( char *dest, const char *src )
+{
+   char c, delim = *src++;
+
+   for (;;)
+   {
+      if ( ( c = *src++ ) == delim )
+      {
+         if (*src == delim )
+         {
+            *dest++ = *src++;
+         }
+         else
+         {
+            break;
+         }
+      }
+      else
+      {
+         if ( c == '\n' )
+         {
+            parser_data.tline = linenr - 1 ; /* set tline for exiterror */
+            exiterror( ERR_UNMATCHED_QUOTE, 0 ) ;
+         }
+         *dest++ = c;
+      }
+   }
+   *dest = '\0';
+}
+
+/*
  * process_hex_or_bin_string convert the string in text which is given as
  * a hexstring or a binstring to a "normal" string. base must be either 2 or
  * 16.
@@ -1536,7 +1629,7 @@ static int process_number_or_const( const char *text, int len )
  * something of the form "content"x or 'content'b or similar.
  * Returns a lexical code. retvalue and retlength will be filled.
  */
-static int process_hex_or_bin_string( const char *text, int len, int base )
+static int process_hex_or_bin_string( char *text, int len, int base )
 {
    char c;
    int i,left;
@@ -1605,6 +1698,37 @@ static int process_hex_or_bin_string( const char *text, int len, int base )
    }
    dest[retlength] = '\0';
 
+   /* We must check if a '(' follows. Remember the number of eaten chars. */
+   left = 1;
+#ifdef __cplusplus
+   for (; ( i = yyinput() ) == '`';)
+#else
+   for (; ( i = input() ) == '`';)
+#endif
+     left++;
+   if (i != '(')
+   {
+      left--;
+      unput(i);
+   }
+   /* input() has destroyed the yytext-terminator re-set it */
+   text[len] = '\0';
+   SET_NEXTSTART();
+   nextstart += left;
+
+   if (i == '(')
+   {
+      kill_next_space = 1;
+      if (insert_abuttal)
+      {
+         inhibit_delayed_abuttal = 1;
+         delayed_symbol = INFUNCNAME;
+         return CONCATENATE;
+      }
+      expression_ended = 0;
+      return INFUNCNAME;
+   }
+
    if ( insert_abuttal && !in_parse && !in_call )
    {
       delayed_symbol = STRING;
@@ -1637,7 +1761,7 @@ static int get_next_line( char *line, int max, FILE *stream )
    lineboxptr newline ;
    offsrcline *incore_newline;
    int pos = 0;
-   int c = 0, nextEOL ;
+   int c = 0;
 
    if (inEOF) /* You can't use myunputc if EOF is reached! */
       return EOF ;
@@ -1660,10 +1784,12 @@ static int get_next_line( char *line, int max, FILE *stream )
 #endif
       }
       else
+      {
          c = getc(stream) ;
 
-      if ( parser_data.TSD->HaltRaised )
-         halt_raised( parser_data.TSD );
+         if ( parser_data.TSD->HaltRaised )
+            halt_raised( parser_data.TSD );
+      }
 
       if ((c=='\r') || (c=='\n') || (c==EOF))
          break ;
@@ -1687,38 +1813,38 @@ static int get_next_line( char *line, int max, FILE *stream )
          inEOF = 1 ;
          return EOF ;
       }
-      nextEOL = EOF;
+      chbuffer[bufptr++] = EOF; /* push back EOF for reuse */
    }
    else
    {
-      /* get one more char */
-      if (bufptr>0)
-         nextEOL = chbuffer[--bufptr] ;
+      /* Maybe we have CRLF or LFCR. Check for the pair character. */
+      char pairChar = (c == '\r') ? '\n' : '\r';
+
+
+      /* get one more char and consume it if it is the pair of the EOL */
+      if (bufptr > 0)
+      {
+         if (chbuffer[bufptr - 1] == (int) pairChar)
+            bufptr--;
+      }
       else if (ipretflag)
       {
-         if (interptr>=interptrmax)
-            nextEOL = EOF ;
-         else
-#ifdef ASCII_0_TERMINATES_STRING
-            if ((nextEOL = *interptr++) == '\0')
-               nextEOL = EOF ;
-#else
-            nextEOL = *interptr++ ;
-#endif
+         if ((interptr < interptrmax) && (*interptr == pairChar))
+            interptr++;
       }
       else
-         nextEOL = getc(stream) ;
-
-      if ( parser_data.TSD->HaltRaised )
-         halt_raised( parser_data.TSD );
+      {
+         int next = getc(stream);
+         if (next != pairChar)
+         {
+            /* ungetc may break some runtime stuff. Use the internal lookahead*/
+            chbuffer[bufptr++] = next;
+         }
+         if ( parser_data.TSD->HaltRaised )
+            halt_raised( parser_data.TSD );
+      }
    }
 
-   /* Decide if the next character is the last char of a EOL pair.
-    * Valid pairs are CR/LF or LF/CR. Put nextEOL back if there is no pair.
-    */
-   if (((c!='\n') || (nextEOL!='\r')) &&
-       ((c!='\r') || (nextEOL!='\n')))
-      chbuffer[bufptr++] = (short) nextEOL ;
 
    cch = 0 ; /* not needed ? */
    line[pos++] = '\n';
@@ -1727,8 +1853,8 @@ static int get_next_line( char *line, int max, FILE *stream )
    {  /* We can use the incore string to describe a source line. */
       incore_newline = FreshLine() ;
       incore_newline->length = pos - 1 ;
-      /* FIXME: What happens on the second attempt to read EOF or with CRLF? */
-      incore_newline->offset = interptr - parser_data.incore_source ;
+      incore_newline->offset = last_interptr - parser_data.incore_source ;
+      last_interptr = interptr;
       return pos ;
    }
 
@@ -1788,6 +1914,7 @@ static int fill_buffer( char *buf, int max_size )
    int nesting_start_line = 0;      /* start line of comment for errortext() */
    char *dest, c;
    int i, squote, dquote;
+   int line_comment;
 
    if (firstln == 0)
    {
@@ -1798,19 +1925,14 @@ static int fill_buffer( char *buf, int max_size )
       max = get_next_line( line, sizeof(line), yyin ) ;
       if (max < 0) /* empty input file */
          return 0 ;
-#if 0
-      if (line[0] == '#')
-      {  /* Ignore first line beginning this way for unix compat */
-         max = 0;
-         return fill_buffer( buf, max_size ) ;
-      }
-#else
-      if (line[0] == '#')
+      /* test for both #! - fixes bug 1230639 */
+      if ( max > 1
+      &&  line[0] == '#'
+      &&  line[1] == '!' )
       {  /* Ignore first line beginning this way for unix compat */
          max = 5;
          memcpy( line, "/**/\n", 5 );
       }
-#endif
    }
    else if (pos < max) /* Are there still characters to transmit? */
    {
@@ -1944,6 +2066,7 @@ repeated_nesting:
     * strings including comments.
     */
    squote = dquote = 0;
+   line_comment = 0;
    while (pos < max)
    {
       /* We use selective loops to reduce comparisons */
@@ -2007,6 +2130,21 @@ repeated_nesting:
             pos++;
             dquote = 0;
          }
+      else if (line_comment)
+         {
+            while ((c = line[pos]) >= ' ')    /* not at end of line yet */
+            {
+               *dest++ = '`';
+               if (++pos >= max)
+               {
+                  parser_data.tline = linenr - 1 ; /* set tline for exiterror */
+                  exiterror( ERR_UNMATCHED_QUOTE, 3 ) ;
+               }
+            }
+            *dest++ = c;    /* line terminator */
+            pos++;
+            line_comment = 0;
+         }
       else
          while (pos < max)
             switch (c = line[pos])
@@ -2030,6 +2168,22 @@ repeated_nesting:
                      *dest++ = '`' ;
                      pos += 2 ;
                      nesting++ ;
+                     goto outer_loop;
+                  }
+                  else
+                  {
+                     *dest++ = c;
+                     pos++ ;
+                  }
+                  break ;
+
+               case '-':    /* line "--" comments */
+                  if (line[pos + 1] == '-')
+                  {
+                     *dest++ = '`' ;
+                     *dest++ = '`' ;
+                     pos += 2 ;
+                     line_comment = 1 ;
                      goto outer_loop;
                   }
                   else
@@ -2151,8 +2305,8 @@ static void init_it_all( tsd_t *TSD )
    itflag = 0 ;
    in_signal = 0 ;
    in_call = 0 ;
-   in_address = 0 ;
-   seek_with = 0 ;
+   in_address = not_in_address ;
+   seek_with = no_seek_with ;
    kill_this_space = 0 ;
    ipretflag = 0 ;
    do_level = 0 ;
@@ -2205,7 +2359,9 @@ static void fetch(tsd_t *TSD, FILE *fptr, const streng *str,
       ipretflag = 1 ;
       cchmax = str->len ;
       interptr = str->value ;
+      last_interptr = interptr ;
       interptrmax = interptr + cchmax ;
+      parser_data.incore_source = str->value; /* fixes bug 972796 */
       result->incore_source = str->value;
    }
 

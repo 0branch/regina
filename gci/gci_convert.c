@@ -166,15 +166,17 @@ static struct {
 static int functable_assigned = 0;
 
 #ifdef NEED_STRTOBIGL
-static GCI_I strtobigl( const char *nptr, char **end, int base )
+static GCI_I strtobigl( void *hidden, const char *nptr, char **end, int base )
 {
    int neg = 0;
    char *run = (char *) nptr;
    GCI_I retval = 0;
 
+   (hidden = hidden);
+
    assert( base == 10 );
 
-   while ( rx_isspace( *run ) )
+   while ( GCI_isspace( *run ) )
       run++;
 
    if ( *run == '-' )
@@ -182,13 +184,13 @@ static GCI_I strtobigl( const char *nptr, char **end, int base )
       neg = 1;
       run++;
    }
-   if ( !rx_isdigit( *run ) )
+   if ( !GCI_isdigit( *run ) )
    {
       *end = (char *) nptr;
       return 0;
    }
 
-   while ( rx_isdigit( *run ) )
+   while ( GCI_isdigit( *run ) )
    {
       if ( neg )
       {
@@ -258,23 +260,25 @@ static GCI_I strtobigl( const char *nptr, char **end, int base )
 #endif
 
 #ifdef NEED_STRTOBIGUL
-static GCI_U strtobigul( const char *nptr, char **end, int base )
+static GCI_U strtobigul( void *hidden, const char *nptr, char **end, int base )
 {
    char *run = (char *) nptr;
    GCI_U retval = 0;
 
+   (hidden = hidden);
+
    assert( base == 10 );
 
-   while ( rx_isspace( *run ) )
+   while ( GCI_isspace( *run ) )
       run++;
 
-   if ( !rx_isdigit( *run ) )
+   if ( !GCI_isdigit( *run ) )
    {
       *end = (char *) nptr;
       return 0;
    }
 
-   while ( rx_isdigit( *run ) )
+   while ( GCI_isdigit( *run ) )
    {
       if ( retval >= GCI_UM / 10 )
       {
@@ -347,16 +351,19 @@ static GCI_F strtobigf( const char *nptr, char **end )
  * A resulting length of 0 may occur only if the complete string contain
  * whitespaces, only.
  */
-static void preparenum( const char **str,
+static void preparenum( void *hidden,
+                        const char **str,
                         int *size )
 {
    const char *s = *str;
    int len = *size;
 
+   (hidden = hidden);
+
    /*
     * We prepare the number by hand and strip away blanks and useless zeros.
     */
-   while ( len && rx_isspace( *s ) )
+   while ( len && GCI_isspace( *s ) )
    {
       s++;
       len--;
@@ -370,7 +377,7 @@ static void preparenum( const char **str,
    /*
     * We know from the previous test that at least one non-space exists.
     */
-   while ( rx_isspace( s[len - 1] ) )
+   while ( GCI_isspace( s[len - 1] ) )
    {
       len--;
    }
@@ -398,10 +405,13 @@ static void preparenum( const char **str,
  * iswhole returns 1 exactly if all characters in str are decimal digits,
  * 0 otherwise.
  */
-static int iswhole( const char *str,
+static int iswhole( void *hidden,
+                    const char *str,
                     int size )
 {
-   while ( size && rx_isdigit( *str ) )
+   (hidden = hidden);
+
+   while ( size && GCI_isdigit( *str ) )
    {
       str++;
       size--;
@@ -427,15 +437,14 @@ static GCI_result string2int( void *hidden,
    char *p;
    int rc;
 
-   (hidden = hidden);
-   preparenum( &str, &size );
-   if ( !size || ( size > sizeof( buf ) - 1 ) )
+   preparenum( hidden, &str, &size );
+   if ( !size || ( size > (int) sizeof( buf ) - 1 ) )
       return GCI_WrongInput;
 
    if ( ( *str == '-' ) || ( *str == '+' ) )
-      rc = iswhole( str + 1, size - 1 );
+      rc = iswhole( hidden, str + 1, size - 1 );
    else
-      rc = iswhole( str, size );
+      rc = iswhole( hidden, str, size );
    if ( !rc )
       return GCI_WrongInput;
 
@@ -492,9 +501,10 @@ static GCI_result string2uint( void *hidden,
    char buf[80]; /* enough even for 256 bit numbers */
    char *p;
 
-   (hidden = hidden);
-   preparenum( &str, &size );
-   if ( !size || ( size > sizeof( buf ) - 1 ) || !iswhole( str, size ) )
+   preparenum( hidden, &str, &size );
+   if ( !size ||
+        ( size > (int) sizeof( buf ) - 1 ) ||
+        !iswhole( hidden, str, size ) )
       return GCI_WrongInput;
 
    memcpy( buf, str, size );
@@ -553,11 +563,11 @@ static GCI_result string2float( void *hidden,
    char *p;
 
    (hidden = hidden);
-   preparenum( &str, &size );
+   preparenum( hidden, &str, &size );
    if ( !size )
       return GCI_WrongInput;
 
-   if ( ( buf = GCI_malloc( hidden, size + 1 ) ) == NULL )
+   if ( ( buf = (char *) GCI_malloc( hidden, size + 1 ) ) == NULL )
       return GCI_NoMemory;
 
    memcpy( buf, str, size );
@@ -569,7 +579,7 @@ static GCI_result string2float( void *hidden,
     */
    errno = 0;
    *retval = GCI_Fr( buf, &p );
-   while ( rx_isspace( *p ) )
+   while ( GCI_isspace( *p ) )
       p++;
 
    if ( *p != '\0' )
@@ -609,7 +619,7 @@ static GCI_result float2string( void *hidden,
    *strsize = GCI_Fw( str, bin );
    if ( ( *str == '-' ) || ( *str == '+' ) )
       str++;
-   if ( !rx_isdigit( *str ) )
+   if ( !GCI_isdigit( *str ) )
       return GCI_UnsupportedNumber;
    return GCI_OK;
 }
@@ -981,7 +991,7 @@ GCI_result GCI_string2bin( void *hidden,
    if ( !functable_assigned )
       setup_functable();
 
-   if ( ( destbyte < 0 ) || ( destbyte >= elements( functable ) ) )
+   if ( ( destbyte < 0 ) || ( destbyte >= (int) elements( functable ) ) )
       return GCI_UnsupportedType;
 
    switch ( type )
@@ -1044,7 +1054,7 @@ GCI_result GCI_bin2string( void *hidden,
    if ( !functable_assigned )
       setup_functable();
 
-   if ( ( size < 0 ) || ( size >= elements( functable ) ) )
+   if ( ( size < 0 ) || ( size >= (int) elements( functable ) ) )
       return GCI_UnsupportedType;
 
    if ( *strsize < 128 )
@@ -1104,11 +1114,12 @@ GCI_result GCI_validate( int size,
       return GCI_UnsupportedType;
 
    if ( ( type == GCI_string ) ||
+        ( type == GCI_raw ) ||
         ( type == GCI_container ) ||
         ( type == GCI_array ) )
       return ( basetype ) ? GCI_NoBaseType : GCI_OK;
 
-   if ( size >= elements( functable ) )
+   if ( size >= (int) elements( functable ) )
       return GCI_UnsupportedType;
 
    switch ( type )

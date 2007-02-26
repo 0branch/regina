@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: builtin.c,v 1.38 2004/02/10 10:43:45 mark Exp $";
+static char *RCSid = "$Id: builtin.c,v 1.54 2006/09/15 05:40:35 mark Exp $";
 #endif
 
 /*
@@ -81,9 +81,10 @@ int init_builtin( tsd_t *TSD )
    if (TSD->bui_tsd != NULL)
       return(1);
 
-   if ((bt = TSD->bui_tsd = MallocTSD(sizeof(bui_tsd_t))) == NULL)
+   if ( ( TSD->bui_tsd = MallocTSD( sizeof(bui_tsd_t) ) ) == NULL )
       return(0);
-   memset(bt,0,sizeof(bui_tsd_t));  /* correct for all values */
+   bt = (bui_tsd_t *)TSD->bui_tsd;
+   memset( bt, 0, sizeof(bui_tsd_t) );  /* correct for all values */
 
 #if defined(HAVE_RANDOM)
    srandom((int) (time((time_t *)0)+getpid())%(3600*24)) ;
@@ -160,95 +161,6 @@ static int contained_in( const char *first, const char *fend, const char *second
 
    return 1 ;
 }
-#if 0
-/* ************************ contained_in() ************************
- * Checks if the first string is a subphrase of the second string,
- * A phrase differs from a substring in one significant way; a
- * phrase is a set of words, separated by any number of blanks. So,
- * this function ignores blanks spaces between any of the words
- * contained within the strings.
- *
- * Passed pointers to the first and second strings. Also passed the
- * pointers to the ends of the first and second strings (ie, so this
- * works on non-null-terminated strings).
- *
- * Returns 1 if so, 0 if not.
- *
- * Note that if first string is an empty string (or one that contains
- * all spaces), this will report a match regardless of what is in
- * second string. It's up to the caller to check for such a condition.
- *
- * Also note that the caller should have stripped any leading spaces
- * in first and second strings.
- *
- * Original routine re-written by J.Glatt 21 Nov 99
- */
-
-static int contained_in( const char *first, const char *fend, const char *second, const char *send )
-{
- /*
-  * Uncomment this to allow this function to skip leading spaces
-  * and add skip: before while() loop after "skip leading spaces in first string"
-  * comment.
-   goto skip;
-   Removed this code. goto inside a loop is bad karma! MH 21 Nov 99
-  */
-   do
-   {
-      /*
-       * Another non-space char in first?
-       */
-      while ( (first < fend) && !rx_isspace(*first) )
-      {
-         /*
-          * Another char in second? If so, compare this char with first's char
-          */
-         if ( (second >= send) || (*first != *second) )
-         {
-            /*
-             * If it doesn't match or second has no more chars, return 0
-             */
-            return 0 ;
-         }
-
-         /*
-          * These two strings match so far. Keep checking more chars for matches
-          */
-         first++;
-         second++;
-      }
-      /*
-       * Does the second string either end at the same position as the first string,
-       * or does it have a space at the same position? If not, no match
-       */
-      if ( (second < send) && !rx_isspace(*second) )
-      {
-         return 0;
-      }
-
-      /*
-       * Skip leading spaces in first string
-       * Add skip: label if you want to ignore leading spaces
-       */
-      while ( (first < fend) && rx_isspace(*first) ) first++;
-
-      /*
-       * Skip leading spaces in second string
-       */
-      while ( (second < send) && rx_isspace(*second) ) second++;
-
-      /*
-       * Any more chars in the first string?
-       */
-   } while ( first < fend );
-
-   /*
-    * We have a match
-    */
-   return 1;
-}
-#endif
-
 
 
 streng *std_wordpos( tsd_t *TSD, cparamboxptr parms )
@@ -260,7 +172,7 @@ streng *std_wordpos( tsd_t *TSD, cparamboxptr parms )
    checkparam(  parms,  2,  3 , "WORDPOS" ) ;
    seek = parms->value ;
    target = parms->next->value ;
-   if ( param( parms, 3 ) )
+   if ((parms->next->next)&&(parms->next->next->value))
       start = atopos( TSD, parms->next->next->value, "WORDPOS", 3 ) ;
 
    end = target->value + Str_len(target) ;
@@ -362,7 +274,7 @@ streng *std_wordindex( tsd_t *TSD, cparamboxptr parms )
    {
       ;
    }
-   for (i=0; i<number-1; i++) 
+   for (i=0; i<number-1; i++)
    {
       for (; (ptr<end)&&(!rx_isspace(*ptr)); ptr++)
       {
@@ -551,7 +463,7 @@ streng *std_subword( tsd_t *TSD, cparamboxptr parms )
    cend = cptr + Str_len(string) ;
    for (i=1; i<start; i++)
    {
-      for ( ; (cptr<cend)&&(rx_isspace(*cptr)); cptr++) ;
+      for ( ; (cptr<cend)&&(rx_isspace(*cptr)); cptr++)
       {
          ;
       }
@@ -581,11 +493,12 @@ streng *std_subword( tsd_t *TSD, cparamboxptr parms )
       }
    }
    else
+      eptr = cend;
+
+   /* fixes bug 1113373 */
+   while ((eptr > cptr) && rx_isspace(*(eptr-1)))
    {
-      for(eptr=cend; (eptr>cptr)&&rx_isspace(*(eptr-1)); eptr--)
-      {
-         ;
-      }
+      eptr--;
    }
 
    result = Str_makeTSD( eptr-cptr ) ;
@@ -618,13 +531,13 @@ streng *std_symbol( tsd_t *TSD, cparamboxptr parms )
 }
 
 
-#if defined(TRACEMEM) && defined(HAVE_PUTENV)
+#if defined(TRACEMEM)
 static void mark_envirvars( const tsd_t *TSD )
 {
    struct envirlist *ptr=NULL ;
    bui_tsd_t *bt;
 
-   bt = TSD->bui_tsd;
+   bt = (bui_tsd_t *) TSD->bui_tsd;
    for (ptr=bt->first_envirvar; ptr; ptr=ptr->next)
    {
       markmemory( ptr, TRC_STATIC ) ;
@@ -634,29 +547,29 @@ static void mark_envirvars( const tsd_t *TSD )
 
 static void add_new_env( const tsd_t *TSD, streng *ptr )
 {
-   struct envirlist *new=NULL ;
+   struct envirlist *newElem=NULL ;
    bui_tsd_t *bt;
 
-   bt = TSD->bui_tsd;
-   new = MallocTSD( sizeof( struct envirlist )) ;
-   new->next = bt->first_envirvar ;
-   new->ptr = ptr ;
+   bt = (bui_tsd_t *) TSD->bui_tsd;
+   newElem = (struct envirlist *) MallocTSD( sizeof( struct envirlist )) ;
+   newElem->next = bt->first_envirvar ;
+   newElem->ptr = ptr ;
 
    if (!bt->first_envirvar)
       regmarker( TSD, mark_envirvars ) ;
 
-   bt->first_envirvar = new ;
+   bt->first_envirvar = newElem ;
 }
 #endif
 
 /*
- * ext_pool_value processes the request of the BIF value() for the external
+ * ext_pool_value processes the request of the BIF value() and putenv() for the external
  * variable pool known as the "environment" in terms of the C library.
  *
  * name has to be a '\0'-terminated streng, value is either NULL or the
  * new content of the variable called name.
  */
-static streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
+streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
                                streng *env )
 {
    streng *retval=NULL;
@@ -692,7 +605,6 @@ static streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
    if ( ok == HOOK_GO_ON )
    {
       char *val = mygetenv( TSD, name->value, NULL, 0 );
-
       if ( val )
       {
          retval = Str_creTSD( val );
@@ -720,7 +632,7 @@ static streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
 # if defined(HAVE_MY_WIN32_SETENV)
          streng *strvalue = Str_dupstrTSD( value );
 
-         my_win32_setenv(name->value, strvalue->value );
+         TSD->OS->setenv(name->value, strvalue->value );
          Free_stringTSD( strvalue );
 # elif defined(HAVE_SETENV)
          streng *strvalue = Str_dupstrTSD( value );
@@ -733,16 +645,16 @@ static streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
           * system might use the pointer itself, not the content.
           * (See glibc's documentation)
           */
-         streng *new = Str_makeTSD( Str_len( name ) + Str_len( value ) + 2 );
+         streng *newstr = Str_makeTSD( Str_len( name ) + Str_len( value ) + 2 );
 
-         Str_catTSD( new, name );
-         Str_catstrTSD( new, "=" );
-         Str_catTSD( new, value );
-         new->value[Str_len(new)] = '\0';
+         Str_catTSD( newstr, name );
+         Str_catstrTSD( newstr, "=" );
+         Str_catTSD( newstr, value );
+         newstr->value[Str_len(newstr)] = '\0';
 
-         putenv( new->value );
+         putenv( newstr->value );
 #  ifdef TRACEMEM
-         add_new_env( TSD, new );
+         add_new_env( TSD, newstr );
 #  endif
 # else
          exiterror( ERR_SYSTEM_FAILURE, 1, "No support for setting an environment variable" );
@@ -754,6 +666,10 @@ static streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
 #endif /* !VMS */
 }
 
+/*
+ * FGC, 07.04.2005
+ * FIXME: We are not throwing 40.36, but I'm not sure we should at all.
+ */
 streng *std_value( tsd_t *TSD, cparamboxptr parms )
 {
    streng *name,*retval;
@@ -1044,7 +960,7 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
    else
    {
       getsecs(&now, &unow) ;
-      TSD->currentnode->now = MallocTSD( sizeof( rexx_time ) ) ;
+      TSD->currentnode->now = (rexx_time *)MallocTSD( sizeof( rexx_time ) ) ;
       TSD->currentnode->now->sec = now ;
       TSD->currentnode->now->usec = unow ;
    }
@@ -1082,7 +998,7 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
    {
       case 'C':
          hour = tmdata.tm_hour ;
-         ampm = (hour>11) ? "pm" : "am" ;
+         ampm = (char *)( ( hour > 11 ) ? "pm" : "am" ) ;
          if ((hour=hour%12)==0)
             hour = 12 ;
          sprintf(answer->value, "%d:%02d%s", hour, tmdata.tm_min, ampm) ;
@@ -1091,8 +1007,8 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
 
       case 'E':
       case 'R':
-         sec = (TSD->currlevel->time.sec) ? rnow-TSD->currlevel->time.sec : 0 ;
-         usec = (TSD->currlevel->time.sec) ? unow-TSD->currlevel->time.usec : 0 ;
+         sec = (long)((TSD->currlevel->rx_time.sec) ? rnow-TSD->currlevel->rx_time.sec : 0) ;
+         usec = (long)((TSD->currlevel->rx_time.sec) ? unow-TSD->currlevel->rx_time.usec : 0) ;
 
          if (usec<0)
          {
@@ -1100,11 +1016,11 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
             sec-- ;
          }
 
-         assert( usec>=0 && sec>=0 ) ;
-         if (!TSD->currlevel->time.sec || format=='R')
+/*         assert( usec>=0 && sec>=0 ) ; */
+         if (!TSD->currlevel->rx_time.sec || format=='R')
          {
-            TSD->currlevel->time.sec = rnow ;
-            TSD->currlevel->time.usec = unow ;
+            TSD->currlevel->rx_time.sec = rnow ;
+            TSD->currlevel->rx_time.usec = unow ;
          }
 
          /*
@@ -1151,7 +1067,7 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
 #ifdef VMS
          timediff = mktime(localtime(&now));
 #else
-         timediff = mktime(localtime(&now))-mktime(gmtime(&now));
+         timediff = (long)(mktime(localtime(&now))-mktime(gmtime(&now)));
 #endif
          sprintf(answer->value, "%ld%s",
                  timediff,(timediff)?"000000":"");
@@ -1180,7 +1096,8 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
 streng *std_date( tsd_t *TSD, cparamboxptr parms )
 {
    static const char *fmt = "%02d/%02d/%02d" ;
-   static const char *iso = "%04d%02d%02d" ;
+   static const char *sdate = "%04d%02d%02d" ;
+   static const char *iso = "%04d-%02d-%02d" ;
    char format = 'N' ;
    char suppformat = 'N' ;
    int length=0 ;
@@ -1194,7 +1111,7 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
 
    checkparam(  parms,  0,  3 , "DATE" ) ;
    if ((parms)&&(parms->value))
-      format = getoptionchar( TSD, parms->value, "DATE", 1, "BDEMNOSUW", "CT" ) ;
+      format = getoptionchar( TSD, parms->value, "DATE", 1, "BDEMNOSUW", "CIT" ) ;
 
    if (parms->next)
    {
@@ -1208,7 +1125,7 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
          if (tmpptr->value)
          {
             str_suppformat = tmpptr->value;
-            suppformat = getoptionchar( TSD, tmpptr->value, "DATE", 3, "BDENOSU", "T" ) ;
+            suppformat = getoptionchar( TSD, tmpptr->value, "DATE", 3, "BDENOSU", "IT" ) ;
          }
       }
       else
@@ -1225,7 +1142,7 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
    else
    {
       getsecs(&now, &unow) ;
-      TSD->currentnode->now = MallocTSD( sizeof( rexx_time ) ) ;
+      TSD->currentnode->now = (rexx_time *)MallocTSD( sizeof( rexx_time ) ) ;
       TSD->currentnode->now->sec = now ;
       TSD->currentnode->now->usec = unow ;
    }
@@ -1239,15 +1156,15 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
       now ++ ;
    */
 
-   if ((tmptr = localtime(&now)) != NULL)
+   if ( ( tmptr = localtime( &now ) ) != NULL )
       tmdata = *tmptr;
    else
-      memset(&tmdata,0,sizeof(tmdata)); /* what shall we do in this case? */
+      memset( &tmdata, 0, sizeof( tmdata ) ); /* what shall we do in this case? */
    tmdata.tm_year += 1900;
 
-   if (suppdate) /* date conversion required */
+   if ( suppdate ) /* date conversion required */
    {
-      if (convert_date(TSD,suppdate,suppformat,&tmdata))
+      if ( convert_date( TSD, suppdate, suppformat, &tmdata ) )
       {
          char *p1, *p2;
          if (suppdate && suppdate->value)
@@ -1270,49 +1187,42 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
    switch (format)
    {
       case 'B':
-         sprintf(answer->value,"%d", tmdata.tm_yday + basedays(tmdata.tm_year));
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%d", tmdata.tm_yday + basedays( tmdata.tm_year ) );
          break ;
 
       case 'C':
          length = tmdata.tm_yday + basedays(tmdata.tm_year); /* was +1 */
-         sprintf(answer->value,"%d", length-basedays((tmdata.tm_year/100)*100)+1); /* bja */
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%d", length-basedays( (tmdata.tm_year/100)*100)+1 ); /* bja */
          break ;
       case 'D':
-         sprintf(answer->value, "%d", tmdata.tm_yday + 1) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%d", tmdata.tm_yday + 1 );
          break ;
 
       case 'E':
-         sprintf(answer->value, fmt, tmdata.tm_mday, tmdata.tm_mon+1,
-                              tmdata.tm_year%100) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, fmt, tmdata.tm_mday, tmdata.tm_mon+1, tmdata.tm_year%100 );
+         break ;
+
+      case 'I':
+         answer->len = sprintf( answer->value, iso, tmdata.tm_year, tmdata.tm_mon+1, tmdata.tm_mday );
          break ;
 
       case 'M':
          chptr = months[tmdata.tm_mon] ;
-         answer->len = strlen(chptr);
-         memcpy(answer->value,chptr,answer->len) ;
+         answer->len = strlen( chptr );
+         memcpy( answer->value, chptr, answer->len ) ;
          break ;
 
       case 'N':
          chptr = months[tmdata.tm_mon] ;
-         sprintf(answer->value,"%d %c%c%c %4d", tmdata.tm_mday, chptr[0], chptr[1],
-                           chptr[2], tmdata.tm_year) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%d %c%c%c %4d", tmdata.tm_mday, chptr[0], chptr[1], chptr[2], tmdata.tm_year );
          break ;
 
       case 'O':
-         sprintf(answer->value, fmt, tmdata.tm_year%100, tmdata.tm_mon+1,
-                           tmdata.tm_mday);
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, fmt, tmdata.tm_year%100, tmdata.tm_mon+1, tmdata.tm_mday );
          break ;
 
       case 'S':
-         sprintf(answer->value, iso, tmdata.tm_year, tmdata.tm_mon+1,
-                           tmdata.tm_mday) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf(answer->value, sdate, tmdata.tm_year, tmdata.tm_mon+1, tmdata.tm_mday );
          break ;
 
       case 'T':
@@ -1322,9 +1232,7 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
          break ;
 
       case 'U':
-         sprintf(answer->value, fmt, tmdata.tm_mon+1, tmdata.tm_mday,
-                                tmdata.tm_year%100 ) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, fmt, tmdata.tm_mon+1, tmdata.tm_mday, tmdata.tm_year%100 );
          break ;
 
       case 'W':
@@ -1420,7 +1328,12 @@ streng *std_address( tsd_t *TSD, cparamboxptr parms )
       opt = getoptionchar( TSD, parms->value, "ADDRESS", 1, "EINO", "" ) ;
 
    update_envirs( TSD, TSD->currlevel ) ;
-   return Str_dupTSD( TSD->currlevel->environment ) ;
+   if ( opt == 'N' )
+      return Str_dupTSD( TSD->currlevel->environment ) ;
+   else
+   {
+      return get_envir_details( TSD, opt, TSD->currlevel->environment );
+   }
 }
 
 
@@ -1480,8 +1393,6 @@ streng *std_qualify( tsd_t *TSD, cparamboxptr parms )
 
    checkparam(  parms,  1,  1 , "QUALIFY" ) ;
    ret = ConfigStreamQualified( TSD, parms->value );
-   if ( Str_len( ret ) == 0 )
-      exiterror( ERR_INCORRECT_CALL, 27, "QUALIFY", tmpstr_of( TSD, parms->value ) )  ;
    /*
     * Returned streng is always MAX_PATH long, so it should be safe
     * to Nul terminate the ret->value
@@ -1783,7 +1694,7 @@ streng *std_sourceline( tsd_t *TSD, cparamboxptr parms )
    const otree *otp;
    streng *retval;
 
-   bt = TSD->bui_tsd;
+   bt = (bui_tsd_t *)TSD->bui_tsd;
    checkparam(  parms,  0,  1 , "SOURCELINE" ) ;
    if (!parms->value)
       return int_to_streng( TSD, num_sourcelines( ipt ) ) ;
@@ -1910,7 +1821,7 @@ streng *std_errortext( tsd_t *TSD, cparamboxptr parms )
       tmp1 = Str_ncreTSD( tmp->value, pos );
       tmp2 = Str_ncreTSD( tmp->value+pos+1, Str_len( tmp ) - pos - 1 );
       errnum = atoposorzero( TSD, tmp1, "ERRORTEXT", 1  );
-      suberrnum = atopos( TSD, tmp2, "ERRORTEXT", 1 );
+      suberrnum = atoposorzero( TSD, tmp2, "ERRORTEXT", 1 );
       Free_stringTSD( tmp1 ) ;
       Free_stringTSD( tmp2 ) ;
    }
@@ -2035,7 +1946,8 @@ streng *std_verify( tsd_t *TSD, cparamboxptr parms )
 
 streng *std_substr( tsd_t *TSD, cparamboxptr parms )
 {
-   int rlength=0, length=0, start=0, i=0, j=0 ;
+   int rlength=0, length=0, start=0, i=0 ;
+   int available, copycount;
    char padch=' ' ;
    streng *pad=NULL, *str=NULL, *ptr=NULL ;
    paramboxptr bptr=NULL ;
@@ -2062,9 +1974,15 @@ streng *std_substr( tsd_t *TSD, cparamboxptr parms )
 
    ptr = Str_makeTSD( length ) ;
    i = ((rlength>=start)?start-1:rlength) ;
-   for (j=0;j<length;ptr->value[j++]=(char)((Str_in(str,i))?str->value[i++]:padch)) ;
-
-   ptr->len = j ;
+   /*
+    * New algorithm by Julian Onions speeds up substr() by 50%
+    */
+   available = Str_len(str) - i;
+   copycount = length > available ? available : length;
+   memcpy(ptr->value, &str->value[i], copycount);
+   if (copycount < length)
+      memset(&ptr->value[copycount], padch, length - copycount);
+   ptr->len = length;
    return ptr ;
 }
 
@@ -2077,7 +1995,7 @@ static streng *minmax( tsd_t *TSD, cparamboxptr parms, const char *name,
     */
    streng *retval;
    num_descr *m,*test;
-   int ccns,fuzz,StrictAnsi,result;
+   int ccns,fuzz,StrictAnsi,result,required,argno;
 
    StrictAnsi = get_options_flag( TSD->currlevel, EXT_STRICT_ANSI );
    /*
@@ -2088,19 +2006,24 @@ static streng *minmax( tsd_t *TSD, cparamboxptr parms, const char *name,
    ccns = TSD->currlevel->currnumsize;
    fuzz = TSD->currlevel->numfuzz;
 
+   required = count_params(parms, PARAM_TYPE_HARD);
    if ( !parms->value )
-       exiterror( ERR_INCORRECT_CALL, 3, name, 1 );
-   m = get_a_descr( TSD, parms->value );
+      exiterror( ERR_INCORRECT_CALL, 3, name, required );
+   m = get_a_descr( TSD, name, 1, parms->value );
    if ( StrictAnsi )
    {
       str_round_lostdigits( TSD, m, ccns );
    }
 
+   parms = parms->next;
+   argno = 1;
    while ( parms )
    {
+      argno++;
       if ( !parms->value )
-         continue;
-      test = get_a_descr( TSD, parms->value );
+         exiterror( ERR_INCORRECT_CALL, 3, name, required ); /* fixes bug 1109296 */
+
+      test = get_a_descr( TSD, name, argno, parms->value );
       if ( StrictAnsi )
       {
          str_round_lostdigits( TSD, test, ccns );
@@ -2328,7 +2251,11 @@ streng *std_delstr( tsd_t *TSD, cparamboxptr parms )
    checkparam(  parms,  2,  3 , "DELSTR" ) ;
 
    sleng = Str_len((string = parms->value)) ;
-   start = atozpos( TSD, parms->next->value, "DELSTR", 2 ) ;
+   /*
+    * found while fixing bug 1108868, but fast-finding Walter will create
+    * a new bug item before releasing the fix I suppose ;-)   (was atozpos)
+    */
+   start = atopos( TSD, parms->next->value, "DELSTR", 2 ) ;
 
    if ((parms->next->next)&&(parms->next->next->value))
       length = atozpos( TSD, parms->next->next->value, "DELSTR", 3 ) ;
@@ -2476,7 +2403,7 @@ streng *std_datatype( tsd_t *TSD, cparamboxptr parms )
             break ;
 
          case 'N':
-            res = myisnumber(string) ;
+            res = myisnumber(TSD, string) ;
             break ;
 
          case 'S':
@@ -2517,7 +2444,7 @@ streng *std_datatype( tsd_t *TSD, cparamboxptr parms )
    }
    else
    {
-      cptr = ((string->len)&&(myisnumber(string))) ? "NUM" : "CHAR" ;
+      cptr = (char *)( ( ( string->len ) && ( myisnumber( TSD, string ) ) ) ? "NUM" : "CHAR" ) ;
       result = Str_creTSD( cptr ) ;
    }
 
@@ -2529,6 +2456,7 @@ streng *std_trace( tsd_t *TSD, cparamboxptr parms )
 {
    streng *result=NULL, *string=NULL ;
    int i=0 ;
+   char tc;
 
    checkparam(  parms,  0,  1 , "TRACE" ) ;
 
@@ -2539,39 +2467,27 @@ streng *std_trace( tsd_t *TSD, cparamboxptr parms )
    result->value[i++] = (char) TSD->trace_stat ;
    result->len = i ;
 
-#if 0
-   i = 0 ;
-   if ((string=parms->value))
-   {
-      if (string->value[i]=='?')
-      {
-         i++ ;
-         TSD->systeminfo->interactive = 1 ;
-      }
-
-      TSD->trace_stat =
-      TSD->currlevel->tracestat =
-      toupper( getoptionchar(TSD, string)) ;
-   }
-#else
    if ( parms->value )
    {
       string = Str_dupTSD( parms->value );
       for (i = 0; i < string->len; i++ )
       {
          if ( string->value[ i ] == '?' )
-            TSD->systeminfo->interactive = ( TSD->systeminfo->interactive ) ? 0 : 1;
+            set_trace_char( TSD, '?' );
          else
             break;
       }
-      TSD->trace_stat =
-      TSD->currlevel->tracestat = getoptionchar( TSD, Str_strp( string, '?', STRIP_LEADING ),
+      /*
+       * In opposite to ANSI this throws 40.21, too.
+       * I assume this to be OK although "trace ?" throws 40.21.
+       */
+      tc = getoptionchar( TSD, Str_strp( string, '?', STRIP_LEADING ),
                                                  "TRACE",
                                                  1,
                                                  "ACEFILNOR", "" ) ;
+      set_trace_char( TSD, tc );
       Free_stringTSD( string );
    }
-#endif
 
    return result ;
 }
@@ -2667,11 +2583,66 @@ streng *rex_poolid( tsd_t *TSD, cparamboxptr parms )
 
 streng *rex_lower( tsd_t *TSD, cparamboxptr parms )
 {
-  streng *ret;
+   int rlength=0, length=0, start=1, i=0 ;
+   int changecount;
+   char padch=' ' ;
+   streng *str=NULL, *ptr=NULL ;
+   paramboxptr bptr=NULL ;
 
-  checkparam( parms, 1, 1, "LOWER" );
-
-  ret = Str_dupTSD( parms->value );
-
-  return Str_lower( ret );
+   /*
+    * Check that we have between 1 and 4 args
+    * ( str [,start[,length[,pad]]] )
+    */
+   checkparam(  parms,  1,  4 , "LOWER" ) ;
+   str = parms->value ;
+   rlength = Str_len( str ) ;
+   /*
+    * Get starting position, if supplied...
+    */
+   if ( parms->next != NULL
+   &&   parms->next->value )
+      start = atopos( TSD, parms->next->value, "LOWER", 2 ) ;
+   /*
+    * Get length, if supplied...
+    */
+   if ( parms->next != NULL
+   && ( (bptr = parms->next->next) != NULL )
+   && ( parms->next->next->value ) )
+      length = atozpos( TSD, parms->next->next->value, "LOWER", 3 ) ;
+   else
+      length = ( rlength >= start ) ? rlength - start + 1 : 0;
+   /*
+    * Get pad character, if supplied...
+    */
+   if ( (bptr )
+   && ( bptr->next )
+   && ( bptr->next->value ) )
+      padch = getonechar( TSD, parms->next->next->next->value, "LOWER", 4) ;
+   /*
+    * Create our new starting; duplicate of input string
+    */
+   ptr = Str_makeTSD( length );
+   memcpy( Str_val( ptr ), Str_val( str ), Str_len( str ) );
+   /*
+    * Determine where to start changing case...
+    */
+   i = ((rlength>=start)?start-1:rlength) ;
+   /*
+    * Determine how many characters to change case...
+    */
+   changecount = length > rlength ? rlength : length;
+   /*
+    * Change them
+    */
+   mem_lower( &ptr->value[i], changecount );
+   /*
+    * Append pad characters if required...
+    */
+   if (changecount < length)
+      memset(&ptr->value[changecount], padch, length - changecount);
+   /*
+    * Determine length of return string...
+    */
+   ptr->len = (length > rlength) ? length : rlength ;
+   return ptr ;
 }

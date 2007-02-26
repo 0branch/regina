@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rexxmsg.h,v 1.14 2004/04/15 10:07:52 mark Exp $
+ * $Id: rexxmsg.h,v 1.15 2004/09/13 09:48:20 mark Exp $
  */
 struct textindex
 {
@@ -37,14 +37,7 @@ struct textindex
 #define NUMBER_ERROR_MESSAGES 266
 
 /*
- * These defines aren't really used; they are just placekeepers
+ * Default language index
  */
 #define LANGUAGE_ENGLISH     0
-#define LANGUAGE_GERMAN      1
-#define LANGUAGE_SPANISH     2
-#define LANGUAGE_NORWEGIAN   3
-#define LANGUAGE_PORTUGUESE  4
-#define LANGUAGE_POLISH      5
-
-#define LANGUAGE_MAXIMUM     6
 

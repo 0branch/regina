@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: cmath.c,v 1.5 2004/02/10 10:43:47 mark Exp $";
+static char *RCSid = "$Id: cmath.c,v 1.6 2006/09/03 09:51:18 mark Exp $";
 #endif
 
 /*
@@ -55,45 +55,6 @@ double myatof( const tsd_t *TSD, const streng *string )
    FreeTSD( str ) ;
 
    return answer ;
-}
-
-
-int myisnumber( const streng *string )
-{
-   const register char *ptr=NULL, *eptr=NULL ;
-   int num=0 ;
-
-   if (!string->len)
-      return 0 ;
-
-   ptr = string->value ;
-   eptr = Str_end( string ) ;
-
-   for (; (ptr<eptr) && (rx_isspace(*ptr)); ptr++) ;
-   if ((ptr<eptr) && ((*ptr=='-') || (*ptr=='+')))
-      for (ptr++; (ptr<eptr) && (rx_isspace(*ptr)); ptr++) ;
-
-   for (; (ptr<eptr) && rx_isdigit(*ptr); ptr++, num++) ;
-   if ((ptr<eptr) && *ptr=='.')
-      for (ptr++;(ptr<eptr) && rx_isdigit(*ptr); ptr++, num++) ;
-
-   if (!num)
-      return 0 ;
-
-   if ((ptr<eptr) && ((*ptr=='e') || (*ptr=='E')))
-   {
-      ptr++ ;
-      num = 0 ;
-      if ((ptr<eptr) && ((*ptr=='-') || (*ptr=='+')))
-         ptr++ ;
-
-      for (; (ptr<eptr) && rx_isdigit(*ptr); ptr++, num++ ) ;
-      if (!num)
-         return 0 ;
-   }
-
-   for (; (ptr<eptr) && (rx_isspace(*ptr)); ptr++) ;
-   return (ptr==eptr) ;
 }
 
 

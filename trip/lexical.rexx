@@ -1,9 +1,9 @@
-written = 0 
+written = 0
 
 
 data.1.caption = 'do'
 data.1.1 = 14 'do 3; say hi'
-data.1.2 = 14 'do 3;' 
+data.1.2 = 14 'do 3;'
 data.1.3 = 25 'do forever 5; say hallo; end'
 data.1.4 = ''
 
@@ -80,7 +80,7 @@ data.9.3 = 09 'select; when 0 then nop; otherwise; nop; otherwise; nop; end'
 data.9.4 = 09 'select; when 0 then nop; otherwise; nop; when 1 then nop; end'
 data.9.5 = ''
 
-data.10.caption = 'end' 
+data.10.caption = 'end'
 data.10.1 = 10 'end'
 data.10.2 = 10 'do i=3 to 5; nop; end j'
 data.10.3 = 10 "i=1; do a.i=1 to 3; j=1; end a.j"
@@ -125,7 +125,7 @@ data.13.4 = 16 'call on notready name nonexistent; xxx=lines("/nope2")'
 data.13.5 = ''
 
 /*
- * Everything related to procedure must be checked in a separate 
+ * Everything related to procedure must be checked in a separate
  * script, since it is very sensitive to the setup in this file.
  */
 
@@ -263,15 +263,15 @@ j = 1
    if symbol('data.j.caption')\='VAR' then signal endoftesst
 
    call notify data.j.caption
-   i = 1 
+   i = 1
    startofloop:
       if symbol('data.j.i')\='VAR' then do
          say 'Inconsistent data for DATA.'j'.'i
-         exit 
+         exit
          end
 
       if data.j.i=='' then do
-         do k=i+1 for 10 
+         do k=i+1 for 10
             if symbol('data.j.k')=='VAR' then do
                say 'Extra data for DATA.'j'.'k
                exit
@@ -280,23 +280,23 @@ j = 1
          signal endoftest
          end
 
-      signal on syntax 
-      parse var data.j.i num string 
-      num = num + 0 
+      signal on syntax
+      parse var data.j.i num string
+      num = num + 0
       interpret string
          say
          say 'Didn''t catch "'string'" as syntax error' num
-         signal endofloop   
+         signal endofloop
 
       syntax:
          if rc\=num then do
-            say 
+            say
             say 'Reports "'string'" as syntax error' rc', not' num
             say condition('e')
             end
 
    endofloop:
-      i = i + 1 
+      i = i + 1
       signal startofloop
 
    endoftest:
@@ -305,7 +305,7 @@ endoflooop:
    signal startoflooop
 
 endoftesst:
-   say 
+   say
    exit 0
 
 

@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: defs.h,v 1.32 2004/02/22 09:25:26 florian Exp $
+ * $Id: defs.h,v 1.35 2006/09/15 04:06:07 mark Exp $
  */
 
 #define X_NULL            1
@@ -237,30 +237,30 @@
  * NOTE: There is a close correspondance between these and the char
  *       array alloc in memory.c
  */
-# define TRC_LEAKED     0
-# define TRC_HASHTAB    1
-# define TRC_PROCBOX    2
-# define TRC_SOURCE     3
-# define TRC_SOURCEL    4
-# define TRC_TREENODE   5
-# define TRC_VARVALUE   6
-# define TRC_VARNAME    7
-# define TRC_VARBOX     8
-# define TRC_STACKBOX   9
-# define TRC_STACKLINE 10
-# define TRC_SYSINFO   11
-# define TRC_FILEPTR   12
-# define TRC_PROCARG   13
-# define TRC_LABEL     14
-# define TRC_STATIC    15
-# define TRC_P_CACHE   16
-# define TRC_MATH      17
-# define TRC_ENVIRBOX  18
-# define TRC_ENVIRNAME 19
-# define TRC_SPCV_BOX  20
-# define TRC_SPCV_NAME 21
-# define TRC_SPCV_NUMB 22
-# define TRC_SPCV_NUMC 23
+# define TRC_LEAKED     0 /*  "leaked",   status unknown, probably leaked */
+# define TRC_HASHTAB    1 /*  "hashtab",  holds hashtable in variable subsystem */
+# define TRC_PROCBOX    2 /*  "procbox",  the info local to a single routine */
+# define TRC_SOURCE     3 /*  "source",   a line of source code */
+# define TRC_SOURCEL    4 /*  "srcbox",   box in list of source lines */
+# define TRC_TREENODE   5 /*  "treenode", node in the parse three */
+# define TRC_VARVALUE   6 /*  "var_val",  value of a variable */
+# define TRC_VARNAME    7 /*  "var_nam",  name of a variable */
+# define TRC_VARBOX     8 /*  "var_box",  other structure in the variable subsystem */
+# define TRC_STACKBOX   9 /*  "stc_box",  box in linked list of the stack lines */
+# define TRC_STACKLINE 10 /*  "stc_line", stack line */
+# define TRC_SYSINFO   11 /*  "sys_info", the common info for a whole program */
+# define TRC_FILEPTR   12 /*  "file_ptr", holds the filetable */
+# define TRC_PROCARG   13 /*  "proc_arg", holds arguments for internal or builtin functions */
+# define TRC_LABEL     14 /*  "label",    holds info about labels */
+# define TRC_STATIC    15 /*  "static",   names of special variables */
+# define TRC_P_CACHE   16 /*  "argcache", the proc argument cache */
+# define TRC_MATH      17 /*  "math",     dynamic workarrays in the math funcstion */
+# define TRC_ENVIRBOX  18 /*  "envirbx",  box holding environment definition */
+# define TRC_ENVIRNAME 19 /*  "envirnm",  name in a box holding environment definition */
+# define TRC_SPCV_BOX  20 /*  "spcvarbx", special variable box */
+# define TRC_SPCV_NAME 21 /*  "spcvarnm", special variable name */
+# define TRC_SPCV_NUMB 22 /*  "spcnumbx", special number box */
+# define TRC_SPCV_NUMC 23 /*  "spcnumnm", special number contents */
 
 
 
@@ -381,6 +381,7 @@
 #define EXT_BROKEN_ADDRESS_COMMAND          18
 #define EXT_CALLS_AS_FUNCS                  19
 #define EXT_QUEUES_301                      20
+#define EXT_HALT_ON_EXT_CALL_FAIL           21
 
 /*
  * Regina 3.1 introduced "pool 0" variables. There exist only some and they
@@ -393,7 +394,8 @@
 #define POOL0_SIGL            3
 #define POOL0_RS              4
 #define POOL0_MN              5
-#define POOL0_CNT             ( POOL0_MN + 1 )
+#define POOL0_LINE            6
+#define POOL0_CNT             ( POOL0_LINE + 1 )
 
 /*
  * treenode.u.parseflags values which may be or'ed.

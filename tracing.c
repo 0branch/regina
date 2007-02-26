@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: tracing.c,v 1.24 2004/02/10 10:44:25 mark Exp $";
+static char *RCSid = "$Id: tracing.c,v 1.26 2006/09/03 09:51:18 mark Exp $";
 #endif
 
 /*
@@ -58,23 +58,24 @@ int init_tracing( tsd_t *TSD )
    if ( TSD->tra_tsd != NULL )
       return 1;
 
-   if ( ( tt = TSD->tra_tsd = MallocTSD( sizeof( tra_tsd_t ) ) ) == NULL )
+   if ( ( TSD->tra_tsd = MallocTSD( sizeof( tra_tsd_t ) ) ) == NULL )
       return 0;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    memset( tt, 0, sizeof( tra_tsd_t ) );
    tt->lasttracedline = -1;
    return 1;
 }
 
-int pushcallstack( const tsd_t *TSD, treenode *this )
+int pushcallstack( const tsd_t *TSD, treenode *thisptr )
 {
    nodeptr *tmpptr;
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( TSD->systeminfo->cstackcnt >= TSD->systeminfo->cstackmax )
    {
       assert( TSD->systeminfo->cstackcnt == TSD->systeminfo->cstackmax );
-      tmpptr = MallocTSD( ( TSD->systeminfo->cstackmax * 2 + 10 ) *
+      tmpptr = (nodeptr *)MallocTSD( ( TSD->systeminfo->cstackmax * 2 + 10 ) *
                                                            sizeof( nodeptr ) );
       if ( TSD->systeminfo->callstack )
       {
@@ -87,7 +88,7 @@ int pushcallstack( const tsd_t *TSD, treenode *this )
       TSD->systeminfo->cstackmax += 10;
    }
 
-   TSD->systeminfo->callstack[TSD->systeminfo->cstackcnt++] = this;
+   TSD->systeminfo->callstack[TSD->systeminfo->cstackcnt++] = thisptr;
    return TSD->systeminfo->cstackcnt;
 }
 
@@ -95,7 +96,7 @@ void popcallstack( const tsd_t *TSD, int value )
 {
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( value >= 0 )
    {
       assert( TSD->systeminfo->cstackcnt >= value );
@@ -137,12 +138,12 @@ static void printout( tsd_t *TSD, const streng *message )
    }
 }
 
-void traceerror( tsd_t *TSD, const treenode *this, int RC )
+void traceerror( tsd_t *TSD, const treenode *thisptr, int RC )
 {
    streng *message;
 
    if ( ( TSD->trace_stat == 'N' ) || ( TSD->trace_stat == 'F' ) )
-      traceline( TSD, this, 'C', 0 );
+      traceline( TSD, thisptr, 'C', 0 );
 
    if ( TSD->trace_stat != 'O' )
    {
@@ -161,7 +162,7 @@ void tracecompound( tsd_t *TSD, const streng *stem, int length,
    tra_tsd_t *tt;
    int indent;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( tt->traceflag || ( TSD->trace_stat != 'I' ) || tt->quiet )
       return;
 
@@ -182,7 +183,7 @@ void starttrace( const tsd_t *TSD )
 {
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    tt->traceflag = 0;
    tt->notnow = 1;
 }
@@ -206,7 +207,7 @@ int intertrace( tsd_t *TSD )
    int retvalue1,rc;
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
 
    if ( tt->intercount )
    {
@@ -290,7 +291,7 @@ void tracenumber( tsd_t *TSD, const num_descr *num, char type )
    if ( ( tmpch != 'I' ) && ( tmpch != 'R' ) )
       return;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( tt->traceflag || tt->quiet )
       return;
 
@@ -321,7 +322,7 @@ void tracebool( tsd_t *TSD, int value, char type )
    if ( ( tmpch != 'I' ) && ( tmpch != 'R' ) )
       return;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( tt->traceflag || tt->quiet )
       return;
 
@@ -349,7 +350,7 @@ void tracevalue( tsd_t *TSD, const streng *str, char type )
    if ( ( tmpch != 'I' ) && ( tmpch != 'R' ) )
       return;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( tt->traceflag || tt->quiet )
       return;
 
@@ -363,18 +364,18 @@ void tracevalue( tsd_t *TSD, const streng *str, char type )
    Free_stringTSD( message );
 }
 
-void traceline( tsd_t *TSD, const treenode *this, char tch, int offset )
+void traceline( tsd_t *TSD, const treenode *thisptr, char tch, int offset )
 {
    streng *srcstr;
    streng *message;
    tra_tsd_t *tt;
    int indent;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( tt->traceflag || tt->quiet )
       return;
 
-   if ( ( this->charnr < 0 ) || ( this->lineno < 0 ) )
+   if ( ( thisptr->charnr < 0 ) || ( thisptr->lineno < 0 ) )
       return;
 
    switch ( tch )
@@ -385,13 +386,13 @@ void traceline( tsd_t *TSD, const treenode *this, char tch, int offset )
          break; /* Oh yes, break the IRA ;-) */
 
       case 'L':
-         if ( this->type == X_LABEL )
+         if ( thisptr->type == X_LABEL )
             break;
          return;
 
       case 'C':
-         if ( ( this->type == X_COMMAND )
-           || ( ( this->type == X_ADDR_N ) && this->p[0] ) )
+         if ( ( thisptr->type == X_COMMAND )
+           || ( ( thisptr->type == X_ADDR_N ) && thisptr->p[0] ) )
             break;
          return;
 
@@ -399,12 +400,12 @@ void traceline( tsd_t *TSD, const treenode *this, char tch, int offset )
          return;
    }
 
-   srcstr = getsourceline( TSD, this->lineno, this->charnr,
+   srcstr = getsourceline( TSD, thisptr->lineno, thisptr->charnr,
                                                      &TSD->systeminfo->tree );
 
    indent = TSD->systeminfo->cstackcnt + TSD->systeminfo->ctrlcounter;
    message = Str_makeTSD( indent + 20 + srcstr->len + offset );
-   if ( this->lineno == tt->lasttracedline )
+   if ( thisptr->lineno == tt->lasttracedline )
    {
       sprintf( tt->tracestr, "       *-* %%%ds%%.%ds",
                              indent + offset, srcstr->len );
@@ -416,11 +417,11 @@ void traceline( tsd_t *TSD, const treenode *this, char tch, int offset )
       sprintf( tt->tracestr, "%%6d *-* %%%ds%%.%ds",
                              indent + offset, srcstr->len );
       message->len = sprintf( message->value, tt->tracestr,
-                                              this->lineno, "", srcstr->value );
+                                              thisptr->lineno, "", srcstr->value );
    }
 
    printout( TSD, message );
-   tt->lasttracedline = this->lineno;
+   tt->lasttracedline = thisptr->lineno;
    Free_stringTSD( message );
    Free_stringTSD( srcstr );
 }
@@ -434,7 +435,7 @@ void traceback( tsd_t *TSD )
    int i,j,linesize=128,indent;
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    /*
     * Allocate enough space for one line and control stuff. Count below
     * characters for the needed size. Beware of the computed format
@@ -504,7 +505,7 @@ void queue_trace_char( const tsd_t *TSD, char ch2 )
 {
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    if ( tt->bufptr0 < 32 )
       tt->buf0[tt->bufptr0++] = ch2;
    else
@@ -517,7 +518,7 @@ void flush_trace_chars( tsd_t *TSD )
    int cnt;
    tra_tsd_t *tt;
 
-   tt = TSD->tra_tsd;
+   tt = (tra_tsd_t *)TSD->tra_tsd;
    for ( cnt = 0; cnt < tt->bufptr0; cnt++ )
       set_trace_char( TSD, tt->buf0[cnt] );
 
@@ -562,7 +563,7 @@ void set_trace( tsd_t *TSD, const streng *setting )
    int cptr,error;
    tra_tsd_t *tt;
 
-   if ( myisnumber( setting ) )
+   if ( myisnumber( TSD, setting ) )
    {
       cptr = streng_to_int( TSD, setting, &error );
       if ( error )
@@ -575,7 +576,7 @@ void set_trace( tsd_t *TSD, const streng *setting )
        * (as is the pauses) for the supplied number of clauses.
        * If the number is zero, this is the same as TRACE OFF
        */
-      tt = TSD->tra_tsd;
+      tt = (tra_tsd_t *)TSD->tra_tsd;
       if ( cptr == 0 )
       {
          TSD->currlevel->tracestat = 'O';

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: dbgfuncs.c,v 1.8 2003/10/05 09:04:25 florian Exp $";
+static char *RCSid = "$Id: dbgfuncs.c,v 1.9 2004/05/24 09:04:35 mark Exp $";
 #endif
 
 /*
@@ -55,7 +55,7 @@ streng *dbg_dumpvars( tsd_t *TSD, cparamboxptr dummy )
 #ifdef TRACEMEM
 streng *dbg_memorystats( tsd_t *TSD, cparamboxptr parms )
 {
-/*    memory_stats(TSD) ; */ /* FIXME, FGC: Shouldn't memory_stats() deleted? */
+   memory_stats(TSD) ;
    return nullstringptr() ;
 }
 

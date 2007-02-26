@@ -6,8 +6,13 @@
 ; Note:
 ;  regina.nsi MUST be in the current directory!
 
-!define LONGNAME "Regina"  ;Long Name (for descriptions)
+!define LONGNAME "Regina Rexx"  ;Long Name (for descriptions)
 !define SHORTNAME "Regina" ;Short name (no slash) of package
+!define SFHOME "http://regina-rexx.sourceforge.net"
+!define SFGROUP "28102"
+!define UNINSTALLER "uninstall.exe"
+!define DISPLAYICON "$INSTDIR\regina.exe,0"
+!define KEYFILE "regina.exe"
 
 !define MUI_ICON "${SRCDIR}\reginaw32.ico"
 !define MUI_UNICON "uninstall.ico"
@@ -23,12 +28,12 @@ Name "${LONGNAME} ${VERSION}"
 !define MUI_DIRECTORYPAGE
 !define MUI_FINISHPAGE
 !define MUI_FINISHPAGE_NOAUTOCLOSE
-  
+
 !define MUI_ABORTWARNING
-  
+
 !define MUI_UNINSTALLER
 !define MUI_UNCONFIRMPAGE
-  
+
 ; VERSION  ;Must be supplied on compile command line
 ; NODOTVER ;Must be supplied on compile command line
 
@@ -56,7 +61,7 @@ Name "${LONGNAME} ${VERSION}"
   LangString TEXT_IO_SUBTITLE_STACK ${LANG_ENGLISH} "Install Regina Stack Service"
 ;--------------------------------
 ;Pages
-  
+
   !insertmacro MUI_PAGE_LICENSE "${SRCDIR}\COPYING-LIB"
   !insertmacro MUI_PAGE_COMPONENTS
   !insertmacro MUI_PAGE_DIRECTORY
@@ -69,6 +74,10 @@ Name "${LONGNAME} ${VERSION}"
 ;--------------------------------
 ;Language
 !insertmacro MUI_LANGUAGE "English"
+
+;================
+;Variables
+  Var IsAdminUser
 
 ;--------------------------------
 ;Reserved files
@@ -100,24 +109,42 @@ Section "${LONGNAME} Core (required)" SecMain
   File no.mtb
   File pt.mtb
   File pl.mtb
+  File tr.mtb
   File /oname=README${NODOTVER}.txt ${SRCDIR}\README.${NODOTVER}
   File /oname=READMEW32.txt ${SRCDIR}\README.W32
   File /oname=LICENSE.txt ${SRCDIR}\COPYING-LIB
   Push $INSTDIR
+  Push $IsAdminUser ; "true" or "false" per admin user
+  Push "PATH"
   Call AddToPath
-  CreateDirectory "$SMPROGRAMS\${SHORTNAME} REXX"
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Uninstall.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Release Notes.lnk" "$INSTDIR\README${NODOTVER}.txt" "" "$INSTDIR\README${NODOTVER}.txt" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\README.lnk" "$INSTDIR\READMEW32.txt" "" "$INSTDIR\READMEW32.txt" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\LICENSE.lnk" "$INSTDIR\LICENSE.txt" "" "$INSTDIR\LICENSE.txt" 0
+  CreateDirectory "$SMPROGRAMS\${LONGNAME}"
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\Uninstall ${SHORTNAME}.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\Release Notes.lnk" "$INSTDIR\README${NODOTVER}.txt" "" "$INSTDIR\README${NODOTVER}.txt" 0
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\README.lnk" "$INSTDIR\READMEW32.txt" "" "$INSTDIR\READMEW32.txt" 0
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\LICENSE.lnk" "$INSTDIR\LICENSE.txt" "" "$INSTDIR\LICENSE.txt" 0
+  ; Can't use CreateShortcut for URLs
+  WriteINIStr "$SMPROGRAMS\${LONGNAME}\Regina Rexx Home Page.url" "InternetShortcut" "URL" "http://regina-rexx.sourceforge.net"
   ; Write the installation path into the registry
-  ;WriteRegStr HKLM SOFTWARE\NSIS_Example2 "Install_Dir" "$INSTDIR"
-  ; Write the uninstall keys for Windows
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "DisplayName" "${LONGNAME} (remove only)"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteUninstaller "$INSTDIR\uninstall.exe"
+  ; Write the uninstall keys
+!include "${SRCDIR}\common\uninstaller.nsh"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "DisplayName" "${LONGNAME}"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "DisplayIcon" "${DISPLAYICON}"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "HelpLink" "http://www.rexxla.org/support.html"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "URLUpdateInfo" "http://sourceforge.net/project/showfiles.php?group_id=28102"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "URLInfoAbout" "http://www.rexx.org/"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "DisplayVersion" "${VERSION}"
+; WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "Publisher" "Mark Hessling"
+; WriteRegExpandStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "UninstallString" '"$INSTDIR\${UNINSTALLER}"'
+; WriteRegExpandStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "InstallLocation" '"$INSTDIR"'
+; WriteRegExpandStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "UnInstallLocation" "$INSTDIR" ; dont quote it
+; WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "NoModify" 0x00000001
+; WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}" "NoRepair" 0x00000001
+; WriteUninstaller "$INSTDIR\${UNINSTALLER}"
+  ; Stack Service
   ReadIniStr $R0 "$PLUGINSDIR\regina_ss.ini" "Field 4" State
+  ReadIniStr $R1 "$PLUGINSDIR\regina_ss.ini" "Field 5" State
   Push $R0
+  Push $R1
   Call InstallRxstack
   StrCpy $5 0
   ReadIniStr $R0 "$PLUGINSDIR\regina_fa.ini" "Field 2" State
@@ -140,6 +167,21 @@ Section "${LONGNAME} Core (required)" SecMain
   Push $R0
   Push $R1
   Call DoFileAssociation
+  ReadIniStr $R0 "$PLUGINSDIR\regina_fa.ini" "Field 6" State
+  ReadIniStr $R1 "$PLUGINSDIR\regina_fa.ini" "Field 6" Text
+  Push $R0
+  Push $R1
+  Call DoFileAssociation
+  ReadIniStr $R0 "$PLUGINSDIR\regina_fa.ini" "Field 7" State
+  ReadIniStr $R1 "$PLUGINSDIR\regina_fa.ini" "Field 7" Text
+  Push $R0
+  Push $R1
+  Call DoFileAssociation
+  ReadIniStr $R0 "$PLUGINSDIR\regina_fa.ini" "Field 8" State
+  ReadIniStr $R1 "$PLUGINSDIR\regina_fa.ini" "Field 8" Text
+  Push $R0
+  Push $R1
+  Call DoFileAssociation
   Call DoFileAssociationDetails
   Call DoLanguageDefault
 SectionEnd
@@ -148,16 +190,16 @@ SectionEnd
 ; Demos
 
 Section "${LONGNAME} Demos" SecDemo
-  CreateDirectory "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos"
+  CreateDirectory "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Demos"
   ; Set output path to the installation directory.
   SetOutPath $INSTDIR\demo
-  File test1.dll
-  File test2.dll
+  File rxtest1.dll
+  File rxtest2.dll
   ; Distribution files...
   File /oname=rexxcps.rexx ${SRCDIR}\demo\rexxcps.rexx
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos\Rexxcps.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\rexxcps.rexx"' "$INSTDIR\regina.exe"
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Demos\Rexxcps.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\rexxcps.rexx"' "$INSTDIR\regina.exe"
   File /oname=dynfunc.rexx ${SRCDIR}\demo\dynfunc.rexx
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos\Dynfunc.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\dynfunc.rexx"' "$INSTDIR\regina.exe"
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Demos\Dynfunc.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\dynfunc.rexx"' "$INSTDIR\regina.exe"
 SectionEnd
 
 ;------------------------------------------------------------------------
@@ -179,9 +221,8 @@ SectionEnd
 Section "${LONGNAME} Documentation" SecDoc
   ; Set output path to the installation directory.
   SetOutPath $INSTDIR\doc
-;  File ..\doc\*.html
-;  File ..\doc\logo1.jpg
-;  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Documentation.lnk" "$INSTDIR\doc\index.html" "" "$INSTDIR\doc\index.html" 0
+  File ..\doc\regina${NODOTVER}.pdf
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} PDF Documentation.lnk" "$INSTDIR\doc\regina${NODOTVER}.pdf" "" "$INSTDIR\doc\regina${NODOTVER}.pdf" 0
 SectionEnd
 
 Section ""
@@ -198,6 +239,10 @@ Function .onInit
   !insertmacro MUI_INSTALLOPTIONS_EXTRACT "regina_fa.ini"
   !insertmacro MUI_INSTALLOPTIONS_EXTRACT "regina_ss.ini"
   !insertmacro MUI_INSTALLOPTIONS_EXTRACT "regina_mt.ini"
+  ;
+  ; Uninstall previous version if present
+  ;
+!include "${SRCDIR}\common\oninit.nsh"
 FunctionEnd
 
 Function SetCustomAssoc
@@ -232,6 +277,7 @@ Function DoFileAssociation
   Pop $R1
   Pop $R0
   Strcmp $R0 0 exitfa
+  Strcmp $R1 "" exitfa
   ; do the association
   DetailPrint "Registering $R1 extension to run with Regina"
   IntOp $5 $5 + 1
@@ -261,27 +307,37 @@ Function DoLanguageDefault
     ReadIniStr $R0 "$PLUGINSDIR\regina_mt.ini" $2 State
     StrCmp $R0 1 langFound
     IntOp $1 $1 + 1
-    StrCmp $1 8 langExit ; the "8" here must be 1 more than the last field number in regina_mt.ini
+    StrCmp $1 9 langExit ; the "9" here must be 1 more than the last field number in regina_mt.ini
     Goto langStartLoop
   langFound:
   ReadIniStr $R0 "$PLUGINSDIR\regina_mt.ini" $2 Text
   ; do the language default
   Push "REGINA_LANG_DIR"
   Push "$INSTDIR"
+  Push $IsAdminUser ; "true" or "false"
   Call WriteEnvStr
   Push "REGINA_LANG"
   Push "$R0"
+  Push $IsAdminUser ; "true" or "false"
   Call WriteEnvStr
+  DetailPrint "$R0 set as default language for error messages"
   langExit:
   Return
 FunctionEnd
 
 Function InstallRxstack
+  Pop $R1
   Pop $R0
   Strcmp $R0 0 exitss
   ; do the install of rxstack
   DetailPrint "Installing Regina Stack Service"
   nsExec::ExecToLog "$INSTDIR\rxstack -install"
+  Strcmp $R1 0 exitss
+  DetailPrint "Starting Regina Stack Service"
+  Services::SendServiceCommand 'start' 'Regina Stack'
+  Pop $R0
+  StrCmp $R0 'Ok' exitss
+     MessageBox MB_OK|MB_ICONEXCLAMATION|MB_TOPMOST "Failed to start the Regina Stack service:$\n$0" /SD IDOK
   exitss:
 FunctionEnd
 
@@ -300,6 +356,7 @@ Section "Uninstall"
   Push ".cmd"
   Call un.DeleteFileAssociation
   Push $INSTDIR
+  Push $IsAdminUser ; pushes "true" or "false"
   Call un.RemoveFromPath
   DeleteRegKey HKCR "Regina"
   ; remove LANG environment variables
@@ -308,17 +365,16 @@ Section "Uninstall"
   Push "REGINA_LANG"
   Call un.DeleteEnvStr
   ; stop and remove the rxstack service - ignore if we get errors
-  Exec 'net stop "Regina Stack"'
+  Services::SendServiceCommand 'stop' 'Regina Stack'
   Exec "$INSTDIR\rxstack -remove"
 
   RMDir /r "$INSTDIR"
 
   ; Remove the installation stuff
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}"
-  DeleteRegKey HKLM SOFTWARE\${LONGNAME}
 
   ; remove shortcuts directory and everything in it
-  RMDir /r "$SMPROGRAMS\${SHORTNAME}"
+  RMDir /r "$SMPROGRAMS\${LONGNAME}"
 
 ; !insertmacro MUI_UNFINISHHEADER
 
@@ -326,6 +382,13 @@ SectionEnd
 
 ;========================================================================
 ;Uninstaller Functions
+
+Function un.onInit
+  ;
+  ; UnInstall as All Users if an admin
+  ;
+!include "${SRCDIR}\common\unoninit.nsh"
+FunctionEnd
 
 Function un.DeleteFileAssociation
   Pop $R0
@@ -336,8 +399,9 @@ Function un.DeleteFileAssociation
   NoOwn:
 FunctionEnd
 
-!include "isnt.nsh"
-!include "path.nsh"
-!include "WriteEnv.nsh"
+!include "${SRCDIR}\common\admin.nsh"
+!include "${SRCDIR}\common\isnt.nsh"
+!include "${SRCDIR}\common\path.nsh"
+!include "${SRCDIR}\common\WriteEnv.nsh"
 
 ;eof

@@ -17,7 +17,7 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * $Id: rexxsaa.h,v 1.32 2004/04/12 01:57:50 mark Exp $
+ * $Id: rexxsaa.h,v 1.36 2005/08/05 10:17:29 mark Exp $
  */
 
 #ifndef __REXXSAA_H_INCLUDED
@@ -66,8 +66,12 @@ extern "C" {
 # define CONST const
 #endif
 
-#if defined(__MINGW32__) && defined(__REGINA_DLL)
-#define EXTNAME(n) __attribute__((alias (n)))
+#if defined(__MINGW32__)
+# if defined(__REGINA_DLL)
+#  define EXTNAME(n) __declspec(dllexport)
+# else
+#  define EXTNAME(n) __declspec(dllimport)
+# endif
 #else
 #define EXTNAME(n)
 #endif
@@ -137,6 +141,9 @@ typedef CHAR *PCH ;
 
 #endif
 
+#ifdef __MINGW32__
+typedef CONST char *PCSZ ;
+#endif
 
 #ifdef INCL_REXXSAA
 # define INCL_RXSUBCOM
@@ -165,7 +172,7 @@ typedef CHAR *PCH ;
 # define APIRET ULONG
 #endif
 
-#if !defined(_OS2EMX_H)
+#if !defined(_OS2EMX_H) && !defined( PFN_TYPEDEFED )
 typedef APIRET (APIENTRY *PFN)();
 #endif
 
@@ -203,6 +210,15 @@ typedef struct {
    LONG  sysexit_code ;
 } RXSYSEXIT ;
 typedef RXSYSEXIT *PRXSYSEXIT ;
+
+typedef PUCHAR PEXIT ;
+
+/*
+ * typedefs for Rexx handler types
+ */
+typedef APIRET APIENTRY RexxFunctionHandler(PCSZ name, ULONG argc, /* CONST */ PRXSTRING argv, PCSZ queuename, PRXSTRING returnstring) ;
+typedef LONG APIENTRY RexxExitHandler( LONG, LONG, /* CONST */ PEXIT ) ;
+typedef APIRET APIENTRY RexxSubcomHandler(/* CONST */ PRXSTRING, PUSHORT, PRXSTRING);
 
 /*
  * -------------------------------------------------------------------
@@ -378,16 +394,12 @@ typedef struct {
    RXSTRING rxcwd_value ;
 } RXCWDSET_PARM ;
 
-typedef PUCHAR PEXIT ;
-
-typedef LONG APIENTRY RexxExitHandler( LONG, LONG, /* CONST */ PEXIT ) ;
-
 APIRET APIENTRY RexxRegisterExitExe(
                 PCSZ             EnvName,
-#ifdef RX_STRONGTYPING
-                RexxExitHandler *EntryPoint,
-#else
+#ifdef RX_WEAKTYPING
                 PFN              EntryPoint,
+#else
+                RexxExitHandler *EntryPoint,
 #endif
     /* CONST */ PUCHAR           UserArea )
 EXTNAME("RexxRegisterExitExe");
@@ -555,14 +567,12 @@ EXTNAME("RexxCallBack");
  */
 #ifdef INCL_RXSUBCOM
 
-typedef APIRET APIENTRY RexxSubcomHandler(/* CONST */ PRXSTRING, PUSHORT, PRXSTRING);
-
 APIRET APIENTRY RexxRegisterSubcomExe(
                 PCSZ               EnvName,
-#ifdef RX_STRONGTYPING
-                RexxSubcomHandler *EntryPoint,
-#else
+#ifdef RX_WEAKTYPING
                 PFN                EntryPoint,
+#else
+                RexxSubcomHandler *EntryPoint,
 #endif
     /* CONST */ PUCHAR             UserArea )
 EXTNAME("RexxRegisterSubcomExe");
@@ -632,14 +642,12 @@ EXTNAME("RexxQuerySubcom");
 #define RXFUNC_BADTYPE       70
 #define RXFUNC_NOEMEM      1002
 
-typedef APIRET APIENTRY RexxFunctionHandler(PCSZ name, ULONG argc, /* CONST */ PRXSTRING argv, PCSZ queuename, PRXSTRING returnstring) ;
-
 APIRET APIENTRY RexxRegisterFunctionExe(
                 PCSZ                 name,
-#ifdef RX_STRONGTYPING
-                RexxFunctionHandler *EntryPoint )
-#else
+#ifdef RX_WEAKTYPING
                 PFN                  EntryPoint )
+#else
+                RexxFunctionHandler *EntryPoint )
 #endif
 EXTNAME("RexxRegisterFunctionExe");
 #define REXXREGISTERFUNCTIONEXE RexxRegisterFunctionExe

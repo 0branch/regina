@@ -73,7 +73,7 @@ static GCI_result checkname( const char **str,
    const char *s = *str;
    int i, l, len = *size;
 
-   for ( i = 0; i < elements( list ); i++ )
+   for ( i = 0; i < (int) elements( list ); i++ )
    {
       l = list[i].length;
       if ( len < l )
@@ -99,13 +99,16 @@ static GCI_result checkname( const char **str,
  * GCI_UnsupportedType: The base calltype isn't cdecl, stdcall, etc or the
  *                      modifiers (as function, etc) couldn't be recognized.
  */
-static GCI_result parseCallType( const GCI_str *str,
+static GCI_result parseCallType( void *hidden,
+                                 const GCI_str *str,
                                  GCI_callinfo *ci )
 {
    GCI_calltype ct;
    InfoType it, lastit;
    const char *ptr = GCI_ccontent( str );
    int size = GCI_strlen( str );
+
+   (hidden = hidden);
 
    lastit = InfoUnknown;
    memset( ci, 0, sizeof( GCI_callinfo ) );
@@ -119,7 +122,7 @@ static GCI_result parseCallType( const GCI_str *str,
       /*
        * Chop off spaces. We stop if we reach EOS here.
        */
-      while ( ( size > 0 ) && rx_isspace( *ptr ) )
+      while ( ( size > 0 ) && GCI_isspace( *ptr ) )
       {
          ptr++;
          size--;
@@ -191,13 +194,16 @@ static GCI_result parseCallType( const GCI_str *str,
  * isempty returns 1 exactly if the passed string is either empty or consists
  * of whitespaces only. 0 is returned otherwise.
  */
-static int isempty( const GCI_str *str )
+static int isempty( void *hidden,
+                    const GCI_str *str )
 {
    const char *s = GCI_ccontent( str );
    int len = GCI_strlen( str );
 
+   (hidden = hidden);
+
    while ( len > 0 ) {
-      if ( !rx_isspace( *s ) )
+      if ( !GCI_isspace( *s ) )
          return 0;
       len--;
       s++;
@@ -216,6 +222,8 @@ static int isempty( const GCI_str *str )
  * nodes element if it isn't NULL on return and the return value signals an
  * error.
  *
+ * prefixChar is the prefix that must be used in front of stem names.
+ *
  * Return values:
  * GCI_OK:  Everything is fine.
  * other:   There are so many different errors, it doesn't make any sense
@@ -224,7 +232,8 @@ static int isempty( const GCI_str *str )
  */
 static GCI_result parseTree( void *hidden,
                              GCI_str *base,
-                             GCI_treeinfo *ti )
+                             GCI_treeinfo *ti,
+                             const char *prefixChar )
 {
    GCI_result rc;
    unsigned argc, return_valid = 0;
@@ -235,16 +244,18 @@ static GCI_result parseTree( void *hidden,
    char tmp[256];
    GCI_strOfCharBuffer( tmp );
 
-   GCI_strcats( base, ".CALLTYPE" );
+   GCI_strcats( base, "." );
+   GCI_strcats( base, prefixChar );
+   GCI_strcats( base, "CALLTYPE" );
    if ( ( rc = GCI_readRexx( hidden, base, &str_tmp, 0, 1, NULL ) ) != GCI_OK )
    {
       if ( rc == GCI_MissingValue )
          rc = GCI_MissingName;
       return rc;
    }
-   GCI_uppercase( &str_tmp );
+   GCI_uppercase( hidden, &str_tmp );
 
-   if ( ( rc = parseCallType( &str_tmp, &ti->callinfo ) ) != GCI_OK )
+   if ( ( rc = parseCallType( hidden, &str_tmp, &ti->callinfo ) ) != GCI_OK )
       return rc;
 
    GCI_strsetlen( base, origlen );
@@ -271,7 +282,12 @@ static GCI_result parseTree( void *hidden,
     * We still need to know whether to provide a return value.
     */
    GCI_strsetlen( base, origlen );
-   GCI_strcats( base, ".RETURN.TYPE" );
+   GCI_strcats( base, "." );
+   GCI_strcats( base, prefixChar );
+   GCI_strcats( base, "RETURN" );
+   GCI_strcats( base, "." );
+   GCI_strcats( base, prefixChar );
+   GCI_strcats( base, "TYPE" );
    if ( ( rc = GCI_readRexx( hidden, base, &str_tmp, 0, 1, NULL ) ) != GCI_OK )
    {
       if ( rc == GCI_MissingValue )
@@ -279,7 +295,7 @@ static GCI_result parseTree( void *hidden,
    }
    else
    {
-      if ( !isempty( &str_tmp ) )
+      if ( !isempty( hidden, &str_tmp ) )
       {
          /*
           * If we have to respect a return value, we have to pass back a
@@ -299,7 +315,7 @@ static GCI_result parseTree( void *hidden,
    if ( rc != GCI_OK )
       return rc;
 
-   return GCI_parsenodes( hidden, base, ti, argc, return_valid );
+   return GCI_parsenodes( hidden, base, ti, argc, return_valid, prefixChar );
 }
 
 /*
@@ -315,6 +331,8 @@ static GCI_result parseTree( void *hidden,
  * error position in the stem in case of an error. It may be unset again to
  * indicate a non specific error location.
  *
+ * prefixChar is the prefix that must be used in front of stem names.
+ *
  * Return values:
  * GCI_OK:  Everything is fine.
  * other:   There are so many different errors, it doesn't make any sense
@@ -324,7 +342,8 @@ static GCI_result parseTree( void *hidden,
 GCI_result GCI_ParseTree( void *hidden,
                           const GCI_str *stem,
                           GCI_treeinfo *gci_info,
-                          GCI_str *error_disposition )
+                          GCI_str *error_disposition,
+                          const char *prefixChar )
 {
    GCI_result rc;
    GCI_str stemval;
@@ -364,7 +383,7 @@ GCI_result GCI_ParseTree( void *hidden,
    /*
     * We do a non-symbolic access later. Make sure we don't loose!
     */
-   GCI_uppercase( &stemval );
+   GCI_uppercase( hidden, &stemval );
    l = GCI_strlen( &stemval );
    if ( ( l > 0 ) & ( GCI_content( &stemval )[l - 1] == '.' ) )
       GCI_strsetlen( &stemval, l - 1 );
@@ -372,11 +391,14 @@ GCI_result GCI_ParseTree( void *hidden,
    GCI_strfree( hidden, &stemval );
 
    memset( &tree, 0, sizeof( tree ) );
-   for ( l = 0; l < elements( tree.args ); l++ )
+   for ( l = 0; l < (int) elements( tree.args ); l++ )
       tree.args[l] = -1;
    tree.retval = -1;
 
-   if ( ( rc = parseTree( hidden, error_disposition, &tree ) ) != GCI_OK )
+   if ( ( rc = parseTree( hidden,
+                          error_disposition,
+                          &tree,
+                          prefixChar ) ) != GCI_OK )
    {
       if ( tree.nodes != NULL )
          GCI_free( hidden, tree.nodes );
@@ -406,6 +428,8 @@ GCI_result GCI_ParseTree( void *hidden,
  * error position in the stem in case of an error. It may be unset again to
  * indicate a non specific error location.
  *
+ * prefixChar is the prefix that must be used in front of stem names.
+ *
  * Return values:
  * GCI_OK:  Everything is fine.
  * other:   There are so many different errors, it doesn't make any sense
@@ -417,7 +441,8 @@ GCI_result GCI_RxFuncDefine( void *hidden,
                              const GCI_str *library,
                              const GCI_str *external,
                              const GCI_str *stem,
-                             GCI_str *error_disposition )
+                             GCI_str *error_disposition,
+                             const char *prefixChar )
 {
    GCI_result rc;
    GCI_treeinfo tree;
@@ -425,7 +450,8 @@ GCI_result GCI_RxFuncDefine( void *hidden,
    if ( ( rc = GCI_ParseTree( hidden,
                               stem,
                               &tree,
-                              error_disposition ) ) != GCI_OK )
+                              error_disposition,
+                              prefixChar ) ) != GCI_OK )
       return rc;
 
    if ( ( rc = GCI_RegisterDefinedFunction( hidden,

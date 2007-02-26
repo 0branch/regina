@@ -23,6 +23,7 @@ BEGIN
             VALUE "OriginalFilename", "REGINATS.DLL\0"
             VALUE "ProductName", "Regina Rexx Interpreter\0"
             VALUE "ProductVersion", "3.1.1\0"
+            VALUE "ProductDate", "????????\0"
         END
     END
 

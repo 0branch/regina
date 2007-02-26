@@ -4,6 +4,10 @@
 
 SRC = $(%REGINA_SRCDIRN)\
 
+!include $(SRC)regina.ver
+VERDOT = $(VER_DOT)
+VERDATE = $(VER_DATE)
+
 YACC = yacc
 #YACC = bison -ly #-d #-lyt
 
@@ -73,7 +77,7 @@ yaccsrc.obj   &
 lexsrc.obj    &
 wrappers.obj  &
 options.obj   &
-doscmd.obj    &
+os_os2.obj    &
 extstack.obj  &
 rexxbif.obj
 
@@ -114,7 +118,7 @@ yaccsrc.dlo   &
 lexsrc.dlo    &
 wrappers.dlo  &
 options.dlo   &
-doscmd.dlo    &
+os_os2.dlo    &
 extstack.dlo  &
 rexxbif.dlo   &
 $(GCI_SHO)
@@ -124,15 +128,15 @@ DLLBASE=regina
 DLLFILE=$(DLLBASE).dll
 IMPFILE=$(DLLBASE).lib
 
-DLLTEST1=test1.dll
-DLLTEST2=test2.dll
+DLLTEST1=rxtest1.dll
+DLLTEST2=rxtest2.dll
 
 CC              = wcc386
 TARGET=os2v2
 
 !ifeq DEBUG Y
 CFLAGS  = /d2
-LDFLAGS = DEBUG WATCOM ALL
+LDFLAGS = DEBUG ALL
 !else
 CFLAGS  =  /dNDEBUG /oneatx
 LDFLAGS =
@@ -143,7 +147,9 @@ CPPFLAGS        = /dOS2 /i=$(SRC)
 
 DYN_CFLAGS = /dDYNAMIC
 
-CCFLAGS         = /4s /wx /zq /mf $(CFLAGS) $(CPPFLAGS)
+CEXTRA = /dREGINA_VERSION_DATE=$(VER_DATE) /dREGINA_VERSION_MAJOR="$(VER_MAJOR)" /dREGINA_VERSION_MINOR="$(VER_MINOR)" /dREGINA_VERSION_SUPP="$(VER_SUPP)"
+
+CCFLAGS         = /4s /wx /zq /mf $(CFLAGS) $(CPPFLAGS) $(CEXTRA)
 
 LINK            = wlink
 
@@ -154,7 +160,7 @@ HFILES = $(SRC)rexx.h $(SRC)defs.h $(SRC)extern.h $(SRC)regina_t.h $(SRC)configu
 
 GCIHEADERS = $(SRC)gci\gci.h $(SRC)gci\embedded.h gci_convert.h
 
-all : rexx.exe $(LIBFILE) regina.exe test1.dll test2.dll execiser.exe threader.exe
+all : rexx.exe $(LIBFILE) regina.exe $(DLLTEST1) $(DLLTEST2) execiser.exe threader.exe
 
 rexx.exe : $(OFILES) rexx.obj nosaa.obj
         @%create dummy.lnk
@@ -198,7 +204,7 @@ rexx.exe : $(OFILES) rexx.obj nosaa.obj
         @%append dummy.lnk file lexsrc.obj
         @%append dummy.lnk file wrappers.obj
         @%append dummy.lnk file options.obj
-        @%append dummy.lnk file doscmd.obj
+        @%append dummy.lnk file os_os2.obj
         @%append dummy.lnk file extstack.obj
         @%append dummy.lnk file rexxbif.obj
         @%append dummy.lnk file nosaa.obj
@@ -278,7 +284,7 @@ $(LIBFILE): $(OFILES) client.obj drexx.obj rexxsaa.obj
         @%append lib.rsp +lexsrc.obj
         @%append lib.rsp +wrappers.obj
         @%append lib.rsp +options.obj
-        @%append lib.rsp +doscmd.obj
+        @%append lib.rsp +os_os2.obj
         @%append lib.rsp +extstack.obj
         @%append lib.rsp +rexxbif.obj
         $(LIBEXE) $(LIBFLAGS) $@ @lib.rsp
@@ -290,6 +296,7 @@ $(DLLFILE): $(DLOFILES) client.dlo drexx.dlo rexxsaa.dlo
         @%append dummy.lnk option caseexact
         @%append dummy.lnk system $(TARGET) dll
         @%append dummy.lnk name $(DLLFILE)
+        @%append dummy.lnk option map
         @%append dummy.lnk file client.dlo
         @%append dummy.lnk file drexx.dlo
         @%append dummy.lnk file rexxsaa.dlo
@@ -328,7 +335,7 @@ $(DLLFILE): $(DLOFILES) client.dlo drexx.dlo rexxsaa.dlo
         @%append dummy.lnk file lexsrc.dlo
         @%append dummy.lnk file wrappers.dlo
         @%append dummy.lnk file options.dlo
-        @%append dummy.lnk file doscmd.dlo
+        @%append dummy.lnk file os_os2.dlo
         @%append dummy.lnk file extstack.dlo
         @%append dummy.lnk file rexxbif.dlo
 !ifneq GCI N
@@ -512,7 +519,7 @@ wrappers.obj: $(SRC)wrappers.c $(HFILES)
 options.obj:  $(SRC)options.c $(HFILES)
         $(CC) $(CCFLAGS) /fo=$@ $(SRC)$*.c
 
-doscmd.obj:   $(SRC)doscmd.c $(HFILES)
+os_os2.obj:   $(SRC)os_os2.c $(HFILES)
         $(CC) $(CCFLAGS) /fo=$@ $(SRC)$*.c
 
 extstack.obj: $(SRC)extstack.c $(HFILES)
@@ -656,7 +663,7 @@ wrappers.dlo: $(SRC)wrappers.c $(HFILES)
 options.dlo:  $(SRC)options.c $(HFILES)
         $(CC) $(CCFLAGS) $(THREADING) $(HAVE_GCI) /bd /fo=$*.dlo $(SRC)$*.c
 
-doscmd.dlo:   $(SRC)doscmd.c $(HFILES)
+os_os2.dlo:   $(SRC)os_os2.c $(HFILES)
         $(CC) $(CCFLAGS) $(THREADING) $(HAVE_GCI) /bd /fo=$*.dlo $(SRC)$*.c
 
 extstack.dlo: $(SRC)extstack.c $(HFILES)

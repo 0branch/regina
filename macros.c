@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: macros.c,v 1.21 2004/02/10 10:44:06 mark Exp $";
+static char *RCSid = "$Id: macros.c,v 1.24 2006/02/20 07:54:00 mark Exp $";
 #endif
 
 /*
@@ -100,7 +100,7 @@ streng *do_instore( tsd_t * volatile TSD, const streng *name, paramboxptr args,
       *RetCode = 0;
 
    SaveInterpreterStatus( TSD, InterpreterStatus );
-   jbuf = MallocTSD( sizeof( jmp_buf ) );
+   jbuf = (jmp_buf *)MallocTSD( sizeof( jmp_buf ) );
    assert( !TSD->in_protected );
 
    saved_TSD = TSD;            /* vars used until here */
@@ -159,8 +159,8 @@ streng *do_instore( tsd_t * volatile TSD, const streng *name, paramboxptr args,
 
       if ( ipt )
          TSD->systeminfo->tree = *ipt;
-      else if ( IsValidTin( instore, instore_length ) )
-         TSD->systeminfo->tree = ExpandTinnedTree( TSD, instore, instore_length,
+      else if ( IsValidTin( (const external_parser_type *)instore, instore_length ) )
+         TSD->systeminfo->tree = ExpandTinnedTree( TSD, (const external_parser_type *)instore, instore_length,
                                                    instore_source,
                                                    instore_source_length );
       else
@@ -224,12 +224,13 @@ streng *execute_external( tsd_t * volatile TSD, const streng *command,
    tsd_t * volatile saved_TSD;
    int * volatile saved_RetCode;
    volatile int doTermHook=0;
+   int iserror=0;
 
    if ( RetCode )
       *RetCode = 0;
 
    SaveInterpreterStatus( TSD, InterpreterStatus );
-   jbuf = MallocTSD( sizeof( jmp_buf ) );
+   jbuf = (jmp_buf *)MallocTSD( sizeof( jmp_buf ) );
    assert( !TSD->in_protected );
 
    saved_TSD = TSD; /* vars used until here */
@@ -255,7 +256,10 @@ streng *execute_external( tsd_t * volatile TSD, const streng *command,
           */
          if ( RetCode )
             *RetCode = atoi( ptr->value );
-
+         /*
+          * Defer the exiting with 40.1 until the jmpbuf stuff is done
+          */
+         iserror = 1;
          ptr = NULL;
       }
    }
@@ -324,17 +328,6 @@ streng *execute_external( tsd_t * volatile TSD, const streng *command,
       newsystem->ctrlcounter = newsystem->previous->ctrlcounter +
                                                newsystem->previous->cstackcnt;
 
-      /* FGC: NOTE: I found that currlevel has changed outside between calls
-       *            to this function. I really don't know, if this should
-       *            happen. A typical change of currlevel is done in interpret.
-       *            Maybe, in interpret is an error caused by an illegal
-       *            "postrecursed" re-interpret. Somebody with a higher view of
-       *            the code as mine should check the code there.
-       *            I detected the error in THE using regina while calling
-       *            macros in macros called by THE in a macro.
-       *            (confusing, hmm? :-(  )
-       * FIXME!
-       */
       oldlevel = TSD->currlevel;
 
       TSD->systeminfo = newsystem;
@@ -396,6 +389,20 @@ streng *execute_external( tsd_t * volatile TSD, const streng *command,
     * jbuf will be freed by killsystem
     */
    killsystem( TSD, tmpsys );
+
+   /*
+    * If the called routine failed exit with "external routine failed"
+    * depending on OPTION HALT_ON_EXT_CALL_FAIL or with STRICT_ANSI
+    */
+   if ( iserror)
+   {
+      if ( get_options_flag( TSD->currlevel, EXT_HALT_ON_EXT_CALL_FAIL )
+      ||   get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+      {
+         char *cmd = (char *) tmpstr_of( TSD, command );
+         exiterror( 40, 1, cmd);
+      }
+   }
 
    RestoreInterpreterStatus( TSD, InterpreterStatus );
    /*

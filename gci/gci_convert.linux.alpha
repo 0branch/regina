@@ -22,36 +22,38 @@
  * gci_convert.c for the requirements. This file must include gci.h.
  */
 
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
 #include <limits.h>
 #include <float.h>
 #include "gci.h"
 
-#define GCI_Ir       strtol
-#define GCI_Iw(s,v)  sprintf( s, "%ld", v )
-#define GCI_I_1      signed char
-#define GCI_I_1m     SCHAR_MIN
-#define GCI_I_1M     SCHAR_MAX
-#define GCI_I_2      signed short
-#define GCI_I_2m     SHRT_MIN
-#define GCI_I_2M     SHRT_MAX
-#define GCI_I_4      signed int
-#define GCI_I_4m     INT_MIN
-#define GCI_I_4M     INT_MAX
-#define GCI_I_8      signed long
-#define GCI_I_8m     LONG_MIN
-#define GCI_I_8M     LONG_MAX
+#define GCI_Ir        strtol
+#define GCI_Iw(s,v)   sprintf( s, "%ld", v )
+#define GCI_I_1       signed char
+#define GCI_I_1m      SCHAR_MIN
+#define GCI_I_1M      SCHAR_MAX
+#define GCI_I_2       signed short
+#define GCI_I_2m      SHRT_MIN
+#define GCI_I_2M      SHRT_MAX
+#define GCI_I_4       signed int
+#define GCI_I_4m      INT_MIN
+#define GCI_I_4M      INT_MAX
+#define GCI_I_8       signed long
+#define GCI_I_8m      LONG_MIN
+#define GCI_I_8M      LONG_MAX
 
-#define GCI_Ur       strtoul
-#define GCI_Uw(s,v)  sprintf( s, "%lu", v )
-#define GCI_U_1      unsigned char
-#define GCI_U_1M     UCHAR_MAX
-#define GCI_U_2      unsigned short
-#define GCI_U_2M     USHRT_MAX
-#define GCI_U_4      unsigned
-#define GCI_U_4M     UINT_MAX
-#define GCI_U_8      unsigned long
-#define GCI_U_8M     ULONG_MAX
+#define GCI_Ur        strtoul
+#define GCI_Uw(s,v)   sprintf( s, "%lu", v )
+#define GCI_U_1       unsigned char
+#define GCI_U_1M      UCHAR_MAX
+#define GCI_U_2       unsigned short
+#define GCI_U_2M      USHRT_MAX
+#define GCI_U_4       unsigned
+#define GCI_U_4M      UINT_MAX
+#define GCI_U_8       unsigned long
+#define GCI_U_8M      ULONG_MAX
 
 #if 0
 
@@ -59,14 +61,14 @@
              in opposite to integer values.
              This isn't supported by GCI!
 
-#define GCI_Fr       strtod
-#define GCI_Fw(s,v)  sprintf( s, "%.*lE", LDBL_MANT_DIG/3, v )
-#define GCI_F_4      float
-#define GCI_F_4m     (-FLT_MAX)
-#define GCI_F_4M     FLT_MAX
-#define GCI_F_8      double
-#define GCI_F_8m     (-DBL_MAX)
-#define GCI_F_8M     DBL_MAX
+#define GCI_Fr        strtod
+#define GCI_Fw(s,v)   sprintf( s, "%.*lE", LDBL_MANT_DIG/3, v )
+#define GCI_F_4       float
+#define GCI_F_4m      (-FLT_MAX)
+#define GCI_F_4M      FLT_MAX
+#define GCI_F_8       double
+#define GCI_F_8m      (-DBL_MAX)
+#define GCI_F_8M      DBL_MAX
 #endif /* if 0 */
 
 /*

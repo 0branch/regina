@@ -63,7 +63,7 @@ static pthread_once_t ThreadOnce = PTHREAD_ONCE_INIT; /* for pthread_once */
  */
 static void Deinitialize(void *buf)
 {
-   tsd_t *TSD = buf;
+   tsd_t *TSD = (tsd_t *)buf;
    mt_tsd_t *mt;
    MT_mem *chunk;
 
@@ -72,7 +72,7 @@ static void Deinitialize(void *buf)
 
    deinit_rexxsaa(TSD);
 
-   mt = TSD->mt_tsd;
+   mt = (mt_tsd_t *)TSD->mt_tsd;
    if (mt)
    {
       while ((chunk = mt->mem_base) != NULL)
@@ -111,25 +111,25 @@ static void ThreadGetKey(void)
 static void *MTMalloc( const tsd_t *TSD, size_t size )
 {
    mt_tsd_t *mt;
-   MT_mem *new = malloc(size + sizeof(MT_mem));
+   MT_mem *newptr = (MT_mem *)malloc(size + sizeof(MT_mem));
 
-   if (new == NULL) /* may happen. errors are detected in the above layers */
+   if (newptr == NULL) /* may happen. errors are detected in the above layers */
       return(NULL);
 
-   mt = TSD->mt_tsd;
-   new->prev = NULL;
-   new->next = mt->mem_base;
+   mt = (mt_tsd_t *)TSD->mt_tsd;
+   newptr->prev = NULL;
+   newptr->next = mt->mem_base;
    if (mt->mem_base)
-      mt->mem_base->prev = new;
-   mt->mem_base = new;
-   return(new + 1); /* jump over the head */
+      mt->mem_base->prev = newptr;
+   mt->mem_base = newptr;
+   return(newptr + 1); /* jump over the head */
 }
 
 /* Lowest level memory deallocation function for normal circumstances. */
 static void MTFree( const tsd_t *TSD, void *chunk )
 {
-   mt_tsd_t *mt = TSD->mt_tsd;
-   MT_mem *this;
+   mt_tsd_t *mt = (mt_tsd_t *)TSD->mt_tsd;
+   MT_mem *thisptr;
 
    /*
     * Just in case...
@@ -137,32 +137,32 @@ static void MTFree( const tsd_t *TSD, void *chunk )
    if (chunk == NULL)
       return;
 
-   this = chunk;
-   this--; /* Go to the header of the chunk */
+   thisptr = (MT_mem *)chunk;
+   thisptr--; /* Go to the header of the chunk */
 
-   if (this->prev)
+   if (thisptr->prev)
    {
-      if (this->prev->next != this)
+      if (thisptr->prev->next != thisptr)
          return;
    }
-   if (this->next)
+   if (thisptr->next)
    {
-      if (this->next->prev != this)
+      if (thisptr->next->prev != thisptr)
          return;
    }
 
    /* This is a chunk allocated by MTMalloc */
-   if (this->prev)
-      this->prev->next = this->next;
-   if (this->next)
-      this->next->prev = this->prev;
-   if (this == mt->mem_base)
-      mt->mem_base = this->next;
+   if (thisptr->prev)
+      thisptr->prev->next = thisptr->next;
+   if (thisptr->next)
+      thisptr->next->prev = thisptr->prev;
+   if (thisptr == mt->mem_base)
+      mt->mem_base = thisptr->next;
 
    /* Last not least we set the pointers to NULL. This prevents a double-free*/
-   this->next = NULL;
-   this->prev = NULL;
-   free(this);
+   thisptr->next = NULL;
+   thisptr->prev = NULL;
+   free(thisptr);
 }
 
 /* Lowest level exit handler. */
@@ -185,13 +185,13 @@ tsd_t *ReginaInitializeThread(void)
    pthread_once(&ThreadOnce,ThreadGetKey);
 
    /* fetch the value of the access variable */
-   retval = pthread_getspecific(ThreadIndex);
+   retval = (tsd_t *)pthread_getspecific(ThreadIndex);
 
    if (retval != NULL)
       return(retval);
 
    /* First call in this thread... */
-   retval = malloc(sizeof(tsd_t)); /* no Malloc, etc! */
+   retval = (tsd_t *)malloc(sizeof(tsd_t)); /* no Malloc, etc! */
 
    if (retval == NULL) /* THIS is really a problem. I don't know what we */
       return(NULL);    /* should do now. Let the caller run into a crash... */
@@ -206,15 +206,20 @@ tsd_t *ReginaInitializeThread(void)
    /* Since the local data structure contains a memory chain for the memory
     * management we initialize it first.
     */
-   if ((retval->mt_tsd = malloc(sizeof(mt_tsd_t))) == NULL)
+   if ( ( retval->mt_tsd = (mt_tsd_t *)malloc( sizeof(mt_tsd_t) ) ) == NULL )
       return(NULL);                     /* This is a catastrophy             */
-   memset(retval->mt_tsd,0,sizeof(mt_tsd_t));
+   memset( retval->mt_tsd, 0, sizeof(mt_tsd_t) );
 
    OK = init_memory(retval);            /* Initialize the memory module FIRST*/
 
    /* Without the initial memory we don't have ANY chance! */
    if (!OK)
       return(NULL);
+
+   {
+      extern OS_Dep_funcs __regina_OS_Unx;
+      retval->OS = &__regina_OS_Unx;
+   }
 
    OK &= init_vars(retval);             /* Initialize the variable module    */
    OK &= init_stacks(retval);           /* Initialize the stack module       */
@@ -251,7 +256,7 @@ tsd_t *ReginaInitializeThread(void)
 tsd_t *__regina_get_tsd(void)
 {
    /* See above for comments */
-   return(pthread_getspecific(ThreadIndex));
+   return( (tsd_t *)pthread_getspecific( ThreadIndex ) );
 }
 
 /******************************************************************************
@@ -265,7 +270,7 @@ tsd_t *__regina_get_tsd(void)
 /* see documentation of getgrgid and getgrgid_r */
 struct group *getgrgid(gid_t gid)
 {
-   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+   mt_tsd_t *mt = (mt_tsd_t *)__regina_get_tsd()->mt_tsd;
    struct group *ptr=NULL;
    int rc=0;
 # ifdef HAVE_GETGRGID_R_RETURNS_INT_5_PARAMS
@@ -301,7 +306,7 @@ struct group *getgrgid(gid_t gid)
 /* see documentation of getpwuid and getpwuid_r */
 struct passwd *getpwuid(uid_t uid)
 {
-   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+   mt_tsd_t *mt = (mt_tsd_t *)__regina_get_tsd()->mt_tsd;
    struct passwd *ptr=NULL;
    int rc=0;
 
@@ -329,7 +334,7 @@ struct passwd *getpwuid(uid_t uid)
 /* see documentation of gmtime and gmtime_r */
 struct tm *gmtime(const time_t *time)
 {
-   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+   mt_tsd_t *mt = (mt_tsd_t *)__regina_get_tsd()->mt_tsd;
 #ifdef HAVE_GMTIME_R
    return(gmtime_r(time,&mt->gmtime_retval));
 #else
@@ -340,7 +345,7 @@ struct tm *gmtime(const time_t *time)
 /* see documentation of localtime and localtime_r */
 struct tm *localtime(const time_t *time)
 {
-   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+   mt_tsd_t *mt = (mt_tsd_t *)__regina_get_tsd()->mt_tsd;
 
 #ifdef HAVE_LOCALTIME_R
    return(localtime_r(time,&mt->localtime_retval));
@@ -354,7 +359,7 @@ struct hostent *gethostbyname(const char *name)
 {
    int herr;
    struct hostent *he=NULL;
-   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+   mt_tsd_t *mt = (mt_tsd_t *)__regina_get_tsd()->mt_tsd;
 
 #ifdef HAVE_GETHOSTBYNAME_R_RETURNS_INT_6_PARAMS
    if (gethostbyname_r(name,
@@ -379,7 +384,7 @@ struct hostent *gethostbyname(const char *name)
 char *inet_ntoa(struct in_addr in)
 {
 #ifdef HAVE_INET_NTOP
-   mt_tsd_t *mt = __regina_get_tsd()->mt_tsd;
+   mt_tsd_t *mt = (mt_tsd_t *)__regina_get_tsd()->mt_tsd;
 
    return((char *) inet_ntop(AF_INET,
                              &in,

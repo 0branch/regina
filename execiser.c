@@ -82,7 +82,7 @@ static void instore( void )
 
    message( "instore" ) ;
 
-   RexxRegisterExitExe( "Foo", (PFN)instore_exit, NULL ) ;
+   RexxRegisterExitExe( "Foo", instore_exit, NULL ) ;
 
    Exits[0].sysexit_name = "Foo" ;
    Exits[0].sysexit_code = RXSIO ;
@@ -133,7 +133,7 @@ static void trace( void )
 
    message( "trace" ) ;
 
-   RexxRegisterExitExe( "Foo", (PFN)trace_exit, NULL ) ;
+   RexxRegisterExitExe( "Foo", trace_exit, NULL ) ;
 
    Exits[0].sysexit_name = "Foo" ;
    Exits[0].sysexit_code = RXSIO ;
@@ -155,7 +155,7 @@ static void assign_new_rxstring( PRXSTRING dest, const char *source )
    char *buf;
 
    len = strlen( source );
-   if ( ( buf = RexxAllocateMemory( len + 1 ) ) == NULL )
+   if ( ( buf = (char *)RexxAllocateMemory( len + 1 ) ) == NULL )
    {
       fprintf( stderr, "RexxAllocateMemory returns NULL.\n" );
       exit( 1 );
@@ -230,7 +230,7 @@ static void intertrc( void )
 
    message( "intertrc" ) ;
 
-   RexxRegisterExitExe( "Foo", (PFN)intertrc_exit, NULL ) ;
+   RexxRegisterExitExe( "Foo", intertrc_exit, NULL ) ;
 
    Exits[0].sysexit_name = "Foo" ;
    Exits[0].sysexit_code = RXSIO ;
@@ -297,7 +297,7 @@ static void pull( void )
 
    message( "pull" ) ;
 
-   RexxRegisterExitExe( "Foo", (PFN)pull_exit, NULL ) ;
+   RexxRegisterExitExe( "Foo", pull_exit, NULL ) ;
 
    Exits[0].sysexit_name = "Foo" ;
    Exits[0].sysexit_code = RXSIO ;
@@ -362,7 +362,7 @@ static void env( void )
 
    message( "env") ;
 
-   RexxRegisterExitExe( "Foo", (PFN)env_exit, NULL ) ;
+   RexxRegisterExitExe( "Foo", env_exit, NULL ) ;
 
    Exits[0].sysexit_name = "Foo" ;
    Exits[0].sysexit_code = RXENV ;
@@ -543,9 +543,9 @@ static void init_term(void)
 
    message( "init/term" ) ;
 
-   RexxRegisterExitExe( "init", (PFN)it_init_exit, NULL ) ;
-   RexxRegisterExitExe( "term", (PFN)it_term_exit, NULL ) ;
-   RexxRegisterExitExe( "say", (PFN)it_say_exit, NULL ) ;
+   RexxRegisterExitExe( "init", it_init_exit, NULL ) ;
+   RexxRegisterExitExe( "term", it_term_exit, NULL ) ;
+   RexxRegisterExitExe( "say", it_say_exit, NULL ) ;
 
    Exits[0].sysexit_name = "init" ;
    Exits[0].sysexit_code = RXINI ;
@@ -596,7 +596,7 @@ LONG APIENTRY vars_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    shv[1].shvname.strptr = "bar " ;
    shv[1].shvname.strlength = strlen( shv[1].shvname.strptr ) ;
    shv[1].shvnamelen = shv[1].shvname.strlength ;
-   shv[1].shvvalue.strptr = RexxAllocateMemory( 64 ) ;
+   shv[1].shvvalue.strptr = (char *)RexxAllocateMemory( 64 ) ;
    shv[1].shvvalue.strlength = 64 ;
    shv[1].shvvaluelen = shv[1].shvvalue.strlength ;
    shv[1].shvcode = RXSHV_SYFET ;
@@ -606,7 +606,7 @@ LONG APIENTRY vars_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    shv[2].shvname.strptr = "BAR" ;
    shv[2].shvname.strlength = strlen( shv[2].shvname.strptr ) ;
    shv[2].shvnamelen = shv[2].shvname.strlength ;
-   shv[2].shvvalue.strptr = RexxAllocateMemory( 64 ) ;
+   shv[2].shvvalue.strptr = (char *)RexxAllocateMemory( 64 ) ;
    shv[2].shvvalue.strlength = 64 ;
    shv[2].shvvaluelen = shv[2].shvvalue.strlength ;
    shv[2].shvcode = RXSHV_SYFET ;
@@ -626,7 +626,7 @@ LONG APIENTRY vars_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    shv[4].shvname.strptr = "BAR" ;
    shv[4].shvname.strlength = strlen( shv[4].shvname.strptr ) ;
    shv[4].shvnamelen = shv[4].shvname.strlength ;
-   shv[4].shvvalue.strptr = RexxAllocateMemory( 64 ) ;
+   shv[4].shvvalue.strptr = (char *)RexxAllocateMemory( 64 ) ;
    shv[4].shvvalue.strlength =  64 ;
    shv[4].shvvaluelen = shv[4].shvvalue.strlength ;
    shv[4].shvcode = RXSHV_SYFET ;
@@ -646,7 +646,7 @@ LONG APIENTRY vars_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    shv[6].shvname.strptr = "BAR" ;
    shv[6].shvname.strlength = strlen( shv[6].shvname.strptr ) ;
    shv[6].shvnamelen = shv[6].shvname.strlength ;
-   shv[6].shvvalue.strptr = RexxAllocateMemory( 64 ) ;
+   shv[6].shvvalue.strptr = (char *)RexxAllocateMemory( 64 ) ;
    shv[6].shvvalue.strlength = 64 ;
    shv[6].shvvaluelen = shv[6].shvvalue.strlength ;
    shv[6].shvcode = RXSHV_SYFET ;
@@ -673,7 +673,7 @@ LONG APIENTRY vars_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    shv[9].shvname.strptr = "ABC.OOPS" ;
    shv[9].shvname.strlength = strlen( shv[9].shvname.strptr ) ;
    shv[9].shvnamelen = shv[9].shvname.strlength ;
-   shv[9].shvvalue.strptr = RexxAllocateMemory(16) ;
+   shv[9].shvvalue.strptr = (char *)RexxAllocateMemory(16) ;
    shv[9].shvvalue.strlength = 16 ;
    shv[9].shvvaluelen = shv[9].shvvalue.strlength ;
    shv[9].shvcode = RXSHV_SYFET ;
@@ -710,7 +710,7 @@ static void vars(void)
 
    message( "vars" ) ;
 
-   RexxRegisterExitExe( "hepp", (PFN)vars_exit, NULL ) ;
+   RexxRegisterExitExe( "hepp", vars_exit, NULL ) ;
 
    Exits[0].sysexit_name = "hepp" ;
    Exits[0].sysexit_code = RXSIO ;
@@ -812,7 +812,7 @@ static void source( void )
 
    message("private") ;
 
-   RexxRegisterExitExe("hei", (PFN)source_exit, NULL ) ;
+   RexxRegisterExitExe("hei", source_exit, NULL ) ;
 
    Exits[0].sysexit_name = "hei" ;
    Exits[0].sysexit_code = RXTER ;
@@ -846,7 +846,7 @@ LONG APIENTRY parms( LONG code, LONG subcode, PEXIT ptr )
    {
       message("parms") ;
 
-      RexxRegisterExitExe("hei", (PFN)parms, NULL ) ;
+      RexxRegisterExitExe("hei", parms, NULL ) ;
 
       Exits[0].sysexit_name = "hei" ;
       Exits[0].sysexit_code = RXTER ;
@@ -976,7 +976,7 @@ LONG APIENTRY allvars( LONG code, LONG subcode, PEXIT ptr )
    {
       message("allvars") ;
 
-      RexxRegisterExitExe("hei", (PFN)allvars, NULL ) ;
+      RexxRegisterExitExe("hei", allvars, NULL ) ;
 
       Exits[0].sysexit_name = "hei" ;
       Exits[0].sysexit_code = RXTER ;
@@ -1079,14 +1079,14 @@ ULONG APIENTRY extfunc( PCSZ name, ULONG params, RXSTRING *parm, PCSZ stck, RXST
    {
       message("extfunc") ;
 
-      RexxRegisterFunctionExe("EXTFUNC", (PFN)extfunc ) ;
+      RexxRegisterFunctionExe("EXTFUNC", extfunc ) ;
 
       Instore[0].strptr = "return extfunc('asdf','qwer',,'zxcv') + 'EXTFUNC'('asdf',,'wer','werrew')" ;
       Instore[0].strlength = strlen( Instore[0].strptr ) ;
       Instore[1].strptr = NULL ;
 
       Result.strlength = 10 ;
-      Result.strptr = RexxAllocateMemory( 10 ) ;
+      Result.strptr = (char *)RexxAllocateMemory( 10 ) ;
 
       rc = RexxStart( 0, NULL, "Testing", Instore, "Foo", RXFUNCTION,
                       NULL, &nret, &Result ) ;
@@ -1145,20 +1145,20 @@ ULONG APIENTRY run_subcom(PRXSTRING Command, PUSHORT Flags, PRXSTRING Retstr)
    {
       message("subcom") ;
 
-      RexxRegisterExitExe( "slhepp", (PFN)subcom_exit, NULL ) ;
+      RexxRegisterExitExe( "slhepp", subcom_exit, NULL ) ;
 
       Exits[0].sysexit_name = "slhepp" ;
       Exits[0].sysexit_code = RXCMD ;
       Exits[1].sysexit_code = RXENDLST ;
 
-      RexxRegisterSubcomExe("SUBCOM", (PFN)run_subcom, NULL ) ;
+      RexxRegisterSubcomExe("SUBCOM", run_subcom, NULL ) ;
 
       Instore[0].strptr = "'foobar asdf qwer'" ;
       Instore[0].strlength = strlen( Instore[0].strptr ) ;
       Instore[1].strptr = NULL ;
 
       Result.strlength = 20 ;
-      Result.strptr = RexxAllocateMemory( 20 ) ;
+      Result.strptr = (char *)RexxAllocateMemory( 20 ) ;
 
       rc = RexxStart( 0, NULL, "Testing", Instore, "SUBCOM", RXCOMMAND,
                       Exits, &nret, &Result ) ;
@@ -1200,8 +1200,8 @@ static void qtest( void )
    Exits[1].sysexit_name = "query_term" ;
    Exits[1].sysexit_code = RXTER ;
    Exits[2].sysexit_code = RXENDLST ;
-   RexxRegisterExitExe( "query_init", (PFN)query_init_exit, NULL ) ;
-   RexxRegisterExitExe( "query_term", (PFN)query_term_exit, NULL ) ;
+   RexxRegisterExitExe( "query_init", query_init_exit, NULL ) ;
+   RexxRegisterExitExe( "query_term", query_term_exit, NULL ) ;
 
    Instore[0].strptr = "call rxqueue 'Set', 'test1';"
                        "if queued() \\= 2 then say 'error:line 2';"

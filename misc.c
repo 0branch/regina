@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: misc.c,v 1.10 2004/04/15 10:06:23 mark Exp $";
+static char *RCSid = "$Id: misc.c,v 1.15 2005/09/05 10:52:02 mark Exp $";
 #endif
 
 /*
@@ -438,6 +438,10 @@ const char *system_type( void )
 #else
    return("DOS");
 # endif
+#elif defined(SKYOS)
+   return "SKYOS" ;
+#elif defined(__CYGWIN__)
+   return "UNIX" ;
 #elif defined(WIN32)
    return "WIN32" ;
 #elif defined(_AMIGA) || defined(AMIGA)
@@ -446,8 +450,6 @@ const char *system_type( void )
    return "QNX" ;
 #elif defined(__BEOS__)
    return "BEOS" ;
-#elif defined(__CYGWIN__)
-   return "WIN32" ;
 #elif defined(__WINS__)
    return "EPOC32-WINS" ;
 #elif defined(__EPOC32__)
@@ -565,9 +567,9 @@ unsigned hashvalue_ic(const char *string, int length)
  * if stop != NULL. In this case, the dot's position is returned in *stop.
  * Note: This is one of the most time-consuming routines. Be careful.
  */
-int hashvalue_var( const streng *name, int start, int *stop )
+unsigned hashvalue_var( const streng *name, int start, int *stop )
 {
-   int sum, idx;
+   unsigned sum, idx;
    const char *ch1, *ech0;
 
    if ( ( char_info[256] & ( RX_ISLOWER | RX_ISDIGIT ) ) !=
@@ -598,7 +600,7 @@ int hashvalue_var( const streng *name, int start, int *stop )
             continue;
       }
       if ( char_info[(unsigned char) *ch1] & RX_ISDIGIT )
-         idx = idx * 10 + ( *ch1 - '0' );
+         idx = idx * 10 + (unsigned) ( *ch1 - '0' );
       else
       {
          if ( idx )
@@ -616,13 +618,272 @@ int hashvalue_var( const streng *name, int start, int *stop )
 
    return sum + idx;
 }
-#ifdef SKYOS
-clock_t clock( void )
+
+/*
+ * Because this modules defines the helper functions for rx_isspace we
+ * don't have access to this defined macro. Just re-define it locally.
+ */
+#define is_expand( c, bit, func ) ( ( char_info[256] & bit ) ?               \
+                        ( char_info[(unsigned char) c] & bit ) :  func( c ) )
+#define rx_isspace( c )  is_expand( c, RX_ISSPACE , Isspace  )
+
+/*
+ * nextarg parses source for the next argument in unix shell terms. If target
+ * is given, it must consist of enough free characters to hold the result +
+ * one byte for the terminator. If len != NULL it will become the length of
+ * the string (which might not been return if target == NULL). The return value
+ * is either NULL or a new start value for nextarg.
+ * escape is the current escape value which should be used, must be set.
+ */
+static const char *nextarg(const char *source, unsigned *len, char *target,
+                                                                  char escape)
 {
-   static long ct = 10L;
+   unsigned l;
+   char c, term;
 
-   ct += 10;
-   return (clock_t)ct;
+   if (len != NULL)
+      *len = 0;
+   if (target != NULL)
+      *target = '\0';
+   l = 0;  /* cached length */
+
+   if (source == NULL)
+      return NULL;
+
+   while (rx_isspace(*source)) /* jump over initial spaces */
+      source++;
+   if (*source == '\0')
+      return NULL;
+
+   do {
+      /* There's something to return. Check for delimiters */
+      term = *source++;
+
+      if ((term == '\'') || (term == '\"'))
+      {
+         while ((c = *source++) != term) {
+            if (c == escape)
+               c = *source++;
+            if (c == '\0')  /* stray \ at EOS is equiv to normal EOS */
+            {
+               /* empty string is valid! */
+               if (len != NULL)
+                  *len = l;
+               if (target != NULL)
+                  *target = '\0';
+               return source - 1; /* next try returns NULL */
+            }
+            l++;
+            if (target != NULL)
+               *target++ = c;
+         }
+      }
+      else /* whitespace delimiters */
+      {
+         c = term;
+         while (!rx_isspace(c) && (c != '\'') && (c != '\"')) {
+            if (c == escape)
+               c = *source++;
+            if (c == '\0')  /* stray \ at EOS is equiv to normal EOS */
+            {
+               /* at least a stray \ was found, empty string checked in
+                * the very beginning.
+                */
+               if (len != NULL)
+                  *len = l;
+               if (target != NULL)
+                  *target = '\0';
+               return source - 1; /* next try returns NULL */
+            }
+            l++;
+            if (target != NULL)
+               *target++ = c;
+            c = *source++;
+         }
+         source--; /* undo the "wrong" character */
+      }
+   } while (!rx_isspace(*source));
+
+   if (len != NULL)
+      *len = l;
+   if (target != NULL)
+      *target = '\0';
+   return source;
 }
-#endif
 
+/*
+ * makeargs chops string into arguments and returns an array of x+1 strings if
+ * string contains x args. The last argument is NULL. This function usually is
+ * called from the subprocess if fork/exec is used.
+ * Example: "xx y" -> { "xx", "y", NULL }
+ * escape must be the escape character of the command line and is usually ^
+ * or \
+ */
+char **makeargs(const char *string, char escape)
+{
+   char **retval;
+   const char *p;
+   int i, argc = 0;
+   unsigned size;
+
+   p = string; /* count the number of strings */
+   while ((p = nextarg(p, NULL, NULL, escape)) != NULL)
+      argc++;
+   if ((retval = (char **)malloc((argc + 1) * sizeof(char *))) == NULL)
+      return(NULL);
+
+   p = string; /* count each string length */
+   for (i = 0; i < argc; i++)
+   {
+      p = nextarg(p, &size, NULL, escape);
+      if ((retval[i] = (char *)malloc(size + 1)) == NULL)
+      {
+         i--;
+         while (i >= 0)
+            free(retval[i--]);
+         free(retval);
+         return(NULL);
+      }
+   }
+
+   p = string; /* assign each string */
+   for (i = 0; i < argc; i++)
+      p = nextarg(p, NULL, retval[i], escape);
+   retval[argc] = NULL;
+
+   return(retval);
+}
+
+/* splitoffarg chops string into two different pieces: The first argument and
+ * all other (uninterpreted) arguments. The first argument is returned in a
+ * freshly allocated string. The rest is a pointer somewhere within string
+ * and returned in *trailer. The return value is allocated by malloc().
+ * Example: "xx y" -> returns "xx", *trailer == "xx y"+2
+ * escape must be the escape character of the command line and is usually ^
+ * or \
+ */
+char *splitoffarg(const char *string, const char **trailer, char escape)
+{
+   unsigned size;
+   char *retval;
+   const char *t;
+
+   if (trailer != NULL)
+      *trailer = ""; /* just a default */
+   nextarg(string, &size, NULL, escape);
+   if ((retval = malloc(size + 1)) == NULL) /* don't change to internal allocation routine */
+      return(NULL);
+
+   t = nextarg(string, NULL, retval, escape);
+   if (trailer != NULL)
+      *trailer = t;
+   return(retval);
+}
+
+/*
+ * nextarg parses source for the next argument as a simple word. If target
+ * is given, it must consist of enough free characters to hold the result +
+ * one byte for the terminator. If len != NULL it will become the length of
+ * the string (which might not been return if target == NULL). The return value
+ * is either NULL or a new start value for nextarg.
+ */
+static const char *nextsimplearg(const char *source, unsigned *len,
+                                                                  char *target)
+{
+   unsigned l;
+   char c;
+
+   if (len != NULL)
+      *len = 0;
+   if (target != NULL)
+      *target = '\0';
+   l = 0;  /* cached length */
+
+   if (source == NULL)
+      return(NULL);
+
+   while (rx_isspace(*source)) /* jump over initial spaces */
+      source++;
+   if (*source == '\0')
+      return(NULL);
+
+   c = *source++;
+
+   while (!rx_isspace(c))
+   {
+      if (c == '\0')  /* stray \ at EOS is equiv to normal EOS */
+      {
+         /* something's found, therefore we don't have to return NULL */
+         if (len != NULL)
+            *len = l;
+         if (target != NULL)
+            *target = '\0';
+         return(source - 1); /* next try returns NULL */
+      }
+      l++;
+      if (target != NULL)
+         *target++ = c;
+      c = *source++;
+   }
+   source--; /* undo the "wrong" character */
+
+   if (len != NULL)
+      *len = l;
+   if (target != NULL)
+      *target = '\0';
+   return(source);
+}
+
+/*
+ * makesimpleargs chops string into arguments and returns an array of x+1
+ * strings if string contains x args. The last argument is NULL. This function
+ * usually is called from the subprocess if fork/exec is used.
+ * Example: "xx y" -> { "xx", "y", NULL }
+ */
+char **makesimpleargs(const char *string)
+{
+   char **retval;
+   const char *p;
+   int i, argc = 0;
+   unsigned size;
+
+   p = string; /* count the number of strings */
+   while ((p = nextsimplearg(p, NULL, NULL)) != NULL)
+      argc++;
+   if ((retval = malloc((argc + 1) * sizeof(char *))) == NULL)
+      return(NULL);
+
+   p = string; /* count each string length */
+   for (i = 0; i < argc; i++)
+   {
+      p = nextsimplearg(p, &size, NULL);
+      if ((retval[i] = malloc(size + 1)) == NULL)
+      {
+         i--;
+         while (i >= 0)
+            free(retval[i--]);
+         free(retval);
+         return(NULL);
+      }
+   }
+
+   p = string; /* assign each string */
+   for (i = 0; i < argc; i++)
+      p = nextsimplearg(p, NULL, retval[i]);
+
+   return(retval);
+}
+
+/*
+ * destroyargs destroys the array created by makeargs
+ */
+void destroyargs(char **args)
+{
+   char **run = args;
+
+   while (*run) {
+      free(*run);
+      run++;
+   }
+   free(args);
+}

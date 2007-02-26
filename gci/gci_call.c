@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <assert.h>
 #include <setjmp.h>
 
@@ -52,16 +53,27 @@ static void doCall( void (*func)(),
                     const GCI_parseinfo *info,
                     const GCI_STACK_ELEMENT *buf )
 {
-#define DOCALL(type) *((type *) returnValue) =                               \
-                                  ((type (*)())func)( GCI_PASSARGS( buf ) ); \
+#ifdef __cplusplus
+# define DOCALL(type) *((type *) returnValue) =                               \
+                               ((type (*)(...))func)( GCI_PASSARGS( buf ) ); \
                      GCI_JUMP( GCI_JUMP_GETVAR( safetyRope ), 1 );           \
                      break;
+#else
+# define DOCALL(type) *((type *) returnValue) =                               \
+                               ((type (*)())func)( GCI_PASSARGS( buf ) ); \
+                     GCI_JUMP( GCI_JUMP_GETVAR( safetyRope ), 1 );           \
+                     break;
+#endif
 
    GCI_parseinfo ptr;
 
    if ( info == NULL )
    {
-      func( GCI_PASSARGS( buf ) );
+#ifdef __cplusplus
+      ((void (*)(...))func)( GCI_PASSARGS( buf ) );
+#else
+      ((void (*)())func)( GCI_PASSARGS( buf ) );
+#endif
       GCI_JUMP( GCI_JUMP_GETVAR( safetyRope ), 1 );
    }
    else
@@ -178,7 +190,7 @@ static void addCallList( const GCI_parseinfo *info,
    /*
     * Now compute the padding bytes.
     */
-   if ( size >= sizeof( GCI_STACK_ELEMENT ) )
+   if ( size >= (int) sizeof( GCI_STACK_ELEMENT ) )
    {
       /*
        * If you have a better idea and know on which boundary to place
@@ -275,7 +287,7 @@ GCI_result GCI_call( void *hidden,
          continue;
       n = ti->nodes + ti->args[start];
       addCallList( &n->type,  &dest, basebuf + n->direct_pos );
-      if ( ( dest - (char *) buf ) > GCI_ARGS * sizeof(unsigned) )
+      if ( ( dest - (char *) buf ) > (ptrdiff_t) (GCI_ARGS * sizeof(unsigned)) )
          return GCI_ArgStackOverflow;
    }
 

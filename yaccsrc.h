@@ -1,7 +1,7 @@
-/* A Bison parser, made by GNU Bison 1.875.  */
+/* A Bison parser, made by GNU Bison 2.0.  */
 
 /* Skeleton parser for Yacc-like parsing with Bison,
-   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -133,9 +133,8 @@
      LOWER = 359,
      CASELESS = 360,
      CCAT = 361,
-     UPLUSS = 362,
-     UMINUS = 363,
-     SYNTOP = 364
+     UPLUS = 362,
+     UMINUS = 363
    };
 #endif
 #define ADDRESS 258
@@ -242,9 +241,8 @@
 #define LOWER 359
 #define CASELESS 360
 #define CCAT 361
-#define UPLUSS 362
+#define UPLUS 362
 #define UMINUS 363
-#define SYNTOP 364
 
 
 

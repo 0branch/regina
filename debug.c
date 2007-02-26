@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: debug.c,v 1.10 2004/02/10 10:43:52 mark Exp $";
+static char *RCSid = "$Id: debug.c,v 1.14 2005/08/16 07:21:48 mark Exp $";
 #endif
 
 /*
@@ -101,7 +101,8 @@ static cvariableptr get_realbox( cvariableptr p, int *exposed )
 void dumpvars( const tsd_t *TSD )
 {
    cvariableptr ptr,tptr,rb,trb;
-   int i,j,isstem,isexposed;
+   int isstem,isexposed;
+   unsigned i,j;
    FILE *fp;
    streng *s;
    cvariableptr *hashptr;
@@ -110,10 +111,16 @@ void dumpvars( const tsd_t *TSD )
    if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
       fp = stdout;
 
-   hashptr = (cvariableptr *) TSD->currlevel->vars;
+   hashptr = (cvariableptr *) TSD->currlevel->vars->tbl;
 
    fprintf( fp, "\nDumping variables, 1. no after \">>>\" is the bin number\n" );
-   for ( i = 0; i != HASHTABLENGTH; i++ )
+   fprintf( fp, "[ %u elements in %u buckets, %u reads, %u writes, %u collisions ]\n",
+                TSD->currlevel->vars->e,
+                TSD->currlevel->vars->size,
+                TSD->currlevel->vars->r,
+                TSD->currlevel->vars->w,
+                TSD->currlevel->vars->c);
+   for ( i = 0; i < TSD->currlevel->vars->size; i++ )
    {
       if ( hashptr[i] == NULL )
          continue;
@@ -137,7 +144,13 @@ void dumpvars( const tsd_t *TSD )
          if ( !isstem )
             continue;
 
-         for ( j = 0; j < HASHTABLENGTH; j++ )
+         fprintf( fp, "   [ %u elements in %u buckets, %u reads, %u writes, %u collisions ]\n",
+                      rb->index->e,
+                      rb->index->size,
+                      rb->index->r,
+                      rb->index->w,
+                      rb->index->c);
+         for ( j = 0; j < rb->index->size; j++ )
          {
             /*
              * The variables of a stem are organized as a normal variable
@@ -145,7 +158,7 @@ void dumpvars( const tsd_t *TSD )
              * Keep in mind that a variable "a.b." isn't a stem, we can't
              * iterate once more.
              */
-            if ( ( tptr = rb->index[j] ) != NULL )
+            if ( ( tptr = rb->index->tbl[j] ) != NULL )
             {
                for ( ; tptr; tptr = tptr->next )
                {
@@ -166,37 +179,37 @@ void dumpvars( const tsd_t *TSD )
    return;
 }
 
-void dumptree(const tsd_t *TSD, const treenode *this, int level, int newline)
+void dumptree(const tsd_t *TSD, const treenode *thisNode, int level, int newline)
 {
-   int i;
+   unsigned i;
    streng *ptr;
    FILE *fp=stderr;
 
    if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
       fp = stdout;
 
-   while ( this ) {
+   while ( thisNode ) {
       if ( newline )
          fprintf( fp, "\n%*s", 2 * level, "" );
 
       fprintf( fp, "%s (type %d)\n",
-                   getsym( this->type ), this->type );
+                   getsym( thisNode->type ), thisNode->type );
 
-      if ( this->name )
+      if ( thisNode->name )
       {
          fprintf( fp, "%*sName: [%.*s]\n",
                       2 * level, "",
-                      this->name->len, this->name->value );
+                      thisNode->name->len, thisNode->name->value );
       }
 
-      if ( ( this->charnr != 0 ) && (this->charnr != -1 ) )
+      if ( ( thisNode->charnr != 0 ) && (thisNode->charnr != -1 ) )
       {
          fprintf( fp, "%*sLineno: %d   Charno: %d",
                       2 * level, "",
-                      this->lineno, this->charnr );
+                      thisNode->lineno, thisNode->charnr );
          if ( newline )
          {
-            ptr = getsourceline( TSD, this->lineno, this->charnr,
+            ptr = getsourceline( TSD, thisNode->lineno, thisNode->charnr,
                                 &TSD->systeminfo->tree );
             fprintf( fp, ", Sourceline: [%.*s]", ptr->len, ptr->value );
          }
@@ -204,10 +217,10 @@ void dumptree(const tsd_t *TSD, const treenode *this, int level, int newline)
       }
 
       /*
-       * See also several places in instore.c where this switch list must be
+       * See also several places in instore.c where thisNode switch list must be
        * changed. Seek for X_CEXPRLIST.
        */
-      switch ( this->type )
+      switch ( thisNode->type )
       {
          case X_EQUAL:
          case X_DIFF:
@@ -217,51 +230,65 @@ void dumptree(const tsd_t *TSD, const treenode *this, int level, int newline)
          case X_LTE:
             fprintf( fp, "%*sFlags: lnum %d, rnum %d, lsvar %d, rsvar %d, lcvar %d, rcvar %d\n",
                          2 * level, "",
-                         this->u.flags.lnum,
-                         this->u.flags.rnum,
-                         this->u.flags.lsvar,
-                         this->u.flags.rsvar,
-                         this->u.flags.lcvar,
-                         this->u.flags.rcvar );
+                         thisNode->u.flags.lnum,
+                         thisNode->u.flags.rnum,
+                         thisNode->u.flags.lsvar,
+                         thisNode->u.flags.rsvar,
+                         thisNode->u.flags.lcvar,
+                         thisNode->u.flags.rcvar );
             break;
 
          case X_ADDR_V:
             fprintf( fp, "%*sFlags: %sANSI version\n",
                          2 * level, "",
-                         ( this->u.nonansi ) ? "non-" : "" );
+                         ( thisNode->u.nonansi ) ? "non-" : "" );
             break;
 
          case X_CEXPRLIST:
-            if ( this->u.strng == NULL )
+            if ( thisNode->u.strng == NULL )
                fprintf( fp, "%*sValue: <null>\n",
                             2 * level, "" );
             else
                fprintf( fp, "%*sValue: [%.*s]\n",
                             2 * level, "",
-                            this->u.strng->len, this->u.strng->value );
+                            thisNode->u.strng->len, thisNode->u.strng->value );
             break;
 
          case X_LABEL:
             fprintf( fp, "%*sFlags: %s\n",
                          2 * level, "",
-                         ( this->u.trace_only ) ? "trace-only" :
+                         ( thisNode->u.trace_only ) ? "trace-only" :
                                                   "is target" );
             break;
 
+         case X_PARSE:
+            /*
+             * similar to bug 972850, fixed in parallel
+             */
+            fprintf( fp, "%*sFlags: %s\n",
+                         2 * level, "",
+                         ( thisNode->u.parseflags == PARSE_UPPER) ? "UPPER" :
+                         ( thisNode->u.parseflags == PARSE_LOWER) ? "LOWER" :
+                         ( thisNode->u.parseflags == PARSE_CASELESS) ? "CASELESS" :
+                         ( thisNode->u.parseflags == (PARSE_CASELESS | PARSE_LOWER)) ? "CASELESS LOWER" :
+                         ( thisNode->u.parseflags == (PARSE_CASELESS | PARSE_UPPER)) ? "CASELESS UPPER" :
+                                                                 "(normal)" );
+            break;
+
          case X_ADDR_WITH:
-            if ( !this->p[0] && !this->p[1] && !this->p[2] )
+            if ( !thisNode->p[0] && !thisNode->p[1] && !thisNode->p[2] )
                fprintf( fp, "%*sFlags: append %d, awt %s, ant %s\n",
                             2 * level, "",
-                            this->u.of.append,
-                            ( this->u.of.awt == awtUNKNOWN ) ? "unknown" :
-                            ( this->u.of.awt == awtSTREAM ) ?  "STREAM" :
-                            ( this->u.of.awt == awtSTEM ) ?    "STEM" :
-                            ( this->u.of.awt == awtLIFO ) ?    "LIFO" :
-                            ( this->u.of.awt == awtFIFO ) ?    "FIFO" :
+                            thisNode->u.of.append,
+                            ( thisNode->u.of.awt == awtUNKNOWN ) ? "unknown" :
+                            ( thisNode->u.of.awt == awtSTREAM ) ?  "STREAM" :
+                            ( thisNode->u.of.awt == awtSTEM ) ?    "STEM" :
+                            ( thisNode->u.of.awt == awtLIFO ) ?    "LIFO" :
+                            ( thisNode->u.of.awt == awtFIFO ) ?    "FIFO" :
                                                                "<error>",
-                            ( this->u.of.ant == antUNKNOWN )   ? "unknown" :
-                            ( this->u.of.ant == antSTRING )    ? "STRING" :
-                            ( this->u.of.ant == antSIMSYMBOL ) ? "SYMBOL" :
+                            ( thisNode->u.of.ant == antUNKNOWN )   ? "unknown" :
+                            ( thisNode->u.of.ant == antSTRING )    ? "STRING" :
+                            ( thisNode->u.of.ant == antSIMSYMBOL ) ? "SYMBOL" :
                                                                  "<error>" );
             break;
 
@@ -269,16 +296,16 @@ void dumptree(const tsd_t *TSD, const treenode *this, int level, int newline)
             break;
       }
 
-      for ( i = 0; i < sizeof( this->p ) / sizeof( this->p[0] ); i++ )
-         if ( this->p[i] != NULL )
+      for ( i = 0; i < sizeof( thisNode->p ) / sizeof( thisNode->p[0] ); i++ )
+         if ( thisNode->p[i] != NULL )
          {
             fprintf( fp, "%*s%d>",
                          2 * level, "",
                          i + 1 );
-            dumptree( TSD, this->p[i], level + 1, 0 );
+            dumptree( TSD, thisNode->p[i], level + 1, 0 );
          }
 
-      this = this->next;
+      thisNode = thisNode->next;
       newline = 1;
    }
 }
@@ -344,6 +371,7 @@ streng *getsourceline( const tsd_t *TSD, int line, int charnr, const internal_pa
    streng *string ;
    const char *ptr, *chptr, *chend, *tmptr ;
    char *outptr ;
+   char *STR_VAL_LIMIT ;
 
    assert( charnr>=0 ) ;
    if (!charnr)
@@ -359,11 +387,12 @@ streng *getsourceline( const tsd_t *TSD, int line, int charnr, const internal_pa
    for (; (chptr < chend) && rx_isspace(*chptr); chptr++) ;
    string = Str_makeTSD(BUFFERSIZE+1) ;
    outptr = string->value ;
+   STR_VAL_LIMIT = BUFFERSIZE + outptr ;
 
    for (;;)
    {
 restart:
-      if (chptr>=chend || outptr >= string->value + BUFFERSIZE)
+      if (chptr>=chend || outptr >= STR_VAL_LIMIT)
          break ;
 
       if (!squote && *chptr=='\"')

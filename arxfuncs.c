@@ -23,42 +23,25 @@
  * contains the ARexx functions that are only usable on the
  * amiga platform or compatibles. (not implemented yet)
  */
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
 #include "rexx.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <float.h>
+#if !defined(__WINS__) && !defined(__EPOC32__)
+# include <float.h>
+#else
+# define DBL_EPSILON 2.2204460492503131e-016
+#endif
 #include <assert.h>
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 
 staticstreng(_fname, "F");
 staticstreng(_fstem, "FI.F");
-
-#ifndef rx_64u
-# if defined(WIN32)
-#  define rx_64u        unsigned __int64
-#  define rx_mk64u(num) (rx_64u) num##ui64
-# elif defined(__WATCOMC__) && !defined(__QNX__)
-   /* You need OpenWatcom 1.1 on Win32 or OS/2 */
-#  define rx_64u        unsigned __int64
-#  define rx_mk64u(num) (rx_64u) num##ui64
-# elif defined(__WORDSIZE) && (__WORDSIZE >= 64)
-#  define rx_64u        unsigned
-#  define rx_mk64u(num) (rx_64u) num##u
-# elif defined(WORD_BIT) && (WORD_BIT >= 64)
-#  define rx_64u        unsigned
-#  define rx_mk64u(num) (rx_64u) num##u
-# elif defined(LONG_BIT) && (LONG_BIT >= 64)
-#  define rx_64u        unsigned long
-#  define rx_mk64u(num) (rx_64u) num##ul
-# elif defined(ULLONG_MAX) && (ULLONG_MAX != ULONG_MAX)
-#  define rx_64u        unsigned long long
-#  define rx_mk64u(num) (rx_64u) num##ull
-# elif defined(ULONG_LONG_MAX) && (ULONG_LONG_MAX != ULONG_MAX)
-#  define rx_64u        unsigned long long
-#  define rx_mk64u(num) (rx_64u) num##ull
-# endif
-#endif
 
 #if defined(_AMIGA) || defined(__AROS__)
 # if defined(GCC)
@@ -79,6 +62,36 @@ typedef struct _arexx_tsd_t {
 #endif
 } arexx_tsd_t;
 
+#if !defined( HAVE_DIV )
+typedef struct _div_t
+{
+   int quot;
+   int rem;
+} div_t;
+
+typedef struct _ldiv_t
+{
+   long quot;
+   long rem;
+} ldiv_t;
+
+div_t div(int x,int y)
+{
+  div_t result;
+  result.quot = x / y;
+  result.rem = x % y;
+  return result;
+}
+
+ldiv_t ldiv(long x,long y)
+{
+  ldiv_t result;
+  result.quot = x / y;
+  result.rem = x % y;
+  return result;
+}
+#endif
+
 /*
  * Init thread data for arexx functions.
  */
@@ -89,8 +102,9 @@ int init_arexxf( tsd_t *TSD )
    if ( TSD->arx_tsd != NULL )
       return 1;
 
-   if ( ( at = TSD->arx_tsd = MallocTSD( sizeof( arexx_tsd_t ) ) ) == NULL )
+   if ( ( TSD->arx_tsd = MallocTSD( sizeof( arexx_tsd_t ) ) ) == NULL )
       return 0;
+   at = (arexx_tsd_t *)TSD->arx_tsd;
    memset( at, 0, sizeof( arexx_tsd_t ) );
 
 /* glibc's starting value is 0 for the whole Xn, we use a seed of 0x1234ABCD */
@@ -133,7 +147,7 @@ int init_arexxf( tsd_t *TSD )
  */
 static void rx_srand48( const tsd_t *TSD, unsigned long ul )
 {
-   arexx_tsd_t *at = TSD->arx_tsd;
+   arexx_tsd_t *at = (arexx_tsd_t *)TSD->arx_tsd;
    rx_64u ull;
 
    ull = ul & 0xFFFFFFFF;
@@ -244,7 +258,7 @@ static double rng( arexx_tsd_t *at )
  */
 static double rx_drand48( const tsd_t *TSD )
 {
-   arexx_tsd_t *at = TSD->arx_tsd;
+   arexx_tsd_t *at = (arexx_tsd_t *)TSD->arx_tsd;
    double big;
 
    big = (double) rng( at );
@@ -937,15 +951,70 @@ streng *arexx_trim( tsd_t *TSD, cparamboxptr parm1 )
 }
 
 
-streng *arexx_upper( tsd_t *TSD, cparamboxptr parm1 )
+streng *arexx_upper( tsd_t *TSD, cparamboxptr parms )
 {
-  streng *ret;
+   int rlength=0, length=0, start=1, i=0 ;
+   int changecount;
+   char padch=' ' ;
+   streng *str=NULL, *ptr=NULL ;
+   paramboxptr bptr=NULL ;
 
-  checkparam( parm1, 1, 1, "UPPER" );
-
-  ret = Str_dup_TSD( TSD, parm1->value );
-
-  return Str_upper( ret );
+   /*
+    * Check that we have between 1 and 4 args
+    * ( str [,start[,length[,pad]]] )
+    */
+   checkparam(  parms,  1,  4 , "UPPER" ) ;
+   str = parms->value ;
+   rlength = Str_len( str ) ;
+   /*
+    * Get starting position, if supplied...
+    */
+   if ( parms->next != NULL
+   &&   parms->next->value )
+      start = atopos( TSD, parms->next->value, "UPPER", 2 ) ;
+   /*
+    * Get length, if supplied...
+    */
+   if ( parms->next != NULL
+   && ( (bptr = parms->next->next) != NULL )
+   && ( parms->next->next->value ) )
+      length = atozpos( TSD, parms->next->next->value, "UPPER", 3 ) ;
+   else
+      length = ( rlength >= start ) ? rlength - start + 1 : 0;
+   /*
+    * Get pad character, if supplied...
+    */
+   if ( (bptr )
+   && ( bptr->next )
+   && ( bptr->next->value ) )
+      padch = getonechar( TSD, parms->next->next->next->value, "UPPER", 4) ;
+   /*
+    * Create our new starting; duplicate of input string
+    */
+   ptr = Str_makeTSD( length );
+   memcpy( Str_val( ptr ), Str_val( str ), Str_len( str ) );
+   /*
+    * Determine where to start changing case...
+    */
+   i = ((rlength>=start)?start-1:rlength) ;
+   /*
+    * Determine how many characters to change case...
+    */
+   changecount = length > rlength ? rlength : length;
+   /*
+    * Change them
+    */
+   mem_upper( &ptr->value[i], changecount );
+   /*
+    * Append pad characters if required...
+    */
+   if (changecount < length)
+      memset(&ptr->value[changecount], padch, length - changecount);
+   /*
+    * Determine length of return string...
+    */
+   ptr->len = (length > rlength) ? length : rlength ;
+   return ptr ;
 }
 
 
@@ -980,45 +1049,47 @@ streng *arexx_randu( tsd_t *TSD, cparamboxptr parm1 )
  */
 streng *arexx_getspace( tsd_t *TSD, cparamboxptr parm1 )
 {
-  int length, error;
-  void *ptr;
+   int length, error;
+   void *ptr;
 
-  checkparam( parm1, 1, 1, "GETSPACE" );
+   checkparam( parm1, 1, 1, "GETSPACE" );
 
-  length = streng_to_int( TSD, parm1->value, &error);
-  if ( error )
-    exiterror( ERR_INCORRECT_CALL, 11, "GETSPACE", 1, tmpstr_of( TSD, parm1->value ) );
-  if ( length<=0 )
-    exiterror( ERR_INCORRECT_CALL, 14, "GETSPACE", 1, tmpstr_of( TSD, parm1->value ) );
+   length = streng_to_int( TSD, parm1->value, &error);
+   if ( error )
+      exiterror( ERR_INCORRECT_CALL, 11, "GETSPACE", 1, tmpstr_of( TSD, parm1->value ) );
+   if ( length<=0 )
+      exiterror( ERR_INCORRECT_CALL, 14, "GETSPACE", 1, tmpstr_of( TSD, parm1->value ) );
 
-  ptr = Malloc_TSD( TSD, length );
-  memset( ptr, 0, length );
-  if ( ptr == NULL )
-    exiterror( ERR_STORAGE_EXHAUSTED, 0 );
+   ptr = Malloc_TSD( TSD, length );
+   memset( ptr, 0, length );
+   if ( ptr == NULL )
+      exiterror( ERR_STORAGE_EXHAUSTED, 0 );
 
-  return Str_ncre_TSD( TSD, (char *)&ptr, sizeof(void *) );
+   return Str_ncre_TSD( TSD, (char *)&ptr, sizeof(void *) );
 }
 
 
 streng *arexx_freespace( tsd_t *TSD, cparamboxptr parm1 )
 {
-  /* For backwards compatibility there may be two arguments
-     But the second argument is ignored in regina */
-  checkparam( parm1, 0, 2, "FREESPACE" );
+   /*
+    * For backwards compatibility there may be two arguments
+    * But the second argument is ignored in regina
+    */
+   checkparam( parm1, 0, 2, "FREESPACE" );
 
-  if ( parm1 == NULL || parm1->value == NULL || parm1->value->len == 0 )
+   if ( parm1 == NULL || parm1->value == NULL || parm1->value->len == 0 )
 #if (defined(_AMIGA) || defined(__AROS__)) && !defined(GCC)
-    return int_to_streng( TSD, AvailMem( MEMF_ANY ) );
+      return int_to_streng( TSD, AvailMem( MEMF_ANY ) );
 #else
-    return int_to_streng( TSD, -1 );
+      return int_to_streng( TSD, -1 );
 #endif
 
-  if ( parm1->value->len != sizeof(void *) )
-    exiterror( ERR_INCORRECT_CALL, 0 );
+   if ( parm1->value->len != sizeof(void *) )
+      exiterror( ERR_INCORRECT_CALL, 0 );
 
-  Free_TSD( TSD, *((void **)parm1->value->value) );
+   Free_TSD( TSD, *((void **)parm1->value->value) );
 
-  return nullstringptr();
+   return nullstringptr();
 }
 
 
@@ -1052,7 +1123,7 @@ streng *arexx_import( tsd_t *TSD, cparamboxptr parm1 )
       exiterror( ERR_INCORRECT_CALL, 14, "IMPORT", 2, tmpstr_of( TSD, parm2->value ) );
   }
 
-  return Str_ncre_TSD( TSD, memptr, len );
+  return Str_ncre_TSD( TSD, (const char *)memptr, len );
 }
 
 
@@ -1158,7 +1229,7 @@ streng *arexx_storage( tsd_t *TSD, cparamboxptr parm1 )
   else
     fill = parm4->value->value[0];
 
-  retval = Str_ncre_TSD( TSD, memptr, len );
+  retval = Str_ncre_TSD( TSD, (const char *)memptr, len );
 
   if (len > src->len)
   {

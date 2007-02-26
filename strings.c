@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: strings.c,v 1.10 2004/01/25 23:20:41 florian Exp $";
+static char *RCSid = "$Id: strings.c,v 1.13 2005/08/16 07:43:14 mark Exp $";
 #endif
 
 /*
@@ -30,6 +30,14 @@ static char *RCSid = "$Id: strings.c,v 1.10 2004/01/25 23:20:41 florian Exp $";
 # define MIN(a,b) (((a)>(b))?(b):(a))
 #endif
 
+void __regina_Str_first( void )
+{
+   /*
+    * Together with __regina_Str_last it defines a region of function
+    * which should not be mentioned in the list of allocator addresses.
+    * See memory.c:mymallocTSD()
+    */
+}
 
 streng *Str_ndup( const streng *name, int length )
 {
@@ -107,15 +115,15 @@ streng *Str_ncpy( streng *to, const streng *from, int length )
 
 streng *Str_ncpy_TSD( const tsd_t *TSD, streng *to, const streng *from, int length )
 {
-   streng *new;
+   streng *newstr;
 
    assert( Str_len(from) >= length );
-   new = to;
+   newstr = to;
    if ( to->max < to->len + length )
    {
-      new = Str_makeTSD( to->len + length );
-      memcpy( new->value, to->value, to->len );
-      new->len = to->len;
+      newstr = Str_makeTSD( to->len + length );
+      memcpy( newstr->value, to->value, to->len );
+      newstr->len = to->len;
       /*
        * Freeing the string is a bad idea if the string is bound to
        * something yet.
@@ -125,10 +133,10 @@ streng *Str_ncpy_TSD( const tsd_t *TSD, streng *to, const streng *from, int leng
 
    if ( length > Str_len( from ) )
       length = Str_len( from );
-   memcpy( new->value, from->value, length );
-   new->len += length;
+   memcpy( newstr->value, from->value, length );
+   newstr->len += length;
 
-   return new;
+   return newstr;
 }
 
 streng *Str_ncre( const char *from, int length )
@@ -238,7 +246,7 @@ streng *__regina_Str_make_TSD( const tsd_t *TSD, int size )
 {
    streng *result;
 
-   result = MallocTSD( size + STRHEAD );
+   result = (streng *) MallocTSD( size + STRHEAD );
    result->max = size;
    result->len = 0;
 
@@ -403,7 +411,7 @@ int Str_cnocmp( const streng *first, const streng *second, int length, int offse
  */
 char *str_of( const tsd_t *TSD, const streng *input )
 {
-   char *retval = MallocTSD( Str_len( input ) + 1 );
+   char *retval = (char *)MallocTSD( Str_len( input ) + 1 );
 
    memcpy( retval, input->value, Str_len( input ) );
    retval[Str_len( input )] = '\0';
@@ -424,7 +432,7 @@ char *str_of( const tsd_t *TSD, const streng *input )
  */
 volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 {
-   int i;
+   unsigned i;
 
    if ( input == NULL )
    {
@@ -448,7 +456,7 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
    TSD->tmp_strs[TSD->next_tmp_str] = str_of( TSD, input );
    i = TSD->next_tmp_str;
 
-   if ( ++TSD->next_tmp_str >= sizeof( TSD->tmp_strs ) / sizeof( TSD->tmp_strs[0] ) )
+   if ( ++TSD->next_tmp_str >= (int) (sizeof( TSD->tmp_strs ) / sizeof( TSD->tmp_strs[0]) ) )
       TSD->next_tmp_str = 0;
 
    return TSD->tmp_strs[i];
@@ -510,4 +518,13 @@ streng *Str_strp( streng *input , char chr, char opt )
       input->len = i;
    }
    return input;
+}
+
+void __regina_Str_last( void )
+{
+   /*
+    * Together with __regina_Str_first it defines a region of function
+    * which should not be mentioned in the list of allocator addresses.
+    * See memory.c:mymallocTSD()
+    */
 }

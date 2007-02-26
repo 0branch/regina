@@ -2,12 +2,12 @@
  *
  */
 Trace O
-validargs = '-s -d -a -A -p -S -l -L -u -e -b -B'
-vars = '_srcdir _tmpdir _abiminor _abimajor _shlpre _shlpst _libpre _libpst _useabi _exe _shlfile _libfile'
-mandatory = '1 1 1 1 1 1 1 1 1 1 1 1'
-valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1'
+validargs = '-s -d -a -A -p -S -l -L -u -e -b -B -P'
+vars = '_srcdir _tmpdir _abiminor _abimajor _shlpre _shlpst _libpre _libpst _useabi _exe _shlfile _libfile _binprefix'
+mandatory = '1 1 1 1 1 1 1 1 1 1 1 1 1'
+valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1 0'
 If ValidOpts( Arg(1), validargs, mandatory, valuereq ) = 0 Then
-exes = 'rexx'_exe 'regina'_exe 'rxqueue'_exe 'rxstack'_exe 'regina-config'
+exes = 'rexx'_binprefix||_exe 'regina'_binprefix||_exe 'rxqueue'_binprefix||_exe 'rxstack'_binprefix||_exe 'regina-config'
 Parse Source os .
 Select
    When os = 'BEOS' Then

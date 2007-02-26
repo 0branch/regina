@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: parsing.c,v 1.7 2004/02/10 10:44:11 mark Exp $";
+static char *RCSid = "$Id: parsing.c,v 1.9 2005/08/03 09:17:56 mark Exp $";
 #endif
 
 /*
@@ -158,15 +158,15 @@ int bmstrstr( const streng *heystack, int Offset, const streng *needle,
           * or tolower. This is not true always, but the opposite is even
           * wrong.
           */
-         TmpPtr = memchr( HeyPtr, rx_toupper( *NeedPtr ), HeyLen );
-         TmpPtr2 = memchr( HeyPtr, rx_tolower( *NeedPtr ), HeyLen );
+         TmpPtr = (const unsigned char *)memchr( HeyPtr, rx_toupper( *NeedPtr ), HeyLen );
+         TmpPtr2 = (const unsigned char *)memchr( HeyPtr, rx_tolower( *NeedPtr ), HeyLen );
          if ( TmpPtr == NULL )
             TmpPtr = TmpPtr2;
          else if ( ( TmpPtr2 != NULL ) && ( TmpPtr2 < TmpPtr ) )
             TmpPtr = TmpPtr2;
       }
       else
-         TmpPtr = memchr( HeyPtr, *NeedPtr, HeyLen );
+         TmpPtr = (const unsigned char *)memchr( HeyPtr, *NeedPtr, HeyLen );
       if ( TmpPtr )
          return TmpPtr - HeyBase;
       else
@@ -260,17 +260,17 @@ int bmstrstr( const streng *heystack, int Offset, const streng *needle,
 }
 
 
-static const streng *handle_var( tsd_t *TSD, nodeptr this )
+static const streng *handle_var( tsd_t *TSD, nodeptr thisptr )
 {
-   if (this->type == X_HEAD_SYMBOL)
-      return fix_compound( TSD, this, NULL ) ;
+   if (thisptr->type == X_HEAD_SYMBOL)
+      return fix_compound( TSD, thisptr, NULL ) ;
    else
-      return shortcut( TSD, this ) ;
+      return shortcut( TSD, thisptr ) ;
 }
 
 /*
  * This parses a part of the source string, determined by (start)
- * and (len) into the variables of the (this) tree. Only variables
+ * and (len) into the variables of the (thisptr) tree. Only variables
  * are handled, not patterns. It will be called by doparse() to fit a
  * string into a set of variables and placeholder.
  *
@@ -288,7 +288,7 @@ static const streng *handle_var( tsd_t *TSD, nodeptr this )
  * characters to be parsed by this function. 'len' gives the length
  * of the string to be parsed by this function.
  */
-static void doparse3( tsd_t *TSD, cnodeptr this, const char *start, int len )
+static void doparse3( tsd_t *TSD, cnodeptr thisptr, const char *start, int len )
 {
    int wordlen ;
    streng *tptr ;
@@ -303,7 +303,7 @@ static void doparse3( tsd_t *TSD, cnodeptr this, const char *start, int len )
     * if so, use the rest of the string. If not, scan forwards to
     * identify a word.
     */
-   if (this->p[0])
+   if (thisptr->p[0])
    {
       /*
        * We shall only fetch out one word. First skip leading spaces,
@@ -345,16 +345,16 @@ static void doparse3( tsd_t *TSD, cnodeptr this, const char *start, int len )
     * but at the cost of MUCH more CPU.
     * DON'T DO IT!
     */
-   if ( this->type == X_TPL_SYMBOL )
+   if ( thisptr->type == X_TPL_SYMBOL )
    {
       tptr = Str_ncreTSD( start, wordlen );
       if ( TSD->traceparse )
          tracevalue( TSD, tptr, '>' );
 
-      if ( this->p[1]->type == X_HEAD_SYMBOL )
-         fix_compound( TSD, this->p[1], tptr );
+      if ( thisptr->p[1]->type == X_HEAD_SYMBOL )
+         fix_compound( TSD, thisptr->p[1], tptr );
       else
-         setshortcut( TSD, this->p[1], tptr );
+         setshortcut( TSD, thisptr->p[1], tptr );
    }
    else
    {
@@ -381,7 +381,7 @@ static void doparse3( tsd_t *TSD, cnodeptr this, const char *start, int len )
     * Now, this should actually be a tail recursion, but since be don't
     * trust compilers, we are optimizeing it ourselves.
     */
-    if ((this = this->p[0]) != NULL)
+    if ((thisptr = thisptr->p[0]) != NULL)
     {
        start += wordlen ;
        len -= wordlen ;
@@ -391,7 +391,7 @@ static void doparse3( tsd_t *TSD, cnodeptr this, const char *start, int len )
 
 /*
  * This routine parses a string (source) into the template that is
- * specified by the structure in the (this) tree. It handles find the next
+ * specified by the structure in the (thisptr) tree. It handles find the next
  * template, and handles the aread between two templates.
  *
  * It calls it self recursively to handle a sequence of templates.
@@ -402,13 +402,13 @@ static void doparse3( tsd_t *TSD, cnodeptr this, const char *start, int len )
  * each pattern can contain the vars/placeholders as a chain linked
  * in at p[0].
  *
- * 'source' is the string to be parsed, 'this' it a ptr to the top
+ * 'source' is the string to be parsed, 'thisptr' it a ptr to the top
  * of the parsetree that describes how 'source' after start'th
  * position is to be parsed. 'start' is a ptr to the first char in
  * 'source' to be parsed by this part of the template.
  */
 
-void doparse( tsd_t *TSD, const streng *source, cnodeptr this, int caseless )
+void doparse( tsd_t *TSD, const streng *source, cnodeptr thisptr, int caseless )
 {
    int start=0,point=0,length=0, end=0, nextstart=0, solid=0 ;
    const streng *pattern=NULL ;
@@ -435,7 +435,7 @@ recurse:
     * another pattern further out, in which case we have to find it.
     *
     */
-   if (this->p[1])
+   if (thisptr->p[1])
    {
       /*
        * We are not the last pattern, so first find the next pattern.
@@ -443,7 +443,7 @@ recurse:
        * two main choises: either seek for a string of some sort, or
        * use an offset of some sort.
        */
-      solid = this->p[1]->type ;
+      solid = thisptr->p[1]->type ;
       if ((solid==X_TPL_MVE)||(solid==X_TPL_VAR))
       {
          /*
@@ -453,9 +453,9 @@ recurse:
           * allocated variable, so don't bother to deallocate.
           */
          if (solid==X_TPL_MVE)
-            pattern = this->p[1]->name ;
+            pattern = thisptr->p[1]->name ;
          else
-            pattern = handle_var( TSD, this->p[1]->p[0] ) ;
+            pattern = handle_var( TSD, thisptr->p[1]->p[0] ) ;
          /*
           * Then we must find where in the source string pattern occurs.
           * If it don't occur there, we use the rest of the string, else
@@ -498,15 +498,16 @@ recurse:
           * The next pattern to match is not a string to match, but a
           * positional movement, which will always be numeric, and if
           * it contains a sign, that should have been stripped off during
-          * parsing, so check that it is non-negative.
+          * parsing. But a variable may be negative, too.
           */
-         if (this->p[1]->name)
-            xtmp = this->p[1]->name ;
+         if (thisptr->p[1]->name)
+            xtmp = thisptr->p[1]->name ;
          else
-            xtmp = handle_var( TSD, this->p[1]->p[0] ) ;
+            xtmp = handle_var( TSD, thisptr->p[1]->p[0] ) ;
 
-         end = atozpos( TSD, xtmp, "internal", 1 ) ;
-         assert( end >= 0 ) ;
+         end = streng_to_int( TSD, xtmp, &nextstart ) ;
+         if (nextstart)
+            exiterror( ERR_INVALID_INTEGER, 4, tmpstr_of( TSD, xtmp ) );
 
          /*
           * Depending on what sort of positional movement, do the right
@@ -527,8 +528,10 @@ recurse:
             start = point ;
             nextstart = point - end ;
             end = length ;
+            if (nextstart > length)
+               nextstart = length;
             if (nextstart < 0)
-               nextstart = 0 ;
+               nextstart = 0;
 
             point = nextstart ;
          }
@@ -537,13 +540,15 @@ recurse:
          {
             /*
              * If the movement is forward, it is simpler, just move the
-             * position of both the end of this, and the start of next
+             * position of both the end of thisptr, and the start of next
              * to the right point.
              */
             start = point ;
             nextstart = point + end ;
             if (nextstart > length)
-               nextstart = length ;
+               nextstart = length;
+            if (nextstart < 0)
+               nextstart = 0;
             end = nextstart ;
             if (end<=start)
                end = length ;
@@ -556,17 +561,15 @@ recurse:
             /*
              * Same applies if the position is absolute, just move it.
              */
-            if ((end--)==0)
-            {
-               exiterror( ERR_INVALID_INTEGER, 0 )  ;
-            }
+            end--;
+            if (end > length)
+               end = length;
+            if (end < 0)        /* fixes bug 1107757 */
+               end = 0;
 
-            if (end>length)
-               end = length ;
-
-            point = nextstart = end ;
+            point = nextstart = end;
             if (end <= start)
-               end = length ;
+               end = length;
          }
       }
    }
@@ -596,9 +599,9 @@ recurse:
     * since doparse3 expects ptr to last char to use, not ptr to char
     * after last char to use.
     */
-   if (this->p[0])
+   if (thisptr->p[0])
    {
-      doparse3( TSD, this->p[0], source->value+start, end-start);
+      doparse3( TSD, thisptr->p[0], source->value+start, end-start);
       --end;
    }
 
@@ -607,7 +610,7 @@ recurse:
     * operation will take care of the next set of variables to be
     * parsed values into.
     */
-   if ((this=this->p[2]) != NULL)
+   if ((thisptr=thisptr->p[2]) != NULL)
    {
       start = nextstart ;
       goto recurse ;
@@ -626,7 +629,7 @@ recurse:
  * There are no limits on the number of arguments to be parsed,
  * other than memory.
  */
-void parseargtree( tsd_t *TSD, cparamboxptr argbox, cnodeptr this, int flags )
+void parseargtree( tsd_t *TSD, cparamboxptr argbox, cnodeptr thisptr, int flags )
 {
    const streng *source ;
    streng *upplow ;
@@ -635,15 +638,15 @@ void parseargtree( tsd_t *TSD, cparamboxptr argbox, cnodeptr this, int flags )
     * All templates in a list of template are connected though the
     * next field of the template.
     */
-   for (; this; this=this->next)
+   for (; thisptr; thisptr=thisptr->next)
    {
-      assert(this->type==X_TPL_SOLID) ;
+      assert(thisptr->type==X_TPL_SOLID) ;
 
       /*
        * Else, it is a tempate into which a string is to be parsed.
        * That string is an argument, to first get that argument,
        * if it exist, else use the nullstring. Never bother about
-       * deallocating this string; either it is part of an arguemnt
+       * deallocating thisptr string; either it is part of an arguemnt
        * which is deallocated somewhere else, or it is the statically
        * allocated nullstring.
        */
@@ -655,17 +658,17 @@ void parseargtree( tsd_t *TSD, cparamboxptr argbox, cnodeptr this, int flags )
       if (flags & PARSE_UPPER)
       {
          upplow = Str_upper( Str_dupTSD( source )) ;
-         doparse( TSD, upplow, this, flags & PARSE_CASELESS ) ;
+         doparse( TSD, upplow, thisptr, flags & PARSE_CASELESS ) ;
          Free_stringTSD( upplow ) ;
       }
       else if (flags & PARSE_LOWER)
       {
          upplow = Str_lower( Str_dupTSD( source )) ;
-         doparse( TSD, upplow, this, flags & PARSE_CASELESS ) ;
+         doparse( TSD, upplow, thisptr, flags & PARSE_CASELESS ) ;
          Free_stringTSD( upplow ) ;
       }
       else
-         doparse( TSD, source, this, flags & PARSE_CASELESS ) ;
+         doparse( TSD, source, thisptr, flags & PARSE_CASELESS ) ;
 
       if (argbox)
          argbox = argbox->next ;

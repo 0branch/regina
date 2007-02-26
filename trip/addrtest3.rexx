@@ -124,6 +124,11 @@ If line1 \= expected2 | line2 \= expected1 then
 If line3 \= expected2 | line4 \= expected1 then
    call oops lastaction
 
+/*
+ * Reset address to default
+ */
+Address System WITH INPUT NORMAL OUTPUT NORMAL ERROR NORMAL
+
 exit 0
 
 info:

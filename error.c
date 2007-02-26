@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: error.c,v 1.48 2004/04/20 09:15:41 mark Exp $";
+static char *RCSid = "$Id: error.c,v 1.53 2005/08/03 09:17:28 mark Exp $";
 #endif
 
 /*
@@ -336,6 +336,8 @@ static const char *errlang[] =
    "no", /* norwegian */
    "pt", /* portuguese */
    "pl", /* polish */
+   "tr", /* turkish */
+   NULL
 } ;
 
 static const char *err1prefix[] =
@@ -346,6 +348,7 @@ static const char *err1prefix[] =
 /*no*/   "Feil %d under kjøring av \"%.*s\" linje %d: %.*s",
 /*pt*/   "Erro %d ao executar \"%.*s\", linha %d: %.*s",
 /*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\", linia %d: %.*s",
+/*tr*/   "%d hatasi \"%.*s\" calisiyorken %d numarali satirda olustu: %.*s",
 } ;
 
 static const char *suberrprefix[] =
@@ -356,6 +359,7 @@ static const char *suberrprefix[] =
 /*no*/   "Feil %d.%d: %.*s",
 /*pt*/   "Erro %d.%d: %.*s",
 /*pl*/   "Bˆ¥d %d.%d: %.*s",
+/*tr*/   "Hata %d.%d: %.*s",
 } ;
 
 static const char *err2prefix[] =
@@ -366,6 +370,7 @@ static const char *err2prefix[] =
 /*no*/   "Feil %d under kjøring av \"%.*s\": %.*s",
 /*pt*/   "Erro %d ao executar \"%.*s\": %.*s",
 /*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\": %.*s",
+/*tr*/   "%d hatasi \"%.*s\" calisiyorken olustu: %.*s",
 } ;
 
 static const char *erropen[] =
@@ -376,6 +381,7 @@ static const char *erropen[] =
 /*no*/   "Ikke i stand til å åpne språkfil: %s",
 /*pt*/   "nao eh possivel abrir arquivo de linguagem: %s",
 /*pl*/   "Nie mo¾na otworzy† pliku j©zyka: %s",
+/*tr*/   "Dil dosyasinin acilmasinda hata ile karsilasildi: %s",
 } ;
 
 static const char *errcount[] =
@@ -386,6 +392,7 @@ static const char *errcount[] =
 /*no*/   "Uriktig antall meldinger i språkfil: %s",
 /*pt*/   "numero incorreto de mensagens no arquivo de linguagem: %s",
 /*pl*/   "Niepoprawna liczba komunikat¢w w pliku j©zyka: %s",
+/*tr*/   "Dil dosyasindaki iletilerin sayisinda yanlislik var: %s",
 } ;
 
 static const char *errread[] =
@@ -396,6 +403,7 @@ static const char *errread[] =
 /*no*/   "Ikke i stand til å lese fra språkfil: %s",
 /*pt*/   "nao eh possivel ler o arquivo de linguagem: %s",
 /*pl*/   "Nie mo¾na czyta† z pliku j©zyka: %s",
+/*tr*/   "Dil dosyasinin okunmasinda hata ile karsilasildi: %s",
 } ;
 
 static const char *errmissing[] =
@@ -406,6 +414,7 @@ static const char *errmissing[] =
 /*no*/   "tekst mangler i språkfil: %s.mtb",
 /*pt*/   "falta texto no arquivo de linguagem: %s.mtb",
 /*pl*/   "Brakuje tekstu w pliku j©zyka: %s.mtb",
+/*tr*/   "Dil dosyasinda eksik metin var: %s.mtb",
 } ;
 
 static const char *errcorrupt[] =
@@ -416,6 +425,7 @@ static const char *errcorrupt[] =
 /*no*/   "språkfil: %s.mtb er ødelagt",
 /*pt*/   "arquivo de linguagem: %s.mtb estah corrompido",
 /*pl*/   "Plik j©zyka: %s.mtb jest znieksztaˆcony",
+/*tr*/   "%s.mtb ismindeki dil dosyasinda kirilma hatasi var",
 } ;
 
 static const char *get_embedded_text_message( int errorno, int suberrorno );
@@ -431,9 +441,10 @@ int init_error( tsd_t *TSD )
    if (TSD->err_tsd != NULL)
       return(1);
 
-   if ((et = TSD->err_tsd = MallocTSD(sizeof(err_tsd_t))) == NULL)
+   if ( ( TSD->err_tsd = MallocTSD( sizeof(err_tsd_t) ) ) == NULL )
       return(0);
-   memset(et,0,sizeof(err_tsd_t));
+   et = (err_tsd_t *)TSD->err_tsd;
+   memset( et, 0, sizeof(err_tsd_t) );
    et->errornum = Str_makeTSD( 3 * sizeof( int ) );
    return(1);
 }
@@ -449,7 +460,7 @@ int init_error( tsd_t *TSD )
 static streng *get_buffer( const tsd_t *TSD, const streng *not_this,
                            unsigned minsize )
 {
-   err_tsd_t *et = TSD->err_tsd;
+   err_tsd_t *et = (err_tsd_t *)TSD->err_tsd;
    int l[2];
    streng *p;
    int idx=-1;
@@ -532,7 +543,7 @@ void exiterror( int errorno, int suberrorno, ... )
                                      * A "fresh" value is always better for
                                      * tracking down ugly errors.
                                      * Speed advantage is no reason here! */
-   et = TSD->err_tsd;
+   et = (err_tsd_t *)TSD->err_tsd;
 
    if ( ( et == NULL )
      || ( ( errorno == ERR_STORAGE_EXHAUSTED ) && ( et->conditions > 10 ) ) )
@@ -607,6 +618,10 @@ void exiterror( int errorno, int suberrorno, ... )
                case 'c':
                   /* assignment to anything inhibits compiler warnings */
                   ok = (int) va_arg( argptr, int );
+                  break;
+
+               case '%': /* Fixes 1107759 */
+                  i++;
                   break;
 
                default:
@@ -755,7 +770,7 @@ not_hookable:
          jump_script_exit( TSD, et->errornum );
       }
    }
-   CloseOpenFiles( TSD );
+   CloseOpenFiles( TSD, fpdRETAIN );
    free_orphaned_libs( TSD );
 
 #ifdef VMS
@@ -799,7 +814,7 @@ static streng *read_index_header( const tsd_t *TSD, char *errfn,
 {
    err_tsd_t *et;
 
-   et = TSD->err_tsd;
+   et = (err_tsd_t *)TSD->err_tsd;
    /*
     * Read the language file header...
     */
@@ -830,7 +845,7 @@ static streng *read_index_file( const tsd_t *TSD, char *errfn,
    streng *ptr;
    int file_lang;
 
-   et = TSD->err_tsd;
+   et = (err_tsd_t *)TSD->err_tsd;
    /*
     * Read the language file header...
     */
@@ -878,7 +893,7 @@ static streng *get_message_indexes( const tsd_t *TSD, const streng *not_this )
    int i, found=0;
 #endif
 
-   et = TSD->err_tsd;
+   et = (err_tsd_t *)TSD->err_tsd;
 
 #if defined(__EPOC32__) || defined(__WINS__)
    /*
@@ -917,9 +932,9 @@ static streng *get_message_indexes( const tsd_t *TSD, const streng *not_this )
        * REGINA_LANG may have a comma separated default locale appended.
        */
       int len = strcspn( ptr, "," );
-      for ( i = 0; i < LANGUAGE_MAXIMUM; i++ )
+      for ( i = 0; errlang[i] != NULL; i++ )
       {
-         if ( ( strlen( errlang[i] ) == len )
+         if ( ( (int) strlen( errlang[i] ) == len )
            && ( memcmp( ptr, errlang[i], len ) == 0 ) )
          {
             et->native_language = i;
@@ -976,7 +991,7 @@ static streng *get_text_message( const tsd_t *TSD, FILE *fp,
    streng *retval;
    const char *errfn;
 
-   et = TSD->err_tsd;
+   et = (err_tsd_t *)TSD->err_tsd;
 
 #if defined(__EPOC32__) || defined(__WINS__)
    errfn="default";
@@ -1037,7 +1052,7 @@ const streng *errortext( const tsd_t *TSD, int errorno, int suberrorno, int requ
       return simple_msg( TSD, "%s", strerror(errorno-100), NULL );
    }
 
-   et = TSD->err_tsd;
+   et = (err_tsd_t *)TSD->err_tsd;
 
 #if defined(__EPOC32__) || defined(__WINS__)
    errfn="default";

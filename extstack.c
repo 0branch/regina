@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: extstack.c,v 1.19 2004/04/18 02:54:33 florian Exp $";
+static char *RCSid = "$Id: extstack.c,v 1.21 2005/08/04 11:28:40 mark Exp $";
 #endif
 
 /*
@@ -25,19 +25,6 @@ static char *RCSid = "$Id: extstack.c,v 1.19 2004/04/18 02:54:33 florian Exp $";
 # include <os2/types.h>
 #endif
 #include "rexx.h"
-
-#ifdef EXTERNAL_TO_REGINA
-# include <assert.h>
-/* tmpstr_of must be defined before the inclusion of extstack.h since it
- * redefines tsd_t (grrr) */
-volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
-{
-   /* even exiterror isn't permitted at this point. */
-   assert(0); /* hint while debugging */
-   return((volatile char *) input->value);
-}
-#endif
-
 
 #if defined(WIN32)
 # if defined(_MSC_VER)
@@ -82,6 +69,18 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 #include <stdarg.h>
 
 #include "extstack.h"
+
+#ifdef EXTERNAL_TO_REGINA
+# include <assert.h>
+/* tmpstr_of must be defined before the inclusion of extstack.h since it
+ * redefines tsd_t (grrr) */
+volatile char *tmpstr_of( dummy_tsd_t *TSD, const streng *input )
+{
+   /* even exiterror isn't permitted at this point. */
+   assert(0); /* hint while debugging */
+   return((volatile char *) input->value);
+}
+#endif
 
 static int debug = -1 ;
 #define DEBUGDUMP(x) {                                                       \
@@ -224,7 +223,7 @@ int connect_to_rxstack( tsd_t *TSD, Queue *q )
    if ( TSD == NULL )
       showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, ERR_RXSTACK_CANT_CONNECT_TMPL, q->u.e.name, q->u.e.portno, strerror ( errno ) );
    else if ( !TSD->called_from_saa )
-      exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, tmpstr_of( (void *) TSD, q->u.e.name ), q->u.e.portno, strerror ( errno ) );
+      exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, tmpstr_of( TSD, q->u.e.name ), q->u.e.portno, strerror ( errno ) );
 
    return -1;
 }
@@ -341,7 +340,7 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
       return 0 ;
 
    len = PSTRENGLEN( queue );
-   if (( h = memchr( PSTRENGVAL( queue ), '@', len ) ) == NULL )
+   if (( h = (char *)memchr( PSTRENGVAL( queue ), '@', len ) ) == NULL )
       return 1 ;
 
    AtPos = (int) ( h - PSTRENGVAL( queue ) ) ;
@@ -368,7 +367,7 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
    PSTRENGVAL( q->u.e.name )[len] = '\0' ;
    q->u.e.name->len = len ;
 
-   if (( h = memchr( PSTRENGVAL( q->u.e.name ), ':', len ) ) == NULL )
+   if (( h = (char *)memchr( PSTRENGVAL( q->u.e.name ), ':', len ) ) == NULL )
       q->u.e.portno = default_port_number();
    else
    {
@@ -381,7 +380,7 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
          if ( TSD == NULL )
             showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, ERR_RXSTACK_INVALID_QUEUE_TMPL, PSTRENGVAL( queue ) );
          else if ( !TSD->called_from_saa )
-            exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of( (void *) TSD, queue ) );
+            exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of( TSD, queue ) );
          DROPSTRENG( q->u.e.name ) ;
          q->u.e.name = NULL ;
          return -5; /* RXQUEUE_BADQNAME */
@@ -414,7 +413,7 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
             if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, ERR_RXSTACK_NO_IP_TMPL, PSTRENGVAL( q->u.e.name ) );
             else if ( !TSD->called_from_saa )
-               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, tmpstr_of( (void *) TSD, q->u.e.name ) );
+               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, tmpstr_of( TSD, q->u.e.name ) );
             DROPSTRENG( q->u.e.name ) ;
             q->u.e.name = NULL ;
             return -5; /* RXQUEUE_BADQNAME */

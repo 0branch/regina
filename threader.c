@@ -82,13 +82,17 @@
 #define INCL_RXSYSEXIT
 #define INCL_RXSUBCOM
 
-#include "rexxsaa.h"
+#ifdef USE_OREXX
+# include "rexx.h"
+#else
+# include "rexxsaa.h"
+#endif
 
 /*
  * MAX_THREADS is the number of parallel starting threads. 20 is a good
  * maximum.
  */
-#define MAX_THREADS 6
+#define MAX_THREADS 20
 
 /*
  * MAX_RUN defines the number of loops each thread has to perform.
@@ -99,8 +103,16 @@
 /*
  * TOTAL_THREADS is the number of threads which shall be created. 2000 should
  * be sufficient to detect memory leaks, etc.
+ * Can be overwritten with -t command line switch
  */
-#define TOTAL_THREADS 2000
+#define TOTAL_THREADS 1500
+int total_threads = TOTAL_THREADS;
+
+/*
+ * timeout_seconds is the number of seconds a thread is allowed to live before
+ * stopping the program. Overwrite with -s command line switch
+ */
+int timeout_seconds = 3;
 
 #ifdef POSIX_THREADS
 /*
@@ -346,10 +358,10 @@ THREAD_RETURN THREAD_CONVENTION instore( void *data )
     * Register an exit handler which shall check Regina's output of the thread.
     */
    RexxRegisterExitExe( "ExitHandler",       /* name of the handler        */
-#ifdef RX_STRONGTYPING
-                        instore_exit,        /* entry point of the handler */
-#else
+#ifdef RX_WEAKTYPING
                         (PFN) instore_exit,  /* entry point of the handler */
+#else
+                        instore_exit,        /* entry point of the handler */
 #endif
                         NULL );              /* user area of the handler   */
 
@@ -374,7 +386,7 @@ THREAD_RETURN THREAD_CONVENTION instore( void *data )
        * for the interpreter. You may or may not pass the original script,
        * it is ignored.
        */
-      Instore[1].strptr = InstoreBuf;
+      Instore[1].strptr = (char *)InstoreBuf;
       Instore[1].strlength = InstoreLen;
    }
    else
@@ -438,7 +450,9 @@ THREAD_RETURN THREAD_CONVENTION instore( void *data )
     * Finally inform the invoker that we have stopped gracefully.
     */
    ThreadHasStopped( ( unsigned ) data );
+#ifdef REGINAVERSION
    ReginaCleanup();
+#endif
 #ifndef THREAD_RETURN_VOID
    return ( THREAD_RETURN ) 0;
 #endif
@@ -474,7 +488,9 @@ THREAD_RETURN THREAD_CONVENTION external( void *data )
     * Finally inform the invoker that we have stopped gracefully.
     */
    ThreadHasStopped( ( unsigned ) data );
+#ifdef REGINAVERSION
    ReginaCleanup();
+#endif
 #ifndef THREAD_RETURN_VOID
    return ( THREAD_RETURN ) 0;
 #endif
@@ -597,7 +613,7 @@ void wait_for_threads( void )
             j++;
          }
       }
-      rc = WaitForMultipleObjects( running, compressed, FALSE, 3000 );
+      rc = WaitForMultipleObjects( running, compressed, FALSE, timeout_seconds*1000 );
       if ( rc == 0xFFFFFFFF )
       {
          /*
@@ -626,7 +642,7 @@ void wait_for_threads( void )
       if ( State[i] != Stopped )
       {
          fprintf( stderr, "\n"
-                          "Thread %u hasn't finished normally.\n");
+                          "Thread %u hasn't finished normally.\n",i);
          GlobalError = 1;
          break;
       }
@@ -644,7 +660,7 @@ void wait_for_threads( void )
       if ( program_name == NULL )
          reap( i );
 
-      if ( done < TOTAL_THREADS )
+      if ( done < total_threads )
       {
          if ( !start_a_thread( i ) )
             break;
@@ -777,7 +793,7 @@ void wait_for_threads( void )
 
    for ( ; ; )
    {
-      rc = DosWaitMuxWaitSem( hmux, 3000, &user );
+      rc = DosWaitMuxWaitSem( hmux, timeout_seconds*1000, &user );
       if ( rc != 0 )
       {
          fprintf( stderr, "\n"
@@ -817,7 +833,7 @@ void wait_for_threads( void )
       if ( program_name == NULL )
          reap( (int) user );
 
-      if ( done < TOTAL_THREADS )
+      if ( done < total_threads )
       {
          if ( !start_a_thread( (int) user ) )
             break;
@@ -861,7 +877,7 @@ void timer_alarm( int sig )
    static unsigned lastvalue = ( unsigned ) -1;
    static int call_count = 0;
 
-   if ( ( lastvalue != done ) || ( done == TOTAL_THREADS ) )
+   if ( ( lastvalue != done ) || ( (int) done == total_threads ) )
    {
       lastvalue = done;
       signal( SIGALRM, timer_alarm );
@@ -979,7 +995,7 @@ void wait_for_threads( void )
    pthread_mutex_lock( &thread_lock );
 #else
    signal( SIGALRM, timer_alarm );
-   ival.it_value.tv_sec = 3;
+   ival.it_value.tv_sec = timeout_seconds;
    ival.it_value.tv_usec = 0;
    ival.it_interval = ival.it_value;
    setitimer( ITIMER_REAL, &ival, NULL );
@@ -992,7 +1008,7 @@ void wait_for_threads( void )
        * Sleep a maximum of 3 seconds.
        */
       gettimeofday(&now,NULL);
-      timeout.tv_sec = now.tv_sec + 3;
+      timeout.tv_sec = now.tv_sec + timeout_seconds;
       timeout.tv_nsec = now.tv_usec * 1000;
       /*
        * The following call will wait up to timeout time for a signalled
@@ -1047,7 +1063,7 @@ void wait_for_threads( void )
          /*
           * Restart a new thread if we need some more runs.
           */
-         if ( done < TOTAL_THREADS )
+         if ( (int) done < total_threads )
          {
             if ( !start_a_thread( i ) )
                break;
@@ -1071,11 +1087,17 @@ void wait_for_threads( void )
  */
 static void usage( void )
 {
-   printf( "usage: threader [-p] [filename]\n"
+   printf( "usage: threader [-p] [-q] [-t total_threads] [-s timeout_seconds] [filename]\n"
            "\n"
            "Options:\n"
            "-p\tLoad the macro only once and then use the generated instore\n"
            "\tmacro. Default: Always load the macro new.\n"
+           "\n"
+           "-q\tRun quietly. Don't display running progress information.\n"
+           "\n"
+           "-t\ttotal_threads\tTotal number of threads to execute.\n"
+           "\n"
+           "-s\ttimeoutseconds\tNumber of seconds to timeout a thread. Default 3.\n"
            "\n"
            "filename\tThe Rexx program to execute rather than the instore test\n"
            "\tprogram.\n"
@@ -1085,8 +1107,8 @@ static void usage( void )
            "seconds up to a few minutes. You should hit ^C to abort the program\n"
            "if you think your harddisk is working heavily.\n"
            "\n"
-           "This program is for testing purpose only.\n"
-           ,TOTAL_THREADS );
+           "This program is for testing Regina's multithreading capabilities.\n"
+           ,total_threads );
    exit( 1 );
 }
 
@@ -1112,6 +1134,20 @@ int main( int argc, char *argv[] )
       if ( strcmp( argv[i], "-p" ) == 0 )
       {
          UseInstore = FirstRun;
+      }
+      else if ( strcmp( argv[i], "-t" ) == 0 )
+      {
+         i++;
+         total_threads = atoi( argv[i] );
+      }
+      else if ( strcmp( argv[i], "-s" ) == 0 )
+      {
+         i++;
+         timeout_seconds = atoi( argv[i] );
+      }
+      else if ( strcmp( argv[i], "-q" ) == 0 )
+      {
+         stdout_is_tty = 0;
       }
       else if ( strcmp( argv[i], "--" ) == 0 )
       {
@@ -1149,6 +1185,7 @@ int main( int argc, char *argv[] )
     * This will not work if we check another Rexx. You can safely comment out
     * the following code up to the 'printf( "\n" );'
     */
+#ifdef REGINAVERSION
    versioncode = ReginaVersion( &version );
    printf( "Regina's version is %lu.%lu",
            versioncode >> 8,
@@ -1158,6 +1195,7 @@ int main( int argc, char *argv[] )
       printf( " (in complete \"%s\")", version.strptr );
       RexxFreeMemory( version.strptr );
    }
+#endif
    printf( "\n" );
 
    if ( UseInstore && program_name )
@@ -1188,7 +1226,7 @@ int main( int argc, char *argv[] )
    {
       printf( "\n"
               "You should see a loop counter which stops at %u.\n\n",
-              TOTAL_THREADS );
+              total_threads );
    }
 
    /*
@@ -1222,7 +1260,7 @@ int main( int argc, char *argv[] )
    printf( "\n"
            "Thread tester passed without an error.\n"
            "About %u seconds used for %u cyles, each creating a thread.\n",
-           (unsigned) ( time( NULL ) - start ), TOTAL_THREADS );
+           (unsigned) ( time( NULL ) - start ), total_threads );
 
    if ( !stdout_is_tty || !isatty( fileno( stdout ) ) )
       return 0;

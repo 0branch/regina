@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexxext.c,v 1.29 2004/04/24 09:32:58 florian Exp $";
+static char *RCSid = "$Id: rexxext.c,v 1.30 2005/08/03 09:18:00 mark Exp $";
 #endif
 
 /*
@@ -201,7 +201,7 @@ char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize )
       return NULL;
    if (!buf)
    {
-      ptr1 = MallocTSD((int)strlen(ptr)+1);
+      ptr1 = (char *)MallocTSD((int)strlen(ptr)+1);
       if (!ptr1)
          return NULL;
       strcpy(ptr1, ptr);

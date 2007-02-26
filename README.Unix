@@ -1,4 +1,4 @@
-                              Regina 3.3 binaries
+                              Regina 3.4 binaries
 
 This archive contains pre-compiled binaries of Regina 3.3.  The directory
 structure is set up to unpack into a base directory such as /usr or /usr/local.
@@ -7,8 +7,8 @@ Regina is distributed under the GNU LIBRARY GENERAL PUBLIC LICENSE. See
 COPYING-LIB for details.
 
 On most platforms, it is necessary to include the directory where the shared
-libraries (including *.so|.sl|.a) reside; eg /usr/local/lib, to the 
-LD_LIBRARY_PATH environment variable.  
+libraries (including *.so|.sl|.a) reside; eg /usr/local/lib, to the
+LD_LIBRARY_PATH environment variable.
 
 Under AIX this environment variable is LIBPATH.
 

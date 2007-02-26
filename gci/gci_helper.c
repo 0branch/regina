@@ -102,8 +102,8 @@ static GCI_result concat( GCI_str *first,
  * GCI_strcat appends the content of second to first.
  * The return value is either GCI_OK or GCI_BufferTooSmall.
  */
-int GCI_strcat( GCI_str *first,
-                const GCI_str *second )
+GCI_result GCI_strcat( GCI_str *first,
+                       const GCI_str *second )
 {
    return concat( first, second->val, second->used );
 }
@@ -112,8 +112,8 @@ int GCI_strcat( GCI_str *first,
  * GCI_strcats appends the content of the 0-terminated string second to first.
  * The return value is either GCI_OK or GCI_BufferTooSmall.
  */
-int GCI_strcats( GCI_str *first,
-                 const char *second )
+GCI_result GCI_strcats( GCI_str *first,
+                        const char *second )
 {
    return concat( first, second, strlen( second ) );
 }
@@ -135,8 +135,8 @@ void GCI_strsetlen( GCI_str *str,
  * GCI_strcpy sets the content of first to the content of second.
  * The return value is either GCI_OK or GCI_BufferTooSmall.
  */
-int GCI_strcpy( GCI_str *first,
-                const GCI_str *second )
+GCI_result GCI_strcpy( GCI_str *first,
+                       const GCI_str *second )
 {
    if ( first->max < second->used )
       return GCI_BufferTooSmall;
@@ -157,7 +157,7 @@ GCI_str *GCI_strfromascii( GCI_str *str,
                            char *ptr,
                            int max )
 {
-   str->val = (void *) ptr;
+   str->val = ptr;
    str->used = 0;
    str->max = max;
 
@@ -174,7 +174,7 @@ GCI_str *GCI_strfromascii( GCI_str *str,
 const GCI_str *GCI_migratefromascii( GCI_str *str,
                                      const char *ptr )
 {
-   str->val = (void *) ptr;
+   str->val = (char *) ptr;
    str->used = strlen( ptr );
    str->max = str->used;
 
@@ -195,7 +195,7 @@ GCI_result GCI_stralloc( void *hidden,
 
    if ( size == 0 )
       size = 1;
-   if ( ( str->val = GCI_malloc( hidden, size ) ) == NULL )
+   if ( ( str->val = (char *) GCI_malloc( hidden, size ) ) == NULL )
       return GCI_NoMemory;
 
    str->used = 0;
@@ -231,7 +231,7 @@ GCI_result GCI_strdup( void *hidden,
 {
    (hidden = hidden);
 
-   if ( ( first->val = GCI_malloc( hidden, second->used ) ) == NULL )
+   if ( ( first->val = (char *) GCI_malloc( hidden, second->used ) ) == NULL )
       return GCI_NoMemory;
 
    memcpy( first->val, second->val, second->used );
@@ -253,7 +253,7 @@ char *GCI_strtoascii( void *hidden,
 
    if ( ( str == NULL ) || ( str->val == NULL ) )
       return NULL;
-   if ( ( retval = GCI_malloc( hidden, str->used + 1 ) ) == NULL )
+   if ( ( retval = (char *) GCI_malloc( hidden, str->used + 1 ) ) == NULL )
       return NULL;
 
    memcpy( retval, str->val, str->used );
@@ -266,13 +266,16 @@ char *GCI_strtoascii( void *hidden,
  * We may or may not convert foreign characters. It depends on the runtime
  * system and on the environment settings of codepage/language.
  */
-void GCI_uppercase( GCI_str *str )
+void GCI_uppercase( void *hidden,
+                    GCI_str *str )
 {
    int i, len = str->used;
    char *ptr = str->val;
 
+   (hidden = hidden);
+
    for ( i = 0; i < len; i++, ptr++ )
-      *ptr = (char) rx_toupper( *ptr );
+      *ptr = (char) GCI_toupper( *ptr );
 }
 
 /*
@@ -327,7 +330,8 @@ void GCI_describe( GCI_str *description,
 /*
  * GCI_strswap exchanges two strings' content completely.
  */
-void GCI_strswap( GCI_str *first, GCI_str *second )
+void GCI_strswap( GCI_str *first,
+                  GCI_str *second )
 {
    GCI_str h;
 

@@ -18,15 +18,15 @@
  */
 
 /*
- * $Id: utsname.h,v 1.3 2001/07/29 07:36:21 mark Exp $
+ * $Id: utsname.h,v 1.4 2005/09/05 10:52:02 mark Exp $
  */
 
 #ifndef _UTSNAME_ALREADY_DEFINED_
 #define _UTSNAME_ALREADY_DEFINED_
 
-#define _UTSNAME_LENGTH 20
+#define _UTSNAME_LENGTH 32
 
-struct utsname
+struct regina_utsname
 {
   char sysname[_UTSNAME_LENGTH];
   char nodename[_UTSNAME_LENGTH];
@@ -34,14 +34,5 @@ struct utsname
   char version[_UTSNAME_LENGTH];
   char machine[_UTSNAME_LENGTH];
 };
-
-#if defined(__cplusplus)
-extern "C"
-{
-#endif
-int uname (struct utsname *name);
-#if defined(__cplusplus)
-}
-#endif
 
 #endif /* _UTSNAME_ALREADY_INCLUDED_ */

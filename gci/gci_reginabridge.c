@@ -170,6 +170,9 @@ static int GCIcode2ReginaFuncCode( tsd_t *TSD,
       case GCI_ArgStackOverflow:
          exiterror( ERR_INCORRECT_CALL, 992, ( tmpDispo ) ? ": " : "", ( tmpDispo ) ? tmpDispo : "" );
 
+      case GCI_NestingOverflow:
+         exiterror( ERR_INCORRECT_CALL, 993, ( tmpDispo ) ? ": " : "", ( tmpDispo ) ? tmpDispo : "" );
+
       default:
          break;
    }
@@ -206,7 +209,7 @@ static const GCI_str *GCI_migrateStreng( GCI_str *str,
 static const GCI_str *GCI_migrateRxString( GCI_str *str,
                                            const RXSTRING *string )
 {
-   if ( !RXVALIDSTRING( *string ) )
+   if ( !RXVALIDSTRING( *string ) && !RXZEROLENSTRING( *string ) )
    {
       str->val = NULL;
       str->used = str->max = 0;
@@ -233,7 +236,7 @@ static int assignRxString( void *hidden,
 
    if ( RXNULLSTRING( *dest ) || ( RXSTRLEN( *dest ) < (ULONG) src->used+1 ) )
    {
-      if ( ( h = IfcAllocateMemory( (ULONG) (src->used+1) ) ) == NULL )
+      if ( ( h = (char *) IfcAllocateMemory( (ULONG) (src->used+1) ) ) == NULL )
          return 1;
    }
    else
@@ -259,7 +262,7 @@ static GCI_result readRexx( void *hidden,
                             int allocate,
                             int *novalue )
 {
-   tsd_t *TSD = hidden;
+   tsd_t *TSD = (tsd_t *) hidden;
    int retval;
    GCI_result rc;
    int Lengths[2];
@@ -270,14 +273,14 @@ static GCI_result readRexx( void *hidden,
    Strings[0] = (char *) GCI_ccontent( name );
 
    if ( !signalOnNovalue )
-      set_ignore_novalue( hidden );
-   retval = IfcVarPool( hidden,
+      set_ignore_novalue( (const tsd_t *) hidden );
+   retval = IfcVarPool( (tsd_t *) hidden,
                         ( symbolicAccess ) ? RX_GETSVAR : RX_GETVAR,
                         Lengths,
                         Strings,
                         &allocated );
    if ( !signalOnNovalue )
-      clear_ignore_novalue( hidden );
+      clear_ignore_novalue( (const tsd_t *) hidden );
 
    switch ( retval )
    {
@@ -466,7 +469,7 @@ GCI_result GCI_writeRexx( void *hidden,
       Strings[1] = (char *) GCI_ccontent( value );
    }
 
-   retval = IfcVarPool( hidden,
+   retval = IfcVarPool( (tsd_t *) hidden,
                         ( symbolicAccess ) ? RX_SETSVAR : RX_SETVAR,
                         Lengths,
                         Strings,
@@ -484,8 +487,6 @@ GCI_result GCI_writeRexx( void *hidden,
       default:
          return GCI_RexxError;
    }
-   if ( Lengths[1] == RX_NO_STRING )
-      return GCI_RexxError;
 
    return GCI_OK;
 }
@@ -516,7 +517,8 @@ int GCI_checkDefinition( tsd_t *TSD,
    if ( ( rc = GCI_ParseTree( TSD,
                               GCI_migrateStreng( &stem, stem_name ),
                               &t,
-                              &disposition ) ) != GCI_OK )
+                              &disposition,
+                              TSD->gci_prefix ) ) != GCI_OK )
       return GCIcode2ReginaFuncCode( TSD, rc, &disposition, 0 );
 
    *tree = MallocTSD( sizeof( GCI_treeinfo ) );
@@ -593,11 +595,12 @@ int GCI_Dispatcher( tsd_t *TSD,
 
    rc = GCI_execute( TSD,
                      (void (*)()) func,
-                     treeinfo,
+                     (const GCI_treeinfo *) treeinfo,
                      Params,
                      args,
                      &disposition,
-                     &direct_retval );
+                     &direct_retval,
+                     TSD->gci_prefix );
 
    if ( rc != GCI_OK )
    {

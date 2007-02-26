@@ -1,4 +1,4 @@
-                              Regina 3.3 for BeOS
+                              Regina 3.4 for BeOS
 
 This archive contains binaries for the Regina Rexx Interpreter 3.0 for BeOS.
 Regina is one of the fastest Rexx interpreters available, and the most
@@ -8,7 +8,7 @@ FreeBSD, Windows 9x/NT/2k/XP, OS/2, DOS, Amiga, OpenVMS, OpenEdition and Linux/3
 Regina is distributed under the GNU LIBRARY GENERAL PUBLIC LICENSE. See
 COPYING-LIB for details.
 
-This port was built on BeOS 5.0. I do not know if it works on any version of 
+This port was built on BeOS 5.0. I do not know if it works on any version of
 BeOS prior to 5.0.
 
 The SoftwareValet package installs the following files in /boot/home/config:
@@ -31,13 +31,13 @@ add-ons/regina/libtest2.so - sample Rexx external function library
 add-ons/regina/*.rexx      - sample Rexx programs
 
 To be able to run the sample dynfunc.rexx, or any other Rexx programs that
-use external function libraries, you should append 
+use external function libraries, you should append
 /boot/home/config/add-ons/regina to your ADDON_PATH in your
 /boot/home/config/boot/UserSetupEnvironment file.
 
 To start the Regina Stack daemon; rxstack, automatically, add the line:
 /boot/home/config/bin/rxstack -d
-to 
+to
 /boot/home/config/boot/UserBootscript
 
 For more information on Regina, visit the Regina Home page at

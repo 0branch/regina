@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: extern.h,v 1.72 2004/04/15 10:05:57 mark Exp $
+ * $Id: extern.h,v 1.86 2006/09/03 09:51:18 mark Exp $
  */
 /* JH 20-10-99 */  /* To make Direct setting of stems Direct and not Symbolic. */
 
@@ -41,14 +41,14 @@
  */
    int bmstrstr( const streng *heystack, int start, const streng *needle, int caseless ) ;
    void doparse( tsd_t *TSD, const streng *source, cnodeptr subtree, int caseless ) ;
-   void parseargtree(tsd_t *TSD, cparamboxptr argbox, cnodeptr this, int flags );
+   void parseargtree(tsd_t *TSD, cparamboxptr argbox, cnodeptr thisptr, int flags );
 
 
 /*
  * Routines in debug.c
  */
    void dumpvars( const tsd_t *TSD );
-   void dumptree( const tsd_t *TSD, const treenode *this, int level, int newline ) ;
+   void dumptree( const tsd_t *TSD, const treenode *thisptr, int level, int newline ) ;
    streng *getsourceline( const tsd_t *TSD, int line, int charnr, const internal_parser_type *ipt ) ;
 #ifdef TRACEMEM
    void marksource( clineboxptr ) ;
@@ -67,7 +67,7 @@
    streng *get_external_routine( const tsd_t *TSD, const char *inname,
                                  FILE **fp );
    void find_shared_library(const tsd_t *TSD,const char *, const char *, char *);
-   void CloseOpenFiles ( const tsd_t *TSD ) ;
+   void CloseOpenFiles ( const tsd_t *TSD, FilePtrDisposition fpd ) ;
    streng *ConfigStreamQualified( tsd_t *TSD, const streng *name );
    streng *std_charin( tsd_t *TSD, cparamboxptr parms ) ;
    streng *std_charout( tsd_t *TSD, cparamboxptr parms ) ;
@@ -96,10 +96,10 @@
 /*
  * Routines in expr.c
  */
-   int isboolean( tsd_t *TSD, nodeptr ) ;
+   int isboolean( tsd_t *TSD, nodeptr, int suberror, const char *op ) ;
    num_descr *calcul( tsd_t *TSD, nodeptr, num_descr** ) ;
    int init_expr( tsd_t *TSD ) ;
-   streng *evaluate( tsd_t *TSD, nodeptr this, streng **kill ) ;
+   streng *evaluate( tsd_t *TSD, nodeptr thisptr, streng **kill ) ;
 
 /*
  * Routines in cmsfuncs.c
@@ -231,10 +231,15 @@
    void getsecs( time_t *secs, time_t *usecs ) ;
    unsigned hashvalue(const char *string, int length ) ;
    unsigned hashvalue_ic(const char *string, int length ) ;
-   int hashvalue_var(const streng *name, int start, int *stop );
+   unsigned hashvalue_var(const streng *name, int start, int *stop );
 #ifdef SKYOS
    clock_t clock( void );
 #endif
+   char **makeargs(const char *string, char escape);
+   char *splitoffarg(const char *string, const char **trailer, char escape);
+   char **makesimpleargs(const char *string);
+   void destroyargs(char **args);
+
 
 
 /*
@@ -259,12 +264,12 @@
    int init_vars( tsd_t *TSD ) ;
    void expand_to_str( const tsd_t *TSD, variableptr ptr ) ;
    int var_was_found( const tsd_t *TSD ) ;
-   variableptr *create_new_varpool( const tsd_t *TSD ) ;
+   var_hashtable *create_new_varpool( const tsd_t *TSD, int size ) ;
    void setdirvalue( tsd_t *TSD, const streng *name, streng *value ) ;
    void setvalue( tsd_t *TSD, const streng *name, streng *value, int pool ) ;
-   num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
+   num_descr *fix_compoundnum( tsd_t *TSD, nodeptr thisptr, num_descr *newdescr,
                                streng *string_val );
-   void setshortcutnum( tsd_t *TSD, nodeptr this, num_descr *value,
+   void setshortcutnum( tsd_t *TSD, nodeptr thisptr, num_descr *value,
                         streng *string_val );
    const streng *getdirvalue( tsd_t *TSD, const streng *name ) ;
    const streng *getvalue( tsd_t *TSD, const streng *name, int pool ) ;
@@ -285,9 +290,9 @@
 #endif /* TRACEMEM */
    const streng *shortcut( tsd_t *TSD, nodeptr ) ;
    num_descr *shortcutnum( tsd_t *TSD, nodeptr ) ;
-   void setshortcut( tsd_t *TSD, nodeptr this, streng *value ) ;
-   streng *fix_compound( tsd_t *TSD, nodeptr this, streng *value ) ;
-   void kill_variables( const tsd_t *TSD, variableptr *array ) ;
+   void setshortcut( tsd_t *TSD, nodeptr thisptr, streng *value ) ;
+   streng *fix_compound( tsd_t *TSD, nodeptr thisptr, streng *value ) ;
+   void kill_variables( const tsd_t *TSD, var_hashtable *array ) ;
    variableptr get_next_variable( tsd_t *TSD, int reset ) ;
    void set_reserved_value( tsd_t *TSD, int poolid, streng *val_str,
                             int val_int, int vflag );
@@ -313,14 +318,14 @@
    void queue_trace_char( const tsd_t *TSD, char ch ) ;
    void tracenumber( tsd_t *TSD, const num_descr *num, char type ) ;
    void tracebool( tsd_t *TSD, int value, char type ) ;
-   int pushcallstack( const tsd_t *TSD, treenode *this ) ;
+   int pushcallstack( const tsd_t *TSD, treenode *thisptr ) ;
    void popcallstack( const tsd_t *TSD, int value ) ;
-   void traceerror( tsd_t *TSD, const treenode *this, int RC ) ;
+   void traceerror( tsd_t *TSD, const treenode *thisptr, int RC ) ;
    void tracecompound( tsd_t *TSD, const streng *stem, int length, const streng *index, char trch ) ;
    void starttrace( const tsd_t *TSD ) ;
    int intertrace( tsd_t *TSD ) ;
    void tracevalue( tsd_t *TSD, const streng *str, char type ) ;
-   void traceline( tsd_t *TSD, const treenode *this, char tch, int offset ) ;
+   void traceline( tsd_t *TSD, const treenode *thisptr, char tch, int offset ) ;
    void traceback( tsd_t *TSD ) ;
 
 
@@ -339,7 +344,7 @@
 #define IPRT_BUFSIZE 2 /* buffer elements for the state in InterpreterStatus */
    void SaveInterpreterStatus(const tsd_t *TSD,unsigned *state);
    void RestoreInterpreterStatus(const tsd_t *TSD,const unsigned *state);
-   streng *CallInternalFunction( tsd_t *TSD, nodeptr node, nodeptr this,
+   streng *CallInternalFunction( tsd_t *TSD, nodeptr node, nodeptr thisptr,
                                  paramboxptr args );
    streng *interpret( tsd_t * volatile TSD, nodeptr volatile rootnode ) ;
    nodeptr getlabel( const tsd_t *TSD, const streng *name ) ;
@@ -356,17 +361,17 @@
    int yylex( void ) ;
    int __reginaparse( void ) ;
    void kill_lines( const tsd_t *TSD, lineboxptr first ) ;
-   void destroytree( const tsd_t *TSD, nodeptr this ) ;
-   void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this ) ;
+   void destroytree( const tsd_t *TSD, nodeptr thisptr ) ;
+   void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr thisptr ) ;
 
 
 
 /*
  * Routines in funcs.c
  */
-   streng *buildtinfunc( tsd_t *TSD, nodeptr this ) ;
+   streng *buildtinfunc( tsd_t *TSD, nodeptr thisptr ) ;
    void deallocplink( tsd_t *TSD, paramboxptr first ) ;
-   paramboxptr initplist( tsd_t *TSD, cnodeptr this );
+   paramboxptr initplist( tsd_t *TSD, cnodeptr thisptr );
    paramboxptr initargs( tsd_t *TSD, int argc, const int *lengths,
                          const char **strings );
    int myatol( const tsd_t *TSD, const streng *text ) ;
@@ -376,7 +381,6 @@
    int atopos( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    int atoposorzero( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    char getonechar( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
-   const streng *param( cparamboxptr ptr, int num ) ;
    streng *int_to_streng( const tsd_t *TSD, int input ) ;
    int convert_date(tsd_t *TSD, const streng *, char, struct tm *);
    int convert_time(const tsd_t *TSD,const streng *, char, struct tm *, time_t *);
@@ -385,28 +389,46 @@
    void mark_param_cache( const tsd_t *TSD ) ;
 #endif
    void addtwostrings( char *one, char *two, char *answer ) ;
+   const char *BIFname( tsd_t *TSD );
 
 
 /*
  * Routines in cmath.c
  */
    double myatof( const tsd_t *TSD, const streng *string ) ;
-   int myisnumber( const streng *string ) ;
+   int myisnumber( const tsd_t *TSD, const streng *string ) ;
    int myisinteger( const streng *string ) ;
 
 
 /*
  Functions in rexx.c
  */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef RXLIB
 # if defined(__LCC__)
    int __regina_faked_main(int argc,char *argv[]) ;
 # else
+#  ifdef __MINGW32__
+#   ifdef __REGINA_DLL
+   int APIENTRY __regina_faked_main(int argc,char *argv[]) __declspec(dllexport);
+#   else
+   int APIENTRY __regina_faked_main(int argc,char *argv[]) __declspec(dllimport);
+#   endif
+#  else
    int APIENTRY __regina_faked_main(int argc,char *argv[]) ;
+#  endif
 # endif
 #else
    int main(int argc,char *argv[]) ;
 #endif
+
+#ifdef __cplusplus
+}
+#endif
+
    int __regina_reexecute_main(int argc, char **argv);
    void mark_systeminfo( const tsd_t *TSD) ;
    nodeptr treadit( cnodeptr ) ;
@@ -443,6 +465,7 @@
    streng *rex_rxfuncquery( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncadd( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncdefine( tsd_t *TSD, cparamboxptr parms );
+   streng *rex_gciprefixchar( tsd_t *TSD, cparamboxptr parms );
    streng *rex_rxfuncdrop( tsd_t *TSD, cparamboxptr parms ) ;
    int IfcRegFunc( const tsd_t *TSD, const char *rxname, const char *module,
                    const char *objnam, PFN entry );
@@ -465,7 +488,7 @@
 /*
  * functions in mt_notmt.c/mt_<os>.c
  */
-   int IfcReginaCleanup( );
+   int IfcReginaCleanup( void );
 
 /*
  * functions in macros.c
@@ -492,10 +515,13 @@
  */
    void post_process_system_call( tsd_t *TSD, const streng *cmd,
                                   int rc_code, const streng *rc_value,
-                                  cnodeptr this );
-   streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodeptr this, cnodeptr overwrite );
+                                  cnodeptr thisptr );
+   streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodeptr thisptr, cnodeptr overwrite );
    void add_envir( tsd_t *TSD, const streng *name, int type, int subtype ) ;
    int envir_exists( const tsd_t *TSD, const streng *name );
+   streng *get_envir_details( const tsd_t *TSD, char opt, const streng *name );
+   int set_subcomed_envir( const tsd_t *TSD, const streng *name, int subcomed );
+   int get_subcomed_envir( const tsd_t *TSD, const streng *name );
    int init_envir( tsd_t *TSD ) ;
    void del_envir( tsd_t *TSD, const streng *name ) ;
    int set_envir( const tsd_t *TSD, const streng *envirname, const nodeptr ios ) ;
@@ -514,27 +540,6 @@
    streng *call_unknown_external( tsd_t *TSD, const streng *name, cparamboxptr parms, char called ) ;
    streng *call_known_external( tsd_t *TSD, const struct entry_point *vbox, cparamboxptr parms, char called ) ;
    streng *SubCom( tsd_t *TSD, const streng *command, const streng *envir, int *rc ) ;
-
-
-/*
- * Routines in doscmd.c
- */
-   int my_win32_setenv( const char *name, const char *value ) ;
-   int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rc);
-   int __regina_wait(int process);
-   int open_subprocess_connection(const tsd_t *TSD, environpart *ep);
-   void unblock_handle( int *handle, void *async_info );
-   void restart_file(int hdl);
-   int __regina_close(int handle, void *async_info);
-   void __regina_close_special( int handle );
-   int __regina_read(int hdl, void *buf, unsigned size, void *async_info) ;
-   int __regina_write(int hdl, const void *buf, unsigned size, void *async_info) ;
-   void *create_async_info(const tsd_t *TSD);
-   void delete_async_info(void *async_info);
-   void reset_async_info(void *async_info);
-   void add_async_waiter(void *async_info, int handle, int add_as_read_handle);
-   void wait_async_info(void *async_info);
-
 
 /*
  * Routines in options.c
@@ -561,12 +566,13 @@
    int init_vms( tsd_t *TSD ) ;
    int vms_do_command( tsd_t *TSD, const streng *cmd, int io_flags, environment *env, Queue *redir );
    int vms_killproc( tsd_t *TSD ) ;
-   streng *vms_resolv_symbol( tsd_t *TSD, streng *name, streng *new, streng *pool ) ;
+   streng *vms_resolv_symbol( tsd_t *TSD, streng *name, streng *newstr, streng *pool ) ;
 
 /*
  * Routines in builtin.c
  */
    int init_builtin( tsd_t *TSD ) ;
+   streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value, streng *env );
    streng *std_abbrev( tsd_t *TSD, cparamboxptr parms ) ;
    streng *std_abs( tsd_t *TSD, cparamboxptr parms ) ;
    streng *std_address( tsd_t *TSD, cparamboxptr parms ) ;
@@ -705,6 +711,7 @@
    streng *unx_unixerror( tsd_t *TSD, cparamboxptr parms ) ;
    streng *unx_chdir( tsd_t *TSD, cparamboxptr parms ) ;
    streng *unx_getenv( tsd_t *TSD, cparamboxptr parms ) ;
+   streng *unx_putenv( tsd_t *TSD, cparamboxptr parms ) ;
    streng *unx_crypt( tsd_t *TSD, cparamboxptr parms ) ;
 
 /*
@@ -745,6 +752,7 @@
  * string and streng routines are ugly but we need the speedup of passing the
  * TSD to take profit from flists in the multi-threading environment.
  */
+   void __regina_Str_first( void );
 #if !defined(FLISTS) || defined(TRACEMEM)
    streng *__regina_Str_make( int size ) ;
    streng *__regina_Str_make_TSD( const tsd_t *TSD, int size ) ;
@@ -803,10 +811,13 @@
 #define Str_ncatstrTSD(base,input,length) Str_ncatstr_TSD(TSD,base,input,length)
    char *str_of( const tsd_t *TSD, const streng *input ) ;
 #define str_ofTSD(input) str_of(TSD,input)
+#ifndef EXTERNAL_TO_REGINA
    volatile char *tmpstr_of( tsd_t *TSD, const streng *input ) ;
+#endif
    streng *Str_upper( streng *in ) ;
    streng *Str_lower( streng *in ) ;
    streng *Str_strp( streng * input, char chr, char opt ) ;
+   void __regina_Str_last( void );
 
 /*
  * Routines in strmath.c
@@ -820,12 +831,12 @@
    streng *str_sign( tsd_t *TSD, const streng*);
    streng *str_trunc( tsd_t *TSD, const streng*, int ) ;
    streng *str_normalize( const tsd_t *TSD, const streng* ) ;
-   streng *str_digitize( tsd_t *TSD, const streng*, int, int ) ;
+   streng *str_digitize( tsd_t *TSD, streng*, int, int, const char *, int ) ;
    streng *str_format( tsd_t *TSD, const streng*, int, int, int, int ) ;
    streng *str_binerize( tsd_t *TSD, num_descr *, int ) ;
    int str_true( const tsd_t *TSD, const streng* ) ;
    streng *str_abs( tsd_t *TSD, const streng* ) ;
-   num_descr* get_a_descr( const tsd_t *TSD, const streng* ) ;
+   num_descr *get_a_descr( tsd_t *TSD, const char *big, int argno, const streng* ) ;
    void free_a_descr( const tsd_t *TSD, num_descr* ) ;
 #ifdef TRACEMEM
    void mark_descrs( const tsd_t *TSD ) ;
@@ -839,7 +850,7 @@
                     num_descr *r, num_descr *r2, int type, cnodeptr left,
                     cnodeptr right );
    int myiswnumber( tsd_t *TSD, const streng *number, num_descr **num,
-                    int round );
+                    int noDigitsLimit );
    void str_round( num_descr *descr, int size ) ;
    void str_round_lostdigits( tsd_t *TSD, num_descr *descr, int size );
    void string_pow( tsd_t *TSD, const num_descr *num, num_descr *acc,
@@ -852,7 +863,7 @@
    void string_add( tsd_t *TSD, const num_descr *f, const num_descr *s,
                     num_descr *r, cnodeptr left, cnodeptr right );
    void str_strip( num_descr *num ) ;
-   streng *str_norm( const tsd_t *TSD, num_descr *in, streng *try )  ;
+   streng *str_norm( const tsd_t *TSD, num_descr *in, streng *trystr )  ;
    int streng_to_int( const tsd_t *TSD, const streng *input, int *error ) ;
 
 /*
@@ -947,7 +958,6 @@ extern unsigned char l_to_u[];
 extern const char *numeric_forms[] ;
 extern const char *invo_strings[] ;
 extern const char *argv0 ;
-
 /* Don't terminate the following lines by a semicolon */
 EXPORT_GLOBAL_PROTECTION_VAR(regina_globals)
 

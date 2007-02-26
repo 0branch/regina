@@ -80,7 +80,7 @@ static GCI_result resizeNodes( WalkerInfo *w,
       GCI_free( w->hidden, ti->nodes );
    }
    ti->max = new_nodemax;
-   ti->nodes = buf;
+   ti->nodes = (GCI_nodeinfo *) buf;
 
    return GCI_OK;
 }
@@ -236,6 +236,10 @@ static GCI_result walker( int depth,
 
       case GCI_string:
          n->direct_size = info->size + 1;
+         break;
+
+      case GCI_raw:
+         n->direct_size = info->size;
          break;
 
       case GCI_container:
@@ -552,6 +556,7 @@ static void dumpNode( const GCI_treeinfo *ti,
          case GCI_float:     sprintf(p, "FLOAT%u", info->size*8 );    break;
          case GCI_char:      sprintf(p, "CHAR%u", info->size*8 );     break;
          case GCI_string:    sprintf(p, "STRING%u", info->size );     break;
+         case GCI_raw:       sprintf(p, "RAW%u", info->size );        break;
          case GCI_container: sprintf(p, "CONTAINER" );                break;
          case GCI_array:     sprintf(p, "ARRAY[%u]", info->size );    break;
          default:            sprintf(p, "???[%u]", info->size );      break;
@@ -588,7 +593,7 @@ static void dump( const GCI_treeinfo *ti )
            ti->used, ti->max, ti->size );
    printf( "idx par chl sib,   dsi   isi   dpo   ipo\n");
 
-   for ( i = 0; i < elements( ti->args ); i++ )
+   for ( i = 0; i < (int) elements( ti->args ); i++ )
    {
       if ( ti->args[i] == -1 )
          break;
@@ -632,6 +637,8 @@ static void dump( const GCI_treeinfo *ti )
  * return_valid shall be set to 1 if the "stem.RETURN.TYPE" is not the
  * empty string. In this case we parse the corresponding tree, too.
  *
+ * prefixChar is the prefix that must be used in front of stem names.
+ *
  * The string base may contain the error location within the stem in case of
  * an error.
  *
@@ -671,7 +678,8 @@ GCI_result GCI_parsenodes( void *hidden,
                            GCI_str *base,
                            GCI_treeinfo *ti,
                            unsigned argc,
-                           unsigned return_valid )
+                           unsigned return_valid,
+                           const char *prefixChar )
 {
    GCI_result rc = GCI_OK;
    unsigned i;
@@ -690,7 +698,11 @@ GCI_result GCI_parsenodes( void *hidden,
       GCI_strcats( base, iter );
       w.parent = -1;
       ti->args[i] = ti->used;
-      if ( ( rc = GCI_parsetree( hidden, base, walker, &w ) ) != GCI_OK )
+      if ( ( rc = GCI_parsetree( hidden,
+                                 base,
+                                 walker,
+                                 &w,
+                                 prefixChar ) ) != GCI_OK )
          break;
       if ( ti->callinfo.with_parameters &&
            ( ti->nodes[ti->args[i]].child != -1 ) )
@@ -708,10 +720,12 @@ GCI_result GCI_parsenodes( void *hidden,
    if ( ( rc == GCI_OK ) && return_valid )
    {
       GCI_strsetlen( base, origlen );
-      GCI_strcats( base, ".RETURN" );
+      GCI_strcats( base, "." );
+      GCI_strcats( base, prefixChar );
+      GCI_strcats( base, "RETURN" );
       w.parent = -1;
       ti->retval = ti->used;
-      rc = GCI_parsetree( hidden, base, walker, &w );
+      rc = GCI_parsetree( hidden, base, walker, &w, prefixChar );
       if ( rc == GCI_OK )
       {
          if ( ti->callinfo.as_function &&
