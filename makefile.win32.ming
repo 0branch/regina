@@ -37,7 +37,7 @@ MT_FILE = mt_notmt
 DYN_COMP = /LD /DDYNAMIC #/ML
 endif
 
-CEXTRA = -DWIN32 -DFGC -funsigned-char
+CEXTRA = -DWIN32 -funsigned-char
 EEXTRA =
 EXTQUEUE_OBJS = extstack.$(OBJ) rexxbif.$(OBJ)
 EXTQUEUE_SHOBJS = extstack.sho rexxbif.sho

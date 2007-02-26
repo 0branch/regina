@@ -62,7 +62,7 @@ signal on notready
    Parse Version Ver .
    If Left( ver, 11 ) = 'REXX-Regina' Then regina = 1
    Else regina = 0
-/* signal test023 */
+/*signal test022*/
 
 test001:
 /* === 001 : simple write and read  ============================ */
@@ -863,19 +863,23 @@ call notify 'empty_out'
 
    call stream simple, 'c', 'close'
    line = linein( simple ) ;
+
+   if line\=="First line" then
+      call complain "STREAM(fn,'C','CLOSE') doesn't seem to have closed file"
+
    call lineout simple 
    line = linein( simple ) 
-   
-   if line\=="First line" then
-      call complain "LINEOUT(fn) doesn't seem to have closed file"
 
-   call lineout simple
+   if line\=="First line" then
+      call complain "LINEOUT(fn) doesn't seem to have closed file. This is allowed under ANSI"
+
+   call stream simple, 'c', 'close'
    signal on notready
    signal test023
 
 
 test023:
-/* === 023 : Positioning of file using STREAM FILE ===== */
+/* === 023 : Line positioning of file using STREAM ===== */
 call notify 'line_pos'
    signal off notready 
 
@@ -887,40 +891,81 @@ call notify 'line_pos'
    if eol = 'LF' then line_length = 11
    else line_length = 12
    call stream simple, 'c', 'close'
-   call stream simple, 'c', 'open both'
 
-   ret = stream( simple, 'c', 'open both' ); correct = 'READY:'
+   cmd = 'OPEN BOTH'
+   ret = stream( simple, 'c', cmd ); correct = 'READY:'
    if ret \= correct then
-      call complain "STREAM(fn,'C','OPEN BOTH') didn't work: got:" ret 'instead of:' correct
+      call complain "STREAM(fn,'C','"cmd"') didn't work: got:" ret 'instead of:' correct
    call checkseekpos 1, 1, 1+(100*line_length), 101
 
+   /*
+    * Move read pos to line 30, write pos to line 70
+    */
    cmd = 'SEEK =30 READ LINE'
    ret = stream( simple, 'c', cmd ); correct = 30
    if ret \= correct then
       call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
    call checkseekpos 1+(29*line_length) , 30, 1+(100*line_length), 101
 
+   cmd = 'SEEK =70 WRITE LINE'
+   ret = stream( simple, 'c', cmd ); correct = 70
+   if ret \= correct then
+      call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
+   call checkseekpos 1+(29*line_length) , 30, 1+(69*line_length), 70
+
+   /*
+    * Move read pos to line 60, write pos to line 50
+    */
    cmd = 'SEEK +30 READ LINE'
    ret = stream( simple, 'c', cmd ); correct = 60
    if ret \= correct then
       call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
-   call checkseekpos 1+(59*line_length) , 60, 1+(100*line_length), 101
+   call checkseekpos 1+(59*line_length) , 60, 1+(69*line_length), 70
 
+   cmd = 'SEEK -20 WRITE LINE'
+   ret = stream( simple, 'c', cmd ); correct = 50
+   if ret \= correct then
+      call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
+   call checkseekpos 1+(59*line_length) , 60, 1+(49*line_length), 50
+
+   /*
+    * Move read pos to line 50, write pos to line 40
+    */
    cmd = 'SEEK -10 READ LINE'
    ret = stream( simple, 'c', cmd ); correct = 50
    if ret \= correct then
       call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
-   call checkseekpos 1+(49*line_length) , 50, 1+(100*line_length), 101
+   call checkseekpos 1+(49*line_length) , 50, 1+(49*line_length), 50
 
+   cmd = 'SEEK -10 WRITE LINE'
+   ret = stream( simple, 'c', cmd ); correct = 40
+   if ret \= correct then
+      call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
+   call checkseekpos 1+(49*line_length) , 50, 1+(39*line_length), 40
+
+   /*
+    * Should now be able to read line 50
+    */
    ret = linein( simple ); correct = 'line 50***'
    if ret \= correct then
       call complain "LINEIN(fn) returns the wrong value got:" '['ret']' 'instead of:' '['correct']'
+   /* read pos should now be at line 51 */
+   call checkseekpos 1+(50*line_length) , 51, 1+(39*line_length), 40
 
+   /*
+    * Move read pos to line 91, write pos to line 81
+    */
    cmd = 'SEEK <10 READ LINE'
    ret = stream( simple, 'c', cmd ); correct = 91
    if ret \= correct then
       call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
-   call checkseekpos 1+(90*line_length) , 91, 1+(100*line_length), 101
+   call checkseekpos 1+(90*line_length) , 91, 1+(39*line_length), 40
+
+   cmd = 'SEEK <20 WRITE LINE'
+   ret = stream( simple, 'c', cmd ); correct = 81
+   if ret \= correct then
+      call complain "STREAM(fn,'C','"cmd"') didn't position correctly got:" ret 'instead of:' correct
+   call checkseekpos 1+(90*line_length) , 91, 1+(80*line_length), 81
 
    call stream simple, 'c', 'close'
    signal on notready

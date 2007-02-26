@@ -1,6 +1,6 @@
 /*
  *  The Regina Rexx Interpreter
- *  Copyright (C) 2001-2003  Florian Groﬂe-Coosmann
+ *  Copyright (C) 2001-2004  Florian Groﬂe-Coosmann
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -20,7 +20,7 @@
  *
  * Asynchroneous thread multiplexer with a parallel use of the REXXSAA API.
  *
- * This example works both with Win32 as with Posix threads.
+ * This example works with Win32 as with OS/2 or Posix threads.
  */
 #include <stdio.h>
 #include <string.h>
@@ -28,11 +28,6 @@
 #include <limits.h>
 #include <errno.h>
 #include <time.h>
-
-#define INCL_RXSHV
-#define INCL_RXFUNC
-#define INCL_RXSYSEXIT
-#define INCL_RXSUBCOM
 
 #ifdef POSIX_THREADS
 # include <sys/time.h>
@@ -47,14 +42,28 @@
 # endif
 #endif
 
+#ifdef OS2_THREADS
+# include <io.h>
+# include <stddef.h>
+# include <process.h>
+# define INCL_DOSSEMAPHORES
+# define INCL_ERRORS
+# include <os2.h>
+# define CHAR_TYPEDEFED
+# define SHORT_TYPEDEFED
+# define LONG_TYPEDEFED
+# ifndef _OS2EMX_H
+#  define _OS2EMX_H       /* prevents PFN from defining (Watcom) */
+# endif
+#endif
+
 #ifdef _MSC_VER
 /* This picky compiler claims about unused formal parameters.
  * This is correct but hides (for human eyes) other errors since they
  * are many and we can't reduce them all.
  * Error 4100 is "unused formal parameter".
- * Error 4115 is generated in the rameter".
  */
-# pragma warning(disable:4100)
+# pragma warning(disable:4100 4115 4201 4214 4514)
 #endif
 
 #ifdef WIN32_THREADS
@@ -65,8 +74,13 @@
 #endif
 
 #ifdef _MSC_VER
-# pragma warning(default:4115)
+# pragma warning(default:4100 4115 4201 4214)
 #endif
+
+#define INCL_RXSHV
+#define INCL_RXFUNC
+#define INCL_RXSYSEXIT
+#define INCL_RXSUBCOM
 
 #include "rexxsaa.h"
 
@@ -86,7 +100,7 @@
  * TOTAL_THREADS is the number of threads which shall be created. 2000 should
  * be sufficient to detect memory leaks, etc.
  */
-#define TOTAL_THREADS 100
+#define TOTAL_THREADS 2000
 
 #ifdef POSIX_THREADS
 /*
@@ -98,6 +112,19 @@
 #define THREAD_RETURN void *
 #define THREAD_CONVENTION
 static pthread_t thread[MAX_THREADS];
+#endif
+
+#ifdef OS2_THREADS
+/*
+ * See below at WIN32_THREADS for a description.
+ */
+#define ThreadIndexType int
+#define my_threadidx() *_threadid
+#define my_threadid() *_threadid
+#define THREAD_RETURN void
+#define THREAD_RETURN_VOID 1
+#define THREAD_CONVENTION
+static int thread[MAX_THREADS];
 #endif
 
 #ifdef WIN32_THREADS
@@ -191,6 +218,8 @@ static unsigned InstoreLen;
 
 static void ThreadHasStopped(unsigned position);
 
+static char *program_name = NULL;
+
 /*
  * We redirect Rexx' output. This is the redirection handler.
  * We expect the string "Loop <x> in thread <y>" where x is a running
@@ -229,7 +258,6 @@ LONG APIENTRY instore_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
       len = sizeof(buf) - 1;  /* This shall NOT happen, but it's irrelevant */
    memcpy( buf, RXSTRPTR( rx ), len );
    buf[len] = '\0'; /* We have a sscanf-able string */
-
    rc = sscanf( buf, "Loop %u in thread %u", &loop, &tid );
    if ( rc != 2 )
    {
@@ -336,7 +364,7 @@ THREAD_RETURN THREAD_CONVENTION instore( void *data )
                          "say 'Loop' i 'in thread' gettid();"
                          "End;"
                          "Return 0",
-                         MAX_RUN );
+                         (unsigned) MAX_RUN );
    Instore[0].strptr = instore_buf;
    Instore[0].strlength = strlen( Instore[0].strptr );
    if ( UseInstore == DoInstore )
@@ -410,6 +438,43 @@ THREAD_RETURN THREAD_CONVENTION instore( void *data )
     * Finally inform the invoker that we have stopped gracefully.
     */
    ThreadHasStopped( ( unsigned ) data );
+   ReginaCleanup();
+#ifndef THREAD_RETURN_VOID
+   return ( THREAD_RETURN ) 0;
+#endif
+}
+
+/*
+ * external is a separate thread and invokes a Rexx program from disk.
+ * It runs a loop (inside Rexx) and checks for errors.
+ * The return value is 0 if a return value is used at all.
+ * The argument data is the index of the thread within threadx.
+ * The Rexx program filename is in a global variable.
+ */
+THREAD_RETURN THREAD_CONVENTION external( void *data )
+{
+   int rc;
+
+   /*
+    * signal that we are alive.
+    */
+   threadx[(unsigned) data] = my_threadidx();
+
+   rc = RexxStart( 0,            /* ArgCount                  */
+                   NULL,         /* ArgList                   */
+                   program_name, /* ProgramName               */
+                   NULL,         /* Instore (source/compiled) */
+                   "Foo",        /* EnvironmentName           */
+                   RXCOMMAND,    /* CallType                  */
+                   NULL,         /* ExitHandlerList           */
+                   NULL,         /* ReturnCode (ignored)      */
+                   NULL );       /* ReturnValue (ignored)     */
+
+   /*
+    * Finally inform the invoker that we have stopped gracefully.
+    */
+   ThreadHasStopped( ( unsigned ) data );
+   ReginaCleanup();
 #ifndef THREAD_RETURN_VOID
    return ( THREAD_RETURN ) 0;
 #endif
@@ -425,7 +490,8 @@ THREAD_RETURN THREAD_CONVENTION instore( void *data )
  * reap checks the thread's result buffer to see if it has seen all the lines
  * the interpreter has emitted.
  * The global error is set in case of an error.
- * The result buffer is resetted on success.
+ * The result buffer is reset on success.
+ * Only called when using "instore" macro.
  */
 void reap( unsigned position )
 {
@@ -433,7 +499,7 @@ void reap( unsigned position )
    {
       fprintf(stderr,"\n"
                      "Thread %lu has stopped without completing its loop.\n",
-                     threadx[position]);
+                     (unsigned long) threadx[position]);
       GlobalError = 1;
    }
    found[position] = 0;
@@ -469,7 +535,7 @@ int start_a_thread( unsigned position )
     */
    thread[position] = ( HANDLE ) _beginthreadex( NULL,
                                                  0,
-                                                 instore,
+                                                 (program_name) ? external : instore,
                                                  ( void * ) position,
                                                  CREATE_SUSPENDED,
                                                  &threadID );
@@ -572,7 +638,11 @@ void wait_for_threads( void )
       CloseHandle( thread[i] );
       State[i] = Ready;
       running--;
-      reap( i );
+      /*
+       * Only reap our threads if running the instore test code
+       */
+      if ( program_name == NULL )
+         reap( i );
 
       if ( done < TOTAL_THREADS )
       {
@@ -589,8 +659,192 @@ void wait_for_threads( void )
 }
 #endif
 
-#ifdef POSIX_THREADS
+#ifdef OS2_THREADS
+/*
+ * init_threads initializes the usage of our thread management system.
+ * Returns 1 on success, 0 otherwise.
+ */
+HMUX hmux;
+SEMRECORD thread_sems[MAX_THREADS];
 
+int init_threads( void )
+{
+   int i;
+   LONG rc;
+
+   for ( i = 0; i < MAX_THREADS; i++ )
+   {
+      thread_sems[i].ulUser = i;
+      rc = DosCreateEventSem( NULL,
+                              (PHEV) &thread_sems[i].hsemCur,
+                              0,
+                              0 );
+      if ( rc != 0 )
+      {
+         fprintf( stderr, "\n"
+                          "Error creating an EventSem, error code is %lu\n",
+                          rc );
+         return 0;
+      }
+   }
+
+   rc = DosCreateMuxWaitSem( NULL,
+                             &hmux,
+                             MAX_THREADS,
+                             thread_sems,
+                             DCMW_WAIT_ANY);
+   if ( rc != 0 )
+   {
+      fprintf( stderr, "\n"
+                       "Error creating a MuxWaitSem, error code is %lu\n",
+                       rc );
+      return 0;
+   }
+   return 1;
+}
+
+/*
+ * start_a_thread starts a thread and sets some state informations which are
+ * set back in case of an error.
+ * The return code is 1 on success, 0 otherwise.
+ */
+int start_a_thread( unsigned position )
+{
+   ULONG rc, post;
+
+   rc = DosResetEventSem( (HEV) thread_sems[position].hsemCur, &post );
+   if ( ( rc != 0 ) && ( rc != ERROR_ALREADY_RESET ) )
+   {
+      fprintf( stderr, "\n"
+                       "Error resetting an EventSem, error code is %lu\n",
+                       rc );
+      GlobalError = 1;
+      return 0;
+   }
+   State[position] = Running;
+   thread[position] = _beginthread( (program_name) ? external : instore,
+                                    NULL,
+                                    0x8000,
+                                    ( void * ) position );
+   if ( thread[position] == -1 )
+   {
+      fprintf( stderr, "\n"
+                       "Error starting thread, error code is %d\n",
+                       errno );
+      GlobalError = 1;
+      State[position] = Stopped;
+      DosPostEventSem( (HEV) thread_sems[position].hsemCur );
+      return 0;
+   }
+   return 1;
+}
+
+/*
+ * Thread has stopped sets the global state information of the thread with the
+ * index "position" to "Stopped".
+ */
+static void ThreadHasStopped( unsigned position )
+{
+   ULONG rc;
+
+   State[position] = Stopped;
+   if ( ( rc = DosPostEventSem( (HEV) thread_sems[position].hsemCur ) ) != 0 )
+   {
+      fprintf( stderr, "\n"
+                       "Error posting an EventSem, error code is %lu\n",
+                       rc );
+      GlobalError = 1;
+   }
+}
+
+/*
+ * wait_for_threads restarts new threads until the requested count of
+ * TOTAL_THREADS has been reached. GlobalError is set if any error occurs.
+ *
+ * We expect to have MAX_THREADS already running.
+ */
+void wait_for_threads( void )
+{
+   unsigned done,running;
+   ULONG rc, post, user;
+
+   running = done = MAX_THREADS;
+
+   if ( stdout_is_tty )
+      printf( "%u\r", MAX_THREADS );
+   if ( GlobalError )
+      return;
+
+   for ( ; ; )
+   {
+      rc = DosWaitMuxWaitSem( hmux, 3000, &user );
+      if ( rc != 0 )
+      {
+         fprintf( stderr, "\n"
+                          "At least one thread won't finish normally within 3 seconds (error=%lu).\n",
+                          rc );
+         GlobalError = 1;
+      }
+      if ( user >= MAX_THREADS )
+      {
+         fprintf( stderr, "\n"
+                          "Strange behaviour after wating for MuxWaitSem, released thread index is %lu.\n",
+                          user );
+         GlobalError = 1;
+      }
+      if ( GlobalError )
+         break;
+
+      /*
+       * A thread has died. Check the reason.
+       */
+      if ( State[user] != Stopped )
+      {
+         fprintf( stderr, "\n"
+                          "Thread %lu hasn't finished normally.\n", user );
+         GlobalError = 1;
+         break;
+      }
+
+      /*
+       * Check values and restart a new instance if we still have to do so.
+       */
+      State[user] = Ready;
+      running--;
+      /*
+       * Only reap our threads if running the instore test code
+       */
+      if ( program_name == NULL )
+         reap( (int) user );
+
+      if ( done < TOTAL_THREADS )
+      {
+         if ( !start_a_thread( (int) user ) )
+            break;
+         done++;
+         running++;
+      }
+      else
+      {
+         rc = DosResetEventSem( (HEV) thread_sems[user].hsemCur, &post );
+         if ( ( rc != 0 ) && ( rc != ERROR_ALREADY_RESET ) )
+         {
+            fprintf( stderr, "\n"
+                             "Error resetting an EventSem, error code is %lu\n",
+                             rc );
+            GlobalError = 1;
+            break;
+         }
+      }
+      if ( stdout_is_tty )
+         printf( "%u(%u)\r", done, running );
+      if ( GlobalError || !running )
+         break;
+   }
+}
+#endif
+
+#ifdef POSIX_THREADS
 /*
  * The number of processed runs needs to be global for error analysis.
  */
@@ -654,7 +908,7 @@ int start_a_thread( unsigned position )
    int rc;
 
    State[position] = Running;
-   rc = pthread_create( &thread[position], NULL, instore, (void *) position );
+   rc = pthread_create( &thread[position], NULL, (program_name) ? external : instore, (void *) position );
    if ( rc )
    {
       fprintf( stderr, "\n"
@@ -784,7 +1038,11 @@ void wait_for_threads( void )
          /*
           * Has the thread done its work completely?
           */
-         reap(i);
+         /*
+          * Only reap our threads if running the instore test code
+          */
+         if ( program_name == NULL )
+            reap(i);
 
          /*
           * Restart a new thread if we need some more runs.
@@ -813,17 +1071,19 @@ void wait_for_threads( void )
  */
 static void usage( void )
 {
-   printf( "usage: threader [-p]\n"
+   printf( "usage: threader [-p] [filename]\n"
            "\n"
            "Options:\n"
            "-p\tLoad the macro only once and then use the generated instore\n"
            "\tmacro. Default: Always load the macro new.\n"
            "\n"
-           "threader uses a macro which generated lines with numbers which can\n"
+           "filename\tThe Rexx program to execute rather than the instore test\n"
+           "\tprogram.\n"
+           "\nThe default instore macro generates lines with numbers which can\n"
            "be parsed to detect problems in the multi-threading implementation.\n"
-           "A loop counter runs until %u. The test should run from a few\n"
+           "A loop counter runs by default until %u. The test should run from a few\n"
            "seconds up to a few minutes. You should hit ^C to abort the program\n"
-           "if you think your harddisk is working heavy.\n"
+           "if you think your harddisk is working heavily.\n"
            "\n"
            "This program is for testing purpose only.\n"
            ,TOTAL_THREADS );
@@ -844,15 +1104,33 @@ int main( int argc, char *argv[] )
    if ( isatty( fileno( stdout ) ) )
       stdout_is_tty = 1;
 
-   if ( argc > 2 )
-      usage();
-   if ( argc > 1 )
+   for ( i = 1; i < argc; i++ )
    {
-      if ( strcmp( argv[1], "-p" ) == 0 )
+      if ( argv[i][0] != '-' )
+         break;
+
+      if ( strcmp( argv[i], "-p" ) == 0 )
+      {
          UseInstore = FirstRun;
-        else
+      }
+      else if ( strcmp( argv[i], "--" ) == 0 )
+      {
+         i++;
+         break;
+      }
+      else
+      {
          usage();
+      }
    }
+
+   if ( argc > i )
+   {
+      program_name = argv[i];
+      i++;
+   }
+   if ( argc > i )
+      usage();
 
    /*
     * Initialize some tables and tune the IO system to show every output
@@ -882,6 +1160,11 @@ int main( int argc, char *argv[] )
    }
    printf( "\n" );
 
+   if ( UseInstore && program_name )
+   {
+      printf( "Ignoring the \"-p\" flag for external REXX scripts\n" );
+      UseInstore = UnUsed;
+   }
    /*
     * In case of a processing with compiled macros we need something
     * compiled ;-) We let run one instance and let instore() save the compiled
@@ -892,7 +1175,10 @@ int main( int argc, char *argv[] )
       State[0] = Running;
       thread[0] = my_threadid();
       threadx[0] = my_threadidx();
-      instore( NULL );
+      if ( program_name )
+         external( NULL );
+      else
+         instore( NULL );
       State[0] = Stopped;
       found[0] = 0;
       UseInstore = DoInstore;
@@ -942,10 +1228,11 @@ int main( int argc, char *argv[] )
       return 0;
 
    printf( "Press ENTER to continue and end the program. You may have a look\n"
-          " at your preferred memory analyser like ps or tasklist...\n" );
+          " at your preferred memory analyser like ps, pstat or tasklist...\n" );
    {
       char buf[128];
       fgets( buf, sizeof( buf ), stdin );
    }
+
    return 0;
 }

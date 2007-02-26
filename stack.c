@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: stack.c,v 1.20 2003/03/27 09:03:48 mark Exp $";
+static char *RCSid = "$Id: stack.c,v 1.29 2004/04/24 09:32:58 florian Exp $";
 #endif
 
 /*
@@ -98,7 +98,6 @@ static char *RCSid = "$Id: stack.c,v 1.20 2003/03/27 09:03:48 mark Exp $";
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <ctype.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -134,10 +133,14 @@ typedef struct { /* stk_tsd: static variables of this module (thread-safe) */
    int initialized ;
 #endif
    /*
-    * The index into the current queue
+    * The pointer of the current queue points to one of the elements of queue.
     */
    Queue *current_queue;
    Queue queue[ NUMBER_QUEUES ] ;
+   /*
+    * The current queue's name is buffered for a faster access.
+    */
+   streng *current_queue_name;
    /*
     * runner is needed to create fresh ids.
     */
@@ -147,9 +150,11 @@ typedef struct { /* stk_tsd: static variables of this module (thread-safe) */
               */
 
 #if !defined(NO_EXTERNAL_QUEUES)
-static void get_socket_details_and_connect( tsd_t *TSD, Queue *target );
+static int get_socket_details_and_connect( tsd_t *TSD, Queue *target );
 static int save_parse_queue( tsd_t *TSD, streng *queue, Queue *q,
                                                               int ignore_name);
+static Queue *open_external( tsd_t *TSD, const streng *queue, Queue *q,
+                                 int *rc, int ignore_name, streng **basename );
 #endif
 
 /* init_stacks initializes the module.
@@ -294,7 +299,7 @@ static void delete_a_queue( const tsd_t *TSD, stk_tsd_t *st, Queue *q )
 
 /*
  * This routine clears all the internal queues we have made
- * and if we have a connection to rxstack, disconnetcs from it
+ * and if we have a connection to rxstack, disconnects from it
  */
 void purge_stacks( const tsd_t *TSD )
 {
@@ -305,6 +310,9 @@ void purge_stacks( const tsd_t *TSD )
    for ( i = 0; i < NUMBER_QUEUES; i++ )
       delete_a_queue( TSD, st, &st->queue[i] );
    st->current_queue = &st->queue[0];
+   if ( st->current_queue_name != NULL )
+      Free_stringTSD( st->current_queue_name );
+   st->current_queue_name = NULL;
 }
 
 static void SetSessionName( const tsd_t *TSD, stk_tsd_t *st )
@@ -316,6 +324,7 @@ static void SetSessionName( const tsd_t *TSD, stk_tsd_t *st )
    {
       q->u.i.name = Str_creTSD( "SESSION" ) ;
       q->u.i.isReal = 1 ;
+      st->current_queue_name = Str_dupTSD( q->u.i.name );
    }
 }
 
@@ -353,7 +362,8 @@ Queue *find_free_slot( const tsd_t *TSD )
       if ( st->queue[i].type == QisUnused )
          return &st->queue[i] ;
    }
-   exiterror( ERR_STORAGE_EXHAUSTED, 0 ); /* message not very helpful */
+   if ( !TSD->called_from_saa )
+      exiterror( ERR_STORAGE_EXHAUSTED, 0 ); /* message not very helpful */
    return NULL ;
 }
 
@@ -493,13 +503,13 @@ streng *stack_to_line( const tsd_t *TSD, Queue *q )
  * The input for a command may be overwritten if both input and output or
  * input and error are STEM values. A temporary queue is created in this
  * case to prevent the destruction of an unread value.
- * fill_input_queue fills up a new queue with a copy of a stems
+ * fill_input_queue_stem fills up a new queue with a copy of a stems
  * content. stemname must end with a period and stem0 is the count of lines
  * in stem.
  * OPTIMIZING HINT: The function can be rewritten to access just only the
  * stem leaves.
  */
-Queue *fill_input_queue(tsd_t *TSD, streng *stemname, int stem0)
+Queue *fill_input_queue_stem(tsd_t *TSD, streng *stemname, int stem0)
 {
    int i,stemlen = Str_len( stemname ) ;
    streng *stem, *new ;
@@ -526,6 +536,41 @@ Queue *fill_input_queue(tsd_t *TSD, streng *stemname, int stem0)
 }
 
 /*
+ * The input for a command may be overwritten if both input and output or
+ * input and error are STREAM values. A temporary queue is created in this
+ * case to prevent the destruction of an unread value.
+ * fill_input_queue_stream fills up a new queue with a copy of a streams
+ * content. fileptr must be an opened file stream pointer gotten by
+ * addr_reopen_file() for an input stream.
+ */
+Queue *fill_input_queue_stream( tsd_t *TSD, void *fileptr )
+{
+   StackLine *line;
+   streng *c;
+   Queue *q = find_free_slot( TSD );
+
+   q->type = QisTemp;
+
+   for ( ; ; )
+   {                                    /* Fetch the value:                  */
+      c = addr_io_file( TSD, fileptr, NULL );
+      if ( c == NULL )
+         break;
+      if ( c->len == 0 )
+      {
+         Free_stringTSD( c );
+         break;
+      }
+
+      line = (StackLine *) MallocTSD( sizeof( StackLine ) );
+      line->contents = c;
+      FIFO_LINE( &q->u.t, line );
+   }
+
+   return q;
+}
+
+/*
  * use_external checks whether or not an external queue must be processed.
  * The different reasons why not to do it are checked.
  * use_external returns either 0, if queue_name is a local queue name or
@@ -542,11 +587,11 @@ static int use_external( const tsd_t *TSD, const streng *queue_name )
     * This function is called at top of each relevant function.
     */
    if ( st->queue[0].u.i.name == NULL )
-      SetSessionName( TSD, st ) ;
+      SetSessionName( TSD, st );
 
 #if defined(NO_EXTERNAL_QUEUES)
    (queue_name);
-   return 0 ;        /* trivial */
+   return 0;        /* trivial */
 #else
 
    if ( !st->initialized )
@@ -556,20 +601,24 @@ static int use_external( const tsd_t *TSD, const streng *queue_name )
        * either internal or external.
        */
       st->initialized = 1;
-      init_external_queue(TSD);
+      init_external_queue( TSD );
    }
 
    if ( get_options_flag( TSD->currlevel, EXT_INTERNAL_QUEUES ) )
-      return 0 ;     /* user forces a local queue in every case */
+      return 0;     /* user forces a local queue in every case */
    if ( ( queue_name == NULL ) || ( PSTRENGLEN( queue_name ) == 0 ) )
-      return st->current_queue->type == QisExternal ;
+      return st->current_queue->type == QisExternal;
 
-   /*
-    * A name exists, check it.
-    */
-   if  (memchr(queue_name->value, '@', Str_len(queue_name)) == NULL)
-      return 0 ;
-   return 1 ;
+   if ( get_options_flag( TSD->currlevel, EXT_QUEUES_301 ) == 0 )
+   {
+      /*
+       * A name exists, check it.
+       */
+      if  ( memchr( queue_name->value, '@', Str_len( queue_name ) ) == NULL )
+         return 0;
+   }
+
+   return 1;
 #endif
 }
 
@@ -596,6 +645,7 @@ int stack_lifo( tsd_t *TSD, streng *line, const streng *queue_name )
    Buffer *b ;
    stk_tsd_t *st ;
    Queue *q ;
+   int rc=0;
 
    st = TSD->stk_tsd;
 
@@ -625,24 +675,17 @@ int stack_lifo( tsd_t *TSD, streng *line, const streng *queue_name )
    else
    {
       Queue q, *work;
-      streng *qn ;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 0, NULL ) ) == NULL )
+         return rc;
 
-      if ( save_parse_queue( TSD, qn, &q, 0 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
-      }
-      else
-         work = st->current_queue ;
-      get_socket_details_and_connect( TSD, work ) ;
-
-      queue_line_lifo_to_rxstack( TSD, work->u.e.socket, line ) ;
+      if ( ( rc = queue_line_lifo_to_rxstack( TSD, work->u.e.socket, line ) )
+                                                                        == -1 )
+         rc = 100;
       disconnect_from_rxstack( TSD, &q ) ;
    }
 #endif
-   return 0;
+   return rc;
 }
 
 
@@ -662,6 +705,7 @@ int stack_fifo( tsd_t *TSD, streng *line, const streng *queue_name )
    stk_tsd_t *st;
    Queue *q;
    Buffer *b ;
+   int rc=0;
 
    st = TSD->stk_tsd;
 
@@ -691,24 +735,17 @@ int stack_fifo( tsd_t *TSD, streng *line, const streng *queue_name )
    else
    {
       Queue q, *work;
-      streng *qn ;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 0, NULL ) ) == NULL )
+         return rc;
 
-      if ( save_parse_queue( TSD, qn, &q, 0 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
-      }
-      else
-         work = st->current_queue ;
-      get_socket_details_and_connect( TSD, work ) ;
-
-      queue_line_fifo_to_rxstack( TSD, work->u.e.socket, line ) ;
+      if ( ( rc = queue_line_fifo_to_rxstack( TSD, work->u.e.socket, line ) )
+                                                                        == -1 )
+         rc = 100;
       disconnect_from_rxstack( TSD, &q ) ;
    }
 #endif
-   return 0;
+   return rc;
 }
 
 
@@ -807,8 +844,11 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
       {
          if ( ( q = find_queue( TSD, st, queue_name ) ) == NULL )
          {
-            if ( result ) *result = -9;
-            return NULL;
+            if ( result )
+               *result = 9;
+            if ( !TSD->called_from_saa )
+               contents = nullstringptr();
+            return contents;
          }
       }
       else
@@ -849,26 +889,23 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
    else
    {
       Queue q, *work;
-      streng *qn ;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
-
-      if ( save_parse_queue( TSD, qn, &q, 0 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 0, NULL ) ) == NULL )
+      {
+         if ( result )
+            *result = rc;
+         return NULL;
       }
-      else
-         work = st->current_queue ;
-      get_socket_details_and_connect( TSD, work ) ;
-      /*
-       * contents created by get_queue_from_stack(); up to caller to free it
-       * rc can be 0; line pulled off stack, or 1; queue empty. Error; 2
-       * handled by get_line_from_rxstack()
-       */
-      rc = get_line_from_rxstack( TSD, work->u.e.socket, &contents, 0 );
+
+      rc = get_line_from_rxstack( TSD, work->u.e.socket, &contents, ( waitflag == 0 ) );
+      switch ( rc )
+      {
+         case -1:    rc = 100;  break;
+         case 2:     rc = 9;   break;  /* map generic error to RXQUEUE_NOTREG */
+         default:    ;
+      }
       disconnect_from_rxstack( TSD, &q ) ;
-      if ( rc == 1 || rc == 4 )
+      if ( ( rc == 1 ) || ( rc == 4 ) ) /* empty or timeout */
          need_line_from_stdin = 1;
    }
 #endif
@@ -876,22 +913,33 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
    if ( need_line_from_stdin )
    {
       if ( TSD->called_from_saa )
-         contents = NULL; /* indicate that queue is empty */
+      {
+         rc = 8; /* RXQUEUE_EMPTY */
+      }
       else if ( rc == 4 )
-         contents = nullstringptr();
+      {
+         rc = 8; /* RXQUEUE_EMPTY */
+      }
       else
       {
-         int rc = HOOK_GO_ON ;
-         if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_PULL))
-            rc = hookup_input( TSD, HOOK_PULL, &contents ) ;
+         int rc2 = HOOK_GO_ON ;
+         if ( TSD->systeminfo->hooks & HOOK_MASK( HOOK_PULL ) )
+            rc2 = hookup_input( TSD, HOOK_PULL, &contents );
 
-         if (rc==HOOK_GO_ON)
-            contents = readkbdline( TSD ) ;
+         if ( rc2 == HOOK_GO_ON )
+            contents = readkbdline( TSD );
 
-         assert( contents ) ;
+         assert( contents );
+
+         rc = 0;
       }
+      rc = 0;
    }
-   if ( result ) *result = 0 ;
+   if ( result )
+      *result = rc;
+   else if ( ( contents == NULL ) && !TSD->called_from_saa )
+      contents = nullstringptr();
+
    return contents;
 }
 
@@ -926,23 +974,15 @@ int lines_in_stack( tsd_t *TSD, const streng *queue_name )
    else
    {
       Queue q, *work;
-      streng *qn ;
+      int rc;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 0, NULL ) ) == NULL )
+         return -rc;
 
-      if ( save_parse_queue( TSD, qn, &q, 0 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
-      }
-      else
-         work = st->current_queue ;
-      get_socket_details_and_connect( TSD, work ) ;
-      /*
-       * Any errors are handled by get_number_in_queue_from_rxstack()
-       */
-      lines = get_number_in_queue_from_rxstack( TSD, work->u.e.socket );
+      lines = get_number_in_queue_from_rxstack( TSD, work->u.e.socket, &rc );
       disconnect_from_rxstack( TSD, &q ) ;
+      if ( rc != 0 )
+         lines = -rc;
    }
 #endif
    return lines ;
@@ -1061,7 +1101,6 @@ void type_buffer( tsd_t *TSD )
    q = st->current_queue ;
    name = get_queue( TSD ) ;
    fprintf(TSD->stddump,"==> Name: %.*s\n", Str_len(name), name->value ) ;
-   Free_stringTSD( name ) ;
    fprintf(TSD->stddump,"==> Lines: %d\n", lines_in_stack( TSD, NULL )) ;
    if ( q->type == QisExternal )
       return ;
@@ -1076,7 +1115,7 @@ void type_buffer( tsd_t *TSD )
          putc( '"', TSD->stddump ) ;
          stop = Str_end( ptr->contents ) ;
          for ( cptr = ptr->contents->value ; cptr < stop; cptr++ )
-            putc( ( isprint( *cptr ) ? ( *cptr ) : '?' ), TSD->stddump ) ;
+            putc( ( rx_isprint( *cptr ) ? ( *cptr ) : '?' ), TSD->stddump ) ;
 
          putc( '"', TSD->stddump ) ;
 #if defined(DOS) || defined(OS2) || defined(WIN32)
@@ -1096,7 +1135,7 @@ void type_buffer( tsd_t *TSD )
  * queue process; rxstack
  * The connection to eq is opened if and only if it isn't opened yet.
  */
-static void get_socket_details_and_connect( tsd_t *TSD, Queue *q )
+static int get_socket_details_and_connect( tsd_t *TSD, Queue *q )
 {
    stk_tsd_t *st;
 
@@ -1115,14 +1154,18 @@ static void get_socket_details_and_connect( tsd_t *TSD, Queue *q )
 
    if ( q->u.e.socket == -1 )
    {
-      connect_to_rxstack( TSD, q );
+      if ( connect_to_rxstack( TSD, q ) == -1 )
+         return 100; /* RXQUEUE_NETERROR */
    }
+   return 0;
 }
 
 /*
  * save_parse_queue wraps parse_queue and exiterrors in case of an error.
  * Returns 1 if queue is (probably) different from the current queue, 0 else.
- * *eq is filled even with a return value of 0.
+ * *q is filled even with a return value of 0.
+ * A negative return code indicates a RXQUEUE_??? error code which must be
+ * passed back to the SAA interface immediately.
  * Queues are treated as equal if ignore_name is set but host address and port
  * numbers are the same.
  */
@@ -1131,12 +1174,11 @@ static int save_parse_queue( tsd_t *TSD, streng *queue, Queue *q,
 {
    stk_tsd_t *st = TSD->stk_tsd;
    Queue *curr ;
+   int rc;
 
-   q->type = QisExternal ;
-   if ( parse_queue( TSD, queue, q ) == -1 )
-      exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of(TSD, queue ) ) ;
-   if ( queue == NULL )
-      return 0 ;
+   if ( ( rc = parse_queue( TSD, queue, q ) ) <= 0 )
+      return rc;
+
    if ( !ignore_name && ( PSTRENGLEN( queue ) != 0 ) )
       return 1 ;
    curr = st->current_queue ;
@@ -1148,21 +1190,97 @@ static int save_parse_queue( tsd_t *TSD, streng *queue, Queue *q,
       return 1 ;
    return 0 ;
 }
+
+/*
+ * open_external opens the connection to the external queue will a full
+ * error checking. NULL is returned on error and *rc describes the
+ * RXQUEUE_??? error.
+ * On success the opened queue is returned and *q is set to the old or
+ * temporary queue. queue is either NULL or describes the new temporary
+ * queue's name.
+ * Queues are treated as equal if ignore_name is set but host address and port
+ * numbers are the same. No set_queue_in_rxstack() is called if ignore_name
+ * is set.
+ * *basename is set to the queue's name without the network extension if
+ * basename != NULL. It must be freed later. *basename may become NULL.
+ */
+static Queue *open_external( tsd_t *TSD, const streng *queue, Queue *q,
+                                  int *rc, int ignore_name, streng **basename )
+{
+   stk_tsd_t *st = TSD->stk_tsd;
+   streng *qn;
+   int h;
+   Queue *retval;
+
+   qn = ( queue == NULL ) ? NULL : Str_dupTSD( queue );
+
+   if ( ( h = save_parse_queue( TSD, qn, q, ignore_name ) ) < 0 )
+   {
+      if ( qn != NULL )
+         Free_stringTSD( qn );
+      *rc = -h;
+      return NULL;
+   }
+   if ( h == 1 )
+   {
+      if ( ( h = get_socket_details_and_connect( TSD, q ) ) != 0 )
+      {
+         if ( qn != NULL )
+            Free_stringTSD( qn );
+         disconnect_from_rxstack( TSD, q );
+         *rc = h;
+         return NULL;
+      }
+      if ( !ignore_name )
+      {
+         if ( ( h = set_queue_in_rxstack( TSD, q->u.e.socket, qn ) ) != 0 )
+         {
+            if ( qn != NULL )
+               Free_stringTSD( qn );
+            disconnect_from_rxstack( TSD, q );
+            *rc = h;
+            return NULL;
+         }
+      }
+      retval = q ;
+   }
+   else
+   {
+      retval = st->current_queue ;
+   }
+
+   if ( basename != NULL )
+      *basename = qn;
+   else if ( qn != NULL )
+      Free_stringTSD( qn );
+
+   *rc = 0;
+   return retval;
+}
 #endif
 
 /* SetCurrentQueue set the current queue and makes all the necessary cleanup
  * of the "old" current queue.
+ * new_name is assigned to the current queue's name, the former value is
+ * returned.
  */
-static void SetCurrentQueue( const tsd_t *TSD, stk_tsd_t *st, Queue *q )
+static streng *SetCurrentQueue( const tsd_t *TSD, stk_tsd_t *st, Queue *q,
+                                                             streng *new_name )
 {
+   streng *retval;
+
 #if !defined( NO_EXTERNAL_QUEUES )
    if ( ( st->current_queue->type == QisExternal )
      && ( st->current_queue != q ) )
-      delete_an_external_queue( TSD, st, st->current_queue ) ;
+      delete_an_external_queue( TSD, st, st->current_queue );
 #else
    (TSD);
 #endif
-   st->current_queue = q ;
+   st->current_queue = q;
+
+   retval = st->current_queue_name;
+   st->current_queue_name = new_name;
+   return retval;
 }
 
 /*
@@ -1202,7 +1320,12 @@ int create_queue( tsd_t *TSD, const streng *queue_name, streng **result )
          else
          {
             if ( q->type == QisSESSION )
+            {
+               if ( !TSD->called_from_saa )
+                  exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting queue from stack" );
+
                return 5 ;
+            }
             /*
              * If the queue we found is a false queue, we can still
              * use the supplied name and the slot
@@ -1214,13 +1337,20 @@ int create_queue( tsd_t *TSD, const streng *queue_name, streng **result )
                 */
                sprintf(buf,"S%d-%ld-%d", getpid(), clock(), st->runner++ );
                new_queue = Str_cre_TSD( TSD, buf ) ;
+               rc = 1;
             }
          }
       }
 
       if ( new_queue != NULL ) /* new name for a new slot */
       {
-         q = find_free_slot( TSD ) ;
+         q = find_free_slot( TSD );
+         if ( q == NULL )
+         {
+            if ( new_queue != NULL )
+               Free_stringTSD( new_queue );
+            return 12; /* RXQUEUE_MEMFAIL */
+         }
          q->type = QisInternal ;
          if ( new_queue == queue_name ) /* need a fresh one */
             new_queue = Str_dupTSD( new_queue ) ;
@@ -1237,33 +1367,17 @@ int create_queue( tsd_t *TSD, const streng *queue_name, streng **result )
    else
    {
       Queue q, *work;
-      streng *qn ;
+      streng *base;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 1, &base ) ) == NULL )
+         return rc;
 
-      if ( save_parse_queue( TSD, qn, &q, 1 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
-      }
-      else
-         work = st->current_queue ;
-      get_socket_details_and_connect( TSD, work ) ;
-      rc = create_queue_on_rxstack( TSD, work, qn, result );
-      if ( ( rc == 0 ) || ( rc == 1 ) )
-      {
-         if ( work == &q )
-         {
-            work = find_free_slot( TSD ) ;
-            *work = q ;
-         }
-         else
-         {
-            disconnect_from_rxstack( TSD, &q ) ;
-         }
-      }
-      else
-         disconnect_from_rxstack( TSD, &q ) ;
+      if ( ( rc = create_queue_on_rxstack( TSD, work, base, result ) ) == -1 )
+         rc = 100;
+
+      if ( base != NULL )
+         Free_stringTSD( base );
+      disconnect_from_rxstack( TSD, &q ) ;
    }
 #endif
    return rc;
@@ -1277,9 +1391,10 @@ int create_queue( tsd_t *TSD, const streng *queue_name, streng **result )
  */
 int delete_queue( tsd_t *TSD, const streng *queue_name )
 {
-   int rc = 0 ;
+   int rc = 0;
    stk_tsd_t *st;
-   Queue *q ;
+   Queue *q;
+   streng *h;
 
    st = TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
@@ -1301,33 +1416,40 @@ int delete_queue( tsd_t *TSD, const streng *queue_name )
        * and mark it as gone.
        */
       delete_an_internal_queue( TSD, st, q );
-      SetCurrentQueue( TSD, st, &st->queue[0] ) ; /* SESSION */
-      rc = 0;
+      h = SetCurrentQueue( TSD, st, &st->queue[0], Str_creTSD( "SESSION" ) ) ;
+      Free_stringTSD( h );
    }
 #if !defined(NO_EXTERNAL_QUEUES)
    else
    {
       Queue q, *work;
-      streng *qn ;
+      streng *base;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 1, &base ) ) == NULL )
+         return rc;
 
-      if ( save_parse_queue( TSD, qn, &q, 1 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
-      }
-      else
-         work = st->current_queue ;
-      if ( ( qn == NULL ) || ( PSTRENGLEN( qn ) == 0 ) )
-         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of(TSD, queue_name ) ) ;
-      get_socket_details_and_connect( TSD, work ) ;
-      if ( ( rc = delete_queue_from_rxstack( TSD, work->u.e.socket, qn ) ) == 0 )
+      if ( ( base == NULL ) || ( PSTRENGLEN( base ) == 0 ) )
       {
-         /* This will disconnect the current external queue is needed */
-         SetCurrentQueue( TSD, st, &st->queue[0] ) ; /* SESSION */
+         if ( base != NULL )
+            Free_stringTSD( base );
+         if ( TSD->called_from_saa )
+            return 9;
+         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of(TSD, queue_name ) ) ;
       }
+
+      if ( ( rc = delete_queue_from_rxstack( TSD, work->u.e.socket, base ) ) == 0 )
+      {
+         /* This will disconnect the current external queue if needed */
+         h = SetCurrentQueue( TSD, st, &st->queue[0], Str_creTSD( "SESSION" ) );
+         Free_stringTSD( h );
+      }
+
+      if ( base != NULL )
+         Free_stringTSD( base );
       disconnect_from_rxstack( TSD, &q ) ;
+
+      if ( rc == -1 )
+         rc = 100;
    }
 #endif
    return rc;
@@ -1338,6 +1460,7 @@ int delete_queue( tsd_t *TSD, const streng *queue_name )
  * RXQUEUE( 'Timeout' )
  * Do not reuse the current connection. A different external queue name
  * leads to an expensive NOP.
+ * Timeout only valid for external queues.
  */
 int timeout_queue( tsd_t *TSD, const streng *timeout, const streng *queue_name )
 {
@@ -1347,34 +1470,25 @@ int timeout_queue( tsd_t *TSD, const streng *timeout, const streng *queue_name )
    st = TSD->stk_tsd;
    if ( !use_external( TSD, queue_name ) )
    {
-      exiterror( ERR_EXTERNAL_QUEUE, 109, "TIMEOUT" ) ;
+      exiterror( ERR_EXTERNAL_QUEUE, 111, "TIMEOUT" ) ;
    }
 #if !defined(NO_EXTERNAL_QUEUES)
    else
    {
       Queue q, *work;
-      int val, err ;
-      streng *qn ;
+      int val, err;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
-
-      if ( save_parse_queue( TSD, qn, &q, 0 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ; /* useless, we close the connection at once! */
-      }
-      else
-         work = st->current_queue ;
-      get_socket_details_and_connect( TSD, work ) ;
-      /*
-       * Any errors are handled by get_number_in_queue_from_rxstack()
-       */
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 1, NULL ) ) == NULL )
+         return rc;
       /*
        * Convert incoming streng to positive (or zero) integer
        */
       val = streng_to_int( TSD, timeout, &err ) ;
       if ( ( val < -1 ) || err )
+      {
+         disconnect_from_rxstack( TSD, &q ) ;
          exiterror( ERR_INCORRECT_CALL, 930, 999999999, tmpstr_of( TSD, timeout ) );
+      }
       rc = timeout_queue_on_rxstack( TSD, work->u.e.socket, val );
       disconnect_from_rxstack( TSD, &q ) ;
    }
@@ -1383,45 +1497,49 @@ int timeout_queue( tsd_t *TSD, const streng *timeout, const streng *queue_name )
 }
 
 /*
- * Return the name of the current queue
+ * Return the name of the current queue. The value is silently nul terminated.
  * RXQUEUE( 'Get' )
  * Returns queue name even if it is a false queue
  */
 streng *get_queue( tsd_t *TSD )
 {
-   streng *result ;
-   stk_tsd_t *st ;
+   streng *result;
+   stk_tsd_t *st;
+   int l;
+   char *p;
 
    st = TSD->stk_tsd;
-   if ( !use_external( TSD, NULL ) )
-   {
-      /*
-       * result created here; up to caller to free it
-       */
-      assert( ( st->current_queue->type == QisSESSION )
-           || ( st->current_queue->type == QisInternal ) ) ;
-      result = Str_dupTSD( st->current_queue->u.i.name );
-   }
-#if !defined(NO_EXTERNAL_QUEUES)
-   else
-   {
-      Queue q, *work;
+   if ( st->queue[0].u.i.name == NULL )
+      SetSessionName( TSD, st ) ;
 
-      memset( &q, 0, sizeof(q) ) ;
-      q.type = QisExternal ;
-      q.u.e.socket = -1 ;
-      if ( st->current_queue->type == QisExternal )
-         work = st->current_queue ;
-      else
-         work = &q;
-      get_socket_details_and_connect( TSD, work ) ;
-      /*
-       * result created by get_queue_from_stack(); up to caller to free it
-       */
-      get_queue_from_rxstack( TSD, work, &result );
-   }
-#endif
+   assert( st->current_queue_name != NULL );
+
+   l = Str_len( st->current_queue_name );
+   result = Str_makeTSD( l + 1 );
+   p = Str_val( result );
+   memcpy( p, Str_val( st->current_queue_name ), l );
+   p[l] = '\0';
+   Str_len( result ) = l;
+
    return result;
+}
+
+/*
+ * Return the name and length of the current queue in argument pointers. No
+ * copy is done.
+ */
+void fill_queue_name( const tsd_t *TSD, int *len, char **name )
+{
+   stk_tsd_t *st;
+
+   st = TSD->stk_tsd;
+   if ( st->queue[0].u.i.name == NULL )
+      SetSessionName( TSD, st ) ;
+
+   assert( st->current_queue_name != NULL );
+
+   *len = Str_len( st->current_queue_name );
+   *name = Str_val( st->current_queue_name );
 }
 
 /*
@@ -1436,7 +1554,6 @@ streng *get_queue( tsd_t *TSD )
 streng *set_queue( tsd_t *TSD, const streng *queue_name )
 {
    stk_tsd_t *st ;
-   streng *result = get_queue( TSD ) ;
    Queue *q ;
 
    st = TSD->stk_tsd;
@@ -1454,44 +1571,49 @@ streng *set_queue( tsd_t *TSD, const streng *queue_name )
          q->u.i.isReal = 0 ; /* false queue */
       }
       assert( ( q->type == QisSESSION ) || ( q->type == QisInternal ) ) ;
-      SetCurrentQueue( TSD, st, q ) ;
+      return SetCurrentQueue( TSD, st, q, Str_dupTSD( q->u.i.name ) );
    }
 #if !defined(NO_EXTERNAL_QUEUES)
    else
    {
       Queue q, *work;
-      streng *qn ;
+      streng *base, *result;
+      int rc;
 
-      qn = ( queue_name == NULL ) ? NULL : Str_dupTSD( queue_name ) ;
+      if ( ( work = open_external( TSD, queue_name, &q, &rc, 1, &base ) ) == NULL )
+         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Setting queue from stack" );
 
-      if ( save_parse_queue( TSD, qn, &q, 1 ) == 1 ) {
-         get_socket_details_and_connect( TSD, &q ) ;
-         set_queue_in_rxstack( TSD, q.u.e.socket, qn );
-         work = &q ;
-      }
-      else
-         work = st->current_queue ;
-      if ( ( qn == NULL ) || ( PSTRENGLEN( qn ) == 0 ) )
-         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of(TSD, queue_name ) ) ;
-      get_socket_details_and_connect( TSD, work ) ;
-      if ( set_queue_in_rxstack( TSD, work->u.e.socket, qn ) == 0 )
+      if ( ( base == NULL ) || ( PSTRENGLEN( base ) == 0 ) )
       {
+         if ( base != NULL )
+            Free_stringTSD( base );
+         disconnect_from_rxstack( TSD, &q ) ;
+         assert( !TSD->called_from_saa );
+         exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of(TSD, queue_name ) ) ;
+      }
+      if ( ( rc = set_queue_in_rxstack( TSD, work->u.e.socket, base ) ) == 0 )
+      {
+         Free_stringTSD( base );
+         if ( ( rc = get_queue_from_rxstack( TSD, work, &result ) ) != 0 )
+         {
+            disconnect_from_rxstack( TSD, &q );
+            assert( !TSD->called_from_saa );
+            exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting queue back from stack" );
+         }
          if ( work == &q )
          {
-            work = find_free_slot( TSD ) ;
-            *work = q ;
-            SetCurrentQueue( TSD, st, work ) ;
+            work = find_free_slot( TSD );
+            *work = q;
          }
-         else
-         {
-            disconnect_from_rxstack( TSD, &q ) ;
-         }
+         return SetCurrentQueue( TSD, st, work, result );
       }
-      else
-         disconnect_from_rxstack( TSD, &q ) ;
+      Free_stringTSD( base );
+      disconnect_from_rxstack( TSD, &q ) ;
+      assert( !TSD->called_from_saa );
+      exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Setting queue from stack" );
    }
 #endif
-   return result;
+   return NULL;
 }
 
 Queue *addr_reopen_queue( tsd_t *TSD, const streng *queuename, char code )
@@ -1542,8 +1664,16 @@ Queue *addr_reopen_queue( tsd_t *TSD, const streng *queuename, char code )
    q = find_free_slot( TSD ) ;
 
    name = Str_dupTSD( queuename ) ;
-   save_parse_queue( TSD, name, q, 1 ) ;
-   get_socket_details_and_connect( TSD, q ) ;
+   if ( save_parse_queue( TSD, name, q, 1 ) < 0 )
+   {
+      Free_stringTSD( name );
+      return NULL;
+   }
+   if ( get_socket_details_and_connect( TSD, q ) != 0 )
+   {
+      disconnect_from_rxstack( TSD, q ) ;
+      return NULL;
+   }
    set_queue_in_rxstack( TSD, q->u.e.socket, name );
 
    /* We can't be sure using a real queue at this place.
@@ -1583,8 +1713,13 @@ int addr_same_queue( const tsd_t *TSD, const Queue *q1, const Queue *q2 )
       return 0 ;
    /* we have to use the slow name comparison */
 #if !defined( NO_EXTERNAL_QUEUES )
-   get_queue_from_rxstack( TSD, q1, &n1 );
-   get_queue_from_rxstack( TSD, q2, &n2 );
+   if ( get_queue_from_rxstack( TSD, q1, &n1 ) != 0 )
+      return 0;
+   if ( get_queue_from_rxstack( TSD, q2, &n2 ) != 0 )
+   {
+      Free_stringTSD( n1 ) ;
+      return 0;
+   }
    retval = !Str_cmp( n1, n2 ) ;
    Free_stringTSD( n1 ) ;
    Free_stringTSD( n2 ) ;
@@ -1615,12 +1750,17 @@ Queue *addr_redir_queue( const tsd_t *TSD, Queue *q )
    if ( ( q->type == QisSESSION ) || ( q->type == QisInternal ) )
    {
       /* trivial */
-      b = q->u.i.top ;
-      q->u.i.elements -= b->elements ;
-      retval->u.t = *b ;
-      retval->u.t.higher = retval->u.t.lower = NULL ;
-      b->top = b->bottom = NULL ;
-      b->elements = 0 ;
+      if ( ( b = q->u.i.top ) != NULL )
+      {
+         /*
+          * Fixes bug 777645
+          */
+         q->u.i.elements -= b->elements ;
+         retval->u.t = *b ;
+         retval->u.t.higher = retval->u.t.lower = NULL ;
+         b->top = b->bottom = NULL ;
+         b->elements = 0 ;
+      }
    }
 #if !defined( NO_EXTERNAL_QUEUES )
    else

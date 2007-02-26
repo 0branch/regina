@@ -3,7 +3,7 @@
 #
 # Using MS Visual C++ under Win32
 # Usage:
-#    nmake -f [DEBUG=Y [TRACEMEM=Y]] [FLISTS=N] [SOCKET=nnnn]
+#    nmake -f [DEBUG=Y] [TRACEMEM=Y]] [FLISTS=N] [SOCKET=nnnn]
 #
 # generated files without giving a target on the command line:
 # rexx.exe     statically bounded REXX interpreter
@@ -28,14 +28,14 @@ SRCDIR=$(REGINA_SRCDIR)
 #SRCDIR=path_to_this_file
 #
 
-VER=32
-VERDOT=3.2
+VER=33
+VERDOT=3.3
 
 CC = cl
 
 !if "$(DEBUG)" == "Y"
 EEXTRA = /DEBUG /PDB:NONE
-DEBUGFLAG  = /Z7 /Od /J
+DEBUGFLAG  = /Z7 /Od /J #/DREGINA_DEBUG_MEMORY /DREGINA_DEBUG_MEMORY1 /DREGINA_DEBUG_MEMORY2 /DREGINA_DEBUG_MEMORY3
 OPTIMIZE =
 ! if "$(TRACEMEM)" == "Y"
 MEMTRACE = /DTRACEMEM
@@ -52,6 +52,17 @@ OPTIMIZE = /Ox /J #-O2gityb1 -J
 NOFLISTS = /DNOFLISTS
 !else
 NOFLISTS =
+!endif
+
+#
+# GCI is default
+#
+!if "$(GCI)" == "N"
+GCI_SHO = 
+HAVE_GCI =
+!else
+GCI_SHO = gci_call.ts.obj gci_convert.ts.obj gci_execute.ts.obj gci_helper.ts.obj gci_prepare.ts.obj gci_reginabridge.ts.obj gci_rxfuncdefine.ts.obj gci_tree.ts.obj
+HAVE_GCI = -DHAVE_GCI -I$(SRCDIR)\gci -I.
 !endif
 
 THREADING = /MT
@@ -76,7 +87,7 @@ LD_RXLIB1= /DEF:$(SRCDIR)\test1_w32_dll.def
 LD_RXLIB2= /DEF:$(SRCDIR)\test2_w32_dll.def
 MV= -ren
 #
-CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) # -Zp1
+CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) # -Zp1
 
 CC2O=-Fo$@
 #
@@ -110,7 +121,7 @@ CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/va
         $(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/arxfuncs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/os2funcs.c $(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c \
         $(SRCDIR)/tracing.c $(SRCDIR)/interp.c $(SRCDIR)/cmath.c $(SRCDIR)/convert.c $(SRCDIR)/strings.c $(SRCDIR)/library.c \
         $(SRCDIR)/strmath.c $(SRCDIR)/signals.c $(SRCDIR)/macros.c $(SRCDIR)/envir.c $(SRCDIR)/expr.c $(SRCDIR)/rexxbif.c \
-        $(SRCDIR)/extlib.c $(SRCDIR)/wrappers.c $(SRCDIR)/options.c $(SRCDIR)/doscmd.c $(SRCDIR)/extstack.c \
+        $(SRCDIR)/wrappers.c $(SRCDIR)/options.c $(SRCDIR)/doscmd.c $(SRCDIR)/extstack.c \
         $(SRCDIR)/mt_notmt.c $(SRCDIR)/mt_win32.c $(SRCDIR)/mt_posix.c $(SRCDIR)/nosaa.c \
         $(SRCDIR)/ntservice/service.c
 
@@ -119,15 +130,15 @@ OFILES = funcs.obj builtin.obj error.obj variable.obj \
         misc.obj unxfuncs.obj arxfuncs.obj cmsfuncs.obj os2funcs.obj shell.obj rexxext.obj stack.obj extstack.obj \
         tracing.obj interp.obj cmath.obj convert.obj strings.obj library.obj \
         strmath.obj signals.obj macros.obj envir.obj expr.obj instore.obj rexxbif.obj \
-        extlib.obj yaccsrc.obj lexsrc.obj options.obj doscmd.obj wrappers.obj mt_notmt.obj #r2perl.obj
+        yaccsrc.obj lexsrc.obj options.obj doscmd.obj wrappers.obj mt_notmt.obj #r2perl.obj
 
 TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj extstack.ts.obj rexxbif.ts.obj \
         interprt.ts.obj debug.ts.obj dbgfuncs.ts.obj memory.ts.obj parsing.ts.obj files.ts.obj \
         misc.ts.obj unxfuncs.ts.obj arxfuncs.ts.obj cmsfuncs.ts.obj os2funcs.ts.obj shell.ts.obj rexxext.ts.obj stack.ts.obj \
         tracing.ts.obj interp.ts.obj cmath.ts.obj convert.ts.obj strings.ts.obj library.ts.obj \
         strmath.ts.obj signals.ts.obj macros.ts.obj envir.ts.obj expr.ts.obj instore.ts.obj \
-        extlib.ts.obj yaccsrc.ts.obj lexsrc.ts.obj wrappers.ts.obj options.ts.obj doscmd.ts.obj \
-        rexx.ts.obj client.ts.obj rexxsaa.ts.obj mt_win32.ts.obj
+        yaccsrc.ts.obj lexsrc.ts.obj wrappers.ts.obj options.ts.obj doscmd.ts.obj \
+        rexx.ts.obj client.ts.obj rexxsaa.ts.obj mt_win32.ts.obj $(GCI_SHO)
 
 DEMODIR = $(SRCDIR)/demo
 DEMOFILES = $(DEMODIR)/*
@@ -139,7 +150,7 @@ UNIXFILES = $(SRCDIR)/*.in $(SRCDIR)/configure $(SRCDIR)/config.sub \
 
 ALLSRC = $(CFILES) $(HFILES)
 
-HFILES = $(SRCDIR)/rexx.h $(SRCDIR)/defs.h $(SRCDIR)/extern.h $(SRCDIR)/types.h \
+HFILES = $(SRCDIR)/rexx.h $(SRCDIR)/defs.h $(SRCDIR)/extern.h $(SRCDIR)/regina_t.h \
                 $(SRCDIR)/config.h $(SRCDIR)/strings.h $(SRCDIR)/configur.h $(SRCDIR)/yaccsrc.h \
                 $(SRCDIR)/rxiface.h $(SRCDIR)/rexxsaa.h $(SRCDIR)/utsname.h \
                 $(SRCDIR)/mt.h $(SRCDIR)/mt_notmt.h $(SRCDIR)/mt_win32.h $(SRCDIR)/mt_posix.h \
@@ -149,7 +160,9 @@ CFILES = $(SRCDIR)/yaccsrc.c $(SRCDIR)/lexsrc.c $(CSRCFILES) $(SRCDIR)/execiser.
                 $(SRCDIR)/r2perl.c $(SRCDIR)/test1.c $(SRCDIR)/test2.c
 
 MTSSRC = $(SRCDIR)/en.mts $(SRCDIR)/pt.mts $(SRCDIR)/no.mts \
-	$(SRCDIR)/de.mts $(SRCDIR)/es.mts
+	$(SRCDIR)/de.mts $(SRCDIR)/es.mts $(SRCDIR)/pl.mts
+
+GCIHEADERS = $(SRCDIR)\gci\gci.h $(SRCDIR)\gci\embedded.h
 
 #.SUFFIXES: .sho $(SUFFIXES)
 #
@@ -161,7 +174,7 @@ all : rexx.exe rexx.lib execiser.exe $(SHL_TARGETS) rxstack.exe rxqueue.exe thre
 
 $(CSRCFILES) : $(SRCDIR)/rexx.h
 
-$(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRCDIR)/types.h $(SRCDIR)/mt.h
+$(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRCDIR)/regina_t.h $(SRCDIR)/mt.h
 
 
 rexx.exe : $(OFILES) rexx.obj rexxw32exe.obj nosaa.obj
@@ -289,9 +302,6 @@ envir.obj :   $(SRCDIR)/envir.c
 
 expr.obj :    $(SRCDIR)/expr.c
         $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/expr.c
-
-extlib.obj :  $(SRCDIR)/extlib.c
-        $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/extlib.c
 
 wrappers.obj :$(SRCDIR)/wrappers.c
         $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/wrappers.c
@@ -461,9 +471,6 @@ envir.ts.obj :   $(SRCDIR)/envir.c
 expr.ts.obj :    $(SRCDIR)/expr.c
         $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/expr.c
 
-extlib.ts.obj :  $(SRCDIR)/extlib.c
-        $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/extlib.c
-
 wrappers.ts.obj :$(SRCDIR)/wrappers.c
         $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/wrappers.c
 
@@ -499,6 +506,33 @@ extstack.ts.obj : $(SRCDIR)/extstack.c $(SRCDIR)/rexx.h
 
 rexxbif.ts.obj : $(SRCDIR)/rexxbif.c $(SRCDIR)/rexx.h
         $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/rexxbif.c
+
+gci_convert.h: $(SRCDIR)\gci\gci_convert.win32.vc
+        copy $(SRCDIR)\gci\gci_convert.win32.vc .\gci_convert.h
+
+gci_call.ts.obj : $(SRCDIR)/gci/gci_call.c $(GCIHEADERS) gci_convert.h
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_call.c
+
+gci_convert.ts.obj : $(SRCDIR)/gci/gci_convert.c $(GCIHEADERS) gci_convert.h
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_convert.c
+
+gci_execute.ts.obj : $(SRCDIR)/gci/gci_execute.c $(GCIHEADERS)
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_execute.c
+
+gci_helper.ts.obj : $(SRCDIR)/gci/gci_helper.c $(GCIHEADERS)
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_helper.c
+
+gci_prepare.ts.obj : $(SRCDIR)/gci/gci_prepare.c $(GCIHEADERS)
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_prepare.c
+
+gci_reginabridge.ts.obj : $(SRCDIR)/gci/gci_reginabridge.c $(GCIHEADERS)
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_reginabridge.c
+
+gci_rxfuncdefine.ts.obj : $(SRCDIR)/gci/gci_rxfuncdefine.c $(GCIHEADERS)
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_rxfuncdefine.c
+
+gci_tree.ts.obj : $(SRCDIR)/gci/gci_tree.c $(GCIHEADERS)
+        $(CC) $(OTHERTSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/gci/gci_tree.c
 
 #
 # Rules for sample programs
@@ -566,4 +600,8 @@ dist: all
 	copy $(SRCDIR)\regina_fa.ini .
 	copy $(SRCDIR)\regina_mt.ini .
 	copy $(SRCDIR)\regina.nsi .
-	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) regina.nsi
+	copy $(SRCDIR)\common\isnt.nsh .
+	copy $(SRCDIR)\common\path.nsh .
+	copy $(SRCDIR)\common\WriteEnv.nsh .
+	copy $(SRCDIR)\common\uninstall.ico .
+	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DSRCDIR=$(SRCDIR) regina.nsi

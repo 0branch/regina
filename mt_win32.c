@@ -2,6 +2,9 @@
  * We initialize the global data structure and the global access variable.
  */
 
+#include "regina_c.h"
+#include "rexxsaa.h"
+#define DONT_TYPEDEF_PFN
 #include "rexx.h"
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +12,18 @@
 #include <assert.h>
 
 #define WIN32_LEAN_AND_MEAN
+#ifdef _MSC_VER
+# if _MSC_VER >= 1100
+/* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
+#  pragma warning(disable: 4115 4201 4214 4514)
+# endif
+#endif
 #include <windows.h>
+#ifdef _MSC_VER
+# if _MSC_VER >= 1100
+#  pragma warning(default: 4115 4201 4214)
+# endif
+#endif
 
 typedef struct { /* mt_tsd: static variables of this module (thread-safe) */
    HANDLE Heap;
@@ -38,6 +52,21 @@ static void DestroyHeap(tsd_t *TSD)
       HeapDestroy(mt->Heap);
    free(mt);
    free(TSD);
+}
+
+
+int IfcReginaCleanup( VOID )
+{
+   tsd_t *TSD = __regina_get_tsd();
+
+   if (TSD == NULL)
+      return 0;
+
+   deinit_rexxsaa(TSD);
+   DestroyHeap(TSD);
+   TlsSetValue(ThreadIndex,NULL);
+
+   return 1;
 }
 
 /* We provide a DLL entry function. Look at the standard documentation */
@@ -125,7 +154,7 @@ static void MTFree( const tsd_t *TSD, void *chunk )
    /*
     * Just in case...
     */
-   if ( chunk == NULL) 
+   if ( chunk == NULL)
       return;
 
    if (mt == NULL)

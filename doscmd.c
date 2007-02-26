@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: doscmd.c,v 1.50 2003/04/17 23:26:31 florian Exp $";
+static char *RCSid = "$Id: doscmd.c,v 1.58 2004/03/12 12:20:17 mark Exp $";
 #endif
 
 /*
@@ -30,8 +30,8 @@ static char *RCSid = "$Id: doscmd.c,v 1.50 2003/04/17 23:26:31 florian Exp $";
 # include <os2.h>
 # define DONT_TYPEDEF_PFN
 #endif
+
 #include "rexx.h"
-#include <ctype.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,7 +79,7 @@ static char *RCSid = "$Id: doscmd.c,v 1.50 2003/04/17 23:26:31 florian Exp $";
 # ifdef _MSC_VER
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -90,10 +90,10 @@ static char *RCSid = "$Id: doscmd.c,v 1.50 2003/04/17 23:26:31 florian Exp $";
 # endif
 #endif
 
-#if defined(MAC) || (defined(__WATCOMC__) && !defined(__QNX__)) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__) || defined(__WINS__) || defined(__LCC__)
+#if defined(MAC) || (defined(__WATCOMC__) && !defined(__QNX__)) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__) || defined(__WINS__) || defined(__LCC__) || defined(SKYOS)
 # include "utsname.h"                                   /* MH 10-06-96 */
 # define NEED_UNAME
-# if !defined(__WINS__) && !defined(__EPOC32__)
+# if !defined(__WINS__) && !defined(__EPOC32__) && !defined(SKYOS)
 #  define MAXPATHLEN  _MAX_PATH                          /* MH 10-06-96 */
 # endif
 #else                                                   /* MH 10-06-96 */
@@ -1251,7 +1251,7 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
                                         "rexx.exe" };
    char **args = NULL;
    int saved_in = -1, saved_out = -1, saved_err = -1;
-   int rc, eno ;
+   int rc;
    const char *ipret;
    char *argline;
    int broken_address_command = get_options_flag( TSD->currlevel, EXT_BROKEN_ADDRESS_COMMAND );
@@ -1330,7 +1330,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
 #define STD_REDIR(hdl,dest,save) if ((hdl != -1) && (hdl != dest)) \
                                     { save = dup(dest); dup2(hdl, dest); }
 #define STD_RESTORE(saved,dest) if (saved != -1) \
-                                    { close(dest); dup2(saved,dest); }
+                                    { close(dest); dup2(saved,dest); \
+                                      close(saved); }
 #define SET_MAXHDL(hdl) if (hdl > max_hdls) max_hdls = hdl
 #define SET_MAXHDLS(ep) SET_MAXHDL(ep.hdls[0]); SET_MAXHDL(ep.hdls[1])
 
@@ -1456,6 +1457,27 @@ int __regina_wait(int process)
       return(__regina_wait(process));
 #endif
 
+#ifdef __WATCOMC__
+   /*
+    * Watcom is strange. EINTR isn't an indicator for a retry of the call.
+    */
+   status = -1;
+   rc = cwait(&status, process, WAIT_CHILD);
+   if (rc == -1)
+   {
+      if ((status != -1) && (errno == EINTR))
+         retval = -status; /* Exception reason in lower byte */
+      else
+         retval = -errno;  /* I don't have a better idea */
+   }
+   else
+   {
+      if (status & 0xFF)
+         retval = -status; /* Exception reason in lower byte */
+      else
+         retval = status >> 8;
+   }
+#else
    do {
       rc = waitpid(process, &status, 0);
    } while ((rc == -1) && (errno == EINTR));
@@ -1482,6 +1504,7 @@ int __regina_wait(int process)
       else if ( retval == 0 )
          retval = -1;
    }
+#endif
 
    return(retval);
 }
@@ -1929,7 +1952,7 @@ void wait_async_info(void *async_info)
       DosWaitEventSem(ai->sem, SEM_INDEFINITE_WAIT);
 }
 /* end of elif define(__EMX__) */
-#elif defined(MAC) || defined(DOS) || defined(__WINS__) || defined(__EPOC32__) || defined(_AMIGA)
+#elif defined(MAC) || defined(DOS) || defined(__WINS__) || defined(__EPOC32__) || defined(_AMIGA) || defined(SKYOS)
 #define NEED_STUPID_DOSCMD
 #else /* !(MAC || DOS || WIN32 || OS2 || _AMIGA || __WINS__ || __EPOC32__) */
 /*****************************************************************************
@@ -2626,7 +2649,8 @@ int fork_exec(tsd_t *TSD, environment *env, const char *cmdline, int *rcode)
 #define STD_REDIR(hdl,dest,save) if ((hdl != -1) && (hdl != dest)) \
                                     { save = dup(dest); dup2(hdl, dest); }
 #define STD_RESTORE(saved,dest) if (saved != -1) \
-                                    { close(dest); dup2(saved,dest); }
+                                    { close(dest); dup2(saved,dest); \
+                                      close(saved); }
 #define SET_MAXHDL(hdl) if (hdl > max_hdls) max_hdls = hdl
 #define SET_MAXHDLS(ep) SET_MAXHDL(ep.hdls[0]); SET_MAXHDL(ep.hdls[1])
 
@@ -2972,7 +2996,7 @@ static const char *nextarg(const char *source, unsigned *len, char *target,
    if (source == NULL)
       return(NULL);
 
-   while (isspace(*source)) /* jump over initial spaces */
+   while (rx_isspace(*source)) /* jump over initial spaces */
       source++;
    if (*source == '\0')
       return(NULL);
@@ -3003,7 +3027,7 @@ static const char *nextarg(const char *source, unsigned *len, char *target,
       else /* whitespace delimiters */
       {
          c = term;
-         while (!isspace(c) && (c != '\'') && (c != '\"')) {
+         while (!rx_isspace(c) && (c != '\'') && (c != '\"')) {
             if (c == escape)
                c = *source++;
             if (c == '\0')  /* stray \ at EOS is equiv to normal EOS */
@@ -3024,7 +3048,7 @@ static const char *nextarg(const char *source, unsigned *len, char *target,
          }
          source--; /* undo the "wrong" character */
       }
-   } while (!isspace(*source));
+   } while (!rx_isspace(*source));
 
    if (len != NULL)
       *len = l;
@@ -3128,14 +3152,15 @@ static const char *nextsimplearg(const char *source, unsigned *len,
    if (source == NULL)
       return(NULL);
 
-   while (isspace(*source)) /* jump over initial spaces */
+   while (rx_isspace(*source)) /* jump over initial spaces */
       source++;
    if (*source == '\0')
       return(NULL);
 
    c = *source++;
 
-   while (!isspace(c)) {
+   while (!rx_isspace(c))
+   {
       if (c == '\0')  /* stray \ at EOS is equiv to normal EOS */
       {
          /* something's found, therefore we don't have to return NULL */
@@ -3310,7 +3335,7 @@ static int local_mkstemp(const tsd_t *TSD, char *base)
        * fixes Bug 587687
        */
       sprintf( slash, "%06u._rx", run );
-#if defined(WIN32) /* currently not used but what's about CE ? */
+#if defined(_MSC_VER) /* currently not used but what's about CE ? */
       retval = _sopen(buf,
                       _O_RDWR|_O_CREAT|_O_BINARY|_O_SHORT_LIVED|_O_EXCL|
                                                                  _O_SEQUENTIAL,
@@ -3318,7 +3343,11 @@ static int local_mkstemp(const tsd_t *TSD, char *base)
                       S_IRWXU);
 #else
       retval = open(buf,
-                    O_RDWR|O_CREAT|O_EXCL|O_NOCTTY,
+                    O_RDWR|O_CREAT|O_EXCL
+# if defined(O_NOCTTY)
+                    |O_NOCTTY
+# endif
+                    ,
                     S_IRWXU);
 #endif
       if (retval != -1) /* success */

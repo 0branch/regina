@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rxqueue.c,v 1.9 2003/04/26 03:14:26 mark Exp $";
+static char *RCSid = "$Id: rxqueue.c,v 1.12 2003/10/06 09:54:42 florian Exp $";
 #endif
 
 /*
@@ -21,6 +21,7 @@ static char *RCSid = "$Id: rxqueue.c,v 1.9 2003/04/26 03:14:26 mark Exp $";
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#define NO_CTYPE_REPLACEMENT
 #include "rexx.h"
 
 #ifdef HAVE_CONFIG_H
@@ -33,7 +34,7 @@ static char *RCSid = "$Id: rxqueue.c,v 1.9 2003/04/26 03:14:26 mark Exp $";
 # if defined(_MSC_VER)
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 #  include <windows.h>
 #  if _MSC_VER >= 1100
@@ -477,9 +478,9 @@ int main( int argc, char *argv[])
                junk_return_from_rxstack( sock, result );
                DROPSTRENG( result );
                DEBUGDUMP(printf("--- Number in Queue ---\n"););
-               num = get_number_in_queue_from_rxstack( NULL, sock );
-               printf("%d\n", num );
-               rc = 0;
+               num = get_number_in_queue_from_rxstack( NULL, sock, &rc );
+               if ( rc == 0 )
+                  printf("%d\n", num );
                break;
             case RXSTACK_PULL:
                /*
@@ -518,18 +519,18 @@ int main( int argc, char *argv[])
                   {
                      printf( "%.*s\n", PSTRENGLEN( result ), PSTRENGVAL( result ) ) ;
                   }
-                  else if ( rc == 2 )
-                  {
-                     showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting line from queue" );
-                     rc = ERR_RXSTACK_INTERNAL;
-                     break;
-                  }
-                  else
+                  else if ( ( rc == 1 ) || ( rc == 4 ) )
                   {
                      /*
                       * Queue empty.
                       */
                      rc = 0;
+                     break;
+                  }
+                  else
+                  {
+                     showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting line from queue" );
+                     rc = ERR_RXSTACK_INTERNAL;
                      break;
                   }
                   DROPSTRENG( result );
@@ -547,6 +548,7 @@ int main( int argc, char *argv[])
       else
       {
          DEBUGDUMP(printf( "queue: <%.*s> server: %.*s<%d> Port:%d\n", PSTRENGLEN( queue ), PSTRENGVAL( queue ), PSTRENGLEN( q.u.e.name ), PSTRENGVAL( q.u.e.name ), q.u.e.address, q.u.e.portno ););
+         rc = 1;
       }
    }
    DROPSTRENG( server_name );

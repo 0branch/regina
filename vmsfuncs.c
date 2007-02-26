@@ -49,7 +49,7 @@ you. You may do the work in this order:
  */
 
 /*
- * $Id: vmsfuncs.c,v 1.4 2001/09/09 10:24:26 mark Exp $
+ * $Id: vmsfuncs.c,v 1.7 2003/12/19 07:24:46 florian Exp $
  */
 
 /* huups, have to add one to length in everyting given to Str_ncatstr */
@@ -59,7 +59,6 @@ you. You may do the work in this order:
 
 #include <assert.h>
 #include <stdio.h>
-#include <ctype.h>
 
 #include <descrip.h>
 #include <rmsdef.h>
@@ -573,7 +572,7 @@ static streng *strip_nulls( streng *input )
 }
 
 
-#define HEXDIG(x) (((x)<'A')?((x)-'0'):(toupper(x)-'A'+10))
+#define HEXDIG(x) ((isdigit(x))?((x)-'0'):(toupper(x)-'A'+10))
 
 static unsigned int read_pid( const streng *hexpid )
 {
@@ -1733,7 +1732,7 @@ streng *vms_f_pid( tsd_t *TSD, cparamboxptr parms )
    items[4] = 0 ;
    items[5] = 0 ;
 
-   Pid = getvalue( TSD, parms->value, 0 ) ;
+   Pid = getvalue( TSD, parms->value, -1 ) ;
 
    if (Pid->len)
    {
@@ -1753,7 +1752,7 @@ streng *vms_f_pid( tsd_t *TSD, cparamboxptr parms )
 
    sprintf( (val=Str_makeTSD(10))->value, "%08x", pid ) ;
    val->len = 8 ;
-   setvalue( TSD, parms->value, val ) ;
+   setvalue( TSD, parms->value, val, -1 ) ;
 
    if (rc == SS$_NOMOREPROC)
       return nullstringptr() ;
@@ -1938,7 +1937,7 @@ streng *vms_f_locate( tsd_t *TSD, cparamboxptr parms )
    int res ;
 
    checkparam( parms, 2, 2, "VMS_F_LOCATE" ) ;
-   res = bmstrstr( parms->next->value, 0, parms->value ) ;
+   res = bmstrstr( parms->next->value, 0, parms->value, 0 ) ;
    if (res==(-1))
       res = parms->next->value->len + 1 ;
 
@@ -3111,8 +3110,7 @@ streng *vms_f_cvtime( tsd_t *TSD, cparamboxptr parms )
    if (item)
    {
       for (cnt=0; cnt<item->len; cnt++)
-         if (islower(item->value[cnt]) )
-            item->value[cnt] = toupper(item->value[cnt]) ;
+         item->value[cnt] = toupper(item->value[cnt]) ;
 
       if (item->len==4 && !memcmp(item->value, "YEAR", 4))
          func = year ;
@@ -3143,8 +3141,7 @@ streng *vms_f_cvtime( tsd_t *TSD, cparamboxptr parms )
    if (output)
    {
       for (cnt=0; cnt<output->len; cnt++)
-         if (islower(output->value[cnt]))
-            output->value[cnt] = toupper(output->value[cnt]) ;
+         output->value[cnt] = toupper(output->value[cnt]) ;
 
       if (output->len==5 && !memcmp(output->value, "DELTA", 5))
          out = delta ;
@@ -3170,8 +3167,7 @@ streng *vms_f_cvtime( tsd_t *TSD, cparamboxptr parms )
       cend = cptr + input->len ;
 
       for (ctmp=cptr;ctmp<cend;ctmp++)
-         if (islower(*ctmp))
-            *ctmp = toupper(*ctmp) ;
+         *ctmp = toupper(*ctmp) ;
 
       for (;isspace(*cptr);cptr++) ; /* strip leading spaces */
       if (out!=delta)

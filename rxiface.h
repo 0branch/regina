@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rxiface.h,v 1.12 2003/02/25 08:31:35 mark Exp $
+ * $Id: rxiface.h,v 1.16 2003/12/19 07:26:13 florian Exp $
  */
 
 #include "wrappers.h"
@@ -162,20 +162,18 @@ int IfcExecCallBack( tsd_t * volatile TSD, int NameLen, const char *Name,
 
 int IfcVarPool( tsd_t *TSD, int Code, int *Lengths, char *Strings[],
                 int *allocated );
-int IfcRegFunc( tsd_t *TSD, const char *Name ) ;
-int IfcDelFunc( tsd_t *TSD, const char *Name ) ;
-int IfcQueryFunc( tsd_t *TSD, const char *Name ) ;
 
-int IfcSubCmd( const tsd_t *TSD, int EnvLen, const char *EnvStr, int CmdLen,
+int IfcSubCmd( tsd_t *TSD, int EnvLen, const char *EnvStr, int CmdLen,
                const char *CmdStr, int *RetLen, char **RetStr ) ;
-int IfcDoExit( const tsd_t *TSD, int Code,
+int IfcDoExit( tsd_t *TSD, int Code,
                int OutputLength1, char *OutputString1,
                int OutputLength2, char *OutputString2,
                int *InputLength, char **InputString ) ;
-int IfcExecFunc( const tsd_t *TSD, PFN Func, char *Name, int Params,
+int IfcExecFunc( tsd_t *TSD, PFN Func, char *Name, int Params,
                  int *Lengths, char **Strings,
+                 int queue_name_len, char *queue_name,
                  int *RetLength, char **RetString,
-                 int *RC, char exitonly, char called ) ;
+                 int *RC, char called, void *gci_info ) ;
 int IfcRegDllFunc( const tsd_t *TSD, const char* rxname, const char* module, const char* objnam ) ;
 
 int IfcHaveFunctionExit(const tsd_t *TSD);
@@ -187,4 +185,4 @@ int IfcCreateQueue( tsd_t *TSD, const char *qname, const int qlen, char *data, u
 int IfcDeleteQueue( tsd_t *TSD, const char *qname, const int qlen );
 int IfcQueryQueue( tsd_t *TSD, const char *qname, const int qlen, unsigned long *count );
 int IfcAddQueue( tsd_t *TSD, const char *qname, const int qlen, const char *data, const int datalen, unsigned long addlifo );
-int IfcPullQueue( tsd_t *TSD, const char *qname, const int qlen, char **data, int *datalen, unsigned long waitforline );
+int IfcPullQueue( tsd_t *TSD, const char *qname, const int qlen, char **data, unsigned long *datalen, unsigned long waitforline );

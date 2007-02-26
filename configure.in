@@ -2,8 +2,8 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT(rexxsaa.h)
 AC_PREFIX_DEFAULT(/usr)
 
-VERSION=3.2
-VERSION_NODOT=32
+VERSION=3.3
+VERSION_NODOT=33
 
 dnl ---------------------- check for C compiler -----------------
 dnl Checks for one of the C compilers below - change if yours not there.
@@ -19,6 +19,7 @@ AC_CANONICAL_SYSTEM
 mymakefile="Makefile"
 on_qnx4=no
 on_beos=no
+GCI_CONVERT_HEADER="gci_convert.unsupported"
 case "$target" in
    *hp-hpux*)
       SYS_DEFS="-D_HPUX_SOURCE"
@@ -32,10 +33,18 @@ case "$target" in
    *sequent-dynix*)
       ;;
    *solaris*)
+      GCI_CONVERT_HEADER="gci_convert.solaris.sparc"
       ;;
    sparc*sunos*)
       ;;
-   *linux*)
+   i*86-*linux*)
+      GCI_CONVERT_HEADER="gci_convert.linux.i86"
+      ;;
+   *86_64-*linux*)
+      GCI_CONVERT_HEADER="gci_convert.linux.86_64"
+      ;;
+   alpha*-*linux*)
+      GCI_CONVERT_HEADER="gci_convert.linux.alpha"
       ;;
    *nto-qnx*)
       ;;
@@ -48,6 +57,7 @@ case "$target" in
       ;;
 esac
 AC_SUBST(SYS_DEFS)
+AC_SUBST(GCI_CONVERT_HEADER)
 
 dnl Check for dynamic shared library support libraries
 MH_EXTRA_LIBS=""
@@ -111,8 +121,8 @@ AC_CHECK_HEADERS( \
 AC_CHECK_FUNCS(sysconf putenv usleep random ftruncate \
    memcpy memmove strerror strerror_r gettimeofday ftime \
    _fullpath vsprintf _splitpath2 _splitpath sigaction \
-   lstat mkstemp inet_ntop gmtime_r localtime_r drand48\
-   readlink)
+   lstat mkstemp inet_ntop gmtime_r localtime_r \
+   readlink realpath)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -223,6 +233,17 @@ else
 fi
 AC_SUBST(EFENCE)
 
+dnl --------------- allow --enable-orexx-binary-compatible to enable binary compatibility with ORexx
+AC_ARG_ENABLE(orexx-binary-compatible,
+   [  --enable-orexx-binary-compatible   enable binary compatibility with ORexx],
+   [with_orexx_bc=$enableval],
+   [with_orexx_bc=no],
+)
+if test "$with_orexx_bc" = yes; then
+   OREXX_BINARY_COMPATIBLE="1"
+   AC_DEFINE(OREXX_BINARY_COMPATIBLE)
+fi
+
 dnl --------------- allow --disable-posix-threads to disable multi-threading
 AC_ARG_ENABLE(posix-threads,
         [  --disable-posix-threads disable POSIX-style multi-threading],
@@ -230,7 +251,25 @@ AC_ARG_ENABLE(posix-threads,
         [enable_posix_threads=yes],
 )
 
-MH_CHECK_GCC_VERSION_SCRIPT
+dnl --------------- allow --enable-gci to enable General Call Interface
+AC_ARG_ENABLE(gci,
+   [  --enable-gci            enable General Call Interface],
+   [with_gci=$enableval],
+   [with_gci=no],
+)
+if test "$with_gci" = yes; then
+   GCI_SHO="gci_call.sho gci_convert.sho gci_execute.sho gci_helper.sho gci_prepare.sho gci_reginabridge.sho gci_rxfuncdefine.sho gci_tree.sho"
+   HAVE_GCI="-DHAVE_GCI -I\$(gcidir)"
+else
+   GCI_SHO=""
+   HAVE_GCI=""
+fi
+AC_SUBST(GCI_SHO)
+AC_SUBST(HAVE_GCI)
+
+if test "$ac_cv_prog_CC" = "gcc"; then
+   MH_CHECK_GCC_VERSION_SCRIPT
+fi
 
 dnl enable_posix_threads="yes"
 MH_CHECK_POSIX_THREADS
@@ -411,6 +450,9 @@ MH_SET_SHLPST
 
 dnl --------------- Force definition of pre-compiler macro UNIX ----------
 AC_DEFINE(UNIX)
+
+dnl --------------- Check what compiler switch sets unsigned char ----------
+MH_CHECK_UNSIGNED_CHAR_COMPILER_SWITCH()
 
 dnl ----------------- get our version information ------------------------
 AC_SUBST(VERSION)

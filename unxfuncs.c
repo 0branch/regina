@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: unxfuncs.c,v 1.23 2003/04/16 10:45:56 mark Exp $";
+static char *RCSid = "$Id: unxfuncs.c,v 1.28 2004/03/12 12:20:20 mark Exp $";
 #endif
 
 /*
@@ -50,7 +50,6 @@ static char *RCSid = "$Id: unxfuncs.c,v 1.23 2003/04/16 10:45:56 mark Exp $";
 #include "rexx.h"
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 
 #ifdef HAVE_ASSERT_H
 # include <assert.h>
@@ -85,15 +84,15 @@ typedef struct utsname
    char *version ;
    char *machine ;
 } _utsname ;
-# elif (defined(__WATCOMC__) && defined(__QNX__)) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__WINS__) || defined(__EPOC32__) || defined(__LCC__)
+# elif defined(__WATCOMC__) || defined(_MSC_VER) || defined(__SASC) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__WINS__) || defined(__EPOC32__) || defined(__LCC__) || defined(SKYOS)
 #  include "utsname.h"
-#  if !defined(__SASC) && !defined(__QNX__) && !defined(__WINS__) && !defined(__EPOC32__)
+#  if !defined(__SASC) && !defined(__QNX__) && !defined(__WINS__) && !defined(__EPOC32__) && !defined(SKYOS)
 #   include <process.h>
 #   include <direct.h>
 #  endif
 # else
 #  ifndef VMS
-#  include <sys/utsname.h>
+#   include <sys/utsname.h>
 #  endif
 # endif
 #endif
@@ -110,7 +109,7 @@ streng *unx_popen( tsd_t *TSD, cparamboxptr parms )
 {
    streng *string=NULL, *result=NULL ;
    streng *cptr=NULL ;
-   int length=0, lines=0 ;
+   int length=0, lines=0, hl ;
    int save_internal_queues_option;
 
    if ( TSD->restricted )
@@ -133,7 +132,9 @@ streng *unx_popen( tsd_t *TSD, cparamboxptr parms )
 
    if (parms->next && parms->next->value)
    {
-      lines = lines_in_stack( TSD, NULL ) ;
+      lines = lines_in_stack( TSD, NULL );
+      if ( lines < 0 )
+         lines = 0;
    }
 
    result = perform( TSD, cptr, TSD->currlevel->environment, TSD->currentnode, NULL ) ;
@@ -143,20 +144,15 @@ streng *unx_popen( tsd_t *TSD, cparamboxptr parms )
    {
       streng *varname=NULL, *varstem=NULL ;
       int stemlen=0 ;
-      char *cptr=NULL, *eptr=NULL ;
+      char *eptr=NULL ;
       streng *tmpptr=NULL ;
 
       varstem = parms->next->value ;
       varname = Str_makeTSD( (stemlen=varstem->len) + 8 ) ;
 
       memcpy( varname->value, varstem->value, stemlen ) ;
-      cptr = varname->value ;
-      eptr = cptr + varstem->len ;
-      for (; cptr<eptr; cptr++)
-      {
-         if (islower(*cptr))
-            *cptr = (char) toupper(*cptr) ;
-      }
+      mem_upper( varname->value, stemlen );
+      eptr = varname->value + stemlen ;
 
       if (*(eptr-1)!='.')
       {
@@ -164,17 +160,18 @@ streng *unx_popen( tsd_t *TSD, cparamboxptr parms )
          stemlen++ ;
       }
 
-      lines = lines_in_stack( TSD, NULL ) - lines ;
+      hl = lines_in_stack( TSD, NULL );
+      lines = ( ( hl < 0 ) ? 0 : hl ) - lines ;
       *eptr = '0' ;
       varname->len = stemlen+1 ;
       tmpptr = int_to_streng( TSD, lines ) ;
-      setvalue( TSD, varname, tmpptr ) ;
+      setvalue( TSD, varname, tmpptr, -1 ) ;
       for (; lines>0; lines--)
       {
          tmpptr = popline( TSD, NULL, NULL, 0 ) ;
          sprintf(eptr, "%d", lines ) ;
          varname->len = strlen( varname->value ) ;
-         setvalue( TSD, varname, tmpptr ) ;
+         setvalue( TSD, varname, tmpptr, -1 ) ;
       }
       Free_stringTSD( varname ); /* bja */
    }

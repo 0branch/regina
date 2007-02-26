@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rexx.h,v 1.58 2003/04/20 06:40:44 mark Exp $
+ * $Id: rexx.h,v 1.86 2004/04/23 22:48:35 mark Exp $
  */
 #ifndef __REXX_H_INCLUDED
 #define __REXX_H_INCLUDED
@@ -153,23 +153,9 @@
 # endif
 #endif
 
-/* The following have been included to support national languages.       */
-/*    English has a small set of letters. In the ASCII alphabet the      */
-/*    English uppercase letters occupy the range from d2c(65) to d2c(90) */
-/*    and the lowercase version of each letter have an offset of +32     */
-/*    from the corresponding uppercase letter.                           */
-/*                                                                       */
-/* You may define FIRST_CHAR and LAST_CHAR to the lowermost and the      */
-/*    uppermost letters of the uppercase alphabet. And you may define    */
-/*    CHAR_OFFSET as the difference between upper- and lowercase.        */
-/*    other Western European languages                                   */
+#include "regina_c.h"
 
-#define FIRST_CHAR      'A'
-#define LAST_CHAR       'Z'
-#define CHAR_OFFSET     32
-
-#define HEXNUM(c) (((c>='0')&&(c<='9'))||((c>='a')&&(c<='f')))
-#define HEXVAL(c) (((c)>'9')?(RXTOLOW(c)-'a'+10):((c)-'0'))
+#define HEXVAL( c ) ( rx_isdigit(c) ? ( ( c ) - '0' ) : ( rx_tolower(c) - 'a' + 10 ) )
 
 /*
  * Which character is used to delimit lines in text files? Actually,
@@ -224,7 +210,7 @@
 # include <mem.h>
 #endif
 #include "strings.h"            /* definitions of REXX strings */
-#include "types.h"              /* various types */
+#include "regina_t.h"           /* various Regina types */
 #include "mt.h"                 /* multi-threading support */
 #include "extern.h"             /* function prototypes */
 
@@ -256,15 +242,15 @@
 #endif
 
 #define REGINA_VERSION_MAJOR "3"
-#define REGINA_VERSION_MINOR "2"
+#define REGINA_VERSION_MINOR "3"
 #define REGINA_VERSION_SUPP  ""
 
 #define PARSE_VERSION_STRING    "REXX-Regina_" REGINA_VERSION_MAJOR "." \
                                 REGINA_VERSION_MINOR REGINA_VERSION_SUPP \
                                 REGINA_VERSION_THREAD \
-                                " 5.00 25 Apr 2003"
+                                " 5.00 25 Apr 2004"
 
-#define INSTORE_VERSION 4 /* Must be incremented each time the parser/lexer
+#define INSTORE_VERSION 9 /* Must be incremented each time the parser/lexer
                            * or data structure changes something.
                            */
 

@@ -49,6 +49,7 @@ static const char *errlang[] =
    "es", /* spanish */
    "no", /* norwegian */
    "pt", /* portuguese */
+   "pl", /* polish */
 #if 0
    "en","ca","cs","da","de","el","es","fi","fr","he","hu","is","it","ja","ko",
    "lt","nl","no","pl","pt","ru","sk","sl","sv","th","tr","zh",
@@ -83,7 +84,7 @@ int main( int argc, char *argv[] )
    ti = (struct textindex *)malloc( 500*sizeof(struct textindex) );
    if ( ti == NULL )
    {
-      fprintf( stderr, "Unable to allocate memory for 500 mesage structures.\n" );
+      fprintf( stderr, "Unable to allocate memory for 500 message structures.\n" );
       exit(1);
    }
    for ( i = 1; i < argc; i++ )
@@ -97,10 +98,10 @@ int main( int argc, char *argv[] )
          exit(1);
       }
       stat( fn, &stat_buf );
-      text = (char *)malloc( stat_buf.st_size ); 
+      text = (char *)malloc( stat_buf.st_size );
       if ( text == NULL )
       {
-         fprintf( stderr, "Unable to allocate stat_buf.st_size bytes of memory.\n" );
+         fprintf( stderr, "Unable to allocate %d bytes of memory.\n", (int) stat_buf.st_size );
          free(ti);
          exit(1);
       }
@@ -207,5 +208,5 @@ int main( int argc, char *argv[] )
    }
    free(ti);
    printf( "%d error messages compiled\n", last_count );
-   exit(0);
+   return 0;
 }

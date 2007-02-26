@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: shell.c,v 1.37 2002/10/11 08:05:37 florian Exp $";
+static char *RCSid = "$Id: shell.c,v 1.44 2004/03/29 10:39:35 florian Exp $";
 #endif
 
 /*
@@ -21,11 +21,13 @@ static char *RCSid = "$Id: shell.c,v 1.37 2002/10/11 08:05:37 florian Exp $";
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include "regina_c.h"
+
 #if defined(WIN32)
 # ifdef _MSC_VER
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -37,12 +39,10 @@ static char *RCSid = "$Id: shell.c,v 1.37 2002/10/11 08:05:37 florian Exp $";
 #endif
 
 #include "rexx.h"
-/*#include <limits.h> */
 #include <stdio.h>
 
 #include <string.h>
 #include <signal.h>
-/* #include <ctype.h>   */
 #include <errno.h>
 #ifdef HAVE_ASSERT_H
 # include <assert.h>
@@ -112,8 +112,8 @@ int init_shell( tsd_t *TSD )
    return(1);
 }
 
-const streng *stem_access( tsd_t *TSD, environpart *e, int pos,
-                                                           const streng *value)
+static const streng *stem_access( tsd_t *TSD, environpart *e, int pos,
+                                  streng *value )
 /* appends "."+itoa(pos) to e->currname and accesses this variable.
  * value is NULL to access the current value or non-NULL to set the new value.
  * The return value is NULL if a new value is set or the old one.
@@ -134,9 +134,9 @@ const streng *stem_access( tsd_t *TSD, environpart *e, int pos,
     *      changing from [sg]etdirvalue_compound to [sg]etvalue.
     */
    if (value == NULL)
-      return( getvalue( TSD, e->currname, 1 ) ) ;
+      return( getvalue( TSD, e->currname, -1 ) ) ;
 
-   setvalue( TSD, e->currname, Str_dupTSD( value ) ) ;
+   setvalue( TSD, e->currname, value, -1 ) ;
    return( NULL ) ;
 }
 
@@ -155,7 +155,7 @@ static void set_currname( tsd_t *TSD, environpart *e )
        */
       if ( (source->len > 0) && ( e->flags.awt != awtSTEM ) )
       {
-         source = getvalue( TSD, source, 0 ) ;
+         source = getvalue( TSD, source, -1 ) ;
       }
    }
    else
@@ -181,23 +181,30 @@ static void set_currname( tsd_t *TSD, environpart *e )
    e->currname->len = e->currnamelen ; /* pro forma, will be recomputed */
 }
 
+static void prepare_env_io( environpart *e )
+/*
+ * Prepares the WITH-IO-redirection from envpart.
+ */
+{
+   e->SameAsOutput = 0;
+   e->FileRedirected = 0;
+   e->tempname = NULL; /* none as default, might become char* RedirTempFile */
+   e->queue = NULL;
+   e->tmp_queue = NULL;
+   e->type = STD_IO;
+   e->hdls[0] = e->hdls[1] = e->hdls[2] = -1;
+}
+
 static void open_env_io( tsd_t *TSD, environpart *e, unsigned overwrite, int isString )
-/* Prepares the WITH-IO-redirection from envpart and sets *flag to either
+/* Opens the WITH-IO-redirection from envpart and sets *flag to either
  * STREAM or STEM. Nothing happens if there isn't a redirection.
+ * The protect-fields are used by the
  */
 {
    const streng *h ;
    int error ;
    unsigned awt ;
    char code ;
-
-   e->SameAsOutput = 0;
-   e->FileRedirected = 0;
-   e->tempname = NULL ; /* none as default, might become char* RedirTempFile */
-   e->queue = NULL ;
-   e->tmp_queue = NULL ;
-   e->type = STD_IO ;
-   e->hdls[0] = e->hdls[1] = e->hdls[2] = -1 ;
 
    if ( ( e->name == NULL ) && !overwrite && ( e->flags.awt == awtUNKNOWN ) )
       return ;
@@ -214,14 +221,16 @@ static void open_env_io( tsd_t *TSD, environpart *e, unsigned overwrite, int isS
           * For a STREAM input/output redirection, set the file reopen
           * flag, and reopen the file.
           */
-         e->type = STREAM ;
-         if (e->flags.isinput)
-            code = 'r' ;
-         else if (e->flags.append)
-            code = 'A' ;
+         e->type = STREAM;
+         if ( e->flags.isinput )
+            code = 'r';
+         else if ( e->flags.append )
+            code = 'A';
          else /* REPLACE */
-            code = 'R' ;
-         e->file = addr_reopen_file( TSD, e->currname, code ) ;
+            code = 'R';
+         if ( e->flags.isinput || !e->SameAsOutput )
+            e->file = addr_reopen_file( TSD, e->currname, code,
+                                        e->flags.iserror );
          break;
 
       case awtSTEM:
@@ -254,7 +263,7 @@ static void open_env_io( tsd_t *TSD, environpart *e, unsigned overwrite, int isS
             e->currnum = 1 ;
             e->base->value[0] = '0' ;
             e->base->len = 1 ;
-            stem_access( TSD, e, 0, e->base ) ;
+            stem_access( TSD, e, 0, Str_dupTSD( e->base ) ) ;
          }
          break;
 
@@ -379,7 +388,7 @@ void put_stem( tsd_t *TSD, environpart *e, streng *str )
     * e->maxnum = e->currnum = streng_to_int( TSD, h, &dummy ) + 1 ;
     */
    e->base->len = sprintf( e->base->value, "%d", e->maxnum ) ;
-   stem_access( TSD, e, 0, e->base ) ;
+   stem_access( TSD, e, 0, Str_dupTSD( e->base ) ) ;
    stem_access( TSD, e, e->maxnum, str ) ;
 }
 
@@ -603,45 +612,15 @@ static void cleanup( tsd_t *TSD, environment *env )
    st->IOBused = 0;
 }
 
-static int setup_io( tsd_t *TSD, int io_flags, environment *env )
-/* Sets up the IO-redirections based on the values in io_flags and env.
- * Each environpart (env->input, env->output, env->error) is set up as follows:
- * a) The enviroment-based streams and stems are set up if used or not.
- *    env->input.type (or output or error) is set to STREAM, STEM or STD_IO.
- * b) The io_flags overwrite the different settings and may have
- *    values QUEUE, simLIFO, simFIFO, STRING.
- * c) If a redirection takes place (type != STD_IO) a pipe() or temporary
- *    file is opened and used.
- * This function returns 1 on success, 0 on error, in which case an error is
- * already reported..
+/*
+ * CheckAndDealWithSameStems shall be used after opening all IO channels.
+ * It checks whether some of the channels address the same stem. This function
+ * takes care of this circumstances and prevents race conditions. In fact,
+ * in may produce a copy of the input to prevent overwriting.
  */
+static void CheckAndDealWithSameStems( tsd_t *TSD, environment *env )
 {
-   shl_tsd_t *st = TSD->shl_tsd;
-   int overwrite ;
-
-   cleanup( TSD, env ); /* Useful in case of an undetected previous error */
-
-   /*
-    * Determine which ANSI redirections are in effect
-    * Use the special io_flags for redirection to overwrite the standard
-    * rules of the environment.
-    */
-   overwrite = ( io_flags & REDIR_INPUT ) ? awtFIFO : awtUNKNOWN ;
-   open_env_io( TSD, &env->input, overwrite, 0 ) ;
-
-   if (io_flags & REDIR_OUTLIFO)
-      overwrite = awtLIFO ;
-   else if (io_flags & REDIR_OUTFIFO)
-      overwrite = awtFIFO ;
-   else if (io_flags & REDIR_OUTSTRING)
-      overwrite = awtFIFO ;
-   else
-      overwrite = awtUNKNOWN ;
-   open_env_io( TSD, &env->output, overwrite, io_flags & REDIR_OUTSTRING ) ;
-
-   open_env_io( TSD, &env->error, awtUNKNOWN, 0 ) ;
-
-   if ((env->output.type == STEM) && (env->error.type == STEM))
+   if ( ( env->output.type == STEM ) && ( env->error.type == STEM ) )
    {
       /* env->output.name and env->error.name must exist here
        *
@@ -650,45 +629,126 @@ static int setup_io( tsd_t *TSD, int io_flags, environment *env )
        * stem values twice nor want to read "stem.0" for every
        * stem on every access to prevent it.
        */
-      if (Str_ccmp(env->output.currname, env->error.currname) == 0)
+      if ( Str_ccmp( env->output.currname, env->error.currname ) == 0 )
       {
          env->error.SameAsOutput = 1;
-         if (env->error.maxnum == 0)
+         if ( env->error.maxnum == 0 )
          {
             /* error may has the REPLACE option while output has not.
              * Force a silent replace in this case.
              */
             env->output.maxnum = 0;
-            env->output.currnum = 1 ;
+            env->output.currnum = 1;
          }
       }
    }
 
-   if (env->input.type == STEM)
+   if ( env->input.type == STEM )
    {
       /* Same procedure. To prevent overwriting variables while
        * outputting to a stem wherefrom we have to read, buffer
        * the input stem if the names do overlap.
        */
 
-      if ((env->output.type == STEM) &&
-          (Str_ccmp(env->input.currname, env->output.currname) == 0))
-         env->input.SameAsOutput = 1;
+      if ( ( env->output.type == STEM ) &&
+           ( Str_ccmp( env->input.currname, env->output.currname ) == 0 ) )
+         env->input.SameAsOutput |= 1;
 
-      if ((env->error.type == STEM) &&
-          (Str_ccmp(env->input.currname, env->error.currname) == 0))
-         env->input.SameAsOutput = 1;
+      if ( ( env->error.type == STEM ) &&
+           ( Str_ccmp( env->input.currname, env->error.currname ) == 0 ) )
+         env->input.SameAsOutput |= 2;
 
-      if (env->input.SameAsOutput)
+      if ( env->input.SameAsOutput )
       {
          /*
           * Fixes bug 609017
           */
          env->input.currname->len = env->input.currnamelen;
-         env->input.tmp_queue = fill_input_queue(TSD, env->input.currname, env->input.maxnum);
+         env->input.tmp_queue =
+           fill_input_queue_stem( TSD, env->input.currname, env->input.maxnum);
       }
    }
+}
 
+/*
+ * CheckSameStreams shall be used before opening all IO channels.
+ * It checks whether some of the channels address the same file. This function
+ * takes detects it and prepares the system to reduce file opening.
+ */
+static void CheckSameStreams( tsd_t *TSD, int io_flags, environment *env )
+{
+   environpart *e;
+   int i, isFile[3], mask;
+   const streng *name;
+   streng *full[3];
+
+   memset( isFile, -1, sizeof( isFile ) );
+
+   for ( i = 0; i < 3; i++ )
+   {
+      switch ( i )
+      {
+         case 0:
+            mask = REDIR_INPUT;
+            e = &env->input;
+            break;
+
+         case 1:
+            mask = REDIR_OUTLIFO | REDIR_OUTFIFO | REDIR_OUTSTRING;
+            e = &env->output;
+            break;
+
+         default:
+            mask = 0;
+            e = &env->error;
+            break;
+
+      }
+
+      e->SameAsOutput = 0;
+      full[i] = NULL;
+      if ( ( io_flags & mask ) ||
+           ( e->flags.awt != awtSTREAM ) )
+         continue;
+
+      name = e->name;
+      if ( ( name != NULL ) && ( name->len == 0 ) )
+         name = NULL;
+
+      if ( ( e->flags.ant == antSIMSYMBOL ) && ( name != NULL ) )
+      {
+         name = getvalue( TSD, name, -1 ) ;
+      }
+      else
+      {
+         assert( ( e->flags.ant == antSTRING ) || ( name == NULL ) );
+      }
+
+      /*
+       * Now get the fully full names and their file type for the
+       * comparison.
+       */
+      full[i] = addr_file_info( TSD, name, i );
+   }
+   if ( ( full[0] != NULL ) && ( full[1] != NULL ) )
+      env->input.SameAsOutput |= filename_cmp( full[0], full[1] ) ? 0 : 1;
+   if ( ( full[0] != NULL ) && ( full[2] != NULL ) )
+      env->input.SameAsOutput |= filename_cmp( full[0], full[2] ) ? 0 : 2;
+   if ( ( full[1] != NULL ) && ( full[2] != NULL ) )
+      env->error.SameAsOutput |= filename_cmp( full[1], full[2] ) ? 0 : 1;
+
+   if ( env->error.SameAsOutput && ( env->error.flags.append == 0 ) )
+      env->output.flags.append = 0;
+}
+
+/*
+ * CheckAndDealWithSameQueues shall be used after opening all IO channels.
+ * It checks whether some of the channels address the same queue. This function
+ * takes care of this circumstances and prevents race conditions. In fact,
+ * in may produce a copy of the input to prevent overwriting.
+ */
+static void CheckAndDealWithSameQueues( tsd_t *TSD, environment *env )
+{
    if ( ( env->output.type & ( LIFO | FIFO | LIFOappend | FIFOappend ) )
      && ( env->error.type  & ( LIFO | FIFO | LIFOappend | FIFOappend ) ) )
    {
@@ -707,9 +767,9 @@ static int setup_io( tsd_t *TSD, int io_flags, environment *env )
              * Force a silent replace in this case.
              */
             if ( env->output.type == LIFOappend )
-               env->output.type = LIFO ;
+               env->output.type = LIFO;
             if ( env->output.type == FIFOappend )
-               env->output.type = FIFO ;
+               env->output.type = FIFO;
          }
       }
    }
@@ -725,68 +785,136 @@ static int setup_io( tsd_t *TSD, int io_flags, environment *env )
       {
          if ( ( env->output.type & ( LIFO | FIFO | LIFOappend | FIFOappend ) )
            && addr_same_queue( TSD, env->input.queue, env->output.queue ) )
-            env->input.SameAsOutput = 1;
+            env->input.SameAsOutput |= 1;
 
          if ( ( env->error.type & ( LIFO | FIFO | LIFOappend | FIFOappend ) )
            && addr_same_queue( TSD, env->input.queue, env->error.queue ) )
-            env->input.SameAsOutput = 1;
+            env->input.SameAsOutput |= 2;
 
          if (env->input.SameAsOutput)
-            env->input.tmp_queue = addr_redir_queue( TSD, env->input.queue ) ;
+            env->input.tmp_queue = addr_redir_queue( TSD, env->input.queue );
       }
    }
 
    /* Final stages for queues: if not "append", do a replace by purging */
    if ( ( env->output.type == FIFO )
      || ( env->output.type == LIFO ) )
-      addr_purge_queue( TSD, env->output.queue ) ;
+      addr_purge_queue( TSD, env->output.queue );
    if ( ( ( env->error.type == FIFO )
        || ( env->error.type == LIFO ) )
      && !env->error.SameAsOutput )
-      addr_purge_queue( TSD, env->error.queue ) ;
+      addr_purge_queue( TSD, env->error.queue );
    /* reduce used names */
    if ( env->output.type == FIFOappend )
-      env->output.type = FIFO ;
+      env->output.type = FIFO;
    if ( env->output.type == LIFOappend )
-      env->output.type = LIFO ;
+      env->output.type = LIFO;
    if ( env->error.type == FIFOappend )
-      env->error.type = FIFO ;
+      env->error.type = FIFO;
    if ( env->error.type == LIFOappend )
-      env->error.type = LIFO ;
+      env->error.type = LIFO;
+}
 
-   if (env->input.type != STD_IO)
+static int setup_io( tsd_t *TSD, int io_flags, environment *env )
+/* Sets up the IO-redirections based on the values in io_flags and env.
+ * Each environpart (env->input, env->output, env->error) is set up as follows:
+ * a) The enviroment-based streams and stems are set up if used or not.
+ *    env->input.type (or output or error) is set to STREAM, STEM or STD_IO.
+ * b) The io_flags overwrite the different settings and may have
+ *    values QUEUE, simLIFO, simFIFO, STRING.
+ * c) If a redirection takes place (type != STD_IO) a pipe() or temporary
+ *    file is opened and used.
+ * This function returns 1 on success, 0 on error, in which case an error is
+ * already reported..
+ */
+{
+   shl_tsd_t *st = TSD->shl_tsd;
+   int overwrite;
+
+   cleanup( TSD, env ); /* Useful in case of an undetected previous error */
+
+   prepare_env_io( &env->input );
+   prepare_env_io( &env->output );
+   prepare_env_io( &env->error );
+
+   CheckSameStreams( TSD, io_flags, env );
+   /*
+    * Determine which ANSI redirections are in effect
+    * Use the special io_flags for redirection to overwrite the standard
+    * rules of the environment.
+    */
+   overwrite = ( io_flags & REDIR_INPUT ) ? awtFIFO : awtUNKNOWN;
+   open_env_io( TSD, &env->input, overwrite, 0 );
+   if ( env->input.SameAsOutput )
    {
-      if (open_subprocess_connection(TSD, &env->input) != 0)
+      /*
+       * It must be a file since we don't have checked for stems and queues.
+       * We read the input into a temporary queue, then we can proceed in the
+       * usual way.
+       */
+      env->input.tmp_queue = fill_input_queue_stream( TSD, env->input.file );
+      addr_reset_file( TSD, env->input.file );
+      env->input.file = NULL;
+   }
+
+   if ( io_flags & REDIR_OUTLIFO )
+      overwrite = awtLIFO;
+   else if ( io_flags & REDIR_OUTFIFO )
+      overwrite = awtFIFO;
+   else if ( io_flags & REDIR_OUTSTRING )
+      overwrite = awtFIFO;
+   else
+      overwrite = awtUNKNOWN;
+   open_env_io( TSD, &env->output, overwrite, io_flags & REDIR_OUTSTRING );
+
+   if ( env->error.SameAsOutput )
+   {
+      /*
+       * It must be a file since we don't have checked for stems and queues.
+       * We read the input into a temporary queue or a temporary file.
+       * Then we can proceed in the usual way.
+       */
+      env->error.type = STREAM;
+   }
+   else
+      open_env_io( TSD, &env->error, awtUNKNOWN, 0 );
+
+   CheckAndDealWithSameStems( TSD, env );
+   CheckAndDealWithSameQueues( TSD, env );
+
+   if ( env->input.type != STD_IO )
+   {
+      if ( open_subprocess_connection( TSD, &env->input ) != 0 )
       {
-         cleanup( TSD, env ) ;
-         exiterror( ERR_SYSTEM_FAILURE, 920, "creating redirection", "for input", strerror(errno) )  ;
-         return( 0 ) ;
+         cleanup( TSD, env );
+         exiterror( ERR_SYSTEM_FAILURE, 920, "creating redirection", "for input", strerror(errno) );
+         return 0;
       }
    }
-   if (env->output.type != STD_IO)
+   if ( env->output.type != STD_IO )
    {
-      if (open_subprocess_connection(TSD, &env->output) != 0)
+      if ( open_subprocess_connection( TSD, &env->output ) != 0 )
       {
-         cleanup( TSD, env ) ;
-         exiterror( ERR_SYSTEM_FAILURE, 920, "creating redirection", "for output", strerror(errno) )  ;
-         return( 0 ) ;
+         cleanup( TSD, env );
+         exiterror( ERR_SYSTEM_FAILURE, 920, "creating redirection", "for output", strerror(errno) );
+         return 0;
       }
    }
    else
-      fflush(stdout);
-   if (env->error.type != STD_IO)
+      fflush( stdout );
+   if ( env->error.type != STD_IO )
    {
-      if (open_subprocess_connection(TSD, &env->error) != 0)
+      if ( open_subprocess_connection( TSD, &env->error ) != 0 )
       {
-         cleanup( TSD, env ) ;
-         exiterror( ERR_SYSTEM_FAILURE, 920, "creating redirection", "for error", strerror(errno) )  ;
-         return( 0 ) ;
+         cleanup( TSD, env );
+         exiterror( ERR_SYSTEM_FAILURE, 920, "creating redirection", "for error", strerror(errno) );
+         return 0;
       }
    }
    else
-      fflush(stderr);
-   st->AsyncInfo = create_async_info(TSD);
-   return( 1 ) ;
+      fflush( stderr );
+   st->AsyncInfo = create_async_info( TSD );
+   return 1;
 }
 
 static streng *fetch_food( tsd_t *TSD, environment *env )
@@ -812,16 +940,24 @@ static streng *fetch_food( tsd_t *TSD, environment *env )
          break;
 
       case STREAM:
+         delflag = 1;
+
+         if ( env->input.tmp_queue )
+         {
+            c = addr_io_queue( TSD, env->input.tmp_queue, NULL, 0 );
+            if ( c == NULL )
+               return NULL;
+            break;
+         }
          if (env->input.file == NULL)
-            return( NULL ) ;
-         delflag = 1 ;
-         c = addr_io_file( TSD, env->input.file, NULL ) ;
+            return NULL;
+         c = addr_io_file( TSD, env->input.file, NULL );
          if ( !c )
-            return( NULL ) ;
+            return NULL;
          if ( c->len == 0 )
          {
-            Free_stringTSD( (streng *) c ) ;
-            return( NULL ) ;
+            Free_stringTSD( (streng *) c );
+            return NULL;
          }
          break;
 
@@ -1032,7 +1168,7 @@ static void drop_crop( tsd_t *TSD, environment *env, streng **string,
    if (is_error)
    {
       isStream = ( env->error.type == STREAM ) ;
-      fptr = env->error.file ;
+      fptr = ( env->error.SameAsOutput ) ? env->output.file : env->error.file;
    }
    else
    {
@@ -1138,23 +1274,20 @@ int posix_do_command( tsd_t *TSD, const streng *command, int io_flags, environme
    env->input.hdls[0] = env->output.hdls[1] = env->error.hdls[1] = -1;
 
    /* Force our own handles to become nonblocked */
-   if (!env->input.FileRedirected)
+   if (!env->input.FileRedirected && ((in = env->input.hdls[1]) != -1))
    {
-      in = env->input.hdls[1];
       unblock_handle( &in, st->AsyncInfo ) ;
    }
    else
       in = -1;
-   if (!env->output.FileRedirected)
+   if (!env->output.FileRedirected && ((out = env->output.hdls[0]) != -1))
    {
-      out = env->output.hdls[0];
       unblock_handle( &out, st->AsyncInfo ) ;
    }
    else
       out = -1;
-   if (!env->error.FileRedirected)
+   if (!env->error.FileRedirected && ((err = env->error.hdls[0]) != -1))
    {
-      err = env->error.hdls[0];
       unblock_handle( &err, st->AsyncInfo ) ;
    }
    else
@@ -1317,6 +1450,12 @@ int posix_do_command( tsd_t *TSD, const streng *command, int io_flags, environme
    if ( env->error.type & ( LIFO | FIFO ) )
       flush_stack( TSD, env->error.tmp_queue, env->error.queue, env->output.type == FIFO ) ;
 
+   if ( ( env->input.type == STREAM ) && ( env->input.file != NULL ) )
+      addr_reset_file( TSD, env->input.file );
+   if ( env->output.type == STREAM )
+      addr_reset_file( TSD, env->output.file );
+   if ( ( env->error.type == STREAM ) && !env->error.SameAsOutput )
+      addr_reset_file( TSD, env->error.file );
    if ( env->output.type == STRING )
       env->output.tmp_queue = NULL ;
 

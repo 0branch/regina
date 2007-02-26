@@ -9,8 +9,10 @@
 !define LONGNAME "Regina"  ;Long Name (for descriptions)
 !define SHORTNAME "Regina" ;Short name (no slash) of package
 
-!define MUI_VERSION "${VERSION}"
-!define MUI_PRODUCT "${LONGNAME}"
+!define MUI_ICON "${SRCDIR}\reginaw32.ico"
+!define MUI_UNICON "uninstall.ico"
+
+Name "${LONGNAME} ${VERSION}"
 
 !include "MUI.nsh"
 
@@ -27,13 +29,8 @@
 !define MUI_UNINSTALLER
 !define MUI_UNCONFIRMPAGE
   
-;Modern UI System
-!insertmacro MUI_SYSTEM
-
 ; VERSION  ;Must be supplied on compile command line
 ; NODOTVER ;Must be supplied on compile command line
-
-!insertmacro MUI_LANGUAGE "English"
 
 ;--------------------------------
 ;Configuration
@@ -45,29 +42,33 @@
 
 
   ;License dialog
-  LicenseData "..\COPYING-LIB"
+  LicenseData "${SRCDIR}\COPYING-LIB"
 
 
   ;Folder-select dialog
   InstallDir "c:\${SHORTNAME}"
 
-  LangString TEXT_IO_PAGETITLE_ASSOC ${LANG_ENGLISH} ": File Associations"
+  LangString TEXT_IO_PAGETITLE_ASSOC ${LANG_ENGLISH} "File Associations"
   LangString TEXT_IO_SUBTITLE_ASSOC ${LANG_ENGLISH} "Associate file extensions with Regina"
-  LangString TEXT_IO_PAGETITLE_LANGUAGE ${LANG_ENGLISH} ": Language for Error Messages"
+  LangString TEXT_IO_PAGETITLE_LANGUAGE ${LANG_ENGLISH} "Language for Error Messages"
   LangString TEXT_IO_SUBTITLE_LANGUAGE ${LANG_ENGLISH} "Select the language for Regina error messages"
-  LangString TEXT_IO_PAGETITLE_STACK ${LANG_ENGLISH} ": Regina Stack Service"
+  LangString TEXT_IO_PAGETITLE_STACK ${LANG_ENGLISH} "Regina Stack Service"
   LangString TEXT_IO_SUBTITLE_STACK ${LANG_ENGLISH} "Install Regina Stack Service"
 ;--------------------------------
 ;Pages
   
-  !insertmacro MUI_PAGECOMMAND_LICENSE
-  !insertmacro MUI_PAGECOMMAND_COMPONENTS
-  !insertmacro MUI_PAGECOMMAND_DIRECTORY
-  Page custom SetCustomAssoc "$(TEXT_IO_PAGETITLE_ASSOC)"
-  Page custom SetCustomLanguage "$(TEXT_IO_PAGETITLE_LANGUAGE)"
-  Page custom SetCustomStack "$(TEXT_IO_PAGETITLE_STACK)"
-  !insertmacro MUI_PAGECOMMAND_INSTFILES
-  !insertmacro MUI_PAGECOMMAND_FINISH
+  !insertmacro MUI_PAGE_LICENSE "${SRCDIR}\COPYING-LIB"
+  !insertmacro MUI_PAGE_COMPONENTS
+  !insertmacro MUI_PAGE_DIRECTORY
+  Page custom SetCustomAssoc
+  Page custom SetCustomLanguage
+  Page custom SetCustomStack
+  !insertmacro MUI_PAGE_INSTFILES
+  !insertmacro MUI_PAGE_FINISH
+
+;--------------------------------
+;Language
+!insertmacro MUI_LANGUAGE "English"
 
 ;--------------------------------
 ;Reserved files
@@ -98,14 +99,15 @@ Section "${LONGNAME} Core (required)" SecMain
   File es.mtb
   File no.mtb
   File pt.mtb
-  File /oname=README32.txt ..\README.32
-  File /oname=READMEW32.txt ..\README.W32
-  File /oname=LICENSE.txt ..\COPYING-LIB
+  File pl.mtb
+  File /oname=README${NODOTVER}.txt ${SRCDIR}\README.${NODOTVER}
+  File /oname=READMEW32.txt ${SRCDIR}\README.W32
+  File /oname=LICENSE.txt ${SRCDIR}\COPYING-LIB
   Push $INSTDIR
   Call AddToPath
   CreateDirectory "$SMPROGRAMS\${SHORTNAME} REXX"
   CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Uninstall.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Release Notes.lnk" "$INSTDIR\README32.txt" "" "$INSTDIR\README32.txt" 0
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Release Notes.lnk" "$INSTDIR\README${NODOTVER}.txt" "" "$INSTDIR\README${NODOTVER}.txt" 0
   CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\README.lnk" "$INSTDIR\READMEW32.txt" "" "$INSTDIR\READMEW32.txt" 0
   CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\LICENSE.lnk" "$INSTDIR\LICENSE.txt" "" "$INSTDIR\LICENSE.txt" 0
   ; Write the installation path into the registry
@@ -152,9 +154,9 @@ Section "${LONGNAME} Demos" SecDemo
   File test1.dll
   File test2.dll
   ; Distribution files...
-  File /oname=rexxcps.rexx ..\demo\rexxcps.rexx
+  File /oname=rexxcps.rexx ${SRCDIR}\demo\rexxcps.rexx
   CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos\Rexxcps.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\rexxcps.rexx"' "$INSTDIR\regina.exe"
-  File /oname=dynfunc.rexx ..\demo\dynfunc.rexx
+  File /oname=dynfunc.rexx ${SRCDIR}\demo\dynfunc.rexx
   CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos\Dynfunc.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\dynfunc.rexx"' "$INSTDIR\regina.exe"
 SectionEnd
 
@@ -168,7 +170,7 @@ Section "${LONGNAME} Development Kit" SecDev
   File regina.lib
   File rexx.lib
   SetOutPath $INSTDIR\include
-  File /oname=rexxsaa.h ..\rexxsaa.h
+  File /oname=rexxsaa.h ${SRCDIR}\rexxsaa.h
 SectionEnd
 
 ;------------------------------------------------------------------------
@@ -185,7 +187,7 @@ SectionEnd
 Section ""
 
   ;Invisible section to display the Finish header
-  !insertmacro MUI_FINISHHEADER
+; !insertmacro MUI_FINISHHEADER
 
 SectionEnd
 
@@ -259,7 +261,7 @@ Function DoLanguageDefault
     ReadIniStr $R0 "$PLUGINSDIR\regina_mt.ini" $2 State
     StrCmp $R0 1 langFound
     IntOp $1 $1 + 1
-    StrCmp $1 7 langExit
+    StrCmp $1 8 langExit ; the "8" here must be 1 more than the last field number in regina_mt.ini
     Goto langStartLoop
   langFound:
   ReadIniStr $R0 "$PLUGINSDIR\regina_mt.ini" $2 Text
@@ -318,7 +320,7 @@ Section "Uninstall"
   ; remove shortcuts directory and everything in it
   RMDir /r "$SMPROGRAMS\${SHORTNAME}"
 
-  !insertmacro MUI_UNFINISHHEADER
+; !insertmacro MUI_UNFINISHHEADER
 
 SectionEnd
 
@@ -334,8 +336,8 @@ Function un.DeleteFileAssociation
   NoOwn:
 FunctionEnd
 
-!include "${NSISDIR}\Contrib\mhes\isnt.nsh"
-!include "${NSISDIR}\Contrib\mhes\path.nsh"
-!include "${NSISDIR}\Contrib\mhes\WriteEnv.nsh"
+!include "isnt.nsh"
+!include "path.nsh"
+!include "WriteEnv.nsh"
 
 ;eof

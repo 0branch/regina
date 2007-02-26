@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: debug.c,v 1.7 2003/03/11 10:38:08 florian Exp $";
+static char *RCSid = "$Id: debug.c,v 1.10 2004/02/10 10:43:52 mark Exp $";
 #endif
 
 /*
@@ -23,7 +23,6 @@ static char *RCSid = "$Id: debug.c,v 1.7 2003/03/11 10:38:08 florian Exp $";
 
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 #include <assert.h>
 #include "rexx.h"
 
@@ -69,9 +68,10 @@ void dumpvarcontent( const tsd_t *TSD, FILE *fp, cvariableptr v, int exposed )
       case VFLAG_BOTH: fprintf( fp, ",\tflag BOTH, " ); break;
       default:         fprintf( fp, ",\tflag %d, ", v->flag );
    }
-   fprintf( fp, "hwired %ld, valid %ld, guard %d%s\n",
+   fprintf( fp, "hwired %ld, valid %ld, guard %d%s%s\n",
                 v->hwired, v->valid, v->guard,
-                ( exposed ) ? ", exposed" : "" );
+                ( exposed ) ? ", exposed" : "",
+                ( v->flag == VFLAG_NONE ) ? ", dropped" : "" );
 }
 
 /*
@@ -166,73 +166,121 @@ void dumpvars( const tsd_t *TSD )
    return;
 }
 
-
 void dumptree(const tsd_t *TSD, const treenode *this, int level, int newline)
 {
-   int i=0, j=0 ;
-   streng *ptr=NULL;
+   int i;
+   streng *ptr;
    FILE *fp=stderr;
 
    if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
       fp = stdout;
-   if ((this->charnr)!=0
-   &&  (this->charnr)!=(-1))
-   {
-      if (newline)
-         putc('\n',fp);
-      for (i=0;i!=level;i++) fprintf(fp,"  ") ;
-      fprintf(fp,"Lineno: %d   Charno: %d", this->lineno, this->charnr) ;
-      if (newline)
+
+   while ( this ) {
+      if ( newline )
+         fprintf( fp, "\n%*s", 2 * level, "" );
+
+      fprintf( fp, "%s (type %d)\n",
+                   getsym( this->type ), this->type );
+
+      if ( this->name )
       {
-         ptr = getsourceline(TSD, this->lineno, this->charnr,
-                             &TSD->systeminfo->tree) ;
-         fprintf(fp," Sourceline: [");
-         for(i=0;i<ptr->len;i++)
-            putc(ptr->value[i],fp);
-         putc(']',fp);
-      }
-      putc('\n',fp);
-   }
-
-   for (i=0;i!=level;i++)
-      fprintf(fp,"  ") ;
-   fprintf(fp,">>>  in type=%d == %s\n", this->type, getsym(this->type)) ;
-
-   for (i=0;i!=level;i++) fprintf(fp,"  ") ;
-   fprintf(fp,"Flags: lnum %d rnum %d lsvar %d rsvar %d lcvar %d rcvar %d\n",
-      this->u.flags.lnum,
-      this->u.flags.rnum,
-      this->u.flags.lsvar,
-      this->u.flags.rsvar,
-      this->u.flags.lcvar,
-      this->u.flags.rcvar );
-
-   if ((this->name)!=NULL)
-   {
-      for (i=0;i!=level;i++) fprintf(fp,"  ") ;
-      fprintf(fp,"Name: [");
-      for (i=0;i<this->name->len;i++)
-         putc(this->name->value[i],fp);
-      fprintf(fp,"]\n") ;
-   }
-
-   for (j=0;j<sizeof(this->p)/sizeof(this->p[0]);j++)
-      if (this->p[j]!=NULL)
-      {
-         for (i=0;i!=level;i++)
-            fprintf(fp,"  ") ;
-         fprintf(fp,"==> (%d) going down in branch %d, type %d = %s\n",
-                this->type,j+1,this->p[j]->type,getsym(this->p[j]->type)) ;
-         dumptree( TSD, this->p[j], level+1, 0 ) ;
+         fprintf( fp, "%*sName: [%.*s]\n",
+                      2 * level, "",
+                      this->name->len, this->name->value );
       }
 
-   for (i=0;i!=level;i++)
-      fprintf(fp,"  ") ;
-   fprintf(fp,"<<< out type=%d == %s\n", this->type,getsym(this->type)) ;
+      if ( ( this->charnr != 0 ) && (this->charnr != -1 ) )
+      {
+         fprintf( fp, "%*sLineno: %d   Charno: %d",
+                      2 * level, "",
+                      this->lineno, this->charnr );
+         if ( newline )
+         {
+            ptr = getsourceline( TSD, this->lineno, this->charnr,
+                                &TSD->systeminfo->tree );
+            fprintf( fp, ", Sourceline: [%.*s]", ptr->len, ptr->value );
+         }
+         putc( '\n', fp );
+      }
 
-   if (this->next)
-      dumptree( TSD, this->next, level, 1 ) ;
+      /*
+       * See also several places in instore.c where this switch list must be
+       * changed. Seek for X_CEXPRLIST.
+       */
+      switch ( this->type )
+      {
+         case X_EQUAL:
+         case X_DIFF:
+         case X_GT:
+         case X_GTE:
+         case X_LT:
+         case X_LTE:
+            fprintf( fp, "%*sFlags: lnum %d, rnum %d, lsvar %d, rsvar %d, lcvar %d, rcvar %d\n",
+                         2 * level, "",
+                         this->u.flags.lnum,
+                         this->u.flags.rnum,
+                         this->u.flags.lsvar,
+                         this->u.flags.rsvar,
+                         this->u.flags.lcvar,
+                         this->u.flags.rcvar );
+            break;
 
+         case X_ADDR_V:
+            fprintf( fp, "%*sFlags: %sANSI version\n",
+                         2 * level, "",
+                         ( this->u.nonansi ) ? "non-" : "" );
+            break;
+
+         case X_CEXPRLIST:
+            if ( this->u.strng == NULL )
+               fprintf( fp, "%*sValue: <null>\n",
+                            2 * level, "" );
+            else
+               fprintf( fp, "%*sValue: [%.*s]\n",
+                            2 * level, "",
+                            this->u.strng->len, this->u.strng->value );
+            break;
+
+         case X_LABEL:
+            fprintf( fp, "%*sFlags: %s\n",
+                         2 * level, "",
+                         ( this->u.trace_only ) ? "trace-only" :
+                                                  "is target" );
+            break;
+
+         case X_ADDR_WITH:
+            if ( !this->p[0] && !this->p[1] && !this->p[2] )
+               fprintf( fp, "%*sFlags: append %d, awt %s, ant %s\n",
+                            2 * level, "",
+                            this->u.of.append,
+                            ( this->u.of.awt == awtUNKNOWN ) ? "unknown" :
+                            ( this->u.of.awt == awtSTREAM ) ?  "STREAM" :
+                            ( this->u.of.awt == awtSTEM ) ?    "STEM" :
+                            ( this->u.of.awt == awtLIFO ) ?    "LIFO" :
+                            ( this->u.of.awt == awtFIFO ) ?    "FIFO" :
+                                                               "<error>",
+                            ( this->u.of.ant == antUNKNOWN )   ? "unknown" :
+                            ( this->u.of.ant == antSTRING )    ? "STRING" :
+                            ( this->u.of.ant == antSIMSYMBOL ) ? "SYMBOL" :
+                                                                 "<error>" );
+            break;
+
+         default:
+            break;
+      }
+
+      for ( i = 0; i < sizeof( this->p ) / sizeof( this->p[0] ); i++ )
+         if ( this->p[i] != NULL )
+         {
+            fprintf( fp, "%*s%d>",
+                         2 * level, "",
+                         i + 1 );
+            dumptree( TSD, this->p[i], level + 1, 0 );
+         }
+
+      this = this->next;
+      newline = 1;
+   }
 }
 
 #endif /* !NDEBUG */
@@ -308,7 +356,7 @@ streng *getsourceline( const tsd_t *TSD, int line, int charnr, const internal_pa
 
    chptr = ptr + --charnr ;
    chend = ptr + len ;
-   for (; (chptr < chend) && isspace(*chptr); chptr++) ;
+   for (; (chptr < chend) && rx_isspace(*chptr); chptr++) ;
    string = Str_makeTSD(BUFFERSIZE+1) ;
    outptr = string->value ;
 
@@ -329,14 +377,14 @@ restart:
          switch (*chptr)
          {
             case ',':
-               for(tmptr=chptr+1; tmptr<chend && isspace(*tmptr); tmptr++ ) ;
+               for(tmptr=chptr+1; tmptr<chend && rx_isspace(*tmptr); tmptr++ ) ;
                assert( tmptr<=chend ) ;
                if (tmptr==chend)
                {
                   *(outptr++) = ' ' ;
                   chptr = sourceline(++line,ipt,&len) ;
                   chend = chptr + len ;
-                  for(; chptr<chend && isspace(*chptr); chptr++) ;
+                  for(; chptr<chend && rx_isspace(*chptr); chptr++) ;
                   goto restart;
                }
                break ;

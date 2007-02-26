@@ -1,6 +1,6 @@
 %{
 #ifndef lint
-static char *RCSid = "$Id: lexsrc.l,v 1.18 2003/04/20 06:58:48 florian Exp $";
+static char *RCSid = "$Id: lexsrc.l,v 1.23 2004/03/04 11:02:06 florian Exp $";
 #endif
 
 /*
@@ -24,9 +24,9 @@ static char *RCSid = "$Id: lexsrc.l,v 1.18 2003/04/20 06:58:48 florian Exp $";
 
 #include "rexx.h"
 #include "yaccsrc.h"
-#include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 
 /* Define ASCII_0_TERMINATES_STRING if you want that ASCII-0 terminates
  * an input string. Normally this should not happen. Input strings are
@@ -226,6 +226,7 @@ key_address       [aA][dD][dD][rR][eE][sS][sS]
 key_arg           [aA][rR][gG]
 key_by            [bB][yY]
 key_call          [cC][aA][lL][lL]
+key_caseless      [cC][aA][sS][eE][lL][eE][sS][sS]
 key_digits        [dD][iI][gG][iI][tT][sS]
 key_do            [dD][oO]
 key_drop          [dD][rR][oO][pP]
@@ -248,6 +249,7 @@ key_iterate       [iI][tT][eE][rR][aA][tT][eE]
 key_leave         [lL][eE][aA][vV][eE]
 key_linein        [lL][iI][nN][eE][iI][nN]
 key_lostdigits    [lL][oO][sS][tT][dD][iI][gG][iI][tT][sS]
+key_lower         [lL][oO][wW][eE][rR]
 key_name          [nN][aA][mM][eE]
 key_nop           [nN][oO][pP]
 key_notready      [nN][oO][tT][rR][eE][aA][dD][yY]
@@ -690,6 +692,14 @@ key_with          [wW][iI][tT][hH]
    SET_NEXTSTART() ;
    return UPPER ; }
 
+<parse>{key_lower}{between} {
+   SET_NEXTSTART() ;
+   return LOWER ; }
+
+<parse>{key_caseless}{between} {
+   SET_NEXTSTART() ;
+   return CASELESS ; }
+
 <parse>{key_arg}{between} {
    BEGIN other ;
    SET_NEXTSTART() ;
@@ -895,7 +905,7 @@ key_with          [wW][iI][tT][hH]
         || ( ch == '\n' )
         || ( MY_ISBLANK( ch ) ) )
          break;
-      retvalue[i] = (char) toupper( ch );
+      retvalue[i] = (char) rx_toupper( ch );
    }
    retvalue[i] = '\0' ;
    SET_NEXTSTART() ;
@@ -939,7 +949,7 @@ key_with          [wW][iI][tT][hH]
    char c;
    int i,base,charcount,first,tuple;
 
-   base = ( toupper( yytext[yyleng - 1] ) == 'X' ) ? 16 : 2;
+   base = ( rx_toupper( yytext[yyleng - 1] ) == 'X' ) ? 16 : 2;
    parser_data.tline = linenr - 1 ; /* set tline for exiterror */
    /*
     * We are sure to have an invalid string since the above patterns won't
@@ -975,7 +985,7 @@ key_with          [wW][iI][tT][hH]
       }
       if ( base == 16 )
       {
-         if ( isxdigit( c ) )
+         if ( rx_isxdigit( c ) )
             continue;
       }
       exiterror( ERR_INVALID_HEX_CONST, ( base == 16 ) ? 3 : 4, c );
@@ -1074,8 +1084,8 @@ key_with          [wW][iI][tT][hH]
 
    if (in_trace) REJECT ;
 
-   for (i=0; i<=yyleng; i++) /* include terminating '\0' */
-      retvalue[i] = (char) toupper(yytext[i]) ;
+   memcpy( retvalue, yytext, yyleng + 1 ); /* include terminating '\0' */
+   mem_upper( retvalue, yyleng );
 
    if (in_numform)
    {
@@ -1405,7 +1415,7 @@ static void set_assignment( void )
         || ( ch == '\n' )
         || ( MY_ISBLANK( ch ) ) )
          break;
-      retvalue[retlength] = (char) toupper( ch );
+      retvalue[retlength] = (char) rx_toupper( ch );
    }
    retvalue[retlength] = '\0' ;
 }
@@ -1421,7 +1431,7 @@ static YY_CHAR_TYPE *rmspc( YY_CHAR_TYPE *instr )
 
    while ((c = *instr++) != '\0')
    {
-      c = (YY_CHAR_TYPE) toupper(c);
+      c = (YY_CHAR_TYPE) rx_toupper(c);
       /* These characters are treated as blanks: */
       if ((c!='`') && (c!=' ') && (c!=',') && (c!='\t') && (c!='\n'))
          *dest++ = c ;
@@ -1440,14 +1450,13 @@ static YY_CHAR_TYPE *rmspc( YY_CHAR_TYPE *instr )
  */
 static int process_number_or_const( const char *text, int len )
 {
-   int i,eaten,c,symbol;
+   int eaten,c,symbol;
 
    /*
     * Copy and uppercase the return value.
     */
-   for ( i = 0; i < len; i++ )
-      retvalue[i] = (char) toupper( text[i] );
-   retvalue[i] = '\0';
+   memcpy( retvalue, text, len + 1 ); /* include terminating '\0' */
+   mem_upper( retvalue, len );
 
    if ( in_numform )
    {
@@ -1653,6 +1662,9 @@ static int get_next_line( char *line, int max, FILE *stream )
       else
          c = getc(stream) ;
 
+      if ( parser_data.TSD->HaltRaised )
+         halt_raised( parser_data.TSD );
+
       if ((c=='\r') || (c=='\n') || (c==EOF))
          break ;
       line[pos++] = (char) (unsigned char) c ;
@@ -1696,6 +1708,9 @@ static int get_next_line( char *line, int max, FILE *stream )
       }
       else
          nextEOL = getc(stream) ;
+
+      if ( parser_data.TSD->HaltRaised )
+         halt_raised( parser_data.TSD );
    }
 
    /* Decide if the next character is the last char of a EOL pair.
@@ -1904,7 +1919,7 @@ repeated_nesting:
          while (pos < max)
          {
             c = line[pos];
-            if (!isspace(c))
+            if (!rx_isspace(c))
             {
                if (c == '/')
                {
@@ -2044,7 +2059,7 @@ outer_loop:
    if (nesting)
    { /* Don't leave ANY spaces at EOL. That would confuse the lexer. */
       i = max - 1;
-      while ((i >= 0) && isspace(line[i]))
+      while ((i >= 0) && rx_isspace(line[i]))
          i--;
       max = i + 1;
       /* Of course, there is one exception: line continuation */
@@ -2213,14 +2228,15 @@ static void fetch(tsd_t *TSD, FILE *fptr, const streng *str,
 /* This function serializes the parser/lexer requests of the process and
  * call fetch which will make the work. Look there.
  */
-static void fetch_protected(tsd_t * volatile TSD, FILE *fptr,
-                            const streng *str, internal_parser_type *result)
+static void fetch_protected( tsd_t * volatile TSD, FILE *fptr,
+                             const streng *str, internal_parser_type *result )
 {
    volatile int panicked = 0;
    tsd_t * volatile saved_TSD;
 
-   THREAD_PROTECT(regina_parser)
+   THREAD_PROTECT( regina_parser )
    TSD->in_protected = 1;
+   memset(&parser_data, 0, sizeof(internal_parser_type));
 
    saved_TSD = TSD; /* vars used until here */
    if ( setjmp( TSD->protect_return ) )
@@ -2229,20 +2245,32 @@ static void fetch_protected(tsd_t * volatile TSD, FILE *fptr,
       panicked = 1;
    }
    else
-      fetch(TSD, fptr, str, result);
+      fetch( TSD, fptr, str, result );
 
    TSD->in_protected = 0;
-   THREAD_UNPROTECT(regina_parser)
+   THREAD_UNPROTECT( regina_parser )
 
-   if (!panicked)
+   if ( !panicked )
       return;
 
-   /* We got a fatal condition while fetching the input. */
-   if (TSD->delayed_error_type == PROTECTED_DelayedExit)
-      TSD->MTExit(TSD->expected_exit_error);
-   if (TSD->delayed_error_type == PROTECTED_DelayedSetjmpBuf)
-      longjmp( *(TSD->currlevel->buf), 1 ) ;
-   longjmp( *(TSD->systeminfo->panic), 1 ) ;
+   /*
+    * We got a fatal condition while fetching the input.
+    */
+   memset(result, 0, sizeof(internal_parser_type));
+
+   /*
+    * FIXME: Currently no time to investigate it, but we have to do
+    *        a cleanup of the node and source lines of parser_data
+    *        here. Test this with
+    *        interpret '"a='
+    *        and with
+    *        interpret 'nop;"a='
+    */
+   if ( TSD->delayed_error_type == PROTECTED_DelayedInterpreterExit )
+      jump_interpreter_exit( TSD, TSD->expected_exit_error );
+   if ( TSD->delayed_error_type == PROTECTED_DelayedRexxSignal )
+      jump_rexx_signal( TSD );
+   jump_script_exit( TSD, TSD->systeminfo->result );
 }
 
 /* fetch_file reads in a REXX file from disk (or a pipe). It returns without

@@ -1,4 +1,4 @@
-                              Regina 3.1 for BeOS
+                              Regina 3.3 for BeOS
 
 This archive contains binaries for the Regina Rexx Interpreter 3.0 for BeOS.
 Regina is one of the fastest Rexx interpreters available, and the most
@@ -11,24 +11,24 @@ COPYING-LIB for details.
 This port was built on BeOS 5.0. I do not know if it works on any version of 
 BeOS prior to 5.0.
 
-It is assumed that the files will be unzipped from the /boot/home/config directory.
+The SoftwareValet package installs the following files in /boot/home/config:
 
 Included in the port are:
-bin/regina               - Regina Rexx Interpreter - BeOS Regina 
-                           add-ons via SAA Rexx API available
-bin/rexx                 - Regina Rexx Interpreter - no add-ons
-bin/rxstack              - Regina Stack Daemon
-                           controls all named external queues
-bin/rxqueue              - Regina Stack Client
-                           interface to rxstack for non-Regina apps
-lib/libregina.a          - Regina Rexx static library
-lib/libregina.so         - Regina Rexx shared library
-headers/rexxsaa.h        - Rexx SAA API header file
+bin/regina                 - Regina Rexx Interpreter - BeOS Regina
+                             add-ons via SAA Rexx API available
+bin/rexx                   - Regina Rexx Interpreter - no add-ons
+bin/rxstack                - Regina Stack Daemon
+                             controls all named external queues
+bin/rxqueue                - Regina Stack Client
+                             interface to rxstack for non-Regina apps
+lib/libregina.a            - Regina Rexx static library
+lib/libregina.so           - Regina Rexx shared library
+include/rexxsaa.h          - Rexx SAA API header file
 add-ons/regina/libtest1.so - sample Rexx external function library
-                           built as BeOS add-on - see dynfunc.rexx
+                             built as BeOS add-on - see dynfunc.rexx
 add-ons/regina/libtest2.so - sample Rexx external function library
-                           built as BeOS add-on - see dynfunc.rexx
-bin/*.rexx               - sample Rexx programs
+                             built as BeOS add-on - see dynfunc.rexx
+add-ons/regina/*.rexx      - sample Rexx programs
 
 To be able to run the sample dynfunc.rexx, or any other Rexx programs that
 use external function libraries, you should append 

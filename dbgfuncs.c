@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: dbgfuncs.c,v 1.7 2003/03/05 08:06:51 florian Exp $";
+static char *RCSid = "$Id: dbgfuncs.c,v 1.8 2003/10/05 09:04:25 florian Exp $";
 #endif
 
 /*
@@ -24,7 +24,6 @@ static char *RCSid = "$Id: dbgfuncs.c,v 1.7 2003/03/05 08:06:51 florian Exp $";
 #include "rexx.h"
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 #include <assert.h>
 
 #ifdef REGINA_DEBUG_MEMORY

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: cmsfuncs.c,v 1.3 2001/04/26 10:14:42 mark Exp $";
+static char *RCSid = "$Id: cmsfuncs.c,v 1.6 2004/02/10 10:43:48 mark Exp $";
 #endif
 
 /*
@@ -21,6 +21,14 @@ static char *RCSid = "$Id: cmsfuncs.c,v 1.3 2001/04/26 10:14:42 mark Exp $";
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * Bug in LCC complier wchar.h that incorrectly says it defines stat struct
+ * but doesn't
+ */
+#if defined(__LCC__)
+# include <sys/stat.h>
+#endif
+
 #include "rexx.h"
 
 #if defined(MAC)
@@ -37,7 +45,6 @@ static char *RCSid = "$Id: cmsfuncs.c,v 1.3 2001/04/26 10:14:42 mark Exp $";
 #endif
 
 #include <stdio.h>
-#include <ctype.h>
 #ifdef HAVE_ASSERT_H
 # include <assert.h>
 #endif
@@ -50,7 +57,7 @@ static char *RCSid = "$Id: cmsfuncs.c,v 1.3 2001/04/26 10:14:42 mark Exp $";
 # ifdef _MSC_VER
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -121,7 +128,7 @@ streng *cms_justify( tsd_t *TSD, cparamboxptr parms )
    {
       if (inspace)
       {
-         if (!isspace(*cp))
+         if (!rx_isspace(*cp))
          {
             chars++ ;
             inspace = 0 ;
@@ -129,7 +136,7 @@ streng *cms_justify( tsd_t *TSD, cparamboxptr parms )
       }
       else
       {
-         if (!isspace(*cp))
+         if (!rx_isspace(*cp))
             chars++ ;
          else
          {
@@ -160,12 +167,12 @@ streng *cms_justify( tsd_t *TSD, cparamboxptr parms )
    out = result->value ;
    oend = out + length ;
    cp = cptr ;
-   for (; cp<cend && isspace(*cp); cp++) ;
+   for (; cp<cend && rx_isspace(*cp); cp++) ;
    for (; cp<cend && out<oend; cp++)
    {
-      if (isspace(*cp))
+      if (rx_isspace(*cp))
       {
-         for (;cp<cend && isspace(*cp); cp++) ;
+         for (;cp<cend && rx_isspace(*cp); cp++) ;
          for (i=0; i<between && out<oend; i++)
             *(out++) = pad ;
          if (count<initial)

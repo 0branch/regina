@@ -23,7 +23,7 @@
 #   "Extra general phrases requiring translation:"
 #   Please translate these phrases also.
 # - Return the translated error messages in a complete file, the same as this
-#   file, with the name XX.mts where XX is the ISO language abbreviation. 
+#   file, with the name XX.mts where XX is the ISO language abbreviation.
 #   Important: Please zip the file up to ensure that the file arrives in
 #              its original form
 #   Add a comment at the top of the file indicating the language, and your name and email address.
@@ -211,6 +211,20 @@
  40,923,[%s argument %d, too many sub-commands; maximum expected is %d; found %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s argument %d, invalid positional specification; expecting one of "%s"; found "%s"]|<bif>,<argnumber>,<value>,<value>
  40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>
+ 40,980,Unexpected input, either unknown type or illegal data%s%s|: ,<location>
+ 40,981,Number out of the allowed range%s%s|: ,<location>
+ 40,982,String too big for the defined buffer%s%s|: ,<location>
+ 40,983,Illegal combination of type/size%s%s|: ,<location>
+ 40,984,Unsupported number like NAN, +INF, -INF%s%s|: ,<location>
+ 40,985,Structure too complex for static internal buffer%s%s|: ,<location>
+ 40,986,An element of the structure is missing%s%s|: ,<location>
+ 40,987,A value of the structure is missing%s%s|: ,<location>
+ 40,988,The name or part of the name is illegal for the interpreter%s%s|: ,<location>
+ 40,989,A problem occured at the interface between Regina and GCI%s%s|: ,<location>
+ 40,990,The type won't fit the requirements for basic types (arguments/return value)%s%s|: ,<location>
+ 40,991,The number of arguments is wrong or an argument is missing%s%s|: ,<location>
+ 40,992,GCI's internal stack for arguments got an overflow%s%s|: ,<location>
+ 40,993,GCI counted too many nested LIKE containers%s%s|: ,<location>
  41,  0,Bad arithmetic conversion
  41,  1,Non-numeric value ("%s") to left of arithmetic operation "%s"|<value>,<operator>
  41,  2,Non-numeric value ("%s") to right of arithmetic operation "%s"|<value>,<operator>
@@ -289,11 +303,13 @@
 100,  0,[Unknown filesystem error]
 #
 # Extra general phrases requiring translation:
+# The text in () is the corresponding array name in error.c
 #
-# Error 3 running "<file>" line 1:
-# Unable to open language file: %s
-# Incorrect number of messages in language file: %s
-# Unable to read from language file: %s
-# Unable to display text for error %d.%d; language file: %s not available
-# Unable to display text for error %d.%d; text missing from language file: %s
-# Unable to display text for error %d.%d; language file: %s is corrupt
+# (err1prefix)   "Error %d running \"%.*s\", line %d: %.*s",
+# (suberrprefix) "Error %d.%d: %.*s",
+# (err2prefix)   "Error %d running \"%.*s\": %.*s",
+# (erropen)      "Unable to open language file: %s",
+# (errcount)     "Incorrect number of messages in language file: %s",
+# (errread)      "Unable to read from language file: %s",
+# (errmissing)   "Text missing from language file: %s.mtb",
+# (errcorrupt)   "Language file: %s.mtb is corrupt",

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: error.c,v 1.37 2003/04/17 22:39:51 florian Exp $";
+static char *RCSid = "$Id: error.c,v 1.48 2004/04/20 09:15:41 mark Exp $";
 #endif
 
 /*
@@ -40,6 +40,8 @@ typedef struct /* err_tsd: static variables of this module (thread-safe) */
    FILE *nls_fp;
    streng *buffer[2];
    struct textindex nls_tmi[NUMBER_ERROR_MESSAGES]; /* indexes for native language messages */
+   int conditions;
+   streng *errornum;
 } err_tsd_t;   /* thread-specific but only needed by this module. see init_error */
 
 typedef struct
@@ -233,6 +235,20 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
    {  40,923,"[%s argument %d, too many sub-commands; maximum expected is %d; found %d]|<bif>,<argnumber>,<value>,<value>" },
    {  40,924,"[%s argument %d, invalid positional specification; expecting one of \"%s\"; found \"%s\"]|<bif>,<argnumber>,<value>,<value>" },
    {  40,930,"[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>" },
+   {  40,980,"Unexpected input, either unknown type or illegal data%s%s|: ,<location>" },
+   {  40,981,"Number out of the allowed range%s%s|: ,<location>" },
+   {  40,982,"String too big for the defined buffer%s%s|: ,<location>" },
+   {  40,983,"Illegal combination of type/size%s%s|: ,<location>" },
+   {  40,984,"Unsupported number like NAN, +INF, -INF%s%s|: ,<location>" },
+   {  40,985,"Structure too complex for static internal buffer%s%s|: ,<location>" },
+   {  40,986,"An element of the structure is missing%s%s|: ,<location>" },
+   {  40,987,"A value of the structure is missing%s%s|: ,<location>" },
+   {  40,988,"The name or part of the name is illegal for the interpreter%s%s|: ,<location>" },
+   {  40,989,"A problem raises at the interface between Regina and GCI%s%s|: ,<location>" },
+   {  40,990,"The type won't fit the requirements for basic types (arguments/return value)%s%s|: ,<location>" },
+   {  40,991,"The number of arguments is wrong or an argument is missing%s%s|: ,<location>" },
+   {  40,992,"GCI's internal stack for arguments got an overflow%s%s|: ,<location>" },
+   {  40,993,"GCI counted too many nested LIKE containers%s%s|: ,<location>" },
    {  41,  0,"Bad arithmetic conversion" },
    {  41,  1,"Non-numeric value (\"%s\") to left of arithmetic operation \"%s\"|<value>,<operator>" },
    {  41,  2,"Non-numeric value (\"%s\") to right of arithmetic operation \"%s\"|<value>,<operator>" },
@@ -319,6 +335,7 @@ static const char *errlang[] =
    "es", /* spanish */
    "no", /* norwegian */
    "pt", /* portuguese */
+   "pl", /* polish */
 } ;
 
 static const char *err1prefix[] =
@@ -328,6 +345,7 @@ static const char *err1prefix[] =
 /*es*/   "Error %d ejecutando \"%.*s\" línea %d: %.*s",
 /*no*/   "Feil %d under kjøring av \"%.*s\" linje %d: %.*s",
 /*pt*/   "Erro %d ao executar \"%.*s\", linha %d: %.*s",
+/*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\", linia %d: %.*s",
 } ;
 
 static const char *suberrprefix[] =
@@ -337,6 +355,7 @@ static const char *suberrprefix[] =
 /*es*/   "Error %d.%d: %.*s",
 /*no*/   "Feil %d.%d: %.*s",
 /*pt*/   "Erro %d.%d: %.*s",
+/*pl*/   "Bˆ¥d %d.%d: %.*s",
 } ;
 
 static const char *err2prefix[] =
@@ -346,18 +365,8 @@ static const char *err2prefix[] =
 /*es*/   "Error %d ejecutando \"%.*s\": %.*s",
 /*no*/   "Feil %d under kjøring av \"%.*s\": %.*s",
 /*pt*/   "Erro %d ao executar \"%.*s\": %.*s",
+/*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\": %.*s",
 } ;
-
-#if 0
-static const char *errunavial[] =
-{
-   "language file: %s not available",
-/*pt*/ "arquivo de linguagem: %s nao estah disponivel",
-/*no*/ "språkfil: %s ikke tilgjengelig",
-/*de*/ "Sprachspezifische Datei %s nicht verfügbar"
-/*es*/   "Fichero de lenguaje: %s no disponible"
-} ;
-#endif
 
 static const char *erropen[] =
 {
@@ -366,6 +375,7 @@ static const char *erropen[] =
 /*es*/   "Incapaz de abrir el fichero de lenguaje: %s",
 /*no*/   "Ikke i stand til å åpne språkfil: %s",
 /*pt*/   "nao eh possivel abrir arquivo de linguagem: %s",
+/*pl*/   "Nie mo¾na otworzy† pliku j©zyka: %s",
 } ;
 
 static const char *errcount[] =
@@ -375,6 +385,7 @@ static const char *errcount[] =
 /*es*/   "Número incorrecto de mensajes en el fichero de lenguaje: %s",
 /*no*/   "Uriktig antall meldinger i språkfil: %s",
 /*pt*/   "numero incorreto de mensagens no arquivo de linguagem: %s",
+/*pl*/   "Niepoprawna liczba komunikat¢w w pliku j©zyka: %s",
 } ;
 
 static const char *errread[] =
@@ -384,6 +395,7 @@ static const char *errread[] =
 /*es*/   "Incapaz de leer el fichero de lenguaje: %s",
 /*no*/   "Ikke i stand til å lese fra språkfil: %s",
 /*pt*/   "nao eh possivel ler o arquivo de linguagem: %s",
+/*pl*/   "Nie mo¾na czyta† z pliku j©zyka: %s",
 } ;
 
 static const char *errmissing[] =
@@ -393,6 +405,7 @@ static const char *errmissing[] =
 /*es*/   "Falta el texto del fichero de lenguaje: %s.mtb",
 /*no*/   "tekst mangler i språkfil: %s.mtb",
 /*pt*/   "falta texto no arquivo de linguagem: %s.mtb",
+/*pl*/   "Brakuje tekstu w pliku j©zyka: %s.mtb",
 } ;
 
 static const char *errcorrupt[] =
@@ -402,7 +415,10 @@ static const char *errcorrupt[] =
 /*es*/   "Fichero de lenguaje: %s.mtb está corrupto",
 /*no*/   "språkfil: %s.mtb er ødelagt",
 /*pt*/   "arquivo de linguagem: %s.mtb estah corrompido",
+/*pl*/   "Plik j©zyka: %s.mtb jest znieksztaˆcony",
 } ;
+
+static const char *get_embedded_text_message( int errorno, int suberrorno );
 
 /* init_error initializes the module.
  * Currently, we set up the thread specific data.
@@ -418,6 +434,7 @@ int init_error( tsd_t *TSD )
    if ((et = TSD->err_tsd = MallocTSD(sizeof(err_tsd_t))) == NULL)
       return(0);
    memset(et,0,sizeof(err_tsd_t));
+   et->errornum = Str_makeTSD( 3 * sizeof( int ) );
    return(1);
 }
 
@@ -499,12 +516,13 @@ static int charno_of( cnodeptr node )
  */
 void exiterror( int errorno, int suberrorno, ... )
 {
+   staticstreng( nofile, "<name>" );
    va_list argptr;
-   int lineno=0, charno=0, signtype=0 ;
-   streng *inputfile=NULL ;
+   int lineno,charno,signtype;
+   streng *inputfile;
    streng *suberror_streng=NULL;
-   streng *errmsg=NULL ;
-   int i,ok=0,len;
+   streng *errmsg;
+   int i,ok,len;
    const streng *fmt, *etext ;
    FILE *fp = stderr ;
    err_tsd_t *et;
@@ -516,34 +534,64 @@ void exiterror( int errorno, int suberrorno, ... )
                                      * Speed advantage is no reason here! */
    et = TSD->err_tsd;
 
-   if (TSD->currentnode)
+   if ( ( et == NULL )
+     || ( ( errorno == ERR_STORAGE_EXHAUSTED ) && ( et->conditions > 10 ) ) )
    {
-      lineno = lineno_of( TSD->currentnode ) ;
-      charno = charno_of( TSD->currentnode ) ;
+      const char *out = get_embedded_text_message( errorno, 0 );
+
+      len = strlen( out );
+      /*
+       * We allow 10 pending errors only before doing a hard cleanup.
+       * You can use any fixed limit as far as we stop at some time when
+       * having a permanent memory allocation error.
+       * Just write a description end exit. DON'T DO USE A ROUTINE CALLING A
+       * MEMORY ALLOCATION ROUTINE!
+       */
+      if ( ( TSD->currlevel != NULL )
+        && get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
+         fp = stdout;
+
+      fwrite( out, len, 1, fp );
+#if defined(DOS) || defined(OS2) || defined(WIN32)
+      /*
+       * stdout is open in binary mode, so we need to add the
+       * extra CR to the end of the line.
+       */
+      fputc( REGINA_CR, fp );
+#endif
+      fputc( REGINA_EOL, fp );
+      goto not_hookable;
+   }
+   et->conditions++;
+
+   if ( TSD->currentnode )
+   {
+      lineno = lineno_of( TSD->currentnode );
+      charno = charno_of( TSD->currentnode );
    }
    else
    {
-      charno =  0 ;
-      lineno = parser_data.tline ;
+      charno = 0;
+      lineno = parser_data.tline;
    }
 
-   signtype = SIGNAL_SYNTAX ;
-   if ( errorno==ERR_PROG_INTERRUPT )
-      signtype = SIGNAL_HALT ;
+   signtype = SIGNAL_SYNTAX;
+   if ( errorno == ERR_PROG_INTERRUPT )
+      signtype = SIGNAL_HALT;
 #ifdef HAVE_VSPRINTF
    /*
     * Expanded the sub-error text and pass this to condition_hook for
     * condition('D') to return the expanded string.
     */
-   if (errorno <= ERR_MAX_NUMBER
-   &&  suberrorno != 0)
+   if ( ( errorno <= ERR_MAX_NUMBER ) && ( suberrorno != 0 ) )
    {
       fmt = errortext( TSD, errorno, suberrorno, 0, 0 );
       len = Str_len( fmt );
       len += strlen( suberrprefix[et->native_language] );
       len += 2 * ( ( sizeof(unsigned) * 8 ) / 3 + 2 );
       errmsg = get_buffer( TSD, fmt, len + 3 );
-      len = sprintf( errmsg->value, suberrprefix[et->native_language], errorno, suberrorno, Str_len( fmt ), fmt->value );
+      len = sprintf( errmsg->value, suberrprefix[et->native_language],
+                     errorno, suberrorno, Str_len( fmt ), fmt->value );
 
       va_start( argptr, suberrorno );
       for ( i = 0; i < Str_len( fmt ); i++ )
@@ -557,12 +605,14 @@ void exiterror( int errorno, int suberrorno, ... )
                   break;
 
                case 'c':
-                  va_arg( argptr, int );
+                  /* assignment to anything inhibits compiler warnings */
+                  ok = (int) va_arg( argptr, int );
                   break;
 
                default:
                   len += ( sizeof( unsigned ) * 8 ) / 3 + 2;
-                  va_arg( argptr, unsigned );
+                  /* assignment to anything inhibits compiler warnings */
+                  ok = (int) va_arg( argptr, unsigned );
                   break;
             }
          }
@@ -570,10 +620,11 @@ void exiterror( int errorno, int suberrorno, ... )
       va_end( argptr );
 
       suberror_streng = Str_makeTSD( len + 1 );
-      if (suberror_streng)
+      if ( suberror_streng )
       {
          va_start( argptr, suberrorno );
-         Str_len( suberror_streng ) = vsprintf( suberror_streng->value, errmsg->value, argptr );
+         Str_len( suberror_streng ) = vsprintf( suberror_streng->value,
+                                                errmsg->value, argptr );
          va_end( argptr );
       }
    }
@@ -582,7 +633,7 @@ void exiterror( int errorno, int suberrorno, ... )
    /* Here we should set sigtype to SIGNAL_FATAL for some 'errno's */
 
    /* Get the text for the base errorno */
-   etext = errortext( TSD, errorno, 0, 0, 0 ) ;
+   etext = errortext( TSD, errorno, 0, 0, 0 );
 
    /*
     * Only in case of a SYNTAX error set .MN, ANSI 8.4.1
@@ -594,44 +645,57 @@ void exiterror( int errorno, int suberrorno, ... )
       char num[2 * ( ( sizeof(unsigned) * 8 ) / 3 + 2 )];
 
       if ( suberrorno )
+      {
          sprintf( num, "%u.%u", (unsigned) errorno, (unsigned) suberrorno );
+         set_reserved_value( TSD, POOL0_MN, Str_creTSD( num ), 0, VFLAG_STR );
+      }
       else
-         sprintf( num, "%u", (unsigned) errorno );
-      setvalue( TSD, dotMN_name, Str_creTSD( num ) ) ;
+         set_reserved_value( TSD, POOL0_MN, NULL, errorno, VFLAG_NUM );
    }
 
    /* enable a hook into the condition system */
-   if (condition_hook( TSD, signtype, errorno, suberrorno, lineno, Str_dupTSD(etext), suberror_streng))
+   et->conditions--;
+   if ( condition_hook( TSD, signtype, errorno, suberrorno, lineno,
+                        Str_dupTSD( etext ), suberror_streng ) )
    {
-      if (suberror_streng)
-         Free_stringTSD(suberror_streng);
+      if ( suberror_streng )
+         Free_stringTSD( suberror_streng );
       suberror_streng = NULL;
       return ; /* if CALL ON */
    }
 
-   inputfile = TSD->systeminfo->input_file ;
-   ok = HOOK_GO_ON ;
-   if (lineno>0)
+   et->conditions++;
+   if ( ( inputfile = TSD->systeminfo->input_file ) == NULL )
+      inputfile = (streng *) nofile;
+   ok = HOOK_GO_ON;
+   if ( lineno > 0 )
    {
-      traceback(TSD);
-      errmsg = Str_makeTSD( 80 + Str_len( etext ) + Str_len( inputfile ) + strlen( err1prefix[et->native_language] ) );
-      sprintf( errmsg->value, err1prefix[et->native_language], errorno, Str_len( inputfile ), inputfile->value, lineno, Str_len( etext ), etext->value ) ;
+      traceback( TSD );
+      errmsg = Str_makeTSD( 80 + Str_len( etext ) + Str_len( inputfile ) +
+                            strlen( err1prefix[et->native_language] ) );
+      sprintf( errmsg->value, err1prefix[et->native_language],
+               errorno, Str_len( inputfile ), inputfile->value, lineno,
+               Str_len( etext ), etext->value );
    }
    else
    {
-      errmsg = Str_makeTSD( 80 + Str_len( etext ) + Str_len( inputfile ) + strlen( err2prefix[et->native_language] ) );
-      sprintf(errmsg->value, err2prefix[et->native_language], errorno, Str_len( inputfile ), inputfile->value, Str_len( etext ), etext->value );
+      errmsg = Str_makeTSD( 80 + Str_len( etext ) + Str_len( inputfile ) +
+                            strlen( err2prefix[et->native_language] ) );
+      sprintf( errmsg->value, err2prefix[et->native_language],
+               errorno, Str_len( inputfile ), inputfile->value,
+               Str_len( etext ), etext->value );
    }
 
-   errmsg->len = strlen( errmsg->value ) ;
-   assert( errmsg->len < errmsg->max ) ;
+   errmsg->len = strlen( errmsg->value );
+   assert( errmsg->len < errmsg->max );
    /*
     * If we have a system exit installed to handle errors, call it here...
     */
-   if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_STDERR))
-      ok = (hookup_output(TSD, HOOK_STDERR, errmsg) == HOOK_GO_ON) ;
+   et->conditions--;
+   if ( TSD->systeminfo->hooks & HOOK_MASK( HOOK_STDERR ) )
+      ok = hookup_output( TSD, HOOK_STDERR, errmsg ) == HOOK_GO_ON;
 
-   if (ok==HOOK_GO_ON)
+   if ( ok == HOOK_GO_ON )
    {
       /*
        * To get here we either don't have an exit handler or the exit
@@ -639,76 +703,65 @@ void exiterror( int errorno, int suberrorno, ... )
        * error (or output) stream.
        */
       if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
-         fp = stdout ;
-      fwrite( errmsg->value, Str_len(errmsg), 1, fp ) ;
+         fp = stdout;
+      fwrite( errmsg->value, Str_len(errmsg), 1, fp );
 #if defined(DOS) || defined(OS2) || defined(WIN32)
       /*
        * stdout is open in binary mode, so we need to add the
        * extra CR to the end of the line.
        */
-      fputc( REGINA_CR, fp ) ;
+      fputc( REGINA_CR, fp );
 #endif
-      fputc( REGINA_EOL, fp ) ;
+      fputc( REGINA_EOL, fp );
    }
    /*
     * Display the sub-error text if there is one.
     */
-   if (errorno <= ERR_MAX_NUMBER
-   &&  suberrorno != 0
-   &&  suberror_streng)
+   if ( ( errorno <= ERR_MAX_NUMBER ) && suberrorno && suberror_streng )
    {
-      if (TSD->systeminfo->hooks & HOOK_MASK(HOOK_STDERR))
-         ok = (hookup_output(TSD, HOOK_STDERR, suberror_streng) == HOOK_GO_ON) ;
-      if (ok==HOOK_GO_ON)
+      if ( TSD->systeminfo->hooks & HOOK_MASK( HOOK_STDERR ) )
+         ok = hookup_output(TSD, HOOK_STDERR, suberror_streng ) == HOOK_GO_ON;
+      if ( ok == HOOK_GO_ON )
       {
-         fwrite( suberror_streng->value, Str_len(suberror_streng), 1, fp ) ;
+         fwrite( suberror_streng->value, Str_len(suberror_streng), 1, fp );
 #if defined(DOS) || defined(OS2) || defined(WIN32)
          /*
           * stdout is open in binary mode, so we need to add the
           * extra CR to the end of the line.
           */
-         fputc( REGINA_CR, fp ) ;
+         fputc( REGINA_CR, fp );
 #endif
-         fputc( REGINA_EOL, fp ) ;
+         fputc( REGINA_EOL, fp );
       }
    }
-   if (ok==HOOK_GO_ON)
+   if ( ok == HOOK_GO_ON )
       fflush( fp );
-   if (suberror_streng)
-      Free_stringTSD(suberror_streng);
+   if ( suberror_streng )
+      Free_stringTSD( suberror_streng );
 
-#ifndef NDEBUG
-   if (errorno == ERR_INTERPRETER_FAILURE)
-      abort() ;
-#endif
+   Free_stringTSD( errmsg );
 
-   Free_stringTSD( errmsg ) ;
-   if (TSD->systeminfo->panic)
+not_hookable:
+
+   if ( TSD->systeminfo->script_exit )
    {
-      TSD->systeminfo->result = NULL ;
-      if (TSD->in_protected)
+      TSD->instore_is_errorfree = 0;
+      if ( et != NULL )
       {
-         TSD->delayed_error_type = PROTECTED_DelayedSetjmpPanic;
-         longjmp( TSD->protect_return, 1 ) ;
+         /*
+          * The error handler must inhibit the cleanup of errornum.
+          */
+         et->errornum->len = sprintf( et->errornum->value, "%d", -errorno );
+         jump_script_exit( TSD, et->errornum );
       }
-      longjmp( *(TSD->systeminfo->panic), 1 ) ;
    }
    CloseOpenFiles( TSD );
+   free_orphaned_libs( TSD );
 
-   if (TSD->in_protected)
-   {
 #ifdef VMS
-      TSD->expected_exit_error = EXIT_SUCCESS;
+   jump_interpreter_exit( TSD, EXIT_SUCCESS );
 #else
-      TSD->expected_exit_error = errorno;
-#endif
-      TSD->delayed_error_type = PROTECTED_DelayedExit;
-      longjmp( TSD->protect_return, 1 ) ;
-   }
-#ifdef VMS
-   TSD->MTExit( EXIT_SUCCESS ) ;
-#else
-   TSD->MTExit( errorno ) ;
+   jump_interpreter_exit( TSD, errorno );
 #endif
 }
 
@@ -854,24 +907,32 @@ static streng *get_message_indexes( const tsd_t *TSD, const streng *not_this )
    et->native_language = file_lang;
 #else
    ptr = getenv( "REGINA_LANG" );
-   if ( ptr == NULL )
+   if ( ptr == NULL || strlen( ptr) == 0 )
    {
       et->native_language = LANGUAGE_ENGLISH;
    }
    else
    {
+      /*
+       * REGINA_LANG may have a comma separated default locale appended.
+       */
+      int len = strcspn( ptr, "," );
       for ( i = 0; i < LANGUAGE_MAXIMUM; i++ )
       {
-         if ( strcmp( ptr, errlang[i] ) == 0 )
+         if ( ( strlen( errlang[i] ) == len )
+           && ( memcmp( ptr, errlang[i], len ) == 0 ) )
          {
             et->native_language = i;
             found = 1;
             break;
          }
       }
-      if ( found == 0 )
+      if ( !found )
       {
-         return simple_msg( TSD, "Unsupported native language \"%s\"", ptr, not_this );
+         err = get_buffer( TSD, not_this, 40 + len );
+         Str_len( err ) = sprintf( err->value, "Unsupported native language \"%.*s\"",
+                                               len, ptr );
+         return err;
       }
    }
    if ( et->native_language != LANGUAGE_ENGLISH )
@@ -940,7 +1001,7 @@ static streng *get_text_message( const tsd_t *TSD, FILE *fp,
    return retval;
 }
 
-static const char *get_embedded_text_message( const tsd_t *TSD, int errorno, int suberrorno )
+static const char *get_embedded_text_message( int errorno, int suberrorno )
 {
    int i;
 
@@ -996,7 +1057,7 @@ const streng *errortext( const tsd_t *TSD, int errorno, int suberrorno, int requ
           * embedded error message format.
           */
 
-         embedded = get_embedded_text_message( TSD, errorno, suberrorno );
+         embedded = get_embedded_text_message( errorno, suberrorno );
          h = get_buffer( TSD, ptr, Str_len( ptr ) + strlen( embedded ) + 6 );
          Str_catstrTSD( h, "(" );
          Str_catTSD( h, ptr );
@@ -1017,7 +1078,7 @@ const streng *errortext( const tsd_t *TSD, int errorno, int suberrorno, int requ
       if ( request_english
       ||   et->native_language == LANGUAGE_ENGLISH )
       {
-         ptr = simple_msg( TSD, "%s", get_embedded_text_message( TSD, errorno, suberrorno ), NULL );
+         ptr = simple_msg( TSD, "%s", get_embedded_text_message( errorno, suberrorno ), NULL );
       }
       else
       {
@@ -1046,7 +1107,7 @@ const streng *errortext( const tsd_t *TSD, int errorno, int suberrorno, int requ
             /*
              * We couldn't find our message...
              */
-            embedded = get_embedded_text_message( TSD, errorno, suberrorno );
+            embedded = get_embedded_text_message( errorno, suberrorno );
             ptr = simple_msg( TSD, errmissing[et->native_language], errfn, NULL );
             h = get_buffer( TSD, ptr, Str_len( ptr ) + strlen( embedded ) + 6 );
             Str_catstrTSD( h, "(" );
@@ -1061,7 +1122,7 @@ const streng *errortext( const tsd_t *TSD, int errorno, int suberrorno, int requ
             ptr = get_text_message( TSD, et->nls_fp, et->nls_tmi[mid].fileoffset, et->nls_tmi[mid].textlength, errorno, suberrorno, &is_fmt, NULL );
             if ( !is_fmt )
             {
-               embedded = get_embedded_text_message( TSD, errorno, suberrorno );
+               embedded = get_embedded_text_message( errorno, suberrorno );
                h = get_buffer( TSD, ptr, Str_len( ptr ) + strlen( embedded ) + 6 );
                Str_catstrTSD( h, "(" );
                Str_catTSD( h, ptr );
@@ -1160,7 +1221,6 @@ const char *getsym( int numb )
 
    switch (numb)
    {
-
       case X_NULL: symb="Null statement" ; break ;
       case X_PROGRAM: symb="Program" ; break ;
       case X_STATS: symb="Statements" ; break ;
@@ -1168,16 +1228,13 @@ const char *getsym( int numb )
       case X_ADDR_V: symb="ADDRESS (value) statement" ; break ;
       case X_ADDR_S: symb="ADDRESS" ; break ;
       case X_ADDR_N: symb="ADDRESS (normal) statement" ; break ;
-      case X_ARG: symb="ARG statement" ; break ;
       case X_CALL: symb="CALL statement" ; break ;
       case X_DO: symb="DO statement" ; break ;
       case X_REP: symb="Repetitor in DO" ; break ;
       case X_REP_FOREVER: symb="Forever in DO" ; break ;
-      case X_REP_COUNT: symb="Counter in DO" ; break ;
       case X_DO_TO: symb="Upper limit in DO" ; break ;
       case X_DO_BY: symb="Step-size in DO" ; break ;
       case X_DO_FOR: symb="Max number in DO" ; break ;
-      case X_DO_EXPR: symb="Upper limit in DO" ; break ;
       case X_WHILE: symb="WHILE expr in DO" ; break ;
       case X_UNTIL: symb="UNTIL expr in DO" ; break ;
       case X_DROP: symb="DROP statement" ; break ;
@@ -1193,16 +1250,13 @@ const char *getsym( int numb )
       case X_NUM_SCI: symb="Scientific numeric form" ; break ;
       case X_NUM_ENG: symb="Engeenering scientific form" ; break ;
       case X_PARSE: symb="PARSE statement" ; break ;
-      case X_PARSE_U: symb="UPPER PARSE statement" ; break ;
       case X_PARSE_ARG: symb="PARSE ARG atatement" ; break ;
       case X_PARSE_EXT: symb="External parsing" ; break ;
-      case X_PARSE_NUM: symb="Numeric parsing" ; break ;
       case X_PARSE_PULL: symb="Parse pull" ; break ;
       case X_PARSE_SRC: symb="Parse source" ; break ;
       case X_PARSE_VAR: symb="Parse variable" ; break ;
       case X_PARSE_VAL: symb="Parse value" ; break ;
       case X_PARSE_VER: symb="Parse version" ; break ;
-      case X_PARSE_ARG_U: symb="PARSE UPPER ARG statement" ; break ;
       case X_PROC: symb="PROCEDURE statement" ; break ;
       case X_PULL: symb="PULL statement" ; break ;
       case X_PUSH: symb="PUSH statement" ; break ;
@@ -1220,18 +1274,9 @@ const char *getsym( int numb )
       case X_OFF: symb="Setting is OFF" ; break ;
       case X_S_ERROR: symb="ERROR option" ; break ;
       case X_S_HALT: symb="HALT option" ; break ;
-      case X_S_LOSTDIGITS: symb="LOSTDIGITS option" ; break ;
       case X_S_NOVALUE: symb="NOVALUE option" ; break ;
       case X_S_SYNTAX: symb="SYNTAX option" ; break ;
       case X_TRACE: symb="TRACE statement" ; break ;
-      case X_T_ALL: symb="ALL option" ; break ;
-      case X_T_COMM: symb="COMMAND option" ; break ;
-      case X_T_ERR: symb="ERROR option" ; break ;
-      case X_T_INTER: symb="INTERMEDIATE option" ; break ;
-      case X_T_LABEL: symb="LABEL option" ; break ;
-      case X_T_NORMAL: symb="NORMAL option" ; break ;
-      case X_T_OFF: symb="OFF option" ; break ;
-      case X_T_SCAN: symb="SCAN option" ; break ;
       case X_UPPER_VAR: symb="UPPER statement" ; break ;
       case X_ASSIGN: symb="Assignment" ; break ;
       case X_LOG_NOT: symb="Logical NOT" ; break ;
@@ -1251,58 +1296,67 @@ const char *getsym( int numb )
       case X_LTE: symb="Less than or equal operator" ; break ;
       case X_GT: symb="Greater than operator" ; break ;
       case X_LT: symb="Less than operator" ; break ;
-      case X_NEQUAL: symb="Not equal operator" ; break ;
-      case X_NDIFF: symb="Not different operator" ; break ;
-      case X_NGT: symb="Not greater than operator" ; break ;
-      case X_NGTE: symb="Not greater than or equal operator" ; break ;
-      case X_NLT: symb="Not less than operator" ; break ;
-      case X_NLTE: symb="Not less than or equal operator" ; break ;
       case X_DIFF: symb="Different operator" ; break ;
-      case X_SEQUAL: symb="Strictly equal operator" ; break ;
-      case X_SDIFF: symb="Strictly different operator" ; break ;
-      case X_SGT: symb="Strictly greater than operator" ; break ;
-      case X_SGTE: symb="Strictly greater than or equal operator" ; break ;
-      case X_SLT: symb="Strictly less than operator" ; break ;
-      case X_SLTE: symb="Strictly less than or equal operator" ; break ;
       case X_SIM_SYMBOL: symb="Simple symbol" ; break ;
       case X_CON_SYMBOL: symb="Constant symbol" ; break ;
-      case X_HEX_STR: symb="Hexadecimal string" ; break ;
       case X_STRING: symb="Constant string" ; break ;
-      case X_FUNC: symb="Function call" ; break ;
       case X_U_MINUS: symb="Unary minus" ; break ;
       case X_S_EQUAL: symb="String equal operator" ; break ;
       case X_S_DIFF: symb="String different operator" ; break ;
-      case X_SIMSYMB: symb="Simple symbol (2)" ; break ;
       case X_INTDIV: symb="Integer division" ; break ;
       case X_EX_FUNC: symb="External function call" ; break ;
       case X_IN_FUNC: symb="Internal function call" ; break ;
       case X_TPL_SOLID: symb="Solid point in template" ; break ;
       case X_TPL_MVE: symb="Constant pattern" ; break ;
       case X_TPL_VAR: symb="Variable pattern" ; break ;
-      case X_TPL_TO: symb="Ehh, what does \"TO\" mean???" ; break ;
       case X_TPL_SYMBOL: symb="Variable in template" ; break ;
-      case X_TPL_SPACE: symb="Space in template" ; break ;
       case X_TPL_POINT: symb="Placeholder in template" ; break ;
-      case X_TMPLS: symb="Template connector" ; break ;
-      case X_TPL_OFF: symb="Offset in template" ; break ;
-      case X_TPL_PATT: symb="Pattern in template" ; break ;
       case X_NEG_OFFS: symb="Negative offset" ; break ;
       case X_POS_OFFS: symb="Positive offset" ; break ;
       case X_ABS_OFFS: symb="Absolute offset" ; break ;
       case X_EXPRLIST: symb="Expression connector" ; break ;
-      case X_SYMBOLS: symb="Symbol connector" ; break ;
-      case X_SYMBOL: symb="Symbol?" ; break ;
+      case X_S_NOTREADY: symb="NOTREADY option" ; break ;
+      case X_S_FAILURE: symb="FAILURE option" ; break ;
       case X_END: symb="End statement" ; break ;
+      case X_CALL_SET: symb="CALL specification" ; break ;
+      case X_NO_OTHERWISE: symb="No otherwise statement" ; break ;
+      case X_IND_SYMBOL: symb="Indirect symbol" ; break ;
       case X_IS_INTERNAL: symb="Internal function" ; break ;
       case X_IS_BUILTIN: symb="Builtin function" ; break ;
       case X_IS_EXTERNAL: symb="External function" ; break ;
-      case X_CEXPRLIST: symb="Expression list" ; break ;
-      case X_NASSIGN: symb="Numeric Assignment" ; break ;
-      case X_VTAIL_SYMBOL: symb="Variable tail symbol" ; break ;
       case X_CTAIL_SYMBOL: symb="Constant tail symbol" ; break ;
+      case X_VTAIL_SYMBOL: symb="Variable tail symbol" ; break ;
       case X_HEAD_SYMBOL: symb="Compound variable symbol" ; break ;
       case X_STEM_SYMBOL: symb="Stem variable symbol" ; break ;
-      case X_NO_OTHERWISE: symb="No otherwise statement" ; break ;
+      case X_SEQUAL: symb="Strictly equal operator" ; break ;
+      case X_SDIFF: symb="Strictly different operator" ; break ;
+      case X_SGT: symb="Strictly greater than operator" ; break ;
+      case X_SGTE: symb="Strictly greater than or equal operator" ; break ;
+      case X_SLT: symb="Strictly less than operator" ; break ;
+      case X_SLTE: symb="Strictly less than or equal operator" ; break ;
+      case X_NEQUAL: symb="Not equal operator" ; break ;
+      case X_NDIFF: symb="Not different operator" ; break ;
+      case X_NGT: symb="Not greater than operator" ; break ;
+      case X_NGTE: symb="Not greater than or equal operator" ; break ;
+      case X_NLT: symb="Not less than operator" ; break ;
+      case X_NLTE: symb="Not less than or equal operator" ; break ;
+      case X_NASSIGN: symb="Numeric Assignment" ; break ;
+      case X_CEXPRLIST: symb="Expression list" ; break ;
+      case X_U_PLUSS: symb="Unary Plus" ; break ;
+      case X_OPTIONS: symb="OPTIONS statement" ; break ;
+      case X_NUM_V: symb="NUMERIC FORM VALUE statement" ; break ;
+      case X_NUM_DDEF: symb="NUMERIC DIGITS statement" ; break ;
+      case X_NUM_FDEF: symb="NUMERIC FUZZ statement" ; break ;
+      case X_NUM_FRMDEF: symb="NUMERIC FORM statement" ; break ;
+      case X_S_NGT: symb="Strictly not greater than operator" ; break ;
+      case X_S_NLT: symb="Strictly not less than operator" ; break ;
+      case X_S_GT: symb="Strictly greater than operator" ; break ;
+      case X_S_GTE: symb="Strictly greater than or equal operator" ; break ;
+      case X_S_LT: symb="Strictly less than operator" ; break ;
+      case X_S_LTE: symb="Strictly less than or equal operator" ; break ;
+      case X_ADDR_WITH: symb="ADDRESS WITH option list" ; break ;
+      case X_S_LOSTDIGITS: symb="LOSTDIGITS option" ; break ;
+      case X_DO_EXPR: symb="Upper limit in DO" ; break ;
       default: symb="Unrecognized value" ;
    }
 

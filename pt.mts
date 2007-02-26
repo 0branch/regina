@@ -193,6 +193,20 @@
  40,923,[%s argumento %d, sub-comandos demais; maximo necessario eh %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s argumento %d, especificacao posicional invalida; eh necessario um dos "%s"; encontrado "%s"]|<bif>,<argnumber>,<value>,<value>
  40,930,[RXQUEUE, funcao TIMEOUT, espera-se um numero total entre -1 e %d; encontrado \"%s\"]|<value>,<value>
+ 40,980,Unexpected input, either unknown type or illegal data%s%s|: ,<location>
+ 40,981,Number out of the allowed range%s%s|: ,<location>
+ 40,982,String too big for the defined buffer%s%s|: ,<location>
+ 40,983,Illegal combination of type/size%s%s|: ,<location>
+ 40,984,Unsupported number like NAN, +INF, -INF%s%s|: ,<location>
+ 40,985,Structure too complex for static internal buffer%s%s|: ,<location>
+ 40,986,An element of the structure is missing%s%s|: ,<location>
+ 40,987,A value of the structure is missing%s%s|: ,<location>
+ 40,988,The name or part of the name is illegal for the interpreter%s%s|: ,<location>
+ 40,989,A problem occured at the interface between Regina and GCI%s%s|: ,<location>
+ 40,990,The type won't fit the requirements for basic types (arguments/return value)%s%s|: ,<location>
+ 40,991,The number of arguments is wrong or an argument is missing%s%s|: ,<location>
+ 40,992,GCI's internal stack for arguments got an overflow%s%s|: ,<location>
+ 40,993,GCI counted too many nested LIKE containers%s%s|: ,<location>
  41,  0,mah conversao aritmetica
  41,  1,valor nao-numerico ("%s") a esquerda da operacao aritmetica "%s"|<value>,<operator>
  41,  2,valor nao-numerico ("%s") a direita da operacao aritmetica "%s"|<value>,<operator>

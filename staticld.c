@@ -18,14 +18,10 @@
  */
 
 /*
- * $Id: staticld.c,v 1.3 2003/02/27 10:51:39 mark Exp $
+ * $Id: staticld.c,v 1.5 2004/04/21 07:16:19 mark Exp $
  */
 
 #include "rexx.h"
-
-#ifdef HAVE_CTYPE_H
-# include <ctype.h>
-#endif
 
 #if defined( DYNAMIC_STATIC )
 typedef void *(*RPFN)( char *);
@@ -116,24 +112,16 @@ static struct
 };
 static int my_stricmp( char *str1,char *str2 )
 {
-   register short i,len,len1=strlen(str1),len2=strlen(str2);
-   char c1,c2;
-   len = min(len1,len2);
-   for( i = 0; i < len; i++ )
-   {
-      if ( isupper( *str1 ) )
-         c1 = tolower( *str1 );
-      else
-         c1 = *str1;
-      if ( isupper( *str2 ) )
-         c2 = tolower( *str2 );
-      else
-         c2 = *str2;
-      if ( c1 != c2 )
-         return(c1-c2);
-      ++str1;
-      ++str2;
-   }
+   int len1,len2,len,rc;
+
+   len1 = strlen( str1 );
+   len2 = strlen( str2 );
+   len = min( len1, len2 );
+
+   rc = mem_cmpic( str1, str2, len );
+   if ( rc != 0 )
+      return rc;
+
    if ( len1 > len2 )
       return(1);
    if ( len1 < len2 )

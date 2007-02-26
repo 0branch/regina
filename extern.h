@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: extern.h,v 1.51 2003/04/26 01:09:02 florian Exp $
+ * $Id: extern.h,v 1.72 2004/04/15 10:05:57 mark Exp $
  */
 /* JH 20-10-99 */  /* To make Direct setting of stems Direct and not Symbolic. */
 
@@ -39,9 +39,9 @@
 /*
  * Routines in parsing.c
  */
-   int bmstrstr( const streng *heystack, int start, const streng *needle ) ;
-   void doparse( tsd_t *TSD, const streng *source, cnodeptr subtree ) ;
-   void parseargtree(tsd_t *TSD, cparamboxptr argbox, cnodeptr this, int upper);
+   int bmstrstr( const streng *heystack, int start, const streng *needle, int caseless ) ;
+   void doparse( tsd_t *TSD, const streng *source, cnodeptr subtree, int caseless ) ;
+   void parseargtree(tsd_t *TSD, cparamboxptr argbox, cnodeptr this, int flags );
 
 
 /*
@@ -60,10 +60,12 @@
  */
    streng *readkbdline( tsd_t *TSD ) ;
    void mark_filetable( const tsd_t *TSD) ;
+   int filename_cmp( const streng *name1, const streng *name2 );
    void purge_filetable( tsd_t *TSD ) ;
    int init_filetable( tsd_t *TSD ) ;
    void fixup_file( tsd_t *TSD, const streng * ) ;
-   void get_external_routine(const tsd_t *TSD,const char *env,const char *inname, FILE **fp, char *retname, int startup) ;
+   streng *get_external_routine( const tsd_t *TSD, const char *inname,
+                                 FILE **fp );
    void find_shared_library(const tsd_t *TSD,const char *, const char *, char *);
    void CloseOpenFiles ( const tsd_t *TSD ) ;
    streng *ConfigStreamQualified( tsd_t *TSD, const streng *name );
@@ -75,8 +77,10 @@
    streng *std_lines( tsd_t *TSD, cparamboxptr parms ) ;
    streng *std_stream( tsd_t *TSD, cparamboxptr parms ) ;
    void closefile( tsd_t *TSD, const streng *name )  ;
-   void *addr_reopen_file( tsd_t *TSD, const streng *filename, char code ) ;
+   void *addr_reopen_file( tsd_t *TSD, const streng *filename, char code, int iserror );
    streng *addr_io_file( tsd_t *TSD, void *fileptr, const streng *line ) ;
+   void addr_reset_file( tsd_t *TSD, void *fileptr );
+   streng *addr_file_info( tsd_t *TSD, const streng *source, int defchannel );
 #ifndef NDEBUG
    streng *dbg_dumpfiles( tsd_t *TSD, cparamboxptr parms ) ;
 #endif
@@ -85,9 +89,8 @@
 #if !defined(HAVE__SPLITPATH2) && !defined(HAVE__SPLITPATH) && !defined(__EMX__) && !defined(DJGPP)
    int my_splitpath2( const char *in, char *out, char **drive, char **dir, char **name, char **ext ) ;
 #endif
-#if !defined(HAVE__FULLPATH) && !defined(HAVE__TRUENAME)
-   int my_fullpath( char *dst, const char *src, int size ) ;
-#endif
+   int my_fullpath( char *dst, const char *src );
+   int my_fullpathstreng( const tsd_t *TSD, char *dst, const streng *src );
    streng *arexx_exists( tsd_t *TSD, cparamboxptr parms ) ;
 
 /*
@@ -162,10 +165,10 @@
 # define Free_stringTSD(ptr)       give_a_strengTSD(TSD,ptr)
 #else /* neither TRACEMEM nor FLISTS */
 # define Malloc(bytes)             Malloc_TSD(__regina_get_tsd(),bytes)
-# define Malloc_TSD(TSD,bytes)     TSD->MTMalloc(TSD,bytes)
+# define Malloc_TSD(TSD,bytes)     (TSD)->MTMalloc(TSD,bytes)
 # define MallocTSD(bytes)          Malloc_TSD(TSD,bytes)
 # define Free(ptr)                 Free_TSD(__regina_get_tsd(),ptr)
-# define Free_TSD(TSD,ptr)         TSD->MTFree(TSD,ptr)
+# define Free_TSD(TSD,ptr)         (TSD)->MTFree(TSD,ptr)
 # define FreeTSD(ptr)              Free_TSD(TSD,ptr)
 # ifdef CHECK_MEMORY
    void  give_a_streng( streng *ptr ) ;
@@ -175,7 +178,7 @@
 #  define Free_stringTSD(ptr)      give_a_strengTSD(TSD,ptr)
 # else
 #  define Free_string(ptr)         Free_string_TSD(__regina_get_tsd(),ptr)
-#  define Free_string_TSD(TSD,ptr) TSD->MTFree(TSD,ptr)
+#  define Free_string_TSD(TSD,ptr) (TSD)->MTFree(TSD,ptr)
 #  define Free_stringTSD(ptr)      Free_string_TSD(TSD,ptr)
 # endif /* CHECK_MEMORY */
 #endif /* ifdef TRACEMEM */
@@ -198,13 +201,15 @@
    int make_buffer( tsd_t *TSD ) ;
    void type_buffer( tsd_t *TSD ) ;
    Queue *find_free_slot( const tsd_t *TSD ) ;
-   Queue *fill_input_queue( tsd_t *TSD, streng *stemname, int stem0 ) ;
+   Queue *fill_input_queue_stem( tsd_t *TSD, streng *stemname, int stem0 ) ;
+   Queue *fill_input_queue_stream( tsd_t *TSD, void *fileptr );
    void flush_stack( const tsd_t *TSD, Queue *src, Queue *dst, int is_fifo ) ;
    streng *stack_to_line( const tsd_t *TSD, Queue *q );
    int create_queue( tsd_t *TSD, const streng *queue_name, streng **result );
    int delete_queue( tsd_t *TSD, const streng *queue_name );
    int timeout_queue( tsd_t *TSD, const streng *timeout, const streng *queue_name );
    streng *get_queue( tsd_t *TSD );
+   void fill_queue_name( const tsd_t *TSD, int *len, char **name );
    streng *set_queue( tsd_t *TSD, const streng *queue_name );
    Queue *addr_reopen_queue( tsd_t *TSD, const streng *queuename, char code ) ;
    int addr_same_queue( const tsd_t *TSD, const Queue *q1, const Queue *q2 ) ;
@@ -217,13 +222,19 @@
 /*
  * Routines in misc.c
  */
-   streng *upcase( streng *text ) ;
+   void set_locale_info( const char *info );
+   void mem_upper( void *m, int len );
+   void mem_lower( void *m, int len );
+   int mem_cmpic( const void *buf1, const void *buf2, int len );
    const char *system_type( void ) ;
    double cpu_time( void ) ;
    void getsecs( time_t *secs, time_t *usecs ) ;
-   unsigned hashvalue(const char *string, int length) ;
-   unsigned hashvalue_ic(const char *string, int length) ;
-
+   unsigned hashvalue(const char *string, int length ) ;
+   unsigned hashvalue_ic(const char *string, int length ) ;
+   int hashvalue_var(const streng *name, int start, int *stop );
+#ifdef SKYOS
+   clock_t clock( void );
+#endif
 
 
 /*
@@ -249,22 +260,22 @@
    void expand_to_str( const tsd_t *TSD, variableptr ptr ) ;
    int var_was_found( const tsd_t *TSD ) ;
    variableptr *create_new_varpool( const tsd_t *TSD ) ;
-   void setdirvalue( const tsd_t *TSD, const streng *name, streng *value ) ;
-   void setvalue( const tsd_t *TSD, const streng *name, streng *value ) ;
+   void setdirvalue( tsd_t *TSD, const streng *name, streng *value ) ;
+   void setvalue( tsd_t *TSD, const streng *name, streng *value, int pool ) ;
    num_descr *fix_compoundnum( tsd_t *TSD, nodeptr this, num_descr *new,
                                streng *string_val );
-   void setshortcutnum( const tsd_t *TSD, nodeptr this, num_descr *value,
+   void setshortcutnum( tsd_t *TSD, nodeptr this, num_descr *value,
                         streng *string_val );
-   void setdirvalue_compound( const tsd_t *TSD, const streng *name, streng *value ) ;
-   const streng *getdirvalue_compound( tsd_t *TSD, const streng *name ) ;
-   const streng *getdirvalue( tsd_t *TSD, const streng *name, int trace ) ;
-   const streng *getvalue( tsd_t *TSD, const streng *name, int trace ) ;
+   const streng *getdirvalue( tsd_t *TSD, const streng *name ) ;
+   const streng *getvalue( tsd_t *TSD, const streng *name, int pool ) ;
    const streng *isvariable( tsd_t *TSD, const streng *name ) ;
-   const streng *get_it_anyway( tsd_t *TSD, const streng *name ) ;
+   int variables_per_SAA( tsd_t *TSD );
+   void restore_variable_state( const tsd_t *TSD, int state );
+   const streng *get_it_anyway( tsd_t *TSD, const streng *name, int pool ) ;
    const streng *get_it_anyway_compound( tsd_t *TSD, const streng *str ) ;
-   void expose_var( const tsd_t *TSD, const streng *name ) ;
-   void drop_var( const tsd_t *TSD, const streng *name ) ;
-   void drop_dirvar( const tsd_t *TSD, const streng *name ) ;
+   void expose_var( tsd_t *TSD, const streng *name ) ;
+   void drop_var( tsd_t *TSD, const streng *name ) ;
+   void drop_dirvar( tsd_t *TSD, const streng *name ) ;
    void upper_var( tsd_t *TSD, const streng *name ) ;
    void set_ignore_novalue( const tsd_t *TSD ) ;
    int valid_var_symbol( const streng *symbol ) ;
@@ -274,16 +285,17 @@
 #endif /* TRACEMEM */
    const streng *shortcut( tsd_t *TSD, nodeptr ) ;
    num_descr *shortcutnum( tsd_t *TSD, nodeptr ) ;
-   void setshortcut( const tsd_t *TSD, nodeptr this, streng *value ) ;
+   void setshortcut( tsd_t *TSD, nodeptr this, streng *value ) ;
    streng *fix_compound( tsd_t *TSD, nodeptr this, streng *value ) ;
    void kill_variables( const tsd_t *TSD, variableptr *array ) ;
    variableptr get_next_variable( tsd_t *TSD, int reset ) ;
+   void set_reserved_value( tsd_t *TSD, int poolid, streng *val_str,
+                            int val_int, int vflag );
 
 
 /*
  * Routines in shell.c
  */
-   const streng *stem_access( tsd_t *TSD, environpart *e, int pos, const streng *value);
    void put_stem( tsd_t *TSD, environpart *e, streng *str );
    int init_shell( tsd_t *TSD ) ;
    void cleanup_envirpart(const tsd_t *TSD, environpart *ep);
@@ -299,17 +311,17 @@
    void set_trace_char( tsd_t *TSD, char ) ;
    void flush_trace_chars( tsd_t *TSD ) ;
    void queue_trace_char( const tsd_t *TSD, char ch ) ;
-   void tracenumber( const tsd_t *TSD, const num_descr *num, char type ) ;
-   void tracebool( const tsd_t *TSD, int value, char type ) ;
+   void tracenumber( tsd_t *TSD, const num_descr *num, char type ) ;
+   void tracebool( tsd_t *TSD, int value, char type ) ;
    int pushcallstack( const tsd_t *TSD, treenode *this ) ;
    void popcallstack( const tsd_t *TSD, int value ) ;
-   void traceerror( const tsd_t *TSD, const treenode *this, int RC ) ;
-   void tracecompound( const tsd_t *TSD, const streng *stem, int length, const streng *index, char trch ) ;
+   void traceerror( tsd_t *TSD, const treenode *this, int RC ) ;
+   void tracecompound( tsd_t *TSD, const streng *stem, int length, const streng *index, char trch ) ;
    void starttrace( const tsd_t *TSD ) ;
    int intertrace( tsd_t *TSD ) ;
-   void tracevalue( const tsd_t *TSD, const streng *str, char type ) ;
-   void traceline( const tsd_t *TSD, const treenode *this, char tch, int offset ) ;
-   void traceback( const tsd_t *TSD ) ;
+   void tracevalue( tsd_t *TSD, const streng *str, char type ) ;
+   void traceline( tsd_t *TSD, const treenode *this, char tch, int offset ) ;
+   void traceback( tsd_t *TSD ) ;
 
 
 /*
@@ -324,14 +336,17 @@
  */
    void update_envirs( const tsd_t *TSD, proclevel level ) ;
    proclevel newlevel( tsd_t *TSD, proclevel oldlevel ) ;
-   void set_sigl( const tsd_t *TSD, int line );
-   void set_rc( const tsd_t *TSD, streng *value );
 #define IPRT_BUFSIZE 2 /* buffer elements for the state in InterpreterStatus */
    void SaveInterpreterStatus(const tsd_t *TSD,unsigned *state);
    void RestoreInterpreterStatus(const tsd_t *TSD,const unsigned *state);
+   streng *CallInternalFunction( tsd_t *TSD, nodeptr node, nodeptr this,
+                                 paramboxptr args );
    streng *interpret( tsd_t * volatile TSD, nodeptr volatile rootnode ) ;
    nodeptr getlabel( const tsd_t *TSD, const streng *name ) ;
    void removelevel( tsd_t *TSD, proclevel level ) ;
+   void jump_rexx_signal( tsd_t *TSD );
+   void jump_interpreter_exit( tsd_t *TSD, int processExitCode );
+   void jump_script_exit( tsd_t *TSD, streng *result );
    int init_spec_vars( tsd_t *TSD ) ;
 
 
@@ -351,7 +366,9 @@
  */
    streng *buildtinfunc( tsd_t *TSD, nodeptr this ) ;
    void deallocplink( tsd_t *TSD, paramboxptr first ) ;
-   paramboxptr initplist( tsd_t *TSD, cnodeptr this ) ;
+   paramboxptr initplist( tsd_t *TSD, cnodeptr this );
+   paramboxptr initargs( tsd_t *TSD, int argc, const int *lengths,
+                         const char **strings );
    int myatol( const tsd_t *TSD, const streng *text ) ;
    void checkparam( cparamboxptr params, int min, int max, const char *name ) ;
    char getoptionchar( tsd_t *TSD, const streng *param, const char *bif, int argnum, const char *ansi_options, const char *regina_options ) ;
@@ -361,7 +378,7 @@
    char getonechar( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    const streng *param( cparamboxptr ptr, int num ) ;
    streng *int_to_streng( const tsd_t *TSD, int input ) ;
-   int convert_date(const streng *, char, struct tm *);
+   int convert_date(tsd_t *TSD, const streng *, char, struct tm *);
    int convert_time(const tsd_t *TSD,const streng *, char, struct tm *, time_t *);
    int basedays(int);
 #ifdef TRACEMEM
@@ -393,7 +410,8 @@
    int __regina_reexecute_main(int argc, char **argv);
    void mark_systeminfo( const tsd_t *TSD) ;
    nodeptr treadit( cnodeptr ) ;
-   sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir ) ;
+   void setup_system( tsd_t *TSD, int isclient );
+   sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir );
 
 
 /*
@@ -403,6 +421,7 @@
    sigtype *getsigs( proclevel level ) ;
    void mark_signals( const tsd_t *TSD ) ;
    signal_handler regina_signal(int signum, signal_handler action);
+   void halt_raised( tsd_t *TSD );
    int condition_hook( tsd_t *TSD, int, int, int, int, streng *, streng * ) ;
 #ifdef WIN32
    void __regina_Win32RaiseCtrlC( tsd_t *TSD );
@@ -410,39 +429,50 @@
 
    void signal_setup( const tsd_t *TSD ) ;
    int identify_trap( int type ) ;
-   void set_rexx_halt( void ) ;
+   void set_rexx_halt( tsd_t *TSD ) ;
 
 /*
  * Routines in library.c
  */
    int init_library( tsd_t *TSD ) ;
-   void purge_library( const tsd_t *TSD );
-   void *loaded_lib_func( const tsd_t *TSD, const streng *name ) ;
+   void free_orphaned_libs( tsd_t *TSD );
+   void purge_library( tsd_t *TSD );
+   struct library *find_library( const tsd_t *TSD, const streng *name );
    void set_err_message( const tsd_t *TSD, const char *message1, const char *message2 ) ;
-   int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, const streng *objnam, void *gci_info );
    streng *rex_rxfuncerrmsg( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncquery( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncadd( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncdefine( tsd_t *TSD, cparamboxptr parms );
    streng *rex_rxfuncdrop( tsd_t *TSD, cparamboxptr parms ) ;
-   int rex_rxfuncdlldrop( tsd_t *TSD, const streng* ) ;
-   int rex_rxfuncdllquery( tsd_t *TSD, const streng* ) ;
+   int IfcRegFunc( const tsd_t *TSD, const char *rxname, const char *module,
+                   const char *objnam, PFN entry );
+   int IfcRegExit( const tsd_t *TSD, const char *rxname, const char *module,
+                   const char *objnam, PFN entry, void *user_area );
+   int IfcRegSubcom( const tsd_t *TSD, const char *rxname, const char *module,
+                     const char *objnam, PFN entry, void *user_area );
+   int IfcDelFunc( tsd_t *TSD, const char *rxname );
+   int IfcDelExit( tsd_t *TSD, const char *rxname, const char *module );
+   int IfcDelSubcom( tsd_t *TSD, const char *rxname, const char *module );
+   int IfcQueryFunc( const tsd_t *TSD, const char *rxname );
+   int IfcQueryExit( const tsd_t *TSD, const char *rxname, const char *module,
+                     void *user_area );
+   int IfcQuerySubcom( const tsd_t *TSD, const char *rxname,
+                       const char *module, void *user_area );
+   struct entry_point *loaded_lib_func( const tsd_t *TSD, const streng *name );
+   struct entry_point *exit_hook( const tsd_t *TSD, const char *env, int len );
+   struct entry_point *subcom_hook( const tsd_t *TSD, const char *com, int len );
 
 /*
- * Functions in extlib.c
+ * functions in mt_notmt.c/mt_<os>.c
  */
-   int addfunc( tsd_t *TSD, streng *name, int type ) ;
-   int delfunc( tsd_t *TSD, const streng *name ) ;
-   int external_func( const tsd_t *TSD, const streng *name ) ;
-
+   int IfcReginaCleanup( );
 
 /*
  * functions in macros.c
  */
    void killsystem( tsd_t *TSD, sysinfo systm ) ;
    internal_parser_type enter_macro( tsd_t *TSD, const streng *source,
-                                     streng *name, void **ept,
-                                     unsigned long *extlength);
+                                     void **ept, unsigned long *extlength);
    streng *do_instore( tsd_t * volatile TSD, const streng *name, paramboxptr args,
                        const streng *envir, int * volatile RetCode, int hooks,
                        const void *instore, unsigned long instore_length,
@@ -460,6 +490,9 @@
 /*
  * Functions in envir.c
  */
+   void post_process_system_call( tsd_t *TSD, const streng *cmd,
+                                  int rc_code, const streng *rc_value,
+                                  cnodeptr this );
    streng *perform( tsd_t *TSD, const streng *command, const streng *envir, cnodeptr this, cnodeptr overwrite );
    void add_envir( tsd_t *TSD, const streng *name, int type, int subtype ) ;
    int envir_exists( const tsd_t *TSD, const streng *name );
@@ -473,14 +506,14 @@
  * Functions in client.c
  */
    int init_client( tsd_t *TSD ) ;
-   int hookup( const tsd_t *TSD, int type ) ;
-   int hookup_output( const tsd_t *TSD, int type, const streng *outdata ) ;
-   int hookup_output2( const tsd_t *TSD, int type, const streng *outdata1, const streng *outdata2 ) ;
-   int hookup_input( const tsd_t *TSD, int type, streng **indata ) ;
-   int hookup_input_output( const tsd_t *TSD, int type, const streng *outdata, streng **indata ) ;
-   streng *do_an_external_exe( tsd_t *TSD, const streng *name, cparamboxptr parms, char exitonly, char called ) ;
-   streng *do_an_external_dll( tsd_t *TSD, const void *vbox, cparamboxptr parms, char called ) ;
-   streng *SubCom( const tsd_t *TSD, const streng *command, const streng *envir, int *rc ) ;
+   int hookup( tsd_t *TSD, int type ) ;
+   int hookup_output( tsd_t *TSD, int type, const streng *outdata ) ;
+   int hookup_output2( tsd_t *TSD, int type, const streng *outdata1, const streng *outdata2 ) ;
+   int hookup_input( tsd_t *TSD, int type, streng **indata ) ;
+   int hookup_input_output( tsd_t *TSD, int type, const streng *outdata, streng **indata ) ;
+   streng *call_unknown_external( tsd_t *TSD, const streng *name, cparamboxptr parms, char called ) ;
+   streng *call_known_external( tsd_t *TSD, const struct entry_point *vbox, cparamboxptr parms, char called ) ;
+   streng *SubCom( tsd_t *TSD, const streng *command, const streng *envir, int *rc ) ;
 
 
 /*
@@ -506,7 +539,7 @@
 /*
  * Routines in options.c
  */
-   void do_options( const tsd_t *TSD, streng *options, int ) ;
+   void do_options( const tsd_t *TSD, proclevel pl, streng *options, int ) ;
    int get_options_flag( cproclevel, int ) ;
    void set_options_flag( proclevel, int, int ) ;
 
@@ -515,6 +548,7 @@
  * Routines in rexxext.c
  */
    char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize ) ;
+   void set_pause_at_exit( );
    streng *rex_userid( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms ) ;
 #if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
@@ -587,6 +621,8 @@
    streng *std_wordpos( tsd_t *TSD, cparamboxptr parms ) ;
    streng *std_words( tsd_t *TSD, cparamboxptr parms ) ;
    streng *std_xrange( tsd_t *TSD, cparamboxptr parms ) ;
+   streng *rex_poolid( tsd_t *TSD, cparamboxptr parms ) ;
+   streng *rex_lower( tsd_t *TSD, cparamboxptr parms );
 
 /*
  * Routines in convert.c
@@ -693,6 +729,7 @@
  * Routines in wrappers.c
  */
    void *wrapper_load( const tsd_t *TSD, const streng *module ) ;
+   void wrapper_unload( const tsd_t *TSD, void *libhandle ) ;
    PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng *name) ;
 
 /*
@@ -768,9 +805,8 @@
 #define str_ofTSD(input) str_of(TSD,input)
    volatile char *tmpstr_of( tsd_t *TSD, const streng *input ) ;
    streng *Str_upper( streng *in ) ;
-   char *str_trans( char *str, char oldch, char newch ) ;
+   streng *Str_lower( streng *in ) ;
    streng *Str_strp( streng * input, char chr, char opt ) ;
-   int mem_cmpic( const char *buf1, const char *buf2, int len ) ;
 
 /*
  * Routines in strmath.c
@@ -905,9 +941,9 @@ extern const char *signalnames[];
 #ifdef WIN32
 extern volatile int __regina_Win32CtrlCRaised;
 #endif
-extern const streng *dotMN_name;
-extern const streng *dotRS_name;
-extern const unsigned char u_to_l[];
+extern unsigned char_info[];
+extern unsigned char u_to_l[];
+extern unsigned char l_to_u[];
 extern const char *numeric_forms[] ;
 extern const char *invo_strings[] ;
 extern const char *argv0 ;

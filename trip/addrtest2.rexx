@@ -2,12 +2,14 @@
  * Generic test for CALL trapping of the conditions FAILURE and HALT.
  * You need the program "rc" to run this script.
  * The test gives some lines of debugging output.
- * An error is written to standard error in case of errors and the return
- * value is 1.
- * Without an error, there is no output to standard error and the return code
- * is 0.
- * Therefore, it is save to do a "rexx addrtest2 ALL >/dev/null", and assume an
- * error only if something's shown.
+ *
+ * The test returns 1 and prints some lines to standard error in case of
+ * an error.
+ * The test returns 0 without any line written to stdardard error on success.
+ *
+ * A good testing environment does the following test; remove the redirection
+ * element in case of errors and check the output:
+ * "rexx addrtest2 >/dev/null"
  */
 call on failure name MustBeNoFail
 call on error name MustBeNoErr

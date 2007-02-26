@@ -8,6 +8,7 @@
 #ifndef REGINA_WRAPPERS_H_INCLUDED
 #define REGINA_WRAPPERS_H_INCLUDED
 
+#define CallInternalFunction         __regina_CallInternalFunction
 #define CloseOpenFiles               __regina_CloseOpenFiles
 #define ConfigStreamQualified        __regina_ConfigStreamQualified
 #define DestroyInternalParsingTree   __regina_DestroyInternalParsingTree
@@ -18,8 +19,10 @@
 #define IfcAddQueue                  __regina_IfcAddQueue
 #define IfcAllocateMemory            __regina_IfcAllocateMemory
 #define IfcCreateQueue               __regina_IfcCreateQueue
-#define IfcDeleteQueue               __regina_IfcDeleteQueue
+#define IfcDelExit                   __regina_IfcDelExit
 #define IfcDelFunc                   __regina_IfcDelFunc
+#define IfcDelSubcom                 __regina_IfcDelSubcom
+#define IfcDeleteQueue               __regina_IfcDeleteQueue
 #define IfcDoExit                    __regina_IfcDoExit
 #define IfcExecCallBack              __regina_IfcExecCallBack
 #define IfcExecFunc                  __regina_IfcExecFunc
@@ -27,14 +30,29 @@
 #define IfcFreeMemory                __regina_IfcFreeMemory
 #define IfcHaveFunctionExit          __regina_IfcHaveFunctionExit
 #define IfcPullQueue                 __regina_IfcPullQueue
+#define IfcQueryExit                 __regina_IfcQueryExit
 #define IfcQueryFunc                 __regina_IfcQueryFunc
 #define IfcQueryQueue                __regina_IfcQueryQueue
-#define IfcRegDllFunc                __regina_IfcRegDllFunc
+#define IfcQuerySubcom               __regina_IfcQuerySubcom
+#define IfcRegExit                   __regina_IfcRegExit
 #define IfcRegFunc                   __regina_IfcRegFunc
+#define IfcRegSubcom                 __regina_IfcRegSubcom
+#define IfcReginaCleanup             __regina_IfcReginaCleanup
 #define IfcStartUp                   __regina_IfcStartUp
 #define IfcSubCmd                    __regina_IfcSubCmd
 #define IfcVarPool                   __regina_IfcVarPool
 #define IsValidTin                   __regina_IsValidTin
+#define Isalnum                      __regina_Isalnum
+#define Isalpha                      __regina_Isalpha
+#define Iscntrl                      __regina_Iscntrl
+#define Isdigit                      __regina_Isdigit
+#define Isgraph                      __regina_Isgraph
+#define Islower                      __regina_Islower
+#define Isprint                      __regina_Isprint
+#define Ispunct                      __regina_Ispunct
+#define Isspace                      __regina_Isspace
+#define Isupper                      __regina_Isupper
+#define Isxdigit                     __regina_Isxdigit
 #define NewProg                      __regina_NewProg
 #define ReginaInitializeProcess      __regina_ReginaInitializeProcess
 #define ReginaInitializeThread       __regina_ReginaInitializeThread
@@ -59,6 +77,7 @@
 #define Str_dup_TSD                  __regina_Str_dup_TSD
 #define Str_dupstr                   __regina_Str_dupstr
 #define Str_dupstr_TSD               __regina_Str_dupstr_TSD
+#define Str_lower                    __regina_Str_lower
 #define Str_ncat                     __regina_Str_ncat
 #define Str_ncat_TSD                 __regina_Str_ncat_TSD
 #define Str_ncatstr                  __regina_Str_ncatstr
@@ -79,19 +98,22 @@
 #define SubCom                       __regina_SubCom
 #define SymbolDetect                 __regina_SymbolDetect
 #define TinTree                      __regina_TinTree
+#define Tolower                      __regina_Tolower
+#define Toupper                      __regina_Toupper
 #ifndef __GNUC__
 # define __yy_memcpy                  __regina___yy_memcpy
 #endif
 #define add_async_waiter             __regina_add_async_waiter
 #define add_envir                    __regina_add_envir
-#define addfunc                      __regina_addfunc
 #define addr_close_queue             __regina_addr_close_queue
+#define addr_file_info               __regina_addr_file_info
 #define addr_io_file                 __regina_addr_io_file
 #define addr_io_queue                __regina_addr_io_queue
 #define addr_purge_queue             __regina_addr_purge_queue
 #define addr_redir_queue             __regina_addr_redir_queue
 #define addr_reopen_file             __regina_addr_reopen_file
 #define addr_reopen_queue            __regina_addr_reopen_queue
+#define addr_reset_file              __regina_addr_reset_file
 #define addr_same_queue              __regina_addr_same_queue
 #define arexx_b2c                    __regina_arexx_b2c
 #define arexx_bitchg                 __regina_arexx_bitchg
@@ -129,6 +151,9 @@
 #define bmstrstr                     __regina_bmstrstr
 #define buildtinfunc                 __regina_buildtinfunc
 #define calcul                       __regina_calcul
+#define call_known_external          __regina_call_known_external
+#define call_unknown_external        __regina_call_unknown_external
+#define char_info                    __regina_char_info
 #define checkparam                   __regina_checkparam
 #define cleanup_envirpart            __regina_cleanup_envirpart
 #define clear_ignore_novalue         __regina_clear_ignore_novalue
@@ -173,22 +198,17 @@
 #define delete_an_internal_queue     __regina_delete_an_internal_queue
 #define delete_async_info            __regina_delete_async_info
 #define delete_queue                 __regina_delete_queue
-#define delfunc                      __regina_delfunc
 #define descr_copy                   __regina_descr_copy
 #define descr_sign                   __regina_descr_sign
 #define descr_to_int                 __regina_descr_to_int
 #define destroytree                  __regina_destroytree
 #define detach                       __regina_detach
 #define disconnect_from_rxstack      __regina_disconnect_from_rxstack
-#define do_an_external_dll           __regina_do_an_external_dll
-#define do_an_external_exe           __regina_do_an_external_exe
 #define do_instore                   __regina_do_instore
 #define do_options                   __regina_do_options
 #define dointerpret                  __regina_dointerpret
 #define doparse                      __regina_doparse
 #define dos_do_command               __regina_dos_do_command
-#define dotMN_name                   __regina_dotMN_name
-#define dotRS_name                   __regina_dotRS_name
 #define drop_buffer                  __regina_drop_buffer
 #define drop_dirvar                  __regina_drop_dirvar
 #define drop_var                     __regina_drop_var
@@ -201,14 +221,18 @@
 #define external_queues_used         __regina_external_queues_used
 #define evaluate                     __regina_evaluate
 #define execute_external             __regina_execute_external
+#define exit_hook                    __regina_exit_hook
 #define exiterror                    __regina_exiterror
 #define expand_to_str                __regina_expand_to_str
 #define expose_var                   __regina_expose_var
-#define external_func                __regina_external_func
 #define fetch_file                   __regina_fetch_file
 #define fetch_string                 __regina_fetch_string
-#define fill_input_queue             __regina_fill_input_queue
+#define filename_cmp                 __regina_filename_cmp
+#define fill_input_queue_stem        __regina_fill_input_queue_stem
+#define fill_input_queue_stream      __regina_fill_input_queue_stream
+#define fill_queue_name              __regina_fill_queue_name
 #define find_free_slot               __regina_find_free_slot
+#define find_library                 __regina_find_library
 #define find_shared_library          __regina_find_shared_library
 #define find_stack_direction         __regina_find_stack_direction
 #define firstmacro                   __regina_firstmacro
@@ -219,6 +243,7 @@
 #define flush_trace_chars            __regina_flush_trace_chars
 #define fork_exec                    __regina_fork_exec
 #define free_a_descr                 __regina_free_a_descr
+#define free_orphaned_libs           __regina_free_orphaned_libs
 #define get_a_chunk                  __regina_get_a_chunk
 #define get_a_chunkTSD               __regina_get_a_chunkTSD
 #define get_a_descr                  __regina_get_a_descr
@@ -240,7 +265,6 @@
 #define get_sys_errlist              __regina_get_sys_errlist
 #define getdescr                     __regina_getdescr
 #define getdirvalue                  __regina_getdirvalue
-#define getdirvalue_compound         __regina_getdirvalue_compound
 #define getlabel                     __regina_getlabel
 #define getonechar                   __regina_getonechar
 #define getoptionchar                __regina_getoptionchar
@@ -254,8 +278,10 @@
 #define give_a_chunkTSD              __regina_give_a_chunkTSD
 #define give_a_streng                __regina_give_a_streng
 #define give_a_strengTSD             __regina_give_a_strengTSD
+#define halt_raised                  __regina_halt_raised
 #define hashvalue                    __regina_hashvalue
 #define hashvalue_ic                 __regina_hashvalue_ic
+#define hashvalue_var                __regina_hashvalue_var
 #define have_allocated               __regina_have_allocated
 #define hookup                       __regina_hookup
 #define hookup_input                 __regina_hookup_input
@@ -263,6 +289,7 @@
 #define hookup_output                __regina_hookup_output
 #define hookup_output2               __regina_hookup_output2
 #define identify_trap                __regina_identify_trap
+#define initargs                     __regina_initargs
 #define init_arexxf                  __regina_init_arexxf
 #define init_builtin                 __regina_init_builtin
 #define init_client                  __regina_init_client
@@ -290,15 +317,18 @@
 #define is_a_descr                   __regina_is_a_descr
 #define isboolean                    __regina_isboolean
 #define isvariable                   __regina_isvariable
+#define jump_interpreter_exit        __regina_jump_interpreter_exit
+#define jump_rexx_signal             __regina_jump_rexx_signal
+#define jump_script_exit             __regina_jump_script_exit
 #define kill_lines                   __regina_kill_lines
 #define kill_variables               __regina_kill_variables
 #define killsystem                   __regina_killsystem
 #define known_reserved_variable      __regina_known_reserved_variable
+#define l_to_u                       __regina_l_to_u
 #define lineno_of                    __regina_lineno_of
 #define lines_in_stack               __regina_lines_in_stack
 #define listleaked                   __regina_listleaked
 #define loaded_lib_func              __regina_loaded_lib_func
-#define loadrxfunc                   __regina_loadrxfunc
 #define make_buffer                  __regina_make_buffer
 #define mark_descrs                  __regina_mark_descrs
 #define mark_filetable               __regina_mark_filetable
@@ -312,9 +342,12 @@
 #define marksubtree                  __regina_marksubtree
 #define markvariables                __regina_markvariables
 #define mem_cmpic                    __regina_mem_cmpic
+#define mem_lower                    __regina_mem_lower
+#define mem_upper                    __regina_mem_upper
 #define memory_stats                 __regina_memory_stats
 #define months                       __regina_months
 #define my_fullpath                  __regina_my_fullpath
+#define my_fullpathstreng            __regina_my_fullpathstreng
 #define my_splitpath2                __regina_my_splitpath2
 #define my_win32_setenv              __regina_my_win32_setenv
 #define myatof                       __regina_myatof
@@ -343,6 +376,7 @@
 #define popline                      __regina_popline
 #define posix_do_command             __regina_posix_do_command
 #define posix_run_as_child           __regina_posix_run_as_child
+#define post_process_system_call     __regina_post_process_system_call
 #define purge_filetable              __regina_purge_filetable
 #define purge_flists                 __regina_purge_flists
 #define purge_library                __regina_purge_library
@@ -359,12 +393,13 @@
 #define removelevel                  __regina_removelevel
 #define reset_async_info             __regina_reset_async_info
 #define restart_file                 __regina_restart_file
+#define restore_variable_state       __regina_restore_variable_state
 #define retlength                    __regina_retlength
 #define retvalue                     __regina_retvalue
+#define rex_lower                    __regina_rex_lower
+#define rex_poolid                   __regina_rex_poolid
 #define rex_rxfuncadd                __regina_rex_rxfuncadd
 #define rex_rxfuncdefine             __regina_rex_rxfuncdefine
-#define rex_rxfuncdlldrop            __regina_rex_rxfuncdlldrop
-#define rex_rxfuncdllquery           __regina_rex_rxfuncdllquery
 #define rex_rxfuncdrop               __regina_rex_rxfuncdrop
 #define rex_rxfuncerrmsg             __regina_rex_rxfuncerrmsg
 #define rex_rxfuncquery              __regina_rex_rxfuncquery
@@ -375,18 +410,19 @@
 #define send_command_to_rxstack      __regina_send_command_to_rxstack
 #define set_envir                    __regina_set_envir
 #define set_ignore_novalue           __regina_set_ignore_novalue
+#define set_locale_info              __regina_set_locale_info
 #define set_options_flag             __regina_set_options_flag
+#define set_pause_at_exit            __regina_set_pause_at_exit
 #define set_queue                    __regina_set_queue
 #define set_queue_in_rxstack         __regina_set_queue_in_rxstack
-#define set_rc                       __regina_set_rc
+#define set_reserved_value           __regina_set_reserved_value
 #define set_rexx_halt                __regina_set_rexx_halt
-#define set_sigl                     __regina_set_sigl
 #define set_trace                    __regina_set_trace
 #define set_trace_char               __regina_set_trace_char
 #define setdirvalue                  __regina_setdirvalue
-#define setdirvalue_compound         __regina_setdirvalue_compound
 #define setshortcut                  __regina_setshortcut
 #define setshortcutnum               __regina_setshortcutnum
+#define setup_system                 __regina_setup_system
 #define setvalue                     __regina_setvalue
 #define shortcut                     __regina_shortcut
 #define shortcutnum                  __regina_shortcutnum
@@ -467,7 +503,6 @@
 #define std_x2c                      __regina_std_x2c
 #define std_x2d                      __regina_std_x2d
 #define std_xrange                   __regina_std_xrange
-#define stem_access                  __regina_stem_access
 #define str_abs                      __regina_str_abs
 #define str_binerize                 __regina_str_binerize
 #define str_digitize                 __regina_str_digitize
@@ -480,7 +515,6 @@
 #define str_round_lostdigits         __regina_str_round_lostdigits
 #define str_sign                     __regina_str_sign
 #define str_strip                    __regina_str_strip
-#define str_trans                    __regina_str_trans
 #define str_true                     __regina_str_true
 #define str_trunc                    __regina_str_trunc
 #define streng_to_int                __regina_streng_to_int
@@ -490,7 +524,9 @@
 #define string_mul                   __regina_string_mul
 #define string_pow                   __regina_string_pow
 #define string_test                  __regina_string_test
+#define subcom_hook                  __regina_subcom_hook
 #define suberrortext                 __regina_suberrortext
+#define system_setup                 __regina_system_setup
 #define system_type                  __regina_system_type
 #define term_external_queue          __regina_term_external_queue
 #define timeout_queue                __regina_timeout_queue
@@ -520,11 +556,11 @@
 #define unx_popen                    __regina_unx_popen
 #define unx_uname                    __regina_unx_uname
 #define unx_unixerror                __regina_unx_unixerror
-#define upcase                       __regina_upcase
 #define update_envirs                __regina_update_envirs
 #define upper_var                    __regina_upper_var
 #define valid_var_symbol             __regina_valid_var_symbol
 #define var_was_found                __regina_var_was_found
+#define variables_per_SAA            __regina_variables_per_SAA
 #define vms_do_command               __regina_vms_do_command
 #define vms_f_cvsi                   __regina_vms_f_cvsi
 #define vms_f_cvtime                 __regina_vms_f_cvtime
@@ -562,5 +598,6 @@
 #define wrapper_dummy_for_aix        __regina_wrapper_dummy_for_aix
 #define wrapper_get_addr             __regina_wrapper_get_addr
 #define wrapper_load                 __regina_wrapper_load
+#define wrapper_unload               __regina_wrapper_unload
 
 #endif /* REGINA_WRAPPERS_H_INCLUDED */

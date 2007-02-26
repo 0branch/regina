@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: extstack.c,v 1.11 2003/03/11 10:39:36 florian Exp $";
+static char *RCSid = "$Id: extstack.c,v 1.19 2004/04/18 02:54:33 florian Exp $";
 #endif
 
 /*
@@ -21,6 +21,9 @@ static char *RCSid = "$Id: extstack.c,v 1.11 2003/03/11 10:39:36 florian Exp $";
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#if defined(__WATCOMC__) && defined(OS2)
+# include <os2/types.h>
+#endif
 #include "rexx.h"
 
 #ifdef EXTERNAL_TO_REGINA
@@ -40,7 +43,7 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 # if defined(_MSC_VER)
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 #  include <windows.h>
 #  if _MSC_VER >= 1100
@@ -52,6 +55,9 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 # endif
 # include <io.h>
 #else
+# ifdef HAVE_TYPES_H
+#  include <types.h>
+# endif
 # ifdef HAVE_SYS_SOCKET_H
 #  include <sys/socket.h>
 # endif
@@ -73,7 +79,6 @@ volatile char *tmpstr_of( tsd_t *TSD, const streng *input )
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <ctype.h>
 #include <stdarg.h>
 
 #include "extstack.h"
@@ -116,10 +121,10 @@ int init_external_queue( const tsd_t *TSD )
    WSADATA wsaData;
    if ( WSAStartup( wsver, &wsaData ) != 0 )
    {
-      /* TSD can be NULL when called from rxqueue or rxstack */
-      if ( TSD == NULL || TSD->called_from_saa )
+      /* TSD will be NULL when called from rxqueue or rxstack */
+      if ( TSD == NULL )
          showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_WINSOCK, ERR_RXSTACK_NO_WINSOCK_TMPL, WSAGetLastError() );
-      else
+      else if ( !TSD->called_from_saa )
          exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_WINSOCK, WSAGetLastError() );
       rc = 1;
    }
@@ -181,7 +186,7 @@ streng *default_external_name( const tsd_t *TSD )
 
    len = sizeof(ReginaLocalHost); /* includes the term. \0 */
    result = MAKESTRENG( len );
-   result->len = len;
+   result->len = len - 1;
    memcpy( result->value, ReginaLocalHost, len ) ;
    return result ;
 }
@@ -189,6 +194,7 @@ streng *default_external_name( const tsd_t *TSD )
 int connect_to_rxstack( tsd_t *TSD, Queue *q )
 {
    struct sockaddr_in server;
+   int eno;
 
    /*
     * Connect to external rxstack process/daemon/service
@@ -203,20 +209,21 @@ int connect_to_rxstack( tsd_t *TSD, Queue *q )
    q->u.e.socket = socket( AF_INET, SOCK_STREAM, 0 );
    if ( q->u.e.socket >= 0 )
    {
-      if ( connect( q->u.e.socket, (struct sockaddr *)&server, sizeof(server) ) < 0 )
+
+      if ( connect( q->u.e.socket, (struct sockaddr *)&server, sizeof(server) ) >= 0 )
       {
-         int eno = errno;
-         close(q->u.e.socket);
-         q->u.e.socket = -1;
-         errno = eno;
+         DEBUGDUMP(printf("In connect_to_rxstack: socket=%d\n", q->u.e.socket););
+         return(q->u.e.socket);
       }
-      DEBUGDUMP(printf("In connect_to_rxstack: socket=%d\n", q->u.e.socket););
-      return(q->u.e.socket);
+      eno = errno;
+      close(q->u.e.socket);
+      q->u.e.socket = -1;
+      errno = eno;
    }
-   /* TSD can be NULL when called from rxqueue or rxstack */
-   if ( TSD == NULL || TSD->called_from_saa )
+   /* TSD will be NULL when called from rxqueue or rxstack */
+   if ( TSD == NULL )
       showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, ERR_RXSTACK_CANT_CONNECT_TMPL, q->u.e.name, q->u.e.portno, strerror ( errno ) );
-   else
+   else if ( !TSD->called_from_saa )
       exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, tmpstr_of( (void *) TSD, q->u.e.name ), q->u.e.portno, strerror ( errno ) );
 
    return -1;
@@ -313,9 +320,10 @@ streng *read_result_from_rxstack( const tsd_t *TSD, int sock, int result_size )
  * IPv4 hostname or a IPv4 IP address.
  * The [@host[:port]] part is chopped off and the pure queue name remains.
  * return values:
- * -1: error detected (exiterror() is thrown normally!)
- *  0: queue is NULL
- *  1: queue is parsed successfully, either with or without host part.
+ * -code: error detected (exiterror() is thrown normally!), code is one
+ *        or RXQUEUE_...
+ *     0: queue is NULL
+ *     1: queue is parsed successfully, either with or without host part.
  */
 int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
 {
@@ -349,12 +357,12 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
    q->u.e.name = MAKESTRENG( len + 1 ) ;
    if (q->u.e.name == NULL )
    {
-      /* TSD can be NULL when called from rxqueue or rxstack */
-      if ( TSD == NULL || TSD->called_from_saa )
+      /* TSD will be NULL when called from rxqueue or rxstack */
+      if ( TSD == NULL )
          showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
-      else
+      else if ( !TSD->called_from_saa )
          exiterror( ERR_STORAGE_EXHAUSTED, 0 );
-      return -1;
+      return -4;  /* RXQUEUE_NOEMEM */
    }
    memcpy( PSTRENGVAL( q->u.e.name ), h, len ) ;
    PSTRENGVAL( q->u.e.name )[len] = '\0' ;
@@ -370,19 +378,23 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
          q->u.e.portno = 0;
       if ( ( q->u.e.portno < 1 ) || ( q->u.e.portno > 0xFFFF ) )
       {
-         if ( TSD == NULL || TSD->called_from_saa )
+         if ( TSD == NULL )
             showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, ERR_RXSTACK_INVALID_QUEUE_TMPL, PSTRENGVAL( queue ) );
-         else
+         else if ( !TSD->called_from_saa )
             exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INVALID_QUEUE, tmpstr_of( (void *) TSD, queue ) );
          DROPSTRENG( q->u.e.name ) ;
          q->u.e.name = NULL ;
-         return -1 ;
+         return -5; /* RXQUEUE_BADQNAME */
       }
    }
 
    h = PSTRENGVAL( q->u.e.name ) ;
-   if ( *h == '\0' ) /* FIXME: need to use default_external_name? */
-      q->u.e.address = default_external_address( ) ;
+   if ( *h == '\0' )
+   {
+      q->u.e.address = default_external_address();
+      DROPSTRENG( q->u.e.name );
+      q->u.e.name = default_external_name( TSD );
+   }
    else
    {
       /* h is either a dotted name or a host name, always try the dotted one
@@ -398,14 +410,14 @@ int parse_queue( tsd_t *TSD, streng *queue, Queue *q )
             q->u.e.address = ( ( struct in_addr * ) he->h_addr )->s_addr;
          if ( ( q->u.e.address == 0 ) || ( q->u.e.address == -1 ) )
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, ERR_RXSTACK_NO_IP_TMPL, PSTRENGVAL( q->u.e.name ) );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_IP, tmpstr_of( (void *) TSD, q->u.e.name ) );
             DROPSTRENG( q->u.e.name ) ;
             q->u.e.name = NULL ;
-            return -1;
+            return -5; /* RXQUEUE_BADQNAME */
          }
       }
    }
@@ -461,7 +473,7 @@ int timeout_queue_on_rxstack( const tsd_t *TSD, int sock, long timeout )
    return rc;
 }
 
-int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock )
+int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock, int *errcode )
 {
    int rc,length=0;
    streng *header;
@@ -483,15 +495,18 @@ int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock )
          }
          else
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting number in queue" );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting number in queue"  );
+            rc = 9; /* RXQUEUE_NOTREG */
          }
          DROPSTRENG( header );
       }
    }
+   if ( errcode )
+      *errcode = rc;
    return length;
 }
 
@@ -531,10 +546,10 @@ static streng *init_connect_string( const tsd_t *TSD, const Queue *q, int addlen
    retval = MAKESTRENG( len + addlength ) ;
    if ( retval == NULL )
    {
-      /* TSD can be NULL when called from rxqueue or rxstack */
-      if ( TSD == NULL || TSD->called_from_saa )
+      /* TSD will be NULL when called from rxqueue or rxstack */
+      if ( TSD == NULL )
          showerror( ERR_STORAGE_EXHAUSTED, 0, ERR_STORAGE_EXHAUSTED_TMPL );
-      else
+      else if ( !TSD->called_from_saa )
          exiterror( ERR_STORAGE_EXHAUSTED, 0 );
    }
    else
@@ -603,13 +618,15 @@ int get_queue_from_rxstack( const tsd_t *TSD, const Queue *q, streng **result )
                inject_result_from_rxstack( q->u.e.socket, *result, length ) ;
                add_connect_string( q, *result );
             }
+            else
+               rc = 4; /* RXQUEUE_NOEMEM, not really used */
          }
          else
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting queue from stack" );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting queue from stack" );
          }
          DROPSTRENG( header );
@@ -647,10 +664,10 @@ int get_line_from_rxstack( const tsd_t *TSD, int sock, streng **result, int nowa
          }
          else
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting line from queue" );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting line from queue" );
          }
          DROPSTRENG( header );
@@ -672,25 +689,7 @@ int create_queue_on_rxstack( const tsd_t *TSD, const Queue *q, const streng *que
       if ( header )
       {
          rc = header->value[0]-'0';
-         if ( rc == 0 )
-         {
-            /*
-             * the requested queue name was created, so put the input
-             * value into the result
-             * FGC: Note: This should never happen. Newer rxstack versions
-             *            return 1 by default with a valid queue name.
-             */
-            length = get_length_from_header( TSD, header );
-            if ( ( *result = init_connect_string( TSD, q, length ) ) != NULL )
-            {
-               length = PSTRENGLEN( queue );
-               memcpy( PSTRENGVAL( *result ), PSTRENGVAL( queue ), length );
-               ( *result )->len = length ;
-               Str_upper( *result ) ;
-               add_connect_string( q, *result );
-            }
-         }
-         else if ( rc == 1 )
+         if ( ( rc == 0 ) || ( rc == 1 ) )
          {
             /*
              * now get the length from the header and get that many characters...
@@ -701,14 +700,23 @@ int create_queue_on_rxstack( const tsd_t *TSD, const Queue *q, const streng *que
                inject_result_from_rxstack( q->u.e.socket, *result, length ) ;
                add_connect_string( q, *result );
             }
+            else
+               rc = 4; /* RXQUEUE_NOEMEM */
          }
          else
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Creating queue" );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Creating queue" );
+            switch ( rc )
+            {
+               case 2: rc = 5; break; /* RXQUEUE_BADQNAME */
+               case 3: rc = 4; break; /* RXQUEUE_NOEMEM */
+               case 6: rc = 1; break; /* RXQUEUE_STORAGE */
+               default:;
+            }
          }
          DROPSTRENG( header );
       }
@@ -740,15 +748,23 @@ int set_queue_in_rxstack( const tsd_t *TSD, int sock, const streng *queue_name )
          }
          else
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Setting queue" );
-            else
-               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Setting quueue" );
+            else if ( !TSD->called_from_saa )
+               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Setting queue" );
+            switch ( rc )
+            {
+               case 3: rc = 4; break; /* RXQUEUE_NOEMEM */
+               case 6: rc = 1; break; /* RXQUEUE_STORAGE */
+               default:;
+            }
          }
          DROPSTRENG( header );
       }
    }
+   else
+      rc = 100; /* RXQUEUE_NETERROR */
    return rc;
 }
 
@@ -766,11 +782,18 @@ int queue_line_fifo_to_rxstack( const tsd_t *TSD, int sock, const streng *line )
          rc = header->value[0]-'0';
          if ( rc != 0 )
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Queueing line" );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Queueing line" );
+            switch ( rc )
+            {
+               case 2: rc = 5; break; /* RXQUEUE_BADQNAME */
+               case 3: rc = 4; break; /* RXQUEUE_NOEMEM */
+               case 6: rc = 1; break; /* RXQUEUE_STORAGE */
+               default:;
+            }
          }
          DROPSTRENG( header );
       }
@@ -792,11 +815,18 @@ int queue_line_lifo_to_rxstack( const tsd_t *TSD, int sock, const streng *line )
          rc = header->value[0]-'0';
          if ( rc != 0 )
          {
-            /* TSD can be NULL when called from rxqueue or rxstack */
-            if ( TSD == NULL || TSD->called_from_saa )
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Queueing line" );
-            else
+            else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Queueing line" );
+            switch ( rc )
+            {
+               case 2: rc = 5; break; /* RXQUEUE_BADQNAME */
+               case 3: rc = 4; break; /* RXQUEUE_NOEMEM */
+               case 6: rc = 1; break; /* RXQUEUE_STORAGE */
+               default:;
+            }
          }
          DROPSTRENG( header );
       }

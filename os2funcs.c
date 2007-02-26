@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: os2funcs.c,v 1.14 2003/04/17 23:27:24 florian Exp $";
+static char *RCSid = "$Id: os2funcs.c,v 1.21 2004/01/17 07:36:50 mark Exp $";
 #endif
 
 /*
@@ -32,6 +32,19 @@ static char *RCSid = "$Id: os2funcs.c,v 1.14 2003/04/17 23:27:24 florian Exp $";
 # include <fcntl.h>
 #endif
 
+#if defined(__WATCOMC__) && defined(OS2)
+# include <os2.h>
+# define DONT_TYPEDEF_PFN
+#endif
+
+#if defined(__WATCOMC__) && !defined(__QNX__)
+# include <i86.h>
+# if defined(OS2)
+#  define DONT_TYPEDEF_PFN
+#  include <os2.h>
+# endif
+#endif
+
 #include "rexx.h"
 #include <errno.h>
 #include <stdio.h>
@@ -42,7 +55,6 @@ static char *RCSid = "$Id: os2funcs.c,v 1.14 2003/04/17 23:27:24 florian Exp $";
 #ifdef HAVE_LIMITS_H
 # include <limits.h>
 #endif
-#include <ctype.h>
 #include <time.h>
 
 #if defined(VMS)
@@ -87,11 +99,6 @@ static char *RCSid = "$Id: os2funcs.c,v 1.14 2003/04/17 23:27:24 florian Exp $";
 # include <direct.h>
 #endif
 
-
-#ifdef __WATCOMC__
-# include <i86.h>
-#endif
-
 #ifdef WIN32
 # if defined(__BORLANDC__)
 #  include <dir.h>
@@ -99,7 +106,7 @@ static char *RCSid = "$Id: os2funcs.c,v 1.14 2003/04/17 23:27:24 florian Exp $";
 # if defined(_MSC_VER)
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -127,9 +134,6 @@ streng *os2_directory( tsd_t *TSD, cparamboxptr parms )
 {
    streng *result=NULL ;
    int ok=HOOK_GO_ON ;
-#ifdef __EMX__
-   int i;
-#endif
    char *path;
 
    checkparam(  parms,  0,  1 , "DIRECTORY" ) ;
@@ -159,29 +163,9 @@ streng *os2_directory( tsd_t *TSD, cparamboxptr parms )
 
    if (ok==HOOK_GO_ON)
    {
-#if defined(HAVE__FULLPATH)
       result = Str_makeTSD( REXX_PATH_MAX );
-      _fullpath(result->value, ".", REXX_PATH_MAX);
-# if defined(__EMX__)
-      /*
-       * Convert / to \ as the API call doesn't do this for us
-       */
-      result->len = strlen( result->value ) ;
-      for ( i=0; i < result->len; i++)
-      {
-         if ( result->value[i] == '/' )
-            result->value[i] = '\\';
-      }
-# endif
-#elif defined(HAVE__TRUENAME)
-      result = Str_makeTSD( _MAX_PATH ) ;
-      _truename(".", result->value);
-#else
-      result = Str_makeTSD( 1024 ) ;
-      if (my_fullpath(result->value, ".", 1024) == -1)
-         result = nullstringptr() ;
-#endif
-      result->len = strlen( result->value ) ;
+      my_fullpath( result->value, "." );
+      result->len = strlen( result->value );
    }
    return result;
 }

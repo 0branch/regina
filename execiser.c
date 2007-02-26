@@ -149,6 +149,21 @@ static void trace( void )
    RexxDeregisterExit( "Foo", NULL ) ;
 }
 
+static void assign_new_rxstring( PRXSTRING dest, const char *source )
+{
+   int len;
+   char *buf;
+
+   len = strlen( source );
+   if ( ( buf = RexxAllocateMemory( len + 1 ) ) == NULL )
+   {
+      fprintf( stderr, "RexxAllocateMemory returns NULL.\n" );
+      exit( 1 );
+   }
+   strcpy( buf, source );
+   MAKERXSTRING( *dest, buf, len );
+
+}
 
 LONG APIENTRY intertrc_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
 {
@@ -197,8 +212,7 @@ LONG APIENTRY intertrc_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
        case 9:
           iverify( "Subfunction", Subfun, RXSIODTR ) ;
           psiodtr = (RXSIODTR_PARM *)PBlock;
-          psiodtr->rxsiodtr_retc.strptr = data[cnt] ;
-          psiodtr->rxsiodtr_retc.strlength = strlen(data[cnt]) ;
+          assign_new_rxstring( &psiodtr->rxsiodtr_retc, data[cnt] );
           break ;
 
        default:
@@ -265,8 +279,7 @@ LONG APIENTRY pull_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
        case 4:
           iverify( "Subfunction", Subfun, RXSIOTRD ) ;
           psiotrd = (RXSIOTRD_PARM *)PBlock;
-          strcpy(psiotrd->rxsiotrd_retc.strptr,data[cnt]) ;
-          psiotrd->rxsiotrd_retc.strlength = strlen(data[cnt]) ;
+          assign_new_rxstring( &psiotrd->rxsiotrd_retc, data[cnt] );
           break ;
 
        default:
@@ -316,8 +329,7 @@ LONG APIENTRY env_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
           iverify( "Subfunction", Subfun, RXENVGET ) ;
           penvget = (RXENVGET_PARM *)PBlock;
           sverify( "Envget name", &(penvget->rxenv_name),"FRED");
-          strcpy(penvget->rxenv_value.strptr,"initial") ;
-          penvget->rxenv_value.strlength = strlen(data) ;
+          assign_new_rxstring( &penvget->rxenv_value, "initial" );
           break ;
 
        case 2:
@@ -332,8 +344,7 @@ LONG APIENTRY env_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
           iverify( "Subfunction", Subfun, RXENVGET ) ;
           penvget = (RXENVGET_PARM *)PBlock;
           sverify( "Envget name", &(penvget->rxenv_name),"FRED");
-          strcpy(penvget->rxenv_value.strptr,data) ;
-          penvget->rxenv_value.strlength = strlen(data) ;
+          assign_new_rxstring( &penvget->rxenv_value, data );
           break ;
 
        default:
@@ -410,11 +421,13 @@ LONG APIENTRY query_term_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
    iverify( "Query Term exit", rc, RXQUEUE_OK ) ;
    iverify( "Query Term count", count, 2L ) ;
 
+   data.strptr = NULL;
    rc = RexxPullQueue( "FRED", &data, &timestamp, RXQUEUE_NOWAIT );
    iverify( "Query Term exit", rc, RXQUEUE_OK ) ;
    sverify( "Query Term data", &data, "2line" ) ;
    RexxFreeMemory( data.strptr ) ;
 
+   data.strptr = NULL;
    rc = RexxPullQueue( "FRED", &data, &timestamp, RXQUEUE_NOWAIT );
    iverify( "Query Term exit", rc, RXQUEUE_OK ) ;
    sverify( "Query Term data", &data, "1line" ) ;
@@ -783,7 +796,7 @@ LONG APIENTRY source_exit( LONG code, LONG subcode, PEXIT ptr )
    sverify( "Parm2b", &(Req[4].shvvalue), NULL ) ;
 
    iverify( "QueName", Req[5].shvret, RXSHV_OK ) ;
-   sverify( "QueName", &(Req[5].shvvalue), "default" ) ;
+   sverify( "QueName", &(Req[5].shvvalue), "SESSION" ) ;
 
    return RXEXIT_HANDLED ;
 }
@@ -1242,6 +1255,15 @@ static RexxSubcomHandler *(scfuncs[]) = {
    NULL
 } ;
 
+char char82( void )
+{
+   return (char) 0x82;
+}
+
+char char0( void )
+{
+   return '\0';
+}
 
 int main( int argc, char *argv[] )
 {
@@ -1272,6 +1294,9 @@ int main( int argc, char *argv[] )
    }
    printf("\n");
 
+   if ( char82() < char0() )
+      printf( "WARNING: Current compiler uses `signed char' as default!\n" );
+
    for( fptr=routines; *fptr; fptr++ )
       (*fptr)() ;
 
@@ -1286,8 +1311,7 @@ int main( int argc, char *argv[] )
 #if !defined(NO_EXTERNAL_QUEUES)
    qtest();
 #endif
+   ReginaCleanup();
    printf( "\n" ) ;
    return 0 ;
-
 }
-

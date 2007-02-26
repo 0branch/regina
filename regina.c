@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: regina.c,v 1.5 2003/04/20 06:40:32 mark Exp $";
+static char *RCSid = "$Id: regina.c,v 1.7 2004/01/01 11:43:04 mark Exp $";
 #endif
 
 /*
@@ -20,6 +20,9 @@ static char *RCSid = "$Id: regina.c,v 1.5 2003/04/20 06:40:32 mark Exp $";
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
+#include "regina_c.h"
+
 #if defined(WIN32) && defined(__IBMC__)
 # include <windows.h>
 # pragma warning(default: 4115 4201 4214)
@@ -33,7 +36,7 @@ static char *RCSid = "$Id: regina.c,v 1.5 2003/04/20 06:40:32 mark Exp $";
 #  undef APIENTRY
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#    pragma warning(disable: 4115 4201 4214)
+#    pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 #  include <windows.h>
 #  if _MSC_VER >= 1100

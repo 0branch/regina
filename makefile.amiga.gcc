@@ -29,13 +29,13 @@ else
 USEFLISTS =
 endif
 
-CEXTRA = -DPOSIX_SOURCE -DAMIGA -DGCC
+CEXTRA = -DPOSIX_SOURCE -DAMIGA -DGCC -funsigned-char
 EEXTRA =
 EXTQUEUE_OBJS = extstack.$(OBJ) rexxbif.$(OBJ)
 EXTQUEUE_SHOBJS = #extstack.sho rexxbif.sho
 DYN_COMP =
 LIBS =
-TCPLIBS = 
+TCPLIBS =
 SHLIBS =
 SHL =
 LD_RXLIB1=

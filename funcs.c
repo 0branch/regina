@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: funcs.c,v 1.25 2003/04/26 01:09:02 florian Exp $";
+static char *RCSid = "$Id: funcs.c,v 1.37 2004/04/15 10:08:45 mark Exp $";
 #endif
 
 /*
@@ -24,7 +24,6 @@ static char *RCSid = "$Id: funcs.c,v 1.25 2003/04/26 01:09:02 florian Exp $";
 #include "rexx.h"
 #include "rxiface.h"
 #include <string.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
@@ -166,6 +165,7 @@ static const struct function_type functions[] = {
 #ifdef TRACEMEM
   { EXT_REGINA_BIFS,dbg_listleaked,        "LISTLEAKED" },
 #endif
+  { EXT_REGINA_BIFS,rex_lower,             "LOWER" },
   { EXT_MAKEBUF_BIF,cms_makebuf,           "MAKEBUF" },
   { 0,              std_max,               "MAX" },
 #ifdef TRACEMEM
@@ -174,6 +174,7 @@ static const struct function_type functions[] = {
   { 0,              std_min,               "MIN" },
   { EXT_REGINA_BIFS,conflict_open,         "OPEN" },
   { 0,              std_overlay,           "OVERLAY" },
+  { EXT_REGINA_BIFS,rex_poolid,            "POOLID" },
   { EXT_REGINA_BIFS,unx_popen,             "POPEN" },
   { 0,              std_pos,               "POS" },
   { 0,              std_qualify,           "QUALIFY" },
@@ -186,7 +187,9 @@ static const struct function_type functions[] = {
   { 0,              std_right,             "RIGHT" },
 
   { 0,              rex_rxfuncadd,         "RXFUNCADD" },
-/*{ EXT_REGINA_BIFS,rex_rxfuncdefine,      "RXFUNCDEFINE" },*/
+#ifdef HAVE_GCI
+  { EXT_REGINA_BIFS,rex_rxfuncdefine,      "RXFUNCDEFINE" },
+#endif
   { 0,              rex_rxfuncdrop,        "RXFUNCDROP" },
   { EXT_REGINA_BIFS,rex_rxfuncerrmsg,      "RXFUNCERRMSG" },
   { 0,              rex_rxfuncquery,       "RXFUNCQUERY" },
@@ -215,7 +218,7 @@ static const struct function_type functions[] = {
   { 0,              std_trunc,             "TRUNC" },
   { EXT_REGINA_BIFS,unx_uname,             "UNAME" },
   { EXT_REGINA_BIFS,unx_unixerror,         "UNIXERROR" },
-  { EXT_AREXX_BIFS, arexx_upper,           "UPPER" },
+  { EXT_REGINA_BIFS,arexx_upper,           "UPPER" },
   { EXT_REGINA_BIFS,rex_userid,            "USERID" },
   { 0,              std_value,             "VALUE" },
   { 0,              std_verify,            "VERIFY" },
@@ -258,34 +261,16 @@ void mark_listleaked_params( const tsd_t *TSD )
 streng *buildtinfunc( tsd_t *TSD, nodeptr this )
 {
    int low=0, topp=0, mid=0, end=1, up=num_funcs-1, i=0 ;
-   streng *ptr=NULL ;
-   int ext=0 ;
-   void *vptr=NULL ;
+   streng *ptr;
+   struct entry_point *vptr;
    streng *(*func)(tsd_t *,cparamboxptr)=NULL ;
-   streng *upper_name;
-   int strict_ansi_option=get_options_flag( TSD->currlevel, EXT_STRICT_ANSI );
-   int cacheext_option=get_options_flag( TSD->currlevel, EXT_CACHEEXT );
 
-   upper_name=Str_upper(Str_dupTSD(this->name));
    /*
     * Look for a function registered in a DLL
     */
-   vptr = loaded_lib_func( TSD, upper_name ) ;
-   if (vptr)
+   vptr = loaded_lib_func( TSD, this->name ) ;
+   if ( vptr )
       func = std_center ; /* e.g. */
-
-   Free_stringTSD( upper_name );
-
-   /*
-    * If no function registered in a DLL, look for one in the
-    * current EXE
-    */
-   if (!func)
-   {
-      ext = external_func( TSD, this->name ) ;
-      if (ext)
-         func = std_center ; /* e.g. */
-   }
 
    /*
     * If no function registered in a DLL or EXE, look for a builtin
@@ -326,14 +311,14 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
              */
             if (functions[mid].compat)
             {
-               if ( strict_ansi_option )
+               if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
                   exiterror( ERR_NON_ANSI_FEATURE, 1, functions[mid].funcname );
                if ( ! get_options_flag( TSD->currlevel, functions[mid].compat ) )
                   func = NULL ;
                else
                {
                   func = functions[mid].function ;
-                  if ( cacheext_option )
+                  if ( get_options_flag( TSD->currlevel, EXT_CACHEEXT ) )
                      this->u.func = func ;
                }
             }
@@ -354,10 +339,8 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
                      */
 
       TSD->bif_first = initplist( TSD, this ) ;
-      if (ext)
-         ptr = do_an_external_exe( TSD, this->name, TSD->bif_first, 0, (char) this->o.called) ;
-      else if (vptr)
-         ptr = do_an_external_dll( TSD, vptr, TSD->bif_first, (char) this->o.called ) ;
+      if (vptr)
+         ptr = call_known_external( TSD, vptr, TSD->bif_first, (char) this->o.called ) ;
       else
          ptr = (*func)(TSD, TSD->bif_first /* ->next */ ) ;
 
@@ -379,14 +362,13 @@ streng *buildtinfunc( tsd_t *TSD, nodeptr this )
 
 
          TSD->bif_first = initplist( TSD, this ) ;
-         ptr = do_an_external_exe( TSD, this->name, TSD->bif_first, 1, (char) this->o.called ) ;
+         ptr = call_unknown_external( TSD, this->name, TSD->bif_first, (char) this->o.called ) ;
          deallocplink( TSD, TSD->bif_first ) ;
          TSD->bif_first = NULL ;
       }
       else
-         return NOFUNC ;
+         ptr = NOFUNC;
    }
-   /* can return valid ptr! */
    return ptr;
 }
 
@@ -449,6 +431,53 @@ paramboxptr initplist( tsd_t *TSD, cnodeptr this )
    if ( currnt )
       currnt->next = NULL ;
    return first ;
+}
+
+
+paramboxptr initargs( tsd_t *TSD, int argc, const int *lengths,
+                      const char **strings )
+{
+   paramboxptr first,new,currnt;
+   int i;
+
+   first = currnt = NULL;
+   for ( i = 0; i < argc; i++ )
+   {
+      if ( TSD->par_stack )
+      {
+         new = TSD->par_stack;
+         TSD->par_stack = new->next;
+      }
+      else
+         new = MallocTSD( sizeof( parambox ) );
+
+      if ( !first )
+         first = currnt = new;
+      else
+      {
+         currnt->next = new;
+         currnt = new;
+      }
+
+      if ( lengths[i] == RX_NO_STRING )
+      {
+         currnt->dealloc = 1;
+         currnt->value = NULL;
+      }
+      else
+      {
+         currnt->value = Str_ncreTSD( strings[i], lengths[i] );
+         currnt->dealloc = 1;
+      }
+   }
+
+#ifdef TRACEMEM
+   TSD->listleaked_params = first;
+#endif
+
+   if ( currnt )
+      currnt->next = NULL;
+   return first;
 }
 
 
@@ -533,7 +562,7 @@ char getoptionchar( tsd_t *TSD, const streng *text, const char* bif, int argnum,
    if (text->len == 0)
       exiterror( ERR_INCORRECT_CALL, 21, bif, argnum )  ;
 
-   ch = (char) toupper( text->value[0] ) ;
+   ch = (char) rx_toupper( text->value[0] ) ;
    /*
     * If the option supplied is ANSI, then return when we find it.
     */
@@ -668,12 +697,12 @@ const streng *param( cparamboxptr ptr, int num )
  * into a struct tm (individual values for year, month, day, year_days and
  * base days).
  */
-int convert_date(const streng *suppdate, char suppformat, struct tm *indate)
+int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm *indate)
 {
    int rc=0,i=0,off=0;
    long num1=0,num2=0,num3=0;
    char buf[20];
-   const char *ptr=suppdate->value;
+   char *ptr=(char*)suppdate->value;
    struct tm *tmpTime;
 
    indate->tm_sec = indate->tm_min = indate->tm_hour = 0;
@@ -718,17 +747,17 @@ int convert_date(const streng *suppdate, char suppformat, struct tm *indate)
               return( 1 );
          memcpy(buf,ptr,2);
          buf[2] = '\0';
-         if ( !isdigit( buf[0] ) || !isdigit( buf[1] ) )
+         if ( !rx_isdigit( buf[0] ) || !rx_isdigit( buf[1] ) )
             return( 1 );
          num1 = atol( buf );
          memcpy(buf,(ptr+3),2);
          buf[2] = '\0';
-         if ( !isdigit( buf[0] ) || !isdigit( buf[1] ) )
+         if ( !rx_isdigit( buf[0] ) || !rx_isdigit( buf[1] ) )
             return( 1 );
          num2 = atol( buf );
          memcpy(buf,(ptr+6),2);
          buf[2] = '\0';
-         if ( !isdigit( buf[0] ) || !isdigit( buf[1] ) )
+         if ( !rx_isdigit( buf[0] ) || !rx_isdigit( buf[1] ) )
             return( 1 );
          num3 = atol( buf );
          switch(suppformat)
@@ -811,7 +840,8 @@ int convert_date(const streng *suppdate, char suppformat, struct tm *indate)
          indate->tm_year = num1;
          break;
       case 'T':
-         num1 = atol( ptr );
+         num1 = streng_to_int( TSD, suppdate, &rc );
+         if ( rc ) return 1;
          tmpTime = localtime( (time_t *)&num1 );
          memcpy( indate, tmpTime, sizeof(struct tm) );
          indate->tm_year += 1900;
@@ -897,33 +927,41 @@ static void base2date(long basedate,void *conv_tmdata)
  */
 int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, struct tm *intime, time_t *unow)
 {
-   int rc=0;
+   int rc=0,offset;
    long num1=0,num2=0,num3=0,num4=0;
    char buf[20];
-   const char *ptr=supptime->value;
+   char *ptr=(char*)supptime->value;
    struct tm *tmpTime;
 
    switch(suppformat)
    {
       case 'C':
-         if (*(ptr+2) != ':')
+         /*
+          * Format of time can be "3:45pm", or "11:45pm"; ie hour can be 1 or
+          * two digits. Use of "offset" below fixes bug 742725
+          */
+         if (*(ptr+2) == ':')
+            offset = 1;
+         else if (*(ptr+1) == ':')
+            offset = 0;
+         else
             return(1);
-         if (memcmp("am",ptr+5,2) != 0 && memcmp("pm",ptr+5,2) != 0)
+         if (memcmp("am",ptr+4+offset,2) != 0 && memcmp("pm",ptr+4+offset,2) != 0)
             return(1);
-         memcpy(buf,ptr,2);
-         buf[2] = '\0';
+         memcpy(buf,ptr,1+offset);
+         buf[1+offset] = '\0';
          if ((num1 = atol(buf)) == 0 && strcmp("00",buf) != 0)
             return(1);
          if (num1 > 12)
             return(1);
-         memcpy(buf,ptr+3,2);
+         memcpy(buf,ptr+2+offset,2);
          buf[2] = '\0';
          if ((num2 = atol(buf)) == 0 && strcmp("00",buf) != 0)
             return(1);
          if (num2 > 59)
             return(1);
          intime->tm_sec = 0;
-         if (memcmp("am",ptr+5,2)==0)
+         if (memcmp("am",ptr+4+offset,2)==0)
          {
             if (num1 == 12)
                intime->tm_hour = 0;
@@ -1019,7 +1057,8 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
          *unow = num4;
          break;
       case 'T':
-         num1 = atol( ptr );
+         num1 = streng_to_int( TSD, supptime, &rc );
+         if ( rc ) return 1;
          tmpTime = localtime( (time_t *)&num1 );
          memcpy( intime, tmpTime, sizeof(struct tm) );
          *unow = 0;

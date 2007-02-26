@@ -20,6 +20,7 @@ dnl MH_GET_SHLPST
 dnl MH_SET_SHLPST
 dnl MH_SHARED_LIBRARY
 dnl MH_STATIC_LOADING
+dnl MH_CHECK_UNSIGNED_CHAR_COMPILER_SWITCH
 dnl
 dnl ---------------------------------------------------------------------------
 dnl Determine if C compiler handles ANSI prototypes
@@ -149,6 +150,57 @@ fi
 AC_SUBST(MH_STRICT_ALIASING)
 ])
 AC_MSG_RESULT($mh_strict_aliasing)
+])
+
+dnl ---------------------------------------------------------------------------
+dnl Determine compiler's "unsigned char" is default switch
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_CHECK_UNSIGNED_CHAR_COMPILER_SWITCH],
+[
+AC_C_CHAR_UNSIGNED()
+AC_MSG_CHECKING(compiler switch for unsigned char)
+AC_CACHE_VAL(
+[MH_UNSIGNED_CHAR_SWITCH],
+[
+#
+# QNX4 Watcom compiler is unsigned char by default
+#
+if test "$on_qnx4" = yes -a "$ac_cv_prog_CC" = "cc" ; then
+	qnx4_char_unsigned="yes"
+fi
+
+if test "$ac_cv_c_char_unsigned" = yes -o "$qnx4_char_unsigned" = yes; then
+	MH_UNSIGNED_CHAR_SWITCH=""
+	msg="not needed - char is unsigned by default"
+else
+	case "$ac_cv_prog_CC" in
+		gcc)
+			MH_UNSIGNED_CHAR_SWITCH="-funsigned-char"
+			msg="$MH_UNSIGNED_CHAR_SWITCH"
+			;;
+		xlC)
+			MH_UNSIGNED_CHAR_SWITCH="-qchars=unsigned"
+			msg="$MH_UNSIGNED_CHAR_SWITCH"
+			;;
+		*)
+			save_cflags="$CFLAGS"
+			mh_have_unsigned_char_switch=no
+			for mh_flag in "-xchar=unsigned"; do
+				CFLAGS="$CFLAGS $mh_flag"
+AC_TRY_COMPILE([#include <stdio.h>],
+[char x;],
+  MH_UNSIGNED_CHAR_SWITCH="$mh_flag"; msg="$MH_UNSIGNED_CHAR_SWITCH"; mh_have_unsigned_char_switch=yes )
+				CFLAGS="$save_cflags"
+			done
+			if test "$mh_have_unsigned_char_switch" = no; then
+				msg="unknown - assuming unsigned by default but running execiser will confirm"
+			fi
+			;;
+	esac
+fi
+])
+AC_MSG_RESULT("$msg")
+AC_SUBST(MH_UNSIGNED_CHAR_SWITCH)
 ])
 dnl ---------------------------------------------------------------------------
 dnl Check if gcc compiler supports --version-script
@@ -418,6 +470,14 @@ if test "$enable_posix_threads" = yes; then
                   THREADING_LINK="-mt"
                fi
                ;;
+            *hp-hpux1*)
+               if test "$ac_cv_prog_CC" = "gcc"; then
+                  THREADING_COMPILE="-D_REENTRANT -DPOSIX"
+               fi
+               if test "$mh_rt_lib_found" = "yes"; then 
+                  THREADING_LINK="-lrt"
+               fi
+               ;;
             *linux*)
                ;;
             *freebsd*)
@@ -504,8 +564,8 @@ if AC_TRY_EVAL(mh_compile) && test -s conftest.o; then
         mh_dyn_link='ld -shared -o conftest.rxlib conftest.o -lc 1>&AC_FD_CC'
 #       mh_dyn_link='${CC} -Wl,-shared -o conftest.rxlib conftest.o -lc 1>&AC_FD_CC'
         if AC_TRY_EVAL(mh_dyn_link) && test -s conftest.rxlib; then
-                LD_RXLIB_A1="ld -shared -o"
-                LD_RXLIB_A2="ld -shared -o"
+                LD_RXLIB_A1="ld -shared -o \$(@)"
+                LD_RXLIB_A2="ld -shared -o \$(@)"
 #               LD_RXLIB1="${CC} -Wl,-shared"
                 LD_RXLIB_B1="-L. -l${SHLFILE}"
                 LD_RXLIB_B2="-L. -l${SHLFILE}"
@@ -515,8 +575,8 @@ if AC_TRY_EVAL(mh_compile) && test -s conftest.o; then
                 mh_dyn_link='ld -G -o conftest.rxlib conftest.o 1>&AC_FD_CC'
 #               mh_dyn_link='${CC} -Wl,-G -o conftest.rxlib conftest.o 1>&AC_FD_CC'
                 if AC_TRY_EVAL(mh_dyn_link) && test -s conftest.rxlib; then
-                        LD_RXLIB_A1="ld -G -o"
-                        LD_RXLIB_A2="ld -G -o"
+                        LD_RXLIB_A1="ld -G -o \$(@)"
+                        LD_RXLIB_A2="ld -G -o \$(@)"
 #                       LD_RXLIB1="${CC} -Wl,-G"
                         LD_RXLIB_B1="-L. -l${SHLFILE}"
                         LD_RXLIB_B2="-L. -l${SHLFILE}"
@@ -855,8 +915,8 @@ EXTRATARGET=""
 case "$target" in
         *hp-hpux*)
                 EEXTRA="-Wl,-E"
-                LD_RXLIB_A1="ld -b -q -n -o"
-                LD_RXLIB_A2="ld -b -q -n -o"
+                LD_RXLIB_A1="ld -b -q -n -o \$(@)"
+                LD_RXLIB_A2="ld -b -q -n -o \$(@)"
                 LD_RXLIB_B1=""
                 LD_RXLIB_B2=""
                 DYNAMIC_LDFLAGS="-Wl,+s"
@@ -865,8 +925,8 @@ case "$target" in
                 ;;
         *ibm-aix3*)
                 STATIC_LDFLAGS="-bnso -bI:/lib/syscalls.exp"
-                LD_RXLIB_A1="ld -bnoentry -bM:SRE -bT:512 -bH:512 -bI:regina.exp -o"
-                LD_RXLIB_A2="ld -bnoentry -bM:SRE -bT:512 -bH:512 -bI:regina.exp -o"
+                LD_RXLIB_A1="ld -bnoentry -bM:SRE -bT:512 -bH:512 -bI:regina.exp -o \$(@)"
+                LD_RXLIB_A2="ld -bnoentry -bM:SRE -bT:512 -bH:512 -bI:regina.exp -o \$(@)"
                 LD_RXLIB_B1="${SHLPRE}${SHLFILE}${SHLPST} -lc"
                 LD_RXLIB_B2="${SHLPRE}${SHLFILE}${SHLPST} -lc"
                 SHLPRE="lib"
@@ -886,8 +946,8 @@ case "$target" in
                 ;;
         *ibm-aix*)
 #                STATIC_LDFLAGS="-bnso -bI:/lib/syscalls.exp"
-                LD_RXLIB_A1="ld -bnoentry -bM:SRE -o"
-                LD_RXLIB_A2="ld -bnoentry -bM:SRE -o"
+                LD_RXLIB_A1="ld -bnoentry -bM:SRE -o \$(@)"
+                LD_RXLIB_A2="ld -bnoentry -bM:SRE -o \$(@)"
                 LD_RXLIB_B1="${SHLPRE}${SHLFILE}${SHLPST} -lc"
                 LD_RXLIB_B2="${SHLPRE}${SHLFILE}${SHLPST} -lc"
                 SHLPRE="lib"
@@ -906,16 +966,16 @@ case "$target" in
                 fi
                 ;;
         *dec-osf*)
-                LD_RXLIB_A1="ld -shared -o"
-                LD_RXLIB_A2="ld -shared -o"
+                LD_RXLIB_A1="ld -shared -o \$(@)"
+                LD_RXLIB_A2="ld -shared -o \$(@)"
                 LD_RXLIB_B1="-lc -L. -l${SHLFILE}"
                 LD_RXLIB_B2="-lc -L. -l${SHLFILE}"
                 SHLPRE="lib"
                 SHL_LD="ld -o ${SHLPRE}${SHLFILE}${SHLPST} -shared -no_archive "'$('SHOFILES')'" -lc"
                 ;;
         *esix*)
-                LD_RXLIB_A1="ld -G -o"
-                LD_RXLIB_A2="ld -G -o"
+                LD_RXLIB_A1="ld -G -o \$(@)"
+                LD_RXLIB_A2="ld -G -o \$(@)"
                 LD_RXLIB_B1=""
                 LD_RXLIB_B2=""
                 DYNAMIC_LDFLAGS=""
@@ -923,8 +983,8 @@ case "$target" in
                 SHL_LD="ld -G -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
         *dgux*)
-                LD_RXLIB_A1="ld -G -o"
-                LD_RXLIB_A2="ld -G -o"
+                LD_RXLIB_A1="ld -G -o \$(@)"
+                LD_RXLIB_A2="ld -G -o \$(@)"
                 LD_RXLIB_B1=""
                 LD_RXLIB_B2=""
                 DYNAMIC_LDFLAGS=""
@@ -932,8 +992,8 @@ case "$target" in
                 SHL_LD="ld -G -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
         *pc-sco*)
-                LD_RXLIB_A1="ld -dy -G -o"
-                LD_RXLIB_A2="ld -dy -G -o"
+                LD_RXLIB_A1="ld -dy -G -o \$(@)"
+                LD_RXLIB_A2="ld -dy -G -o \$(@)"
                 LD_RXLIB_B1=""
                 LD_RXLIB_B2=""
                 DYNAMIC_LDFLAGS=""
@@ -942,12 +1002,12 @@ case "$target" in
                 ;;
         *solaris*)
                 if test "$ac_cv_prog_CC" = "gcc"; then
-                   LD_RXLIB_A1="gcc -shared -o"
-                   LD_RXLIB_A2="gcc -shared -o"
+                   LD_RXLIB_A1="gcc -shared -o \$(@)"
+                   LD_RXLIB_A2="gcc -shared -o \$(@)"
                    SHL_LD="gcc -shared -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 else
-                   LD_RXLIB_A1="ld -G -o"
-                   LD_RXLIB_A2="ld -G -o"
+                   LD_RXLIB_A1="ld -G -o \$(@)"
+                   LD_RXLIB_A2="ld -G -o \$(@)"
                    SHL_LD="ld -G -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 fi
                 LD_RXLIB_B1=""
@@ -956,24 +1016,24 @@ case "$target" in
                 SHLPRE="lib"
                 ;;
         sparc*sunos*)
-                LD_RXLIB_A1="ld -o"
-                LD_RXLIB_A2="ld -o"
+                LD_RXLIB_A1="ld -o \$(@)"
+                LD_RXLIB_A2="ld -o \$(@)"
                 LD_RXLIB_B1=""
                 LD_RXLIB_B2=""
                 SHLPRE="lib"
                 SHL_LD="ld -assert pure-text -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
         *freebsd*)
-                LD_RXLIB_A1="ld -Bdynamic -Bshareable -o"
-                LD_RXLIB_A2="ld -Bdynamic -Bshareable -o"
+                LD_RXLIB_A1="ld -Bdynamic -Bshareable -o \$(@)"
+                LD_RXLIB_A2="ld -Bdynamic -Bshareable -o \$(@)"
                 LD_RXLIB_B1="-lc -L. -l${SHLFILE}"
                 LD_RXLIB_B2="-lc -L. -l${SHLFILE}"
                 SHLPRE="lib"
                 SHL_LD="ld -Bdynamic -Bshareable -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
         *linux*)
-                LD_RXLIB_A1="${CC} -shared -o"
-                LD_RXLIB_A2="${CC} -shared -o"
+                LD_RXLIB_A1="${CC} -shared -o \$(@)"
+                LD_RXLIB_A2="${CC} -shared -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE}"
                 LD_RXLIB_B2="-L. -l${SHLFILE}"
                 SHLPRE="lib"
@@ -983,8 +1043,8 @@ case "$target" in
                 USE_ABI="yes"
                 ;;
         *atheos*)
-                LD_RXLIB_A1="${CC} -shared -o"
-                LD_RXLIB_A2="${CC} -shared -o"
+                LD_RXLIB_A1="${CC} -shared -o \$(@)"
+                LD_RXLIB_A2="${CC} -shared -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} "'$('BOTHLIBS')'
                 LD_RXLIB_B2="-L. -l${SHLFILE} "'$('BOTHLIBS')'
                 SHLPRE="lib"
@@ -993,21 +1053,21 @@ case "$target" in
                 BASE_BINARY="atheosbinary"
                 ;;
         *beos*)
-                LD_RXLIB_A1="${CC} -Wl,-shared -nostart -Xlinker -o"
-                LD_RXLIB_A2="${CC} -Wl,-shared -nostart -Xlinker -o"
+                LD_RXLIB_A1="${CC} -Wl,-shared -nostart -Xlinker -o\$(@)"
+                LD_RXLIB_A2="${CC} -Wl,-shared -nostart -Xlinker -o\$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE}"
                 LD_RXLIB_B2="-L. -l${SHLFILE}"
                 SHLPRE="lib"
                 SHL_LD="${CC} -o ${SHLPRE}${SHLFILE}${SHLPST} -Wl,-shared -nostart -Xlinker \$(SHOFILES)"
                 SHL_BASE="${SHLPRE}${SHLFILE}${SHLPST}"
                 BEOS_DYN="yes"
-                BASE_INSTALL="beosinstall"
-                BASE_BINARY="beosbinary"
-                OTHER_INSTALLS=""
+                BASE_INSTALL="installbase"
+                BASE_BINARY="installbase"
+                OTHER_INSTALLS="installlib"
                 ;;
         *nto-qnx*)
-                LD_RXLIB_A1="${CC} -shared -o"
-                LD_RXLIB_A2="${CC} -shared -o"
+                LD_RXLIB_A1="${CC} -shared -o \$(@)"
+                LD_RXLIB_A2="${CC} -shared -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE}"
                 LD_RXLIB_B2="-L. -l${SHLFILE}"
                 SHLPRE="lib"
@@ -1031,8 +1091,8 @@ case "$target" in
                 LIBFILE="rexx"
                 ;;
         *cygwin*)
-                LD_RXLIB_A1="dllwrap --target i386-cygwin32 --def ${srcdir}/test1_w32_dll.def --dllname test1.dll -o"
-                LD_RXLIB_A2="dllwrap --target i386-cygwin32 --def ${srcdir}/test2_w32_dll.def --dllname test2.dll -o"
+                LD_RXLIB_A1="dllwrap --target i386-cygwin32 --def ${srcdir}/test1_w32_dll.def --dllname test1.dll -o \$(@)"
+                LD_RXLIB_A2="dllwrap --target i386-cygwin32 --def ${srcdir}/test2_w32_dll.def --dllname test2.dll -o \$(@)"
                 LD_RXLIB_B1="-L. -lregina"
                 LD_RXLIB_B2="-L. -lregina"
                 SHLPRE=""
@@ -1044,9 +1104,9 @@ case "$target" in
                 SHL_BASE="${SHLPRE}${SHLFILE}${SHLPST}"
                 TEST1EXPORTS=""
                 TEST2EXPORTS=""
-                TEST1EXP="test1_w32_dll.def"
-                TEST2EXP="test2_w32_dll.def"
-                REGINAEXP="regina_w32_dll.def"
+                TEST1EXP="${srcdir}/test1_w32_dll.def"
+                TEST2EXP="${srcdir}/test2_w32_dll.def"
+                REGINAEXP="${srcdir}/regina_w32_dll.def"
                 BASE_INSTALL="cygwininstall"
                 BASE_BINARY="cygwinbinary"
                 OTHER_INSTALLS=""
@@ -1056,10 +1116,10 @@ case "$target" in
                 #
                 # Link switches for building "bundles"
                 #
-# MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o"
-# MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o"
-                LD_RXLIB_A1="${CC} -dynamiclib -o"
-                LD_RXLIB_A2="${CC} -dynamiclib -o"
+# MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
+# MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
+                LD_RXLIB_A1="${CC} -dynamiclib -o \$(@)"
+                LD_RXLIB_A2="${CC} -dynamiclib -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 LD_RXLIB_B2="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 DYN_COMP="-DDYNAMIC -fno-common"
@@ -1282,8 +1342,8 @@ case "$target" in
         *)
                 ;;
 esac
-LD_RXLIB_A1="${LIBEXE} cr"
-LD_RXLIB_A2="${LIBEXE} cr"
+LD_RXLIB_A1="${LIBEXE} cr \$(@)"
+LD_RXLIB_A2="${LIBEXE} cr \$(@)"
 LD_RXLIB_B1=""
 LD_RXLIB_B2=""
 SHL_LD="${LIBEXE} cr ${SHLPRE}${SHLFILE}${SHLPST} \$(SHOFILES)"

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexxext.c,v 1.22 2002/11/26 09:38:41 mark Exp $";
+static char *RCSid = "$Id: rexxext.c,v 1.29 2004/04/24 09:32:58 florian Exp $";
 #endif
 
 /*
@@ -26,6 +26,12 @@ static char *RCSid = "$Id: rexxext.c,v 1.22 2002/11/26 09:38:41 mark Exp $";
 # define DONT_TYPEDEF_PFN
 #endif
 
+#if defined(__WATCOMC__) && defined(OS2)
+# define INCL_DOS
+# include <os2.h>
+# define DONT_TYPEDEF_PFN
+#endif
+
 #include "rexx.h"
 #include <stdio.h>
 #if !defined(VMS)                                       /* MH 10-06-96 */
@@ -41,7 +47,7 @@ static char *RCSid = "$Id: rexxext.c,v 1.22 2002/11/26 09:38:41 mark Exp $";
 # ifdef _MSC_VER
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -78,8 +84,9 @@ streng *rex_userid( tsd_t *TSD, cparamboxptr parms )
 
 streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms )
 {
-   char opt='?' ;
-   streng *result=NULL ;
+   char opt='?';
+   streng *result=NULL;
+   int rc;
 
    checkparam(  parms,  1,  2 , "RXQUEUE" ) ;
 
@@ -89,11 +96,20 @@ streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms )
       case 'C': /* Create */
          if ( ( parms->next )
          && ( parms->next->value ) )
-            create_queue( TSD, parms->next->value, &result );
+            rc = create_queue( TSD, parms->next->value, &result );
             /* result created by create_queue() */
          else
-            create_queue( TSD, NULL, &result );
-            /* result created by create_queue() */
+            rc = create_queue( TSD, NULL, &result );
+
+         if ( result == NULL )
+         {
+            if ( rc == 5 )
+               exiterror( ERR_EXTERNAL_QUEUE, 104, tmpstr_of( TSD, parms->next->value ) );
+            else
+               exiterror( ERR_EXTERNAL_QUEUE, 99, rc, "Creating from stack" );
+         }
+
+         /* result created by create_queue() or an internal error occurred */
          break;
       case 'D': /* Delete */
          if ( ( parms->next )
@@ -201,14 +217,14 @@ char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize )
 #endif
 }
 
-#if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
+#if !defined(__WINS__) && !defined(__EPOC32__)
 static int actually_pause = 1;
 
 /*
  * These functions are used to allow Regina to display "Press ENTER key to exit..."
  * in the console if it is NOT started from a console.
  */
-void do_pause_at_exit( void )
+static void do_pause_at_exit( void )
 {
    int ch;
    if ( actually_pause )
@@ -217,12 +233,6 @@ void do_pause_at_exit( void )
       fflush( stdout );
       ch = getchar();
    }
-}
-
-void flush_stdout( void )
-{
-   fflush( stdout );
-   return;
 }
 
 void set_pause_at_exit( void )

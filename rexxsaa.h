@@ -17,7 +17,7 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * $Id: rexxsaa.h,v 1.19 2003/03/23 10:37:15 mark Exp $
+ * $Id: rexxsaa.h,v 1.32 2004/04/12 01:57:50 mark Exp $
  */
 
 #ifndef __REXXSAA_H_INCLUDED
@@ -35,16 +35,25 @@
 #if defined(_MSC_VER) && !defined(__WINS__)
 # if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 # endif
 # include <windows.h>
 # if _MSC_VER >= 1100
 #   pragma warning(default: 4115 4201 4214)
 # endif
+# define VOID_TYPEDEFED
 #endif
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+/*
+ * pack(1) was introduced in Regina 3.3 to become binary compatible in
+ * structures with OS/2, Object Rexx, etc.
+ */
+#ifdef OREXX_BINARY_COMPATIBLE
+# pragma pack(1)
 #endif
 
 #ifndef CONST
@@ -57,55 +66,77 @@ extern "C" {
 # define CONST const
 #endif
 
-#if defined(__MINGW32__)
-typedef CONST char *PCSZ ;
-#endif
-
 #if defined(__MINGW32__) && defined(__REGINA_DLL)
 #define EXTNAME(n) __attribute__((alias (n)))
 #else
 #define EXTNAME(n)
 #endif
 
-#if !defined(_OS2EMX_H) && !defined(__RSXNT__) && !defined(__MINGW32__)
+#if !defined(OS2_VAC_C) && !defined(_OS2EMX_H) && !defined(__RSXNT__) && !defined(__MINGW32__)
+
+# if !defined(VOID_TYPEDEFED) && !defined(VOID)
+typedef void VOID ;
+#  define VOID_TYPEDEFED
+# endif
+
+# ifndef PVOID_TYPEDEFED
+typedef void* PVOID ;
+#  define PVOID_TYPEDEFED
+# endif
+
 # ifndef CHAR_TYPEDEFED
 typedef char CHAR;
+#  define CHAR_TYPEDEFED
 # endif
-# ifndef SHORT_TYPEDEFED
-typedef short SHORT;
-# endif
-# ifndef LONG_TYPEDEFED
-typedef long LONG;
-# endif
-typedef char *PSZ ;
-typedef CONST char *PCSZ ;
-# ifndef VOID
-typedef void VOID ;
-# endif
-typedef void* PVOID ;
-
+# ifndef PCHAR_TYPEDEFED
 typedef CHAR *PCHAR ;
-typedef SHORT *PSHORT ;
-typedef LONG *PLONG ;
-
+#  define PCHAR_TYPEDEFED
+# endif
 # ifndef UCHAR_TYPEDEFED
 typedef unsigned char UCHAR ;
 #  define UCHAR_TYPEDEFED
 # endif
+# ifndef PUCHAR_TYPEDEFED
+typedef UCHAR *PUCHAR;
+#  define PUCHAR_TYPEDEFED
+# endif
+
+# ifndef SHORT_TYPEDEFED
+typedef short SHORT;
+#  define SHORT_TYPEDEFED
+# endif
+# ifndef PSHORT_TYPEDEFED
+typedef SHORT *PSHORT ;
+#  define PSHORT_TYPEDEFED
+# endif
 # ifndef USHORT_TYPEDEFED
 typedef unsigned short USHORT ;
 #  define USHORT_TYPEDEFED
+# endif
+# ifndef PUSHORT_TYPEDEFED
+typedef USHORT *PUSHORT;
+#  define PUSHORT_TYPEDEFED
+# endif
+
+# ifndef LONG_TYPEDEFED
+typedef long LONG;
+#  define LONG_TYPEDEFED
+# endif
+# ifndef PLONG_TYPEDEFED
+typedef LONG *PLONG;
+#  define PLONG_TYPEDEFED
 # endif
 # ifndef ULONG_TYPEDEFED
 typedef unsigned long ULONG ;
 #  define ULONG_TYPEDEFED
 # endif
 
-typedef USHORT *PUSHORT ;
+typedef char *PSZ ;
+typedef CONST char *PCSZ ;
 typedef CHAR *PCH ;
-typedef UCHAR *PUCHAR ;
 
 #endif
+
 
 #ifdef INCL_REXXSAA
 # define INCL_RXSUBCOM
@@ -116,6 +147,14 @@ typedef UCHAR *PUCHAR ;
 # define INCL_RXARI
 # define INCL_RXQUEUE
 # define INCL_RXMACRO
+#endif
+
+/*
+ * For Innotek gcc, force use of _System calling convention
+ */
+#if defined( __EMX__ ) && defined( __INNOTEK_LIBC__ )
+# undef APIENTRY
+# define APIENTRY _System
 #endif
 
 #if !defined(APIENTRY)
@@ -380,8 +419,7 @@ EXTNAME("RexxQueryExit");
 #endif /* INCL_RXSYSEXIT */
 
 
-
-#define MAXENVNAMELEN 31
+#define MAXENVNAMELEN 32767   /* at least, there is no limit */
 
 #define MAKERXSTRING(x,c,l)   ((x).strptr=(c),(x).strlength=(l))
 #define RXNULLSTRING(x)       (!(x).strptr)
@@ -493,7 +531,7 @@ EXTNAME("RexxStart");
 #define RX_START_TOOMANYP   3  /* To many parameters */
 #define RX_DIDNT_START      4  /* Unable to start interpreter */
 
-APIRET APIENTRY RexxCallBack( 
+APIRET APIENTRY RexxCallBack(
                 PCSZ       ProcedureName,
                 LONG       ArgCount,
                 PRXSTRING  ArgList,
@@ -549,7 +587,7 @@ APIRET APIENTRY RexxQuerySubcom(
                 PCSZ    Envname,
                 PCSZ    ModuleName,
                 PUSHORT Flag,       /* Documentation diverges ... */
-                PUCHAR  UserArea ) 
+                PUCHAR  UserArea )
 EXTNAME("RexxQuerySubcom");
 #define REXXQUERYSUBCOM RexxQuerySubcom
 
@@ -673,7 +711,7 @@ EXTNAME("RexxQueryQueue");
 #define REXXQUERYQUEUE RexxQueryQueue
 
 ULONG  APIENTRY RexxAddQueue (
-                PSZ,      
+                PSZ,
                 PRXSTRING,
                 ULONG )
 EXTNAME("RexxAddQueue");
@@ -710,7 +748,8 @@ EXTNAME("RexxPullQueue");
 #define RXQUEUE_ACCESS       10        /* Queue busy and wait active  */
 #define RXQUEUE_MAXREG       11        /* No memory to create a queue */
 #define RXQUEUE_MEMFAIL      12        /* Failure in memory management*/
-  
+#define RXQUEUE_NETERROR    100        /* Network error               */
+
 #endif /* INCL_RXQUEUE */
 
 /*
@@ -783,10 +822,13 @@ EXTNAME("RexxClearMacroSpace");
 
 
 /* REGINA EXTENSIONS *********************************************************/
-/* The following function is an extension to the standard. Never try to
- * address the function directly. Use the dynamic linking machanism of
- * your operating system instead. This function was introduced in version
- * 2.0.
+/* The following functions are an extension to the standard. Never try to
+ * address the function directly if you want to be compatible. Use the dynamic
+ * linking machanism of your operating system instead.
+ *
+ *
+ * ReginaVersion returns informations about the version of the library.
+ * This function was introduced in version 2.0.
  * Returns: ULONG, in lower byte the two-digit fraction part of the version.
  *          The higher bytes will hold the integer part of the version.
  *          Examples: 0x10A codes the Version "1.10".
@@ -802,10 +844,32 @@ EXTNAME("RexxClearMacroSpace");
  *       although it is never counted in VersionString.strlength.
  *       RexxAllocateMemory is used if needed.
  */
-APIRET APIENTRY ReginaVersion( 
+APIRET APIENTRY ReginaVersion(
                 PRXSTRING VersionString )
 EXTNAME("ReginaVersion");
 #define REGINAVERSION ReginaVersion
+
+/*
+ * ReginaCleanup performs a graceful cleanup. This is done automatically
+ * on many systems but you can't be sure in all cases. The cleanup operations
+ * destroys all informations that are collected so far by one thread.
+ * It works for a single process or thread too. Although all memory is
+ * freed, some open handles may remain open. It is necessary to perform
+ * the appropriate "RexxDeregister<whatever>" calls before this routine
+ * is called.
+ * This function was introduced in version 3.3.
+ * Returns: ULONG, 0 if this call hasn't done anything.
+ *          1 if at least something could be freed.
+ * It is allowed to reuse every API function after this call but this routine
+ * must not be used when some parts of the Regina core are in use.
+ */
+APIRET APIENTRY ReginaCleanup( VOID )
+EXTNAME("ReginaCleanup");
+#define REGINACLEANUP ReginaCleanup
+
+#ifdef OREXX_BINARY_COMPATIBLE
+# pragma pack()
+#endif
 
 #ifdef __cplusplus
 }

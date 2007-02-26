@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.23 2003/04/13 09:53:09 florian Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.30 2004/02/10 10:44:30 mark Exp $";
 #endif
 
 /*
@@ -23,8 +23,8 @@ static char *RCSid = "$Id: yaccsrc.y,v 1.23 2003/04/13 09:53:09 florian Exp $";
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <time.h>
 #include "rexx.h"
+#include <time.h>
 
 #if defined(HAVE_MALLOC_H)
 # include <malloc.h>
@@ -34,7 +34,6 @@ static char *RCSid = "$Id: yaccsrc.y,v 1.23 2003/04/13 09:53:09 florian Exp $";
 # include <alloca.h>
 #endif
 
-#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -47,12 +46,25 @@ static char *RCSid = "$Id: yaccsrc.y,v 1.23 2003/04/13 09:53:09 florian Exp $";
 #define YYSTYPE nodeptr
 
 /* locals, they are protected by regina_parser (see lexsrc.l) */
-static int tmplno, tmpchr ;
-static nodeptr current, with = NULL ;
-#if 0 /* see below */
-static nodeptr *narray=NULL ;
-static int narptr=0, narmax=0 ;
-#endif
+static int tmplno,           /* lineno of current instruction             */
+           tmpchr,           /* character position of current instruction */
+           level,            /* nested do/if/select depth                 */
+           start_parendepth; /* see below at parendepth                   */
+
+/*
+ * parendepth regulates the action which happens detecting a comma or an
+ * empty expression. A negative values indicates an error; both a comma
+ * and an empty expression raise an error.
+ * We regulate the enumeration of arguments with this semantical flag.
+ * Look at "call subroutine args" and "function args". Function itself
+ * contains a parentheses pair, so starting with a depth of just allows
+ * the enumeration. subroutine starts with either 0 or 1. The latter one
+ * is allowed for the support request of "call subroutine(a,b,c)" which
+ * isn't allowed by ANSI but can be enabled for backward compatibility.
+ */
+static int parendepth;
+
+static nodeptr current, with = NULL;
 
 typedef enum { IS_UNKNOWN,
                IS_A_NUMBER,
@@ -60,14 +72,46 @@ typedef enum { IS_UNKNOWN,
                IS_SIM_SYMBOL,
                IS_COMP_SYMBOL } node_type;
 
+typedef enum { REDUCE_CALL,
+               REDUCE_EXPR,
+               REDUCE_RIGHT,
+               REDUCE_SUBEXPR } reduce_mode;
+
 static node_type gettypeof( nodeptr this ) ;
 static void checkconst( nodeptr this ) ;
+static nodeptr reduce_expr_list( nodeptr this, reduce_mode mode );
 static void transform( nodeptr this ) ;
 static nodeptr create_head( const char *name ) ;
 static nodeptr makenode( int type, int numb, ... ) ;
 static void checkdosyntax( cnodeptr this ) ;
 void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this ) ;
+static nodeptr optgluelast( nodeptr p1, nodeptr p2 );
+static void move_labels( nodeptr front, nodeptr end, int level );
 
+#define IS_EXPRLIST(x) ( ( (x) != NULL )                   \
+                      && ( ( (x)->type == X_CEXPRLIST )    \
+                        || ( (x)->type == X_EXPRLIST ) ) )
+
+#define IS_FUNCTION(x) ( ( (x) != NULL )                  \
+                      && ( ( (x)->type == X_EX_FUNC )     \
+                        || ( (x)->type == X_IN_FUNC ) ) )
+
+#define AUTO_REDUCE(x,y) { if ( parendepth == 1 )                             \
+                           {                                                  \
+                             x = reduce_expr_list( x, REDUCE_EXPR );          \
+                             /* detect "call s (a,b)<op>" and      */         \
+                             /* "call s ()<op>"                    */         \
+                             if ( IS_EXPRLIST( x ) )                          \
+                             {                                                \
+                                if ( (y) != NULL )                            \
+                                   exiterror( ERR_INVALID_EXPRESSION, 1, y ); \
+                                else if ( (x)->p[0] == NULL )                 \
+                                   exiterror( ERR_UNEXPECTED_PARAN, 0 );      \
+                                else                                          \
+                                   exiterror( ERR_UNEXPECTED_PARAN, 1 );      \
+                             }                                                \
+                           }                                                  \
+                         }
 %}
 
 %token ADDRESS ARG CALL DO TO BY FOR WHILE UNTIL EXIT IF THEN ELSE
@@ -82,8 +126,9 @@ void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this ) ;
 %token FAILURE BINSTRING OPTIONS ENVIRONMENT LOSTDIGITS
 %token GTGT LTLT NOTGTGT NOTLTLT GTGTE LTLTE
 %token INPUT OUTPUT ERROR NORMAL APPEND REPLACE STREAM STEM LIFO FIFO
+%token LOWER CASELESS
 
-%start prog
+%start start
 
 %left '|' XOR
 %left '&'
@@ -110,74 +155,86 @@ void newlabel( const tsd_t *TSD, internal_parser_type *ipt, nodeptr this ) ;
 
 %%
 
-prog         : nseps stats { $2->o.last = NULL ; EndProg( $2 ) ; }
-             | nseps       { EndProg( NULL ) ; }
+start        :                         { level = 0;
+                                         if ( get_options_flag( parser_data.TSD->currlevel, EXT_CALLS_AS_FUNCS )
+                                           && !get_options_flag( parser_data.TSD->currlevel, EXT_STRICT_ANSI ) )
+                                            start_parendepth = 1;
+                                         else
+                                            start_parendepth = 0;
+                                         parendepth = 0; }
+               prog
              ;
 
-stats        : stats ystatement         { $$ = $1 ; /* fixes bug 579711 */
-                                          if ( $$->o.last == NULL )
-                                             $$->next = $2 ;
-                                          else
-                                             $$->o.last->next = $2 ;
-                                          $$->o.last = $2 ; }
-             | ystatement               { $$ = $1 ;
-                                          assert( $$->next == NULL ) ; }
+prog         : nlncl stats             { $$ = optgluelast( $1, $2 );
+                                         $$->o.last = NULL;
+                                         EndProg( $$ ) ; }
+             | nlncl                   { $$ = $1;
+                                         if ( $$ != NULL )
+                                            $$->o.last = NULL;
+                                         EndProg( $$ ); }
              ;
 
-xstats       : xstats statement         { $$ = $1 ; /* fixes bug 579711 */
-                                          if ( $$->o.last == NULL )
-                                             $$->next = $2 ;
-                                          else
-                                             $$->o.last->next = $2 ;
-                                          $$->o.last = $2 ; }
-             | statement gruff          { $$->next = NULL ; }
+stats        : stats ystatement        { /* fixes bug 579711 */
+                                         $$ = optgluelast( $1, $2 ); }
+             | ystatement              { $$ = $1; }
+             ;
+
+xstats       : xstats statement        { /* fixes bug 579711 */
+                                         $$ = optgluelast( $1, $2 ); }
+             | statement gruff         { $$ = $1; }
              ;
 
 ystatement   : statement               { $$ = $1 ; }
-             | lonely_end        {  exiterror( ERR_UNMATCHED_END, 1 )  ; }
+             | lonely_end              { exiterror( ERR_UNMATCHED_END, 1 ); }
              ;
 
-lonely_end   : gruff end seps
+lonely_end   : gruff end ncl           /* ncl's label's out of matter, this
+                                        * rule leads to an error.
+                                        */
              ;
 
-nxstats      : xstats                  { $$ = $1 ; $$->o.last = NULL ; }
-             | gruff                   { $$ = NULL ; }
+nxstats      : xstats                  { $$ = $1; }
+             | gruff                   { $$ = NULL; }
              ;
 
-nseps        : seps
-             |
+ncl          : ncl STATSEP optLabels   { $$ = optgluelast( $1, $3 ); }
+             | STATSEP optLabels       { $$ = $2; }
              ;
 
-seps         : seps STATSEP            { /* fixes bugs like bug 579711 */ }
-             | STATSEP
+nlncl        : optLabels ncl           { $$ = optgluelast( $1, $2 ); }
+             | optLabels               { $$ = $1; }
              ;
 
-statement    : mstatement   { $$=$1; }
-             | ex_when_stat { $$=$1; }
+optLabels    : optLabels label_stat    { $$ = optgluelast( $1, $2 ); }
+             |                         { $$ = NULL; }
              ;
 
-mstatement   : mttstatement { $$=$1; }
-             | unexp_then   { $$=$1; }
+statement    : mttstatement
+             | ex_when_stat
              ;
 
-gruff        : { tmpchr=parser_data.tstart; tmplno=parser_data.tline; }
+gruff        :                         { tmpchr=parser_data.tstart;
+                                         tmplno=parser_data.tline; }
              ;
 
-mttstatement : gruff mtstatement { $$=$2; }
+mttstatement : gruff mtstatement       { $$=$2; }
              ;
 
-mtstatement  : address_stat
+mtstatement  : nclstatement ncl        { $$ = optgluelast( $1, $2 ); }
+             | if_stat
+             | unexp_then
+             | unexp_else
+             ;
+
+nclstatement : address_stat
              | expr_stat
              | arg_stat
              | call_stat
              | do_stat
              | drop_stat
              | exit_stat
-             | if_stat
-             | unexp_else
              | ipret_stat
              | iterate_stat
-             | label_stat
              | leave_stat
              | nop_stat
              | numeric_stat
@@ -198,85 +255,115 @@ mtstatement  : address_stat
 
 call         : CALL                    { $$ = makenode(X_CALL,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 do           : DO                      { $$ = makenode(X_DO,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ;
+                                         level++; }
+             ;
 exit         : EXIT                    { $$ = makenode(X_EXIT,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 if           : IF                      { $$ = makenode(X_IF,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ;
+                                         level++; }
+             ;
 iterate      : ITERATE                 { $$ = makenode(X_ITERATE,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 leave        : LEAVE                   { $$ = makenode(X_LEAVE,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 say          : SAY                     { $$ = makenode(X_SAY,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 return       : RETURN                  { $$ = makenode(X_RETURN,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 address      : ADDRESS                 { $$ = makenode(X_ADDR_N,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
-arg          : ARG                     { $$ = makenode(X_PARSE_ARG_U,0) ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
+arg          : ARG                     { $$ = makenode(X_PARSE_ARG,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 drop         : DROP                    { $$ = makenode(X_DROP,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 interpret    : INTERPRET               { $$ = makenode(X_IPRET,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 label        : LABEL                   { $$ = makenode(X_LABEL,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 nop          : NOP                     { $$ = makenode(X_NULL,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 numeric      : NUMERIC                 { $$ = makenode(0,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 options      : OPTIONS                 { $$ = makenode(X_OPTIONS,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 parse        : PARSE                   { $$ = makenode(0,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 proc         : PROCEDURE               { $$ = makenode(X_PROC,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 pull         : PULL                    { $$ = makenode(X_PULL,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 push         : PUSH                    { $$ = makenode(X_PUSH,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 queue        : QUEUE                   { $$ = makenode(X_QUEUE,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 select       : SELECT                  { $$ = makenode(X_SELECT,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ;
+                                         level++; }
+             ;
 signal       : SIGNAL                  { $$ = makenode(X_SIG_LAB,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 when         : WHEN                    { $$ = makenode(X_WHEN,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 otherwise    : OTHERWISE               { $$ = makenode(X_OTHERWISE,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 trace        : TRACE                   { $$ = makenode(X_TRACE,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 upper        : UPPER                   { $$ = makenode(X_UPPER_VAR,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; } ;
+                                         $$->charnr = parser_data.tstart ; }
+             ;
 address_stat : address                 { $$ = current = $1 ; }
                address_stat2
              ;
@@ -285,7 +372,7 @@ address_stat2: VALUE expr naddr_with   { current->type = X_ADDR_V ;
                                          current->p[0] = $2 ;
                                          current->p[1] = $3 ; }
              | addr_with               { exiterror( ERR_STRING_EXPECTED, 1, __reginatext ) ;}
-             | seps                    { current->type = X_ADDR_S ; }
+             |                         { current->type = X_ADDR_S ; }
              | error                   { exiterror( ERR_STRING_EXPECTED, 1, __reginatext ) ;}
                naddr_with
              | nvir nexpr naddr_with   { current->name = (streng *)$1 ;
@@ -298,41 +385,40 @@ address_stat2: VALUE expr naddr_with   { current->type = X_ADDR_V ;
                                          current->u.nonansi = 1 ; }
              ;
 
-arg_stat     : arg templs seps         { $$ = $1 ;
-                                         $$->p[0] = $2 ; }
+arg_stat     : arg templs              { $$ = makenode( X_PARSE, 2, $1, $2 );
+                                         $$->u.parseflags = PARSE_UPPER;
+                                         $$->lineno = $1->lineno;
+                                         $$->charnr = $1->charnr; }
              ;
 
-call_stat    : call call_name exprs seps { $$ = $1 ;
-                                           $$->p[0] = $3 ;
-                                           $$->name = (streng *) $2 ; }
-             | call call_name exprs ')'  { exiterror(ERR_UNEXPECTED_PARAN, 2);}
-             | call string exprs seps    { $$ = $1 ;
-                                           $$->type = X_EX_FUNC ;
-                                           $$->p[0] = $3 ;
-                                           $$->name = (streng *) $2 ; }
-             | call string exprs ')'     { exiterror(ERR_UNEXPECTED_PARAN, 2);}
+call_stat    : call call_name          { parendepth = start_parendepth; }
+                             call_args { $$ = $1;
+                                         $$->p[0] = $4;
+                                         $$->name = (streng *) $2;
+                                         parendepth = 0; }
+             | call string             { parendepth = start_parendepth; }
+                             call_args { $$ = $1;
+                                         $$->type = X_EX_FUNC;
+                                         $$->p[0] = $4;
+                                         $$->name = (streng *) $2;
+                                         parendepth = 0; }
              | call on error { exiterror( ERR_INV_SUBKEYWORD, 1, "ERROR FAILURE HALT NOTREADY", __reginatext ) ;}
-                       seps
              | call off error { exiterror( ERR_INV_SUBKEYWORD, 2, "ERROR FAILURE HALT NOTREADY", __reginatext ) ;}
-                        seps
              | call on c_action error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                                seps
              | call on c_action namespec error { exiterror( ERR_STRING_EXPECTED, 3, __reginatext ) ;}
-                                         seps
-             | call on c_action namespec seps
+             | call on c_action namespec
                                        { $$ = $1 ;
                                          $$->type = X_CALL_SET ;
                                          $$->p[0] = $2 ;
                                          $$->name = (streng *)$4 ;
                                          $$->p[1] = $3 ; }
-             | call on c_action seps   { $$ = $1 ;
+             | call on c_action        { $$ = $1 ;
                                          $$->type = X_CALL_SET ;
                                          $$->p[0] = $2 ;
                                          $$->name = NULL ;
                                          $$->p[1] = $3 ; }
              | call off c_action error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                                 seps
-             | call off c_action seps  { $$ = $1 ;
+             | call off c_action       { $$ = $1 ;
                                          $$->type = X_CALL_SET ;
                                          $$->p[0] = $2 ;
                                          $$->p[1] = $3 ; }
@@ -342,8 +428,18 @@ call_name    : asymbol                 { $$ = $1; }
              | error                   { exiterror( ERR_STRING_EXPECTED, 2, __reginatext );}
              ;
 
-expr_stat    : expr seps
-                                       { $$ = makenode(X_COMMAND,0) ;
+call_args    : exprs                   {
+                                         /*
+                                          * "call_args" accepted probably with
+                                          * surrounding parentheses. Strip them.
+                                          */
+                                         $$ = reduce_expr_list( $1,
+                                                                REDUCE_CALL );
+                                       }
+             | exprs ')'               { exiterror(ERR_UNEXPECTED_PARAN, 2); }
+             ;
+
+expr_stat    : expr                    { $$ = makenode(X_COMMAND,0) ;
                                          $$->charnr = tmpchr ;
                                          $$->lineno = tmplno;
                                          $$->p[0] = $1 ; }
@@ -351,31 +447,34 @@ expr_stat    : expr seps
 
 end_stat     : END                     { $$ = makenode(X_END,0) ;
                                          $$->lineno = parser_data.tline ;
-                                         $$->charnr = parser_data.tstart ; }
+                                         $$->charnr = parser_data.tstart ;
+                                         level--; }
              ;
 
-end          : end_stat simsymb       { $$ = $1 ;
+end          : end_stat simsymb        { $$ = $1 ;
                                          $$->name = (streng*)($2) ; }
              | end_stat                { $$ = $1 ; }
-             | end_stat simsymb error {  exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
+             | end_stat simsymb error  {  exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
              ;
 
-do_stat      :  do repetitor conditional seps nxstats end seps
-                                       { $$ = $1 ;
-                                         $$->p[0] = $2 ;
-                                         $$->p[1] = $3 ;
-                                         $$->p[2] = $5 ;
-                                         $$->p[3] = $6 ;
+do_stat      : do repetitor conditional ncl nxstats end
+                                       { $$ = $1;
+                                         $$->p[0] = $2;
+                                         $$->p[1] = $3;
+                                         $$->p[2] = optgluelast( $4, $5 );
+                                         if ( $$->p[2] )
+                                            $$->p[2]->o.last = NULL;
+                                         $$->p[3] = $6;
                           if (($$->p[0]==NULL || $$->p[0]->name==NULL)
                               && $$->p[3]->name)
-                                            exiterror( ERR_UNMATCHED_END, 0 ) ;
+                                            exiterror( ERR_UNMATCHED_END, 0 );
                           if (($$->p[0])&&($$->p[0]->name)&&
                               ($$->p[3]->name)&&
                               (($$->p[3]->name->len != $$->p[0]->name->len)||
                                (strncmp($$->p[3]->name->value,
                                         $$->p[0]->name->value,
                                         $$->p[0]->name->len))))
-                                            exiterror( ERR_UNMATCHED_END, 0 )  ;
+                                            exiterror( ERR_UNMATCHED_END, 0 );
                                        }
              ;
 
@@ -411,12 +510,12 @@ naddr_with   :                         { SymbolDetect |= SD_ADDRWITH ;
                                          $$->charnr = parser_data.tstart ; }
                addr_with               { with = NULL ;
                                          SymbolDetect &= ~SD_ADDRWITH ; }
-             | seps                    { $$ = NULL ; }
+             |                         { $$ = NULL ; }
              ;
 
-addr_with    : WITH connection seps    { $$ = $2 ; /* pro forma */ }
-             | WITH connection error seps { exiterror( ERR_INV_SUBKEYWORD, 5, __reginatext ) ; }
-             | WITH nspace seps        { exiterror( ERR_INV_SUBKEYWORD, 5, __reginatext ) ; }
+addr_with    : WITH connection         { $$ = $2; }
+             | WITH connection error   { exiterror( ERR_INV_SUBKEYWORD, 5, __reginatext ) ; }
+             | WITH nspace             { exiterror( ERR_INV_SUBKEYWORD, 5, __reginatext ) ; }
              ;
 
 connection   : inputstmts
@@ -568,34 +667,43 @@ conditional  : WHILE expr              { $$ = makenode(X_WHILE,1,$2) ; }
              ;
 
 drop_stat    : drop anyvars error { exiterror( ERR_SYMBOL_EXPECTED, 1, __reginatext ) ;}
-             | drop anyvars seps       { $$ = $1 ;
+             | drop anyvars            { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
 upper_stat   : upper anyvars error { exiterror( ERR_SYMBOL_EXPECTED, 1, __reginatext ) ;}
-             | upper anyvars seps       { $$ = $1 ;
+             | upper anyvars            { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-exit_stat    : exit nexpr seps         { $$ = $1 ;
+exit_stat    : exit nexpr              { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-if_stat      : if expr nseps THEN nseps ystatement
-                                       { $$ = $1 ;
-                                         $$->p[0] = $2 ;
-                                         $$->p[1] = $6 ; }
-             | if expr nseps THEN nseps ystatement ELSE nseps ystatement
-                                       { $$ = $1 ;
-                                         $$->p[0] = $2 ;
-                                         $$->p[1] = $6 ;
-                                         $$->p[2] = $9 ; }
-             | if expr nseps THEN nseps ystatement ELSE nseps error
+if_stat      : if expr nlncl THEN nlncl ystatement
+                                       { move_labels( $1, $6, level - 1 );
+                                         $$ = $1;
+                                         $$->p[0] = optgluelast( $2, $3 );
+                                         $$->p[0]->o.last = NULL;
+                                         $$->p[1] = optgluelast( $5, $6 );
+                                         $$->p[1]->o.last = NULL;
+                                         level--; }
+             | if expr nlncl THEN nlncl ystatement ELSE nlncl ystatement
+                                       { move_labels( $1, $9, level - 1 );
+                                         $$ = $1;
+                                         $$->p[0] = optgluelast( $2, $3 );
+                                         $$->p[0]->o.last = NULL;
+                                         $$->p[1] = optgluelast( $5, $6 );
+                                         $$->p[1]->o.last = NULL;
+                                         $$->p[2] = optgluelast( $8, $9 );
+                                         $$->p[2]->o.last = NULL;
+                                         level--; }
+             | if expr nlncl THEN nlncl ystatement ELSE nlncl error
                                        {  exiterror( ERR_INCOMPLETE_STRUCT, 4 ) ;}
-             | if expr nseps THEN nseps error
+             | if expr nlncl THEN nlncl error
                                        {  exiterror( ERR_INCOMPLETE_STRUCT, 3 ) ;}
-             | if seps                 {  exiterror( ERR_INCOMPLETE_STRUCT, 0 ) ;}
-             | if expr nseps error     {  exiterror( ERR_THEN_EXPECTED, 1, parser_data.if_linenr, __reginatext )  ; }
+             | if ncl                  {  exiterror( ERR_INCOMPLETE_STRUCT, 0 ) ;}
+             | if expr nlncl error     {  exiterror( ERR_THEN_EXPECTED, 1, parser_data.if_linenr, __reginatext )  ; }
              ;
 
 unexp_then   : gruff THEN              {  exiterror( ERR_THEN_UNEXPECTED, 1 )  ; }
@@ -604,19 +712,20 @@ unexp_then   : gruff THEN              {  exiterror( ERR_THEN_UNEXPECTED, 1 )  ;
 unexp_else   : gruff ELSE              {  exiterror( ERR_THEN_UNEXPECTED, 2 )  ; }
              ;
 
-ipret_stat   : interpret expr seps     { $$ = $1 ;
+ipret_stat   : interpret expr          { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
 
-iterate_stat : iterate simsymb seps    { $$ = $1 ;
+iterate_stat : iterate simsymb         { $$ = $1 ;
                                          $$->name = (streng *) $2 ; }
              | iterate simsymb error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                               seps
-             | iterate seps            { $$ = $1 ; }
+             | iterate                 { $$ = $1 ; }
              ;
 
-label_stat   : labelname nseps         { $$ = $1 ;
+label_stat   : labelname               { $$ = $1 ;
+                                         $$->u.trace_only =
+                                                         (level == 0) ? 0 : 1;
                                          newlabel( (const tsd_t *)parser_data.TSD,
                                                    &parser_data,
                                                    $1 ) ; }
@@ -626,81 +735,82 @@ labelname    : label                   { $$ = $1 ;
                                          $$->name = Str_cre_TSD(parser_data.TSD,retvalue) ; }
              ;
 
-leave_stat   : leave simsymb seps      { $$ = $1 ;
+leave_stat   : leave simsymb           { $$ = $1 ;
                                          $$->name = (streng *) $2 ; }
              | leave simsymb error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                             seps
-             | leave seps              { $$ = $1 ; }
+             | leave                   { $$ = $1 ; }
              ;
 
-nop_stat     : nop seps                { $$ = $1 ; }
+nop_stat     : nop                     { $$ = $1 ; }
              | nop error {  exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                   seps
              ;
 
-numeric_stat : numeric DIGITS expr seps { $$ = $1 ;
+numeric_stat : numeric DIGITS expr     { $$ = $1 ;
                                          $$->type = X_NUM_D ;
                                          $$->p[0] = $3 ; }
-             | numeric DIGITS seps     { $$ = $1; $$->type = X_NUM_DDEF ; }
+             | numeric DIGITS          { $$ = $1; $$->type = X_NUM_DDEF ; }
              | numeric FORM form_expr error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                                      seps
-             | numeric FORM form_expr seps
-                                       { $$ = $1 ;
+             | numeric FORM form_expr  { $$ = $1 ;
                                          $$->type = X_NUM_F ;
                                          $$->p[0] = $3 ; }
-             | numeric FORM seps       { /* NOTE! This clashes ANSI! */
+             | numeric FORM            { /* NOTE! This clashes ANSI! */
                                          $$ = $1 ; $$->type=X_NUM_FRMDEF ;}
-             | numeric FORM VALUE expr seps  { $$ = $1 ; $$->type=X_NUM_V ;
+             | numeric FORM VALUE expr { $$ = $1 ; $$->type=X_NUM_V ;
                                          $$->p[0] = $4 ; }
              | numeric FORM error { exiterror( ERR_INV_SUBKEYWORD, 11, "ENGINEERING SCIENTIFIC", __reginatext ) ;}
-                            seps
-             | numeric FUZZ seps       { $$ = $1; $$->type = X_NUM_FDEF ;}
-             | numeric FUZZ expr seps  { $$ = $1 ;
+             | numeric FUZZ            { $$ = $1; $$->type = X_NUM_FDEF ;}
+             | numeric FUZZ expr       { $$ = $1 ;
                                          $$->type = X_NUM_FUZZ ;
                                          $$->p[0] = $3 ; }
              | numeric error { exiterror( ERR_INV_SUBKEYWORD, 15, "DIGITS FORM FUZZ", __reginatext ) ;}
-                       seps
              ;
 
 form_expr    : SCIENTIFIC              { $$ = makenode(X_NUM_SCI,0) ; }
              | ENGINEERING             { $$ = makenode(X_NUM_ENG,0) ; }
              ;
 
-options_stat : options nexpr seps      { ($$=$1)->p[0]=$2 ; }
+options_stat : options nexpr           { ($$=$1)->p[0]=$2 ; }
              ;
 
-parse_stat   : parse parse_param template seps
+parse_stat   : parse parse_flags parse_param templs
                                        { $$ = $1 ;
                                          $$->type = X_PARSE ;
-                                         $$->p[0] = $2 ;
-                                         $$->p[1] = $3 ; }
-             | parse UPPER parse_param template seps
-                                       { $$ = $1 ;
-                                         $$->type = X_PARSE_U ;
+                                         $$->u.parseflags = (int) $2 ;
                                          $$->p[0] = $3 ;
                                          $$->p[1] = $4 ; }
-             | parse ARG templs seps   { $$ = $1 ;
-                                         $$->type = X_PARSE_ARG ;
-                                         $$->p[0] = $3 ; }
-             | parse UPPER ARG templs seps
+             | parse parse_param templs
                                        { $$ = $1 ;
-                                         $$->type = X_PARSE_ARG_U ;
-                                         $$->p[0] = $4 ; }
-             | parse UPPER error { exiterror( ERR_INV_SUBKEYWORD, 13, "ARG EXTERNAL LINEIN PULL SOURCE UPPER VAR VALUE VERSION", __reginatext ) ;}
-             | parse error { exiterror( ERR_INV_SUBKEYWORD, 12, "ARG EXTERNAL LINEIN PULL SOURCE UPPER VAR VALUE VERSION", __reginatext ) ;}
-                     seps
+                                         $$->type = X_PARSE ;
+                                         $$->u.parseflags = 0;
+                                         $$->p[0] = $2 ;
+                                         $$->p[1] = $3 ; }
+             | parse parse_flags error { exiterror( ERR_INV_SUBKEYWORD, 12, "ARG EXTERNAL LINEIN PULL SOURCE VAR VALUE VERSION", __reginatext ) ;}
+             | parse error             { exiterror( ERR_INV_SUBKEYWORD, 12, "ARG CASELESS EXTERNAL LINEIN LOWER PULL SOURCE UPPER VAR VALUE VERSION", __reginatext ) ;}
              ;
 
-templs       : templs ',' template     { $$ = $1 ; /* fixes bugs like bug 579711 */
-                                         if ( $$->o.last == NULL )
-                                            $$->next = $3 ;
-                                         else
-                                            $$->o.last->next = $3 ;
-                                         $$->o.last = $3 ; }
+parse_flags  : UPPER                   { $$ = (nodeptr) (PARSE_UPPER  |
+                                                         PARSE_NORMAL); }
+             | UPPER CASELESS          { $$ = (nodeptr) (PARSE_UPPER  |
+                                                         PARSE_CASELESS); }
+             | CASELESS UPPER          { $$ = (nodeptr) (PARSE_UPPER  |
+                                                         PARSE_CASELESS); }
+             | LOWER                   { $$ = (nodeptr) (PARSE_LOWER  |
+                                                         PARSE_NORMAL); }
+             | LOWER CASELESS          { $$ = (nodeptr) (PARSE_LOWER  |
+                                                         PARSE_CASELESS); }
+             | CASELESS LOWER          { $$ = (nodeptr) (PARSE_LOWER  |
+                                                         PARSE_CASELESS); }
+             | CASELESS                { $$ = (nodeptr) (PARSE_NORMAL |
+                                                         PARSE_CASELESS); }
+             ;
+
+templs       : templs ',' template     { /* fixes bugs like bug 579711 */
+                                         $$ = optgluelast( $1, $3 ); }
              | template                { $$ = $1 ; }
              ;
 
-parse_param  : LINEIN                  { $$ = makenode(X_PARSE_EXT,0) ; }
+parse_param  : ARG                     { $$ = makenode(X_PARSE_ARG,0) ; }
+             | LINEIN                  { $$ = makenode(X_PARSE_EXT,0) ; }
              | EXTERNAL                { $$ = makenode(X_PARSE_EXT,0) ; }
              | VERSION                 { $$ = makenode(X_PARSE_VER,0) ; }
              | PULL                    { $$ = makenode(X_PARSE_PULL,0) ; }
@@ -711,73 +821,67 @@ parse_param  : LINEIN                  { $$ = makenode(X_PARSE_EXT,0) ; }
              | VALUE error             { exiterror( ERR_INVALID_TEMPLATE, 3 ) ;}
              ;
 
-proc_stat    : proc seps               { $$ = $1 ; }
+proc_stat    : proc                    { $$ = $1 ; }
              | proc error { exiterror( ERR_INV_SUBKEYWORD, 17, __reginatext ) ;}
-                    seps
              | proc EXPOSE error { exiterror( ERR_SYMBOL_EXPECTED, 1, __reginatext ) ;}
-                           seps
              | proc EXPOSE anyvars error { exiterror( ERR_SYMBOL_EXPECTED, 1, __reginatext ) ;}
-                                   seps
-             | proc EXPOSE anyvars seps { $$ = $1 ;
+             | proc EXPOSE anyvars     { $$ = $1 ;
                                          $$->p[0] = $3 ; }
              ;
 
-pull_stat    : pull template seps      { $$ = $1 ;
+pull_stat    : pull template           { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-push_stat    : push nexpr seps         { $$ = $1 ;
+push_stat    : push nexpr              { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-queue_stat   : queue nexpr seps        { $$ = $1 ;
+queue_stat   : queue nexpr             { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-say_stat     : say nexpr seps          { $$ = $1 ;
+say_stat     : say nexpr               { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-return_stat  : return nexpr seps       { $$ = $1 ;
+return_stat  : return nexpr            { $$ = $1 ;
                                          $$->p[0] = $2 ; }
              ;
 
-sel_end      : END simsymb             {  exiterror( ERR_UNMATCHED_END, 0 ) ;}
-             | END simsymb error       {  exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-             | END
+sel_end      : END simsymb             { exiterror( ERR_UNMATCHED_END, 0 ) ;}
+             | END simsymb error       { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
+             | END                     { level--; }
              ;
 
-select_stat  : select seps when_stats otherwise_stat sel_end seps
-                                       { $$ = $1 ;
-                                         $$->p[0] = $3 ;
-                                         $$->p[1] = $4 ; }
-             | select seps END error   {  exiterror( ERR_WHEN_EXPECTED, 0 ) ;}
-             | select seps otherwise error
+select_stat  : select ncl when_stats otherwise_stat sel_end
+                                       { $$ = $1;
+                                         $$->p[0] = optgluelast( $2, $3 );
+                                         $$->p[0]->o.last = NULL;
+                                         $$->p[1] = $4; }
+             | select ncl END error    {  exiterror( ERR_WHEN_EXPECTED, 0 ) ;}
+             | select ncl otherwise error
                                        {  exiterror( ERR_WHEN_EXPECTED, 0 ) ;}
              | select error            {  exiterror( ERR_EXTRA_DATA, 1, __reginatext )  ;}
-             | select seps THEN        {  exiterror( ERR_THEN_UNEXPECTED, 0 ) ;}
-             | select seps when_stats otherwise error
+             | select ncl THEN         {  exiterror( ERR_THEN_UNEXPECTED, 0 ) ;}
+             | select ncl when_stats otherwise error
                                        {  exiterror( ERR_INCOMPLETE_STRUCT, 0 ) ;}
              ;
 
-when_stats   : when_stats when_stat    { $$ = $1 ;
-                                         if ( $$->o.last == NULL )
-                                            $$->next = $2 ;
-                                         else
-                                            $$->o.last->next = $2 ;
-                                         $$->o.last = $2 ; }
+when_stats   : when_stats when_stat    { $$ = optgluelast( $1, $2 ); }
              | when_stat               { $$ = $1 ; }
              | error                   {  exiterror( ERR_WHEN_EXPECTED, 0 )  ;}
              ;
 
-when_stat    : when expr nseps THEN nseps statement
-                                       { $$ = $1 ; /* fixes bugs like bug 579711 */
-                                         $$->p[0] = $2 ;
-                                         $$->p[1] = $6 ; }
-             | when expr nseps THEN nseps statement THEN
+when_stat    : when expr nlncl THEN nlncl statement
+                                       { $$ = $1; /* fixes bugs like bug 579711 */
+                                         $$->p[0] = optgluelast( $2, $3 );
+                                         $$->p[0]->o.last = NULL;
+                                         $$->p[1] = optgluelast( $5, $6 );
+                                         $$->p[1]->o.last = NULL; }
+             | when expr nlncl THEN nlncl statement THEN
                                        {  exiterror( ERR_THEN_UNEXPECTED, 0 ) ;}
-             | when expr seps
-                                       {  exiterror( ERR_THEN_EXPECTED, 2, parser_data.when_linenr, __reginatext )  ; }
+             | when expr               {  exiterror( ERR_THEN_EXPECTED, 2, parser_data.when_linenr, __reginatext )  ; }
              | when error              {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
              ;
 
@@ -785,48 +889,41 @@ when_or_other: when
              | otherwise
              ;
 
-ex_when_stat : gruff when_or_other    {  exiterror( ERR_WHEN_UNEXPECTED, 0 ) ;}
+ex_when_stat : gruff when_or_other     { exiterror( ERR_WHEN_UNEXPECTED, 0 ); }
              ;
 
-otherwise_stat : otherwise nseps nxstats {
-                                         $$ = $1 ;
-                                         $$->p[0] = $3 ; }
+otherwise_stat : otherwise nlncl nxstats { $$ = $1;
+                                         $$->p[0] = optgluelast( $2, $3 );
+                                         if ( $$->p[0] )
+                                            $$->p[0]->o.last = NULL; }
              |                         { $$ = makenode(X_NO_OTHERWISE,0) ;
                                          $$->lineno = parser_data.tline ;
                                          $$->charnr = parser_data.tstart ; }
              ;
 
 
-signal_stat : signal VALUE expr seps   { $$ = $1 ;
+signal_stat : signal VALUE expr        { $$ = $1 ;
                                          $$->type = X_SIG_VAL ;
                                          $$->p[0] = $3 ; }
             | signal signal_name error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                             seps
-            | signal signal_name seps  { $$ = $1 ;
+            | signal signal_name       { $$ = $1 ;
                                          $$->name = (streng *)$2 ; }
             | signal on error { exiterror( ERR_INV_SUBKEYWORD, 3, "ERROR FAILURE HALT NOTREADY NOVALUE SYNTAX LOSTDIGITS", __reginatext ) ;}
-                        seps
             | signal off error { exiterror( ERR_INV_SUBKEYWORD, 4, "ERROR FAILURE HALT NOTREADY NOVALUE SYNTAX LOSTDIGITS", __reginatext ) ;}
-                         seps
             | signal on s_action error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                                 seps
             | signal on s_action namespec error { exiterror( ERR_STRING_EXPECTED, 3, __reginatext ) ;}
-                                          seps
-            | signal on s_action namespec seps
+            | signal on s_action namespec
                                        { $$ = $1 ;
                                          $$->type = X_SIG_SET ;
                                          $$->p[0] = $2 ;
                                          $$->name = (streng *)$4 ;
                                          $$->p[1] = $3 ; }
-            | signal on s_action seps
-                                       { $$ = $1 ;
+            | signal on s_action       { $$ = $1 ;
                                          $$->type = X_SIG_SET ;
                                          $$->p[0] = $2 ;
-                                         $$->name = (streng *)$4 ;
                                          $$->p[1] = $3 ; }
             | signal off s_action error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                                  seps
-            | signal off s_action seps { $$ = $1 ;
+            | signal off s_action      { $$ = $1 ;
                                          $$->type = X_SIG_SET ;
                                          $$->p[0] = $2 ;
                                          $$->p[1] = $3 ; }
@@ -862,13 +959,12 @@ s_action    : c_action                 { $$ = $1 ; }
             | LOSTDIGITS               { $$ = makenode(X_S_LOSTDIGITS,0) ; }
             ;
 
-trace_stat  : trace VALUE expr seps    { $$ = $1 ;
+trace_stat  : trace VALUE expr         { $$ = $1 ;
                                          $$->p[0] = $3 ; }
-            | trace expr seps          { $$ = $1 ;
+            | trace expr               { $$ = $1 ;
                                          $$->p[0] = $2 ; }
             | trace whatever error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
-                             seps
-            | trace whatever seps      { $$ = $1 ;
+            | trace whatever           { $$ = $1 ;
                                          $$->name = (streng *) $2 ; }
             ;
 
@@ -876,7 +972,7 @@ whatever    : WHATEVER                 { $$ = (nodeptr)Str_cre_TSD(parser_data.T
             ;
 
 
-assignment  : ass_part nexpr seps      { $$ = $1 ;
+assignment  : ass_part nexpr           { $$ = $1 ;
                                          $$->p[1] = $2 ;
                                          /*
                                           * An assignment is a numerical
@@ -899,101 +995,192 @@ ass_part    : ASSIGNMENTVARIABLE       { $$ = makenode(X_ASSIGN,0) ;
             ;
 
 
-expr        : '(' expr ')'             { $$ = $2 ; }
-            | '(' expr ','             { exiterror( ERR_UNEXPECTED_PARAN, 1 );}
-            | NOT expr                 { $$ = makenode(X_LOG_NOT,1,$2) ; }
-            |      NOT                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "NOT" ) ;}
-            | expr '+' expr            { $$ = makenode(X_PLUSS,2,$1,$3) ; }
-            | expr '=' expr            { $$ = makenode(X_EQUAL,2,$1,$3) ;
+expr        : '('                      { /* We have to accept exprs here even
+                                          * if we just want to accept
+                                          * '(' expr ')' only. We do this
+                                          * because we appect
+                                          * "call '(' exprs ')'" too.
+                                          * This kann happen only if the
+                                          * related control flag parendepth is
+                                          * set. But since the parentheses are
+                                          * voided just for the outer ones, we
+                                          * can reduce the allowness level.
+                                          * We don't have to set it back,
+                                          * because the outer parentheses
+                                          * either is THE one we look for or
+                                          * none. This allows a faster error
+                                          * detection and that's a good goal.*/
+                                         parendepth--; }
+                  exprs_sub            { parendepth++;
+                                         if ( parendepth == 1 )
+                                         {
+                                            /* exprs on as-is basis */
+                                            $$ = $3;
+                                         }
+                                         else
+                                         {
+                                            /* Must already be a plain expr.
+                                             * The nexpr part of exprs detects
+                                             * mistakes. */
+                                            $$ = reduce_expr_list( $3,
+                                                                REDUCE_EXPR );
+                                            if ( $$ == $3 )
+                                               exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "Reduction of `exprs' not happened." );
+                                         }
+                                       }
+            | expr '+'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "+" );
+                                         $$ = makenode( X_PLUSS, 2, $1, $4 ); }
+            | expr '-'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "-" );
+                                         $$ = makenode( X_MINUS, 2, $1, $4 ); }
+            | expr '*'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "*" );
+                                         $$ = makenode( X_MULT, 2, $1, $4 ); }
+            |      '*'                 { exiterror( ERR_INVALID_EXPRESSION, 1, "*" ); }
+            | expr '/'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "/" );
+                                         $$ = makenode( X_DEVIDE, 2, $1, $4 ); }
+            |      '/'                 { exiterror( ERR_INVALID_EXPRESSION, 1, "/" ); }
+            | expr MODULUS             { parendepth--; }
+                           expr        { parendepth++; AUTO_REDUCE( $1, "//" );
+                                         $$ = makenode( X_MODULUS, 2, $1, $4 ); }
+            |      MODULUS             { exiterror( ERR_INVALID_EXPRESSION, 1, "//" ); }
+            | expr '%'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "%" );
+                                         $$ = makenode( X_INTDIV, 2, $1, $4 ); }
+            |      '%'                 { exiterror( ERR_INVALID_EXPRESSION, 1, "%" ); }
+            | expr '|'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "|" );
+                                         $$ = makenode( X_LOG_OR, 2, $1, $4 ); }
+            |      '|'                 { exiterror( ERR_INVALID_EXPRESSION, 1, "|" ); }
+            | expr '&'                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "&" );
+                                         $$ = makenode( X_LOG_AND, 2, $1, $4 ); }
+            |      '&'                 { exiterror( ERR_INVALID_EXPRESSION, 1, "&" ); }
+            | expr XOR                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "&&" );
+                                         $$ = makenode( X_LOG_XOR, 2, $1, $4 ); }
+            |      XOR                 { exiterror( ERR_INVALID_EXPRESSION, 1, "&&" ); }
+            | expr EXP                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "**" );
+                                         $$ = makenode( X_EXP, 2, $1, $4 ); }
+            |      EXP                 { exiterror( ERR_INVALID_EXPRESSION, 1, "**" ); }
+            | expr SPACE               { parendepth--; }
+                               expr    { parendepth++; AUTO_REDUCE( $1, " " );
+                                         $$ = makenode( X_SPACE, 2, $1, $4 ); }
+            |      SPACE               { exiterror( ERR_INVALID_EXPRESSION, 1, " " ); }
+            | expr CONCATENATE         { parendepth--; }
+                               expr    { parendepth++; AUTO_REDUCE( $1, "||" );
+                                         $$ = makenode( X_CONCAT, 2, $1, $4 ); }
+            |      CONCATENATE         { exiterror( ERR_INVALID_EXPRESSION, 1, "||" ); }
+            | NOT expr                 { AUTO_REDUCE( $2, "\\" );
+                                         $$ = makenode( X_LOG_NOT, 1, $2 ); }
+            |      NOT                 { exiterror( ERR_INVALID_EXPRESSION, 1, "\\" ); }
+            | expr '='                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "=" );
+                                         $$ = makenode( X_EQUAL, 2, $1, $4 );
+                                         transform( $$ ); }
+            |      '='                 { exiterror( ERR_INVALID_EXPRESSION, 1, "=" ); }
+            | expr GTE                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, ">=" );
+                                         $$ = makenode( X_GTE, 2, $1, $4 );
                                          transform( $$ ) ; }
-            |      '='                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "=" ) ;}
-            | expr '-' expr            { $$ = makenode(X_MINUS,2,$1,$3) ; }
-            | expr '*' expr            { $$ = makenode(X_MULT,2,$1,$3) ; }
-            |      '*'                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "*" ) ;}
-            | expr '/' expr            { $$ = makenode(X_DEVIDE,2,$1,$3) ; }
-            |      '/'                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "/" ) ;}
-            | expr '%' expr            { $$ = makenode(X_INTDIV,2,$1,$3) ; }
-            |      '%'                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "%" ) ;}
-            | expr '|' expr            { $$ = makenode(X_LOG_OR,2,$1,$3) ; }
-            |      '|'                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "|" ) ;}
-            | expr '&' expr            { $$ = makenode(X_LOG_AND,2,$1,$3) ; }
-            |      '&'                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "&" ) ;}
-            | expr XOR expr            { $$ = makenode(X_LOG_XOR,2,$1,$3) ; }
-            |      XOR                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "&&" ) ;}
-            | expr EXP expr            { $$ = makenode(X_EXP,2,$1,$3) ; }
-            |      EXP                 {  exiterror( ERR_INVALID_EXPRESSION, 1, "**" ) ;}
-            | expr SPACE expr          { $$ = makenode(X_SPACE,2,$1,$3) ; }
-            |      SPACE               {  exiterror( ERR_INVALID_EXPRESSION, 1, " " ) ;}
-            | expr GTE expr            { $$ = makenode(X_GTE,2,$1,$3) ;
+            |      GTE                 { exiterror( ERR_INVALID_EXPRESSION, 1, ">=" ); }
+            | expr LTE                 { parendepth--; }
+                       expr            { parendepth++; AUTO_REDUCE( $1, "<=" );
+                                         $$ = makenode( X_LTE, 2, $1, $4 );
                                          transform( $$ ) ; }
-            |      GTE                 {  exiterror( ERR_INVALID_EXPRESSION, 1, ">=" ) ;}
-            | expr LTE expr            { $$ = makenode(X_LTE,2,$1,$3) ;
+            |      LTE                 { exiterror( ERR_INVALID_EXPRESSION, 1, "<=" ); }
+            | expr GT                  { parendepth--; }
+                      expr             { parendepth++; AUTO_REDUCE( $1, ">" );
+                                         $$ = makenode( X_GT, 2, $1, $4 );
                                          transform( $$ ) ; }
-            |      GT                  {  exiterror( ERR_INVALID_EXPRESSION, 1, ">" ) ;}
-            | expr GT expr             { $$ = makenode(X_GT,2,$1,$3) ;
+            |      GT                  { exiterror( ERR_INVALID_EXPRESSION, 1, ">" ); }
+            | expr LT                  { parendepth--; }
+                      expr             { parendepth++; AUTO_REDUCE( $1, "<" );
+                                         $$ = makenode( X_LT, 2, $1, $4 );
                                          transform( $$ ) ; }
-            | expr MODULUS expr        { $$ = makenode(X_MODULUS,2,$1,$3) ; }
-            |      MODULUS             {  exiterror( ERR_INVALID_EXPRESSION, 1, "//" ) ;}
-            | expr LT expr             { $$ = makenode(X_LT,2,$1,$3) ;
+            |      LT                  { exiterror( ERR_INVALID_EXPRESSION, 1, "<" ); }
+            | expr DIFFERENT           { parendepth--; }
+                             expr      { parendepth++; AUTO_REDUCE( $1, "\\=" );
+                                         $$ = makenode( X_DIFF, 2, $1, $4 );
                                          transform( $$ ) ; }
-            |      LT                  {  exiterror( ERR_INVALID_EXPRESSION, 1, "<" ) ;}
-            | expr DIFFERENT expr      { $$ = makenode(X_DIFF,2,$1,$3) ;
-                                         transform( $$ ) ; }
-            |      DIFFERENT           {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | expr EQUALEQUAL expr     { $$ = makenode(X_S_EQUAL,2,$1,$3) ; }
-            |      EQUALEQUAL          {  exiterror( ERR_INVALID_EXPRESSION, 1, "==" ) ;}
-            | expr NOTEQUALEQUAL expr  { $$ = makenode(X_S_DIFF,2,$1,$3) ; }
-            |      NOTEQUALEQUAL       {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | expr GTGT expr           { $$ = makenode(X_S_GT,2,$1,$3) ; }
-            |      GTGT                {  exiterror( ERR_INVALID_EXPRESSION, 1, ">>" ) ;}
-            | expr LTLT expr           { $$ = makenode(X_S_LT,2,$1,$3) ; }
-            |      LTLT                {  exiterror( ERR_INVALID_EXPRESSION, 1, "<<" ) ;}
-            | expr NOTGTGT expr        { $$ = makenode(X_S_NGT,2,$1,$3) ; }
-            |      NOTGTGT             {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | expr NOTLTLT expr        { $$ = makenode(X_S_NLT,2,$1,$3) ; }
-            |      NOTLTLT             {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | expr GTGTE expr          { $$ = makenode(X_S_GTE,2,$1,$3) ; }
-            |      GTGTE               {  exiterror( ERR_INVALID_EXPRESSION, 1, ">>=" ) ;}
-            | expr LTLTE expr          { $$ = makenode(X_S_LTE,2,$1,$3) ; }
-            |      LTLTE               {  exiterror( ERR_INVALID_EXPRESSION, 1, "<<=" ) ;}
+            |      DIFFERENT           { exiterror( ERR_INVALID_EXPRESSION, 1, "\\=" ); }
+            | expr EQUALEQUAL          { parendepth--; }
+                              expr     { parendepth++; AUTO_REDUCE( $1, "==" );
+                                         $$ = makenode( X_S_EQUAL, 2, $1, $4 ); }
+            |      EQUALEQUAL          { exiterror( ERR_INVALID_EXPRESSION, 1, "==" ); }
+            | expr NOTEQUALEQUAL       { parendepth--; }
+                                 expr  { parendepth++; AUTO_REDUCE( $1, "\\==" );
+                                         $$ = makenode( X_S_DIFF, 2, $1, $4 ); }
+            |      NOTEQUALEQUAL       { exiterror( ERR_INVALID_EXPRESSION, 1, "\\==" ); }
+            | expr GTGT                { parendepth--; }
+                        expr           { parendepth++; AUTO_REDUCE( $1, ">>" );
+                                         $$ = makenode( X_S_GT, 2, $1, $4 ); }
+            |      GTGT                { exiterror( ERR_INVALID_EXPRESSION, 1, ">>" ); }
+            | expr LTLT                { parendepth--; }
+                        expr           { parendepth++; AUTO_REDUCE( $1, "<<" );
+                                         $$ = makenode( X_S_LT, 2, $1, $4 ); }
+            |      LTLT                { exiterror( ERR_INVALID_EXPRESSION, 1, "<<" ); }
+            | expr NOTGTGT             { parendepth--; }
+                           expr        { parendepth++; AUTO_REDUCE( $1, "\\>>" );
+                                         $$ = makenode( X_S_NGT, 2, $1, $4 ); }
+            |      NOTGTGT             { exiterror( ERR_INVALID_EXPRESSION, 1, "\\>>" ); }
+            | expr NOTLTLT             { parendepth--; }
+                           expr        { parendepth++; AUTO_REDUCE( $1, "\\<<" );
+                                         $$ = makenode( X_S_NLT, 2, $1, $4 ); }
+            |      NOTLTLT             { exiterror( ERR_INVALID_EXPRESSION, 1, "\\<<" ); }
+            | expr GTGTE               { parendepth--; }
+                         expr          { parendepth++; AUTO_REDUCE( $1, ">>=" );
+                                         $$ = makenode( X_S_GTE, 2, $1, $4 ); }
+            |      GTGTE               { exiterror( ERR_INVALID_EXPRESSION, 1, ">>=" ); }
+            | expr LTLTE               { parendepth--; }
+                         expr          { parendepth++; AUTO_REDUCE( $1, "<<=" );
+                                         $$ = makenode( X_S_LTE, 2, $1, $4 ); }
+            |      LTLTE               { exiterror( ERR_INVALID_EXPRESSION, 1, "<<=" ); }
             | symbtree                 { $$ = $1 ; }
-            | CONSYMBOL                { $$ = makenode(X_STRING,0) ;
+            | CONSYMBOL                { $$ = makenode( X_STRING, 0 );
                                          $$->name = Str_cre_TSD(parser_data.TSD,retvalue) ; }
-            | HEXSTRING                { $$ = makenode(X_STRING,0) ;
+            | HEXSTRING                { $$ = makenode( X_STRING, 0 );
                                          $$->name = Str_make_TSD(parser_data.TSD,retlength) ;
                                          memcpy($$->name->value,retvalue,
                                                     $$->name->len=retlength); }
-            | BINSTRING                { $$ = makenode(X_STRING,0) ;
+            | BINSTRING                { $$ = makenode( X_STRING, 0 );
                                          $$->name = Str_make_TSD(parser_data.TSD,retlength) ;
                                          memcpy($$->name->value,retvalue,
                                                     $$->name->len=retlength); }
-            | STRING                   { $$ = makenode(X_STRING,0) ;
+            | STRING                   { $$ = makenode( X_STRING, 0 );
                                          $$->name = Str_cre_TSD(parser_data.TSD,retvalue) ; }
             | function                 { $$ = $1 ; }
-            | '+' expr %prec UPLUSS    { $$ = makenode(X_U_PLUSS,1,$2) ; }
-            | '-' expr %prec UMINUS    { $$ = makenode(X_U_MINUS,1,$2) ; }
-            | '+'      %prec SYNTOP    {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | '-'      %prec SYNTOP    {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | expr CONCATENATE expr    { $$ = makenode(X_CONCAT,2,$1,$3) ; }
-            |      CONCATENATE         {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
-            | expr CCAT expr           { $$ = makenode(X_CONCAT,2,$1,$2) ; }
-            |      CCAT                {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
+            | '+' expr %prec UPLUSS    { AUTO_REDUCE( $2, NULL );
+                                         $$ = makenode( X_U_PLUSS, 1, $2 ); }
+            | '-' expr %prec UMINUS    { AUTO_REDUCE( $2, NULL );
+                                         $$ = makenode( X_U_MINUS, 1, $2 ); }
+            | '+'      %prec SYNTOP    { exiterror( ERR_INVALID_EXPRESSION, 0 ); }
+            | '-'      %prec SYNTOP    { exiterror( ERR_INVALID_EXPRESSION, 0 ); }
+            ;
+
+exprs_sub   : exprs ')'                { $$ = $1; }
+            | exprs error              { exiterror( ERR_UNMATCHED_PARAN, 0 ); }
+            | STATSEP                  { exiterror( ERR_UNMATCHED_PARAN, 0 ); }
             ;
 
 symbtree    : SIMSYMBOL                { $$ = (nodeptr)create_head( (const char *)retvalue ) ; }
             ;
 
 
-function    : extfunc  exprs ')'       { $$ = makenode(X_EX_FUNC,1,$2) ;
+function    : extfunc func_args        { $$ = makenode(X_EX_FUNC,1,$2) ;
                                          $$->name = (streng *)$1 ; }
-            | extfunc exprs error      { exiterror( ERR_UNMATCHED_PARAN, 0 );
-                                         /* fixes bug 499163 */
-                                       }
-            | intfunc  exprs ')'       { $$ = makenode(X_IN_FUNC,1,$2) ;
+            | intfunc func_args        { $$ = makenode(X_IN_FUNC,1,$2) ;
                                          $$->name = (streng *)$1 ; }
-            | intfunc exprs error      { exiterror( ERR_UNMATCHED_PARAN, 0 );
-                                         /* fixes bug 499163 */
-                                       }
+            ;
+
+func_args   :                          { /* ugly fake preservs parendepth */
+                                         $$ = (YYSTYPE) parendepth;
+                                         parendepth = 0; }
+              exprs_sub                { parendepth = (int) $$;
+                                         $$ = $2; }
             ;
 
 intfunc     : INFUNCNAME               { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
@@ -1053,11 +1240,130 @@ pv          : PLACEHOLDER pv           { $$ = makenode(X_TPL_POINT,1,$2) ; }
             |                          { $$ = NULL ; }
             ;
 
-exprs       : nexpr ',' exprs          { $$ = makenode(X_EXPRLIST,2,$1,$3) ;
-                                         checkconst( $$ ) ; }
+                                       /*
+                                        * exprs isn't for enumerating arguments
+                                        * only, it has to detect missing closing
+                                        * parentheses and other stuff.
+                                        * parendepth regulates the behaviour.
+                                        * Getting negative indicates an error.
+                                        */
+exprs       : nexpr ','                { /* detect
+                                          * "x = ( a,. b )",
+                                          * "x = ( ,. b )",
+                                          * "x = a,. b",
+                                          * "x = ,. b",
+                                          * "x = f( ( x,. b ) )",
+                                          * "x = f( ( ,. b ) )"      */
+                                         if ( parendepth < 0 )
+                                            exiterror( ERR_UNEXPECTED_PARAN, 1 );
 
-            | nexpr                    { $$ = makenode(X_EXPRLIST,1,$1) ;
-                                         checkconst( $$ ) ; }
+                                         /* With call being the extended kind
+                                          * of CALL we may have:
+                                          * "x = f( (a),. b )",
+                                          * "x = f( a,. b )",
+                                          * "x = f( ,. b )",
+                                          * "CALL s (a),. b",
+                                          * "CALL s a,. b",
+                                          * "CALL s ,. b",
+                                          * "call s (a),. b",
+                                          * "call s a,. b",
+                                          * "call s ,. b",
+                                          * "call s( (a),. b )",
+                                          * "call s( a,. b )",
+                                          * "call s( ,. b )",
+                                          * "call s (a,a),. b",
+                                          * "call s (a),. b",
+                                          * "call s (),. b"
+                                          *
+                                          * detect "(a),." and transform it
+                                          * to "a,."                         */
+                                         $1 = reduce_expr_list( $1,
+                                                                REDUCE_EXPR );
+
+                                         /* detect "call s (a,b),. b" and
+                                          * "call s (),. b", but every list on
+                                          * the left side of "," is wrong, so
+                                          * complain about every exprlist.   */
+                                         if ( IS_EXPRLIST( $1 ) )
+                                            exiterror( ERR_UNEXPECTED_PARAN, 1 );
+
+                                         $1 = reduce_expr_list( $1,
+                                                              REDUCE_SUBEXPR );
+                                       }
+                        exprs          { assert( IS_EXPRLIST( $4 ) );
+
+                                         /* detect ",()." */
+                                         if ( IS_EXPRLIST( $4->p[0] )
+                                           && ( $4->p[1] == NULL )
+                                           && ( $4->p[0]->p[0] == NULL ) )
+                                            exiterror( ERR_UNEXPECTED_PARAN, 0 );
+
+                                         /* detect ",(a,b)." */
+                                         if ( IS_EXPRLIST( $4->p[0] )
+                                           && ( $4->p[1] == NULL )
+                                           && IS_EXPRLIST( $4->p[0]->p[1] ) )
+                                            exiterror( ERR_UNEXPECTED_PARAN, 1 );
+
+                                         /* detect ",(a)." and transform it
+                                          * to ",a."                         */
+                                         $4 = reduce_expr_list( $4,
+                                                                REDUCE_RIGHT );
+                                         assert( IS_EXPRLIST( $4 ) );
+
+                                         /* Detect something like
+                                          * "call s (a,b)+1"                 */
+                                         current = $4->p[0];
+                                         if ( ( current != NULL )
+                                           && !IS_EXPRLIST( current )
+                                           && !IS_FUNCTION( current )
+                                           && ( IS_EXPRLIST( current->p[0] )
+                                             || IS_EXPRLIST( current->p[1] ) ) )
+                                            exiterror( ERR_INVALID_EXPRESSION, 0 );
+
+                                         $$ = makenode( X_EXPRLIST, 2, $1, $4 );
+                                         checkconst( $$ ); }
+            | nexpr                    { /* detect
+                                          * "x = ()."
+                                          * "x = f(().)"
+                                          * "call s (().)"
+                                          * "CALL s ()."                     */
+                                         if ( ( parendepth < 0 ) && ( $1 == NULL ) )
+                                            exiterror( ERR_UNEXPECTED_PARAN, 0 );
+
+                                         /* With call being the extended kind
+                                          * of CALL we may have:
+                                          * "x = ( a. )",
+                                          * "x = f( . )",
+                                          * "x = f( ., )",
+                                          * "x = f( a. )",
+                                          * "x = f( a., )",
+                                          * "x = f( a, . )",
+                                          * "x = f( a, b. )",
+                                          * "CALL s .",
+                                          * "CALL s .,",
+                                          * "CALL s a.,",
+                                          * "CALL s a, .",
+                                          * "CALL s a, b.",
+                                          * "call s .",
+                                          * "call s .,",
+                                          * "call s a.,",
+                                          * "call s a, .",
+                                          * "call s a, b.",
+                                          * "call s (a.)",
+                                          * "call s (a)+1, .",
+                                          * "call s (a), .",
+                                          * "call s (a), a.",
+                                          * "call s (a), (a).",
+                                          * "call s ( ., )",
+                                          * "call s ( a., )",
+                                          * "call s ( a, . )",
+                                          * "call s ( a, b. )"               */
+
+                                         $1 = reduce_expr_list( $1,
+                                                              REDUCE_SUBEXPR );
+                                         $$ = makenode( X_EXPRLIST, 1, $1 );
+                                         checkconst( $$ );
+                                        }
             ;
 
 nexpr       : expr                     { $$ = $1 ; }
@@ -1082,32 +1388,6 @@ simsymb     : SIMSYMBOL                { $$ = (treenode *) Str_cre_TSD(parser_da
             ;
 
 %%
-
-#if 0
-static void checkin( nodeptr ptr )
-{
-   nodeptr *new ;
-   tsd_t *TSD = parser_data.TSD;
-
-   if (!narray)
-   {
-      narray = MallocTSD( sizeof(nodeptr)* 100 ) ;
-      narmax = 100 ;
-      narptr = 0 ;
-   }
-
-   if (narptr==narmax)
-   {
-      new = MallocTSD( sizeof(nodeptr)*narmax*3 ) ;
-      memcpy( new, narray, sizeof(nodeptr)*narmax ) ;
-      narmax *= 3 ;
-      FreeTSD( narray ) ;
-      narray = new ;
-   }
-
-   narray[narptr++] = ptr ;
-}
-#endif
 
 static nodeptr makenode( int type, int numb, ... )
 {
@@ -1213,7 +1493,7 @@ static nodeptr create_tail( const char *name )
    }
 
    cptr = name ;
-   constant = isdigit(*cptr) || *cptr=='.' || (!*cptr) ;
+   constant = rx_isdigit(*cptr) || *cptr=='.' || (!*cptr) ;
    node = makenode( (constant) ? X_CTAIL_SYMBOL : X_VTAIL_SYMBOL, 0 ) ;
 
    for (;*cptr && *cptr!='.'; cptr++) ;
@@ -1462,5 +1742,177 @@ static void checkconst( nodeptr this )
          this->u.strng = NULL ;
 
       this->type = X_CEXPRLIST ;
+   }
+}
+
+/*
+ * reduce_expr_list will be invoked if the reduction of a list expression for
+ * "call" arguments or a plain "(expr)" is needed. The reduction of the
+ * outer parentheses of the extended CALL syntax is done with
+ * mode==REDUCE_CALL, the reduction of a simple "(expr)" is done with
+ * mode==REDUCE_EXPR. REDUCE_RIGHT is a synonym for REDUCE_CALL currently and
+ * is intended to be used for reducing the right side of an expression list.
+ *
+ * REDUCE_SUBEXPR detect "call s (a)+1," and "call s 1+(a)," and reduces it.
+ * Furthermore it detects "call s ()+1", "call s 1+()", "call s 1+(a,b)",
+ * "call s (a,b)+1" and raises an error in this case.
+ */
+static nodeptr reduce_expr_list( nodeptr this, reduce_mode mode )
+{
+   nodeptr h, retval = this;
+
+   if ( !this )
+      return retval;
+
+   if ( mode == REDUCE_SUBEXPR )
+   {
+      if ( ( parendepth == 1 ) && !IS_FUNCTION( this ) && !IS_EXPRLIST( this ) )
+      {
+         if ( IS_EXPRLIST( this->p[0] ) )
+         {
+            h = this->p[0];
+            if ( ( h->p[0] == NULL ) || ( h->p[1] != NULL ) )
+               exiterror( ERR_INVALID_EXPRESSION, 0 );
+            this->p[0] = h->p[0];
+            RejectNode( h );
+         }
+         if ( IS_EXPRLIST( this->p[1] ) )
+         {
+            h = this->p[1];
+            if ( ( h->p[0] == NULL ) || ( h->p[1] != NULL ) )
+               exiterror( ERR_INVALID_EXPRESSION, 0 );
+            this->p[1] = h->p[0];
+            RejectNode( h );
+         }
+      }
+      return retval;
+   }
+
+   if ( !IS_EXPRLIST( this ) )
+      return retval;
+
+   if ( ( mode == REDUCE_CALL ) || ( mode == REDUCE_RIGHT ) )
+   {
+      if ( IS_EXPRLIST( this->p[0] ) && ( this->p[1] == NULL ) )
+      {
+         retval = this->p[0];
+         RejectNode( this );
+      }
+   }
+   else
+   {
+      /*
+       * mode == REDUCE_EXPR
+       */
+      if ( ( this->p[0] != NULL ) && ( this->p[1] == NULL ) )
+      {
+         if ( !IS_EXPRLIST( this->p[0] ) )
+         {
+            retval = this->p[0];
+            RejectNode( this );
+         }
+      }
+   }
+   return retval;
+}
+
+/*
+ * optgluelast connect p2 as the ->next element to p1. Every element may be
+ * NULL.
+ * If both are non-NULL, the connection is performed using the o.last elements.
+ * Just the o.last element of p1 remains non-NULL.
+ *
+ * Returns: NULL if p1 and p2 are NULL.
+ *          The non-NULL element if one argumet is NULL.
+ *          p1 otherwise.
+ */
+static nodeptr optgluelast( nodeptr p1, nodeptr p2 )
+{
+   nodeptr p2last;
+
+   if ( p1 == NULL )
+      return p2;
+   if ( p2 == NULL )
+      return p1;
+
+   /*
+    * This is performed very often, so keep the code fast.
+    *
+    * p2last is the "o.last"-element of p2 or just p2 if p2 has no next
+    * elements. We set p1's o.last further down, but we have to ensure that
+    * p2->o.last is NULL first. Therefore every element in the ->next chain
+    * of p1 will have NULL as its o.last field.
+    */
+   if ( ( p2last = p2->o.last ) == NULL )
+      p2last = p2;
+   else
+      p2->o.last = NULL;
+
+   if ( p1->o.last == NULL )
+      p1->next = p2;
+   else
+      p1->o.last->next = p2;
+   p1->o.last = p2last;
+
+   return p1;
+}
+
+/*
+ * justlabels returns 1, if n consists of a sequence of labels. The return
+ * value is 0 otherwise.
+ */
+static int justlabels( nodeptr n )
+{
+   while ( n != NULL )
+   {
+      if ( n->type != X_LABEL )
+         return 0;
+      n = n->next;
+   }
+
+   return 1;
+}
+
+/*
+ * move_labels move the labels from the end of "end" to the end of "front".
+ * The labels are marked "read_only" if level is nonnull, the read-only flag
+ * is removed if level is 0.
+ * NOTE: At least one element of the "end" chain must contain a non-label
+ * element.
+ */
+static void move_labels( nodeptr front, nodeptr end, int level )
+{
+   nodeptr oend = end;
+   nodeptr labels;
+
+   assert( front != NULL );
+   assert( !justlabels( end ) );
+
+   while ( !justlabels( end->next ) )
+      end = end->next;
+
+   if ( ( labels = end->next ) == NULL )
+      return;
+
+   /*
+    * extract the labels.
+    */
+   labels->o.last = oend->o.last;
+   end->next = NULL;
+   if ( end == oend )
+      oend->o.last = NULL;
+   else
+      oend->o.last = end;
+
+   if ( labels->next == NULL )
+      labels->o.last = NULL;
+
+   /*
+    * add the labels to the end of front and then re-mark the labels.
+    */
+   optgluelast( front, labels );
+   while ( labels ) {
+      labels->u.trace_only = ( level == 0 ) ? 0 : 1;
+      labels = labels->next;
    }
 }

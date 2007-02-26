@@ -187,6 +187,20 @@
  40,923,[Routine %s, Argument %d, Zuviele Folgebefehle; das Maximum ist %d; gefunden %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[Routine %s, Argument %d, ungültige Positionierungsbasis; erwartet wird ein Wort aus "%s"; gefunden "%s"]|<bif>,<argnumber>,<value>,<value>
  40,930,[Routine RXQUEUE, Funktion TIMEOUT: Ein Ganzzahlwert zwischen -1 und %d erwartet; gefunden: \"%s\"]|<value>,<value>
+ 40,980,Unerwartete Eingabe, entweder unbekannter Typ oder nicht erlaubte Daten%s%s|: ,<location>
+ 40,981,Zahl außerhalb des erlaubten Bereichs%s%s|: ,<location>
+ 40,982,Zeichenkette zu lang für den definierten Puffer%s%s|: ,<location>
+ 40,983,Illegale Kombination von Typ/Größe%s%s|: ,<location>
+ 40,984,Nicht unterstützte Zahl wie NAN, +INF, -INF%s%s|: ,<location>
+ 40,985,Struktur zu komplex für den statischen internen Puffer%s%s|: ,<location>
+ 40,986,Ein Element in der Struktur fehlt%s%s|: ,<location>
+ 40,987,Ein Wert in der Struktur fehlt%s%s|: ,<location>
+ 40,988,Der Name oder ein Namensteil ist ungültig für den Interpreter%s%s|: ,<location>
+ 40,989,Ein Problem tauchte auf bei der Schnittstelle zwischen Regina und GCI%s%s|: ,<location>
+ 40,990,Der Typ paßt nicht zu den Anforderungen an Basistypen (Argumente/Rückgabewert)%s%s|: ,<location>
+ 40,991,Die Anzahl der Argument ist falsch oder ein Argument fehlt%s%s|: ,<location>
+ 40,992,GCI's interner Argumentstack lief über%s%s|: ,<location>
+ 40,993,GCI zählte zu viele geschachtelte LIKE-Container%s%s|: ,<location>
  41,  0,Fehlerhafte Zahlumwandlung
  41,  1,Nichtnumerischer Wert ("%s") zur Linken des arithmetischen Operators "%s"|<value>,<operator>
  41,  2,Nichtnumerischer Wert ("%s") zur Rechten des arithmetischen Operators "%s"|<value>,<operator>

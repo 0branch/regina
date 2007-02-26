@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: wrappers.c,v 1.18 2003/04/26 01:09:02 florian Exp $
+ * $Id: wrappers.c,v 1.32 2004/04/24 09:25:03 mark Exp $
  */
 
 /*
@@ -30,11 +30,13 @@
  * At least, that's the theory ...
  */
 
+#include "regina_c.h"
+
 #if defined(WIN32)
 # ifdef _MSC_VER
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -56,7 +58,6 @@
 #endif
 
 #include "rexx.h"
-#include <ctype.h>
 
 #ifdef DYNAMIC
 
@@ -86,15 +87,18 @@
 #   define DYNLIBPRE ""
 #   define DYNLIBPST ".dll"
 #   define DYNLIBLEN 4
+#  elif defined(__APPLE__) && defined(__MACH__)
+#   define DYNLIBPRE "lib"
+#   define DYNLIBPST ".dylib"
+#   define DYNLIBLEN 9
+#  elif defined(AIX)
+#   define DYNLIBPRE "lib"
+#   define DYNLIBPST ".a"
+#   define DYNLIBLEN 5
 #  else
 #   define DYNLIBPRE "lib"
-#   if defined(AIX)
-#     define DYNLIBPST ".a"
-#     define DYNLIBLEN 5
-#   else
-#     define DYNLIBPST ".so"
-#     define DYNLIBLEN 6
-#   endif
+#   define DYNLIBPST ".so"
+#   define DYNLIBLEN 6
 #  endif
 # elif defined(DYNAMIC_AIXLOAD)
 #  include <sys/types.h>
@@ -122,12 +126,19 @@
 #  define DYNLIBPST ".so"
 #  define DYNLIBLEN 6
 
+# elif defined(DYNAMIC_SKYOS)
+   typedef sDllHandle * handle_type ;
+#  define DYNLIBPRE "/boot/programs/Regina/extensions/lib"
+#  define DYNLIBPST ".dll"
+#  define DYNLIBLEN 40
+
 # elif defined(DYNAMIC_OS2)
    typedef HMODULE handle_type ;
 /*  typedef PHMODULE handle_type ; */
 
 # elif defined(DYNAMIC_WIN32)
    typedef HINSTANCE handle_type ;
+
 # elif defined(DYNAMIC_VMS)
 #  define DYNLIBPRE "LIB"
 #  define DYNLIBPST ".EXE"
@@ -155,7 +166,7 @@
 char Food_For_Fuzzy_HP_Linkers[] = {
    (char)exiterror, (char)getonechar,
    (char)nullstringptr,
-   (char)atozpos, (char)checkparam, (char)loadrxfunc } ;
+   (char)atozpos, (char)checkparam, (char)find_library } ;
 #endif
 
 #if defined(DYNAMIC_AIXLOAD)
@@ -163,25 +174,6 @@ void *wrapper_dummy_for_aix( void )
 {
 }
 #endif
-
-/* versions of strlwr & strupr to simulate case-insensitivity */
-static void rxstrlwr(unsigned char * s, unsigned char *e)
-{
-   while (*s && s != e)
-   {
-      *s = (unsigned char) (tolower(*s));
-      s++;
-   }
-}
-
-static void rxstrupr(unsigned char * s, unsigned char *e)
-{
-   while (*s && s != e)
-   {
-      *s = (unsigned char) (toupper(*s));
-      s++;
-   }
-}
 
 void *wrapper_load( const tsd_t *TSD, const streng *module )
 {
@@ -193,11 +185,12 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
 #if defined(DYNAMIC_WIN32)
    char LoadError[256];
 #endif
-#if defined(DYNAMIC_HPSHLOAD)
+#if defined(DYNAMIC_HPSHLOAD) || defined(DYNAMIC_BEOS)
    char buf[1024];
 #endif
-   char *file_name, *module_name, *udpart, *postfix;
+   char *file_name, *module_name, *udpart, *postfix, *orig_module;
 
+   orig_module = str_ofTSD( module );
 #ifdef DYNLIBLEN
    module_name = MallocTSD( Str_len( module ) + strlen(DYNLIBPRE) +
                            strlen(DYNLIBPST) + 1 ) ;
@@ -208,7 +201,6 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    file_name = module_name;
    postfix = udpart + Str_len(module);
 # if defined(DYNAMIC_HPSHLOAD)
-   find_shared_library(TSD,module_name,"SHLIB_PATH",buf);
    file_name = buf;
 # endif
 #else
@@ -223,27 +215,34 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
       handle = (handle_type)NULL;
    }
 #elif defined(DYNAMIC_DLOPEN)
-   handle = dlopen( file_name, RTLD_LAZY ) ;
-
-   /* deal with incorrect case in call */
+   /*
+    * Try and load the module name exactly as specified (before wrapping it
+    * in lib*.so)
+    */
+   handle = dlopen( orig_module, RTLD_LAZY ) ;
    if (handle == NULL)
    {
-      rxstrlwr(udpart,postfix);
-      handle = dlopen(module_name, RTLD_LAZY);
-
+      handle = dlopen( file_name, RTLD_LAZY ) ;
+      /* deal with incorrect case in call */
       if (handle == NULL)
       {
-         rxstrupr(udpart,postfix);
+         mem_lower( udpart, Str_len( module ) );
          handle = dlopen(module_name, RTLD_LAZY);
-         /*
-          * Reset the original module portion of the filename to be
-          * searched again so that any error message returned uses the
-          * original module name
-          */
-         if ( handle == NULL )
+
+         if (handle == NULL)
          {
-            memcpy(udpart, module->value, Str_len(module) );
+            mem_upper( udpart, Str_len( module ) );
             handle = dlopen(module_name, RTLD_LAZY);
+            /*
+             * Reset the original module portion of the filename to be
+             * searched again so that any error message returned uses the
+             * original module name
+             */
+            if ( handle == NULL )
+            {
+               memcpy(udpart, module->value, Str_len(module) );
+               handle = dlopen(module_name, RTLD_LAZY);
+            }
          }
       }
    }
@@ -259,35 +258,55 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
          set_err_message(TSD, "", "");
    }
 #elif defined(DYNAMIC_HPSHLOAD)
+   /*
+    * Try and load the module name exactly as specified (before wrapping it
+    * in lib*.sl)
+    */
+   find_shared_library( TSD, orig_module, "SHLIB_PATH", buf );
    handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH, 0L ) ;
    if (handle == NULL)
    {
-      rxstrlwr(udpart,postfix);
       find_shared_library(TSD,module_name,"SHLIB_PATH",buf);
-      handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH ,0L ) ;
-
+      handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH, 0L ) ;
       if (handle == NULL)
       {
-         rxstrupr(udpart,postfix);
-         find_shared_library(TSD,module_name,"SHLIB_PATH",buf);
+         mem_lower( udpart, Str_len( module ) );
+         find_shared_library( TSD, module_name, "SHLIB_PATH", buf );
          handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH ,0L ) ;
+
+         if (handle == NULL)
+         {
+            mem_upper( udpart, Str_len( module ) );
+            find_shared_library( TSD, module_name, "SHLIB_PATH", buf );
+            handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH ,0L ) ;
+         }
       }
    }
 
    if (handle==NULL)
       set_err_message(TSD,  "shl_load() failed: ", strerror(errno)) ;
 #elif defined(DYNAMIC_AIXLOAD)
-   handle = load( file_name, 1, NULL ) ;
-   if (handle)
+   /*
+    * Try and load the module name exactly as specified (before wrapping it
+    * in lib*.a)
+    */
+   handle = load( orig_module, 1, NULL ) ;
+   if ( handle == NULL )
    {
-      int rc=loadbind( 0, (void *)wrapper_dummy_for_aix, (void *)handle ) ;
-      if (rc)
-         handle = NULL ;
-   }
-   else
-   {
-      set_err_message(TSD,  "load() failed: ", strerror( errno )) ;
-   }
+      handle = load( file_name, 1, NULL ) ;
+      if ( handle == NULL )
+      {
+         set_err_message(TSD,  "load() failed: ", strerror( errno )) ;
+      }
+      else
+      {
+         int rc=loadbind( 0, (void *)wrapper_dummy_for_aix, (void *)handle ) ;
+         if (rc)
+         {
+            handle = NULL ;
+            set_err_message(TSD,  "loadbind() failed: ", strerror( errno )) ;
+         }
+      }
 #elif defined(DYNAMIC_OS2)
    rc = DosLoadModule( LoadError, sizeof(LoadError),
                        file_name, &handle ) ;
@@ -304,17 +323,73 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
       set_err_message(TSD, "LoadLibrary() failed: ", LoadError);
    }
 #elif defined(DYNAMIC_BEOS)
-   handle = load_add_on( file_name );
-   if (handle == B_ERROR)
+   handle = load_add_on( orig_module );
+   if (handle < B_NO_ERROR)
    {
-      set_err_message(TSD, "load_add_on() failed loading:", file_name );
-      handle = (handle_type)NULL;
+      handle = load_add_on( file_name );
+      if (handle < B_NO_ERROR)
+      {
+         sprintf( buf, "load_add_on() failed loading \"%s\" with error:", file_name );
+         set_err_message(TSD, buf, strerror( handle ) );
+         handle = (handle_type)NULL;
+      }
+   }
+#elif defined(DYNAMIC_SKYOS)
+   handle = (handle_type)MallocTSD( sizeof( sDllHandle ) );
+   if ( DllLoad( orig_module, handle ) != 0 )
+   {
+      if ( DllLoad( file_name, handle ) != 0 )
+      {
+         set_err_message(TSD, "DLLLoad() failed loading:", file_name );
+         FreeTSD( handle );
+         handle = (handle_type)NULL;
+      }
    }
 #endif
 
-   FreeTSD(module_name);
+   FreeTSD( module_name );
+   FreeTSD( orig_module );
 
    return (void *)handle ;
+}
+
+void wrapper_unload( const tsd_t *TSD, void *libhandle )
+{
+#ifdef DYNAMIC_STATIC
+
+   (libhandle = libhandle);
+
+#elif defined(DYNAMIC_DLOPEN)
+
+   dlclose((handle_type) libhandle);
+
+#elif defined(DYNAMIC_HPSHLOAD)
+
+   shl_unload((handle_type) libhandle);
+
+#elif defined(DYNAMIC_AIXLOAD)
+
+   unload((handle_type) libhandle);
+
+#elif defined(DYNAMIC_OS2)
+
+   DosFreeModule((handle_type) libhandle);
+
+#elif defined(DYNAMIC_WIN32)
+
+   FreeLibrary((handle_type) libhandle);
+
+#elif defined(DYNAMIC_BEOS)
+
+   unload_add_on((handle_type) libhandle);
+
+#elif defined(DYNAMIC_SKYOS)
+
+   FreeTSD( libhandle );
+
+#else
+   (libhandle = libhandle);
+#endif
 }
 
 PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng *name )
@@ -324,8 +399,15 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    char *funcname ;
 #if defined(DYNAMIC_WIN32)
    char LoadError[256];
+   char *entryname;
+   unsigned u;
+   char c;
 #endif
 #if defined(DYNAMIC_OS2)
+   char *entryname;
+   unsigned u;
+   char c;
+   ULONG ordinal;
    APIRET rc=0L;
 #endif
 #if defined(DYNAMIC_BEOS)
@@ -372,12 +454,12 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    /* deal with, eg 'SysLoadFuncs' when the function is 'sysloadfuncs' or 'SYSLOADFUNCS' */
    if (addr == NULL)
    {
-      rxstrupr(funcname,NULL);
+      mem_upper( funcname, strlen( funcname ) );
       addr = (PFN)(dlsym( handle, funcname )) ;
 
       if (addr == NULL)
       {
-         rxstrlwr(funcname,NULL);
+         mem_lower( funcname, strlen( funcname ) );
          addr = (PFN)(dlsym( handle, funcname )) ;
 
          if (addr==NULL)
@@ -392,10 +474,10 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
 
       if (rc = shl_findsym( &handle, funcname, TYPE_PROCEDURE, &eaddr ))
       {
-         rxstrupr(funcname,NULL);
+         mem_upper( funcname, strlen( funcname ) );
          if (rc = shl_findsym( &handle, funcname, TYPE_PROCEDURE, &eaddr ))
          {
-            rxstrlwr(funcname,NULL);
+            mem_lower( funcname, strlen( funcname ) );
             if (rc = shl_findsym( &handle, funcname, TYPE_PROCEDURE, &eaddr ))
             {
                addr = NULL ;
@@ -412,11 +494,21 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    addr = (PFN)handle ;
 
 #elif defined(DYNAMIC_OS2)
-   rc = DosQueryProcAddr(handle,0L,funcname,&addr);
+   if ( ( sscanf( funcname, "#%u%c", &u, &c ) == 1 ) && ( u != 0 ) )
+   {
+      ordinal = (ULONG) u;
+      entryname = NULL;
+   }
+   else
+   {
+      ordinal = 0L;
+      entryname = funcname;
+   }
+   rc = DosQueryProcAddr(handle,ordinal,entryname,&addr);
    if (rc)
    {
       char buf[150];
-      sprintf(buf,"DosQueryProcAddr() failed with %ld looking for %s", (long) rc, funcname );
+      sprintf(buf,"DosQueryProcAddr() failed with %lu looking for %.90s", (long) rc, funcname );
       set_err_message(TSD, buf, "" ) ;
    }
 
@@ -424,9 +516,15 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    /*  13/12/1999 JH moved cast, (HMODULE), from second parm to first.  Removed
     * a compiler warning,
     */
-   addr = (PFN)GetProcAddress((HMODULE)handle,funcname);
+   if ( ( sscanf( funcname, "#%u%c", &u, &c ) == 1 ) && ( u != 0 ) &&
+                                                             ( u <= 0xFFFF ) )
+      entryname = (char *) u;
+   else
+      entryname = funcname;
 
-   if (addr == NULL)
+   addr = (PFN) GetProcAddress( (HMODULE) handle, entryname );
+
+   if ( ( addr == NULL ) && ( funcname == entryname ) )
    {
       strlwr(funcname);
       addr = (PFN)GetProcAddress((HMODULE)handle,funcname);
@@ -435,12 +533,12 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
       {
          strupr(funcname);
          addr = (PFN)GetProcAddress((HMODULE)handle, funcname);
-         if (addr == NULL)
-         {
-            FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT), LoadError, 256, NULL ) ;
-            set_err_message( TSD, "GetProcAddress() failed: ", LoadError );
-         }
       }
+   }
+   if (addr == NULL)
+   {
+      FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT), LoadError, 256, NULL );
+      set_err_message( TSD, "GetProcAddress() failed: ", LoadError );
    }
 
 #elif defined(DYNAMIC_BEOS)
@@ -449,6 +547,16 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    {
       char buf[150];
       sprintf(buf,"get_image_symbol() failed with %d looking for %s", rc, funcname );
+      set_err_message( TSD,  buf, "" );
+      addr = NULL;
+   }
+
+#elif defined(DYNAMIC_SKYOS)
+   addr = (PFN)GetDllFunction( handle, funcname );
+   if ( addr == NULL )
+   {
+      char buf[150];
+      sprintf(buf,"GetDllFunction() failed looking for %s", funcname );
       set_err_message( TSD,  buf, "" );
       addr = NULL;
    }
@@ -461,5 +569,14 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    else
       return NULL ;
 }
+# ifdef SKYOS
+/*
+ * Required as entry point for DLL under SkyOS
+ */
+int DllMain( void )
+{
+   return 0;
+}
+# endif
 
 #endif /* DYNAMIC */

@@ -34,7 +34,7 @@ Else
       say instance
       If instance // 2 = 0 Then order = 'fifo'
       Else order = 'lifo'
-      Call Rxqueue 'Create', 'QUEUE'instance'@'
+      call RxQueue 'Set', Rxqueue('Create', 'QUEUE'instance'@')
       /* Say '***Creating queue' Rxqueue('Create', 'QUEUE'instance'@'  ) */
       /*
        * push or queue num_lines lines onto our queue

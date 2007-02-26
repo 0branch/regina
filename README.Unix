@@ -1,7 +1,7 @@
-                              Regina 3.0 binaries
+                              Regina 3.3 binaries
 
-This archive contains pre-compiled binaries of Regina 3.0.  The directory
-structure is set up to unpack into a base directory such as /usr/local.
+This archive contains pre-compiled binaries of Regina 3.3.  The directory
+structure is set up to unpack into a base directory such as /usr or /usr/local.
 
 Regina is distributed under the GNU LIBRARY GENERAL PUBLIC LICENSE. See
 COPYING-LIB for details.

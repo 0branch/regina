@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: extstack.h,v 1.8 2002/07/10 08:36:21 florian Exp $
+ * $Id: extstack.h,v 1.9 2003/07/17 09:32:22 florian Exp $
  */
 
 #include "rexxbif.h"            /* C functions that mimic REXX BIFs */
@@ -151,7 +151,7 @@ int send_command_to_rxstack( const tsd_t *TSD, int sock, const char *action, con
 streng *read_result_from_rxstack( const tsd_t *TSD, int sock, int result_size );
 int delete_queue_from_rxstack( const tsd_t *TSD, int sock, const streng *queue_name );
 int set_queue_in_rxstack( const tsd_t *TSD, int sock, const streng *queue_name );
-int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock );
+int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock, int *errcode );
 int clear_queue_on_rxstack( const tsd_t *TSD, int sock ) ;
 int get_queue_from_rxstack( const tsd_t *TSD, const Queue *q, streng **result );
 int create_queue_on_rxstack( const tsd_t *TSD, const Queue *q, const streng *queue, streng **result );

@@ -35,7 +35,7 @@ CC              = @CC@
 LN_S            = @LN_S@
 CFLAGS          = @CFLAGS@
 
-CEXTRA =           @CEXTRA@ @DLFCNINCDIR@ -DREGINA_SHARE_DIRECTORY=\"$(sharedir)\"
+CEXTRA =           @CEXTRA@ @DLFCNINCDIR@ -DREGINA_SHARE_DIRECTORY=\"$(sharedir)\" @unsigned_char@
 DEBUG =            @DEBUG@
 TRACEMEM =         @TRACEMEM@
 FLISTS =           @FLISTS@
@@ -140,7 +140,7 @@ MTSSRC = $(srcdir)/en.mts $(srcdir)/pt.mts $(srcdir)/no.mts \
 MTBFILES = en.mtb pt.mtb no.mtb \
            de.mtb es.mtb
 
-HFILES = $(REG_DIR)/rexx.h $(REG_DIR)/defs.h $(REG_DIR)/extern.h $(REG_DIR)/types.h \
+HFILES = $(REG_DIR)/rexx.h $(REG_DIR)/defs.h $(REG_DIR)/extern.h $(REG_DIR)/regina_t.h \
          $(REG_DIR)/strings.h $(REG_DIR)/configur.h $(REG_DIR)/yaccsrc.h \
          $(REG_DIR)/rxiface.h $(REG_DIR)/rexxsaa.h $(REG_DIR)/utsname.h
 CFILES = $(CSRCFILES) $(REG_DIR)/yaccsrc.c $(REG_DIR)/lexsrc.c $(REG_DIR)/execiser.c \
@@ -157,7 +157,7 @@ JUNK = *.o $(STATICLIB) execiser$(EXE) threader$(EXE) rxqueue$(EXE) rxstack$(EXE
 
 all : rexx$(EXE) execiser$(EXE) trexx$(EXE) $(SHL_TARGETS) rxstack$(EXE) rxqueue$(EXE) $(MTBFILES)
 
-$(srcdir)/rexx.h : $(srcdir)/extern.h $(srcdir)/strings.h $(srcdir)/defs.h $(srcdir)/types.h $(srcdir)/mt.h
+$(srcdir)/rexx.h : $(srcdir)/extern.h $(srcdir)/strings.h $(srcdir)/defs.h $(srcdir)/regina_t.h $(srcdir)/mt.h
 
 $(srcdir)/mt.h : $(srcdir)/$(MT_FILE).h
 

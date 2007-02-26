@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rxstack.c,v 1.26 2003/03/12 08:11:23 mark Exp $";
+static char *RCSid = "$Id: rxstack.c,v 1.31 2004/04/18 02:54:34 florian Exp $";
 #endif
 
 /*
@@ -65,11 +65,11 @@ static char *RCSid = "$Id: rxstack.c,v 1.26 2003/03/12 08:11:23 mark Exp $";
  *       regina PUSH, rxqueue /lifo
  *   C - create queue
  *       in->  CFFFFFFxxx--queue name--xxx (if length 0, create name)
- *       out-> 0xxxxxx (if queue name created - length ignored)
+ *       out-> 0FFFFFFxxx--queue name--xxx (if queue name created)
  *       out-> 1FFFFFFxxx--queue name--xxx (if queue name existed)
  *       out-> 2xxxxxx (if error)
  *       regina RXQUEUE('C'), rxqueue N/A
- *x  D - delete queue
+ *   D - delete queue
  *       in->  DFFFFFFxxx--queue name--xxx
  *       out-> 0000000 (if queue name deleted)
  *       out-> 5xxxxxx (trying to delete 'SESSION' queue)
@@ -124,13 +124,14 @@ static char *RCSid = "$Id: rxstack.c,v 1.26 2003/03/12 08:11:23 mark Exp $";
  *       out->
  */
 
+#define NO_CTYPE_REPLACEMENT
 #include "rexx.h"
 
 #if defined(WIN32) || defined(__LCC__)
 # if defined(_MSC_VER)
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 #  include <windows.h>
 #  if _MSC_VER >= 1100
@@ -698,6 +699,14 @@ void delete_a_queue( RxQueue *q )
 {
    Client *c ;
 
+   if ( q->name )
+   {
+      DEBUGDUMP(printf("Deleting queue <%.*s>\n", PSTRENGLEN( q->name), PSTRENGVAL( q->name)););
+   }
+   else
+   {
+      DEBUGDUMP(printf("Deleting natal queue\n"););
+   }
    empty_queue( q ) ;
 
    if ( q == SESSION )
@@ -1153,6 +1162,7 @@ int rxstack_create_queue( Client *client, streng *data, streng **result )
 {
    RxQueue *q ;
    streng *new_queue = NULL;
+   int rc = 0;
 
    if ( data )
    {
@@ -1179,14 +1189,16 @@ int rxstack_create_queue( Client *client, streng *data, streng **result )
             /* SET or CREATE resets a timeout to 0 */
             client->queue_timeout = 0;
             *result = q->name;
-            return 1; /* Pass back the name. May be different due to
-                       * different locales or codepages.
+            return 0; /* Pass back the name. May be different due to
+                       * different locales or codepages, but it IS the selected
+                       * name.
                        */
          }
          new_queue = unique_name( );
          if ( new_queue == NULL )
             return 3;
          DEBUGDUMP(printf("Having to create unique queue <%.*s>\n", PSTRENGLEN( new_queue ), PSTRENGVAL( new_queue ) ););
+         rc = 1;
       }
    }
    else
@@ -1212,9 +1224,9 @@ int rxstack_create_queue( Client *client, streng *data, streng **result )
    /* SET or CREATE resets a timeout to 0 */
    client->queue_timeout = 0 ;
    *result = q->name;
-   return 1; /* always pass this process' queue name to the caller.
-              * May be different due to codepages, etc.
-              */
+   return rc; /* Both code 0 and code 1 return the name to the caller.
+               * May be different due to codepages, etc.
+               */
 }
 
 /*
@@ -1365,11 +1377,11 @@ void empty_queue( RxQueue *q )
    b = &q->buf ;
    for ( line = b->top; line != NULL; )
    {
-      contents = line->contents ;
+      contents = line->contents;
       DROPSTRENG( contents );
-      tmp = line ;
+      tmp = line;
       line = line->lower;
-      free( line ) ;
+      free( tmp );
    }
    memset( &q->buf, 0, sizeof( Buffer ) ) ;
 
@@ -1636,7 +1648,7 @@ int rxstack_process_command( Client *client )
          {
             q = rxstack_set_default_queue( client, buffer );
             if ( q == NULL )
-               rxstack_send_return( client->socket, "2", NULL, 0 );
+               rxstack_send_return( client->socket, "3", NULL, 0 );
             else
                rxstack_send_return( client->socket, "0", q->name->value, q->name->len );
             DROPSTRENG( buffer );
@@ -1705,13 +1717,11 @@ int rxstack_process_command( Client *client )
           * Create a new queue
           */
          rc = rxstack_create_queue( client, buffer, &result );
-         if ( rc != 1 )
-            {
-               rcode[0] = (char)(rc+'0');
-               rxstack_send_return( client->socket, rcode, NULL, 0 );
-            }
-         else if ( rc == 1 )
-            rxstack_send_return( client->socket, "1", PSTRENGVAL(result), PSTRENGLEN(result) );
+         rcode[0] = (char)(rc+'0');
+         if ( ( rc != 1 ) && ( rc != 0 ) )
+            rxstack_send_return( client->socket, rcode, NULL, 0 );
+         else
+            rxstack_send_return( client->socket, rcode, PSTRENGVAL(result), PSTRENGLEN(result) );
          buffer = NULL;  /* consumed by rxstack_create_queue */
          break;
       case RXSTACK_DELETE_QUEUE:

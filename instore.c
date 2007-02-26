@@ -23,7 +23,7 @@
  * that we must create a pointerless list which is included
  * in the tinned tree.
  *
- * This structure is called ttree, have a look at types.h.
+ * This structure is called ttree, have a look at regina_t.h.
  *
  * DEFAULT_TTREE_ELEMS defines the normal number of elements in the ttree.
  * The more elements the better is the performance in searching. The less
@@ -244,7 +244,7 @@ void DestroyInternalParsingTree(const tsd_t *TSD, internal_parser_type *ipt)
    {
       tr = ipt->nodes;
 
-      while (tr) 
+      while (tr)
       {
          for (i = 0; i < tr->num; i++)
             DestroyNode(TSD, tr->elems + i);
@@ -263,7 +263,7 @@ void DestroyInternalParsingTree(const tsd_t *TSD, internal_parser_type *ipt)
    {
       lr = ipt->first_source_line;
 
-      while (lr) 
+      while (lr)
       {
          lh = lr->next;
          Free_stringTSD(lr->line);
@@ -279,7 +279,7 @@ void DestroyInternalParsingTree(const tsd_t *TSD, internal_parser_type *ipt)
    {
       ar = ipt->first_label;
 
-      while (ar) 
+      while (ar)
       {
          ah = ar->next;
          FreeTSD(ar);
@@ -302,7 +302,7 @@ void DestroyInternalParsingTree(const tsd_t *TSD, internal_parser_type *ipt)
    {
       or = ipt->srclines;
 
-      while (or) 
+      while (or)
       {
          oh = or->next;
          FreeTSD(or->elems);
@@ -406,18 +406,37 @@ internal_parser_type ExpandTinnedTree(const tsd_t *TSD,
                 es + 1 /* position of string content */,
                 es->length);
       }
-      if (this->u.strng)
-      {
-         es = (extstring *) ((char *) ept + (unsigned long) this->u.strng);
-         this->u.strng = Str_makeTSD(es->length);
-         this->u.strng->len = es->length;
-         memcpy(this->u.strng->value,
-                es + 1 /* position of string content */,
-                es->length);
-      }
 
-      if (this->type == X_LABEL)
-         newlabel(TSD, &ipt, this);
+      /*
+       * Do things the parsing step would have do. Simple values in this->u
+       * are copied already.
+       */
+
+      /*
+       * See also several places in this file and in debug.c where this
+       * switch list must be changed. Seek for X_CEXPRLIST.
+       */
+      switch ( this->type )
+      {
+         case X_CEXPRLIST:
+            if ( this->u.strng )
+            {
+               es = (extstring *) ((char *) ept + (unsigned long) this->u.strng);
+               this->u.strng = Str_makeTSD( es->length );
+               this->u.strng->len = es->length;
+               memcpy( this->u.strng->value,
+                       es + 1 /* position of string content */,
+                       es->length);
+            }
+            break;
+
+         case X_LABEL:
+            newlabel(TSD, &ipt, this);
+            break;
+
+         default:
+            break;
+      }
 
       if (this->next == (nodeptr) (unsigned long) -1)
          this->next = NULL;
@@ -459,7 +478,7 @@ static unsigned long ComputeExternalSize(const internal_parser_type *ipt,
    /* sourceline table */
    elems = 0;
    otp = ipt->srclines;
-   while (otp != NULL) 
+   while (otp != NULL)
    {
       elems += otp->sum;
       otp = otp->next;
@@ -470,7 +489,8 @@ static unsigned long ComputeExternalSize(const internal_parser_type *ipt,
    /* nodetable */
    elems = bufchars = 0;
    ttp = ipt->nodes;
-   while (ttp) {
+   while (ttp)
+   {
       for (i = 0;i < ttp->num;i++)
       {
          elems++;
@@ -478,9 +498,25 @@ static unsigned long ComputeExternalSize(const internal_parser_type *ipt,
          if (np->name)
             bufchars += StringSize(np->name);
 
-         if ((np->type == X_CEXPRLIST) && np->u.strng)
-           /* should be save, since it isn't computed after the parsing step.*/
-            bufchars += StringSize(np->u.strng);
+         /*
+          * Add all sizes of strings that have been generated at the parsing
+          * step.
+          */
+
+         /*
+          * See also several places in this file and in debug.c where this
+          * switch list must be changed. Seek for X_CEXPRLIST.
+          */
+         switch ( np->type )
+         {
+            case X_CEXPRLIST:
+               if ( np->u.strng )
+                  bufchars += StringSize( np->u.strng );
+            break;
+
+            default:
+               break;
+         }
       }
       ttp = ttp->next;
    }
@@ -508,7 +544,7 @@ static unsigned long FillStrings(char *base, unsigned long start, const otree *o
 }
 
 /* FillTree copies all treenodes of the ttree to base+buf in a relocatable
- * manner. Look at ExpandTinnedTree() or types.h for a description.
+ * manner. Look at ExpandTinnedTree() or regina_t.h for a description.
  * Each treenode is copied to the table and the containing strings are copied
  * as extstrings to base+start which is incremented.
  * The table must be large enough.
@@ -537,16 +573,54 @@ static unsigned long FillTree(treenode *table, char *base, unsigned long start,
             start += StringSize(np->name);
          }
 
-         if ((np->type == X_CEXPRLIST) && np->u.strng)
+         /*
+          * Remove all "flags" from the target and copy only approved values
+          * the parser computes already.
+          */
+         memset( &table->u, 0, sizeof( table->u ) );
+
+         /*
+          * See also several places in this file and in debug.c where this
+          * switch list must be changed. Seek for X_CEXPRLIST.
+          */
+         switch ( np->type )
          {
-            table->u.strng = (streng *) start;
-            e = (extstring *) (base + start);
-            e->length = np->u.strng->len;
-            memcpy(e + 1, np->u.strng->value, e->length);
-            start += StringSize(np->u.strng);
+            case X_EQUAL:
+            case X_DIFF:
+            case X_GT:
+            case X_GTE:
+            case X_LT:
+            case X_LTE:
+               table->u.flags = np->u.flags;
+               break;
+
+            case X_ADDR_V:
+               table->u.nonansi = np->u.nonansi;
+               break;
+
+            case X_CEXPRLIST:
+               if ( np->u.strng )
+               {
+                  table->u.strng = (streng *) start;
+                  e = (extstring *) (base + start);
+                  e->length = np->u.strng->len;
+                  memcpy(e + 1, np->u.strng->value, e->length);
+                  start += StringSize(np->u.strng);
+               }
+            break;
+
+            case X_LABEL:
+               table->u.trace_only = np->u.trace_only;
+               break;
+
+            case X_ADDR_WITH:
+               if ( !np->p[0] && !np->p[1] && !np->p[2] )
+                  table->u.of = np->u.of;
+               break;
+
+            default:
+               break;
          }
-         else
-            table->u.strng = 0; /* Be sure not to run into troubles */
 
          if (table->next == NULL)
             table->next = (nodeptr) (unsigned long) -1;
@@ -571,7 +645,7 @@ static unsigned long FillTree(treenode *table, char *base, unsigned long start,
  * is allocated by one call to IfcAllocateMemory. The returned value shall
  * be used as an instore macro for RexxStart.
  * *length is set to the allocated size of the memory block on return.
- * ExpandedTinnedTree can expand the returned value and IaValidTin checks it.
+ * ExpandedTinnedTree can expand the returned value and IsValidTin checks it.
  */
 external_parser_type *TinTree(const tsd_t *TSD,
                               const internal_parser_type *ipt,

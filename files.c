@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: files.c,v 1.57 2003/04/24 11:32:12 mark Exp $";
+static char *RCSid = "$Id: files.c,v 1.83 2004/04/24 09:32:58 florian Exp $";
 #endif
 
 /*
@@ -80,6 +80,14 @@ static char *RCSid = "$Id: files.c,v 1.57 2003/04/24 11:32:12 mark Exp $";
  * flag, which all other routines will check for.
  */
 
+/*
+ * Bug in LCC complier wchar.h that incorrectly says it defines stat struct
+ * but doesn't
+ */
+#if defined(__LCC__)
+# include <sys/stat.h>
+#endif
+
 #include "rexx.h"
 #include <errno.h>
 #include <stdio.h>
@@ -90,7 +98,6 @@ static char *RCSid = "$Id: files.c,v 1.57 2003/04/24 11:32:12 mark Exp $";
 #ifdef HAVE_LIMITS_H
 # include <limits.h>
 #endif
-#include <ctype.h>
 #include <time.h>
 #if defined(VMS)
 # include <stat.h>
@@ -140,7 +147,7 @@ static char *RCSid = "$Id: files.c,v 1.57 2003/04/24 11:32:12 mark Exp $";
 # ifdef _MSC_VER
 #  if _MSC_VER >= 1100
 /* Stupid MSC can't compile own headers without warning at least in VC 5.0 */
-#   pragma warning(disable: 4115 4201 4214)
+#   pragma warning(disable: 4115 4201 4214 4514)
 #  endif
 # endif
 # include <windows.h>
@@ -185,6 +192,7 @@ static char *RCSid = "$Id: files.c,v 1.57 2003/04/24 11:32:12 mark Exp $";
 #if defined(S_IFNAM) && !defined(S_ISNAM)
 # define S_ISNAM(mode) (((mode) & S_IFNAM)==S_IFNAM)
 #endif
+
 #if !defined(ACCESSPERMS)
 # if defined(S_IRWXU) && defined(S_IRWXG) && defined(S_IRWXO)
 #  define ACCESSPERMS (S_IRWXU|S_IRWXG|S_IRWXO)
@@ -592,7 +600,17 @@ typedef struct fileboxtype {
  * macros to switch directly before an I/O operation. "Useful" fseeks should
  * be error checked. This is not necessary here since the following operation
  * will fault in case of an error.
+ * FIXME - (MH 29/08/2003) Shouldn't these functions do the following ?
+#define SWITCH_OPER_READ(fptr)  {if (fptr->oper!=OPER_READ) {                    \
+                                    fptr->thispos = fptr->readpos;               \
+                                    fseek(fptr->fileptr,fptr->thispos,SEEK_SET); \
+                                    fptr->oper=OPER_READ; } }
+#define SWITCH_OPER_WRITE(fptr) {if (fptr->oper!=OPER_WRITE) {                   \
+                                    fptr->thispos = fptr->writepos;              \
+                                    fseek(fptr->fileptr,fptr->thispos,SEEK_SET); \
+                                    fptr->oper=OPER_WRITE; } }
  */
+
 #define SWITCH_OPER_READ(fptr)  {if (fptr->oper==OPER_WRITE)          \
                                     fseek(fptr->fileptr,0l,SEEK_CUR); \
                                  fptr->oper=OPER_READ;}
@@ -600,7 +618,8 @@ typedef struct fileboxtype {
                                     fseek(fptr->fileptr,0l,SEEK_CUR); \
                                  fptr->oper=OPER_WRITE;}
 
-typedef struct { /* fil_tsd: static variables of this module (thread-safe) */
+typedef struct
+{  /* fil_tsd: static variables of this module (thread-safe) */
    /*
     * The following two pointers are pointers into the doble linked list
     * of all files in the file table. They points to the most recently
@@ -621,10 +640,85 @@ typedef struct { /* fil_tsd: static variables of this module (thread-safe) */
 } fil_tsd_t; /* thread-specific but only needed by this module. see
               * init_filetable
               */
+/*
+ * Structure to define stream types; names and whether persistent,transient or unknown
+ */
+typedef struct
+{
+   int streamtype;
+   char *streamname;
+} stream_type_t;
+
+#define STREAMTYPE_DIRECTORY          1
+#define STREAMTYPE_CHARACTERSPECIAL   2
+#define STREAMTYPE_BLOCKSPECIAL       3
+#define STREAMTYPE_REGULARFILE        4
+#define STREAMTYPE_FIFO               5
+#define STREAMTYPE_SYMBOLICLINK       6
+#define STREAMTYPE_SOCKET             7
+#define STREAMTYPE_SPECIALNAME        8
+
+static const stream_type_t stream_types[] =
+{
+   { STREAMTYPE_UNKNOWN  , ""                  },
+   { STREAMTYPE_UNKNOWN  , " Directory"        },
+   { STREAMTYPE_PERSISTENT," CharacterSpecial" },
+   { STREAMTYPE_PERSISTENT," BlockSpecial"     },
+   { STREAMTYPE_PERSISTENT," RegularFile"      },
+   { STREAMTYPE_UNKNOWN  , " FIFO"             },
+   { STREAMTYPE_UNKNOWN  , " SymbolicLink"     },
+   { STREAMTYPE_UNKNOWN  , " Socket"           },
+   { STREAMTYPE_UNKNOWN  , " SpecialName"      },
+};
 
 static int positioncharfile( tsd_t *TSD, const char *bif, int argno, fileboxptr fileptr, int oper, long where, int from );
 static int positionfile( tsd_t *TSD, const char *bif, int argno, fileboxptr ptr, int oper, int lineno, int from );
 static void handle_file_error( tsd_t *TSD, fileboxptr ptr, int rc, const char *errmsg, int level) ;
+static int flush_output( tsd_t *TSD, fileboxptr ptr );
+
+/*
+ * Based on the st_mode filed returned from stat(), determine the Regina "stream type".
+ * The returned value is an index into stream_types array, which allows the caller to
+ * determine if the stream is persistent, transient or unknown, and also allows the
+ * user to look up the stream type name.
+ * Added to resolve 802114.
+ */
+static int determine_stream_type( int mode )
+{
+#ifdef S_ISDIR
+   if ( S_ISDIR(mode) )
+      return STREAMTYPE_DIRECTORY;
+#endif
+#ifdef S_ISCHR
+   if ( S_ISCHR(mode) )
+      return STREAMTYPE_CHARACTERSPECIAL;
+#endif
+#ifdef S_ISBLK
+   if ( S_ISBLK(mode) )
+      return STREAMTYPE_BLOCKSPECIAL;
+#endif
+#ifdef S_ISREG
+   if ( S_ISREG(mode) )
+      return STREAMTYPE_REGULARFILE;
+#endif
+#ifdef S_ISFIFO
+   if ( S_ISFIFO(mode) )
+      return STREAMTYPE_FIFO;
+#endif
+#ifdef S_ISLNK
+   if ( S_ISLNK(mode) )
+      return STREAMTYPE_SYMBOLICLINK;
+#endif
+#ifdef S_ISSOCK
+   if ( S_ISSOCK(mode) )
+      return STREAMTYPE_SOCKET;
+#endif
+#ifdef S_ISNAM
+   if ( S_ISNAM(mode) )
+      return STREAMTYPE_SPECIALNAME;
+#endif
+   return STREAMTYPE_UNKNOWN;
+}
 
 /*
  * Marks all entries in the filetable. Used only by the memory
@@ -922,7 +1016,7 @@ static void enterfileptr( const tsd_t *TSD, fileboxptr ptr )
  * The given fileboxptr MUST NOT be swapped out. It indicates a file which
  * should be swapped in after this operation. dont_swap may be NULL.
  */
-static void swapout_file( const tsd_t *TSD, fileboxptr dont_swap )
+static void swapout_file( tsd_t *TSD, fileboxptr dont_swap )
 {
    fil_tsd_t *ft;
    fileboxptr start, run, found;
@@ -964,12 +1058,7 @@ static void swapout_file( const tsd_t *TSD, fileboxptr dont_swap )
    if ( found == NULL )
       exiterror( ERR_SYSTEM_FAILURE, 0 )  ;
 
-   errno = 0 ;
-   if (fclose( found->fileptr )==EOF)
-      exiterror( ERR_SYSTEM_FAILURE, 1, strerror(errno) )  ;
-
-   found->fileptr = NULL ;
-   found->flag |= FLAG_SWAPPED ;
+   flush_output( TSD, found );
 }
 
 
@@ -977,23 +1066,16 @@ static void swapout_file( const tsd_t *TSD, fileboxptr dont_swap )
  * swapin_file to reuse them.
  * This function is useful when exiting the external's interface.
  */
-static void swapout_all( const tsd_t *TSD )
+static void swapout_all( tsd_t *TSD )
 {
-   fil_tsd_t *ft ;
-   fileboxptr run ;
+   fil_tsd_t *ft;
+   fileboxptr run;
 
    ft = TSD->fil_tsd;
 
    for ( run = ft->mrufile ; run ; run = run->older )
    {
-      if ( ( (run->flag & ( FLAG_SURVIVOR | FLAG_SWAPPED ) ) == 0 ) &&
-           ( run->fileptr != NULL ) )
-      {
-         run->flag |= FLAG_SWAPPED ;   /* Be reentrant in case of errors! */
-         if ( fclose( run->fileptr ) == EOF )
-            exiterror( ERR_SYSTEM_FAILURE, 1, strerror( errno ) ) ;
-         run->fileptr = NULL ;
-      }
+      flush_output( TSD, run );
    }
 }
 
@@ -1064,6 +1146,17 @@ tryagain:
    }
 }
 
+/*
+ * Compares two filesnames, either with ignoring or respecting the letter case.
+ */
+int filename_cmp( const streng *name1, const streng *name2 )
+{
+#ifdef CASE_SENSITIVE_FILENAMES
+   return Str_cmp( name1, name2 );
+#else
+   return Str_ccmp( name1, name2 );
+#endif
+}
 
 static fileboxptr getfileptr( tsd_t *TSD, const streng *name )
 {
@@ -1081,11 +1174,7 @@ static fileboxptr getfileptr( tsd_t *TSD, const streng *name )
     */
    for (ptr=ft->filehash[hashval];ptr;ptr=ptr->next)
    {
-#ifdef CASE_SENSITIVE_FILENAMES
-      if (!Str_cmp(name,ptr->filename0))
-#else
-      if (!Str_ccmp(name,ptr->filename0))
-#endif
+      if ( !filename_cmp( name, ptr->filename0 ) )
          break ;
    }
    /*
@@ -1157,14 +1246,54 @@ static void flush_input( cfileboxptr dummy )
 
 
 /*
- * This closes the file ... actually, I'm not sure whether that is the
- * correct thing to do, but lots of other rexx interpreters seem to do
- * exactly that. Maybe a feature for the 'traditional' mode?
+ * flush_output doesn't close a file any longer. Beginning from August 2003 we
+ * just do the intended flush of ANSI by swapping out the file. We save the
+ * positions in this case. See ANSI 9.7.2, 9.7.5, A.5.8.9
+ * Returns -1 in case of an error, 0 on success.
  */
-static void flush_output( tsd_t *TSD, const streng *ptr )
+static int flush_output( tsd_t *TSD, fileboxptr ptr )
 {
-   closefile( TSD, ptr ) ;
-   return ;
+   int h;
+
+   errno = 0;
+
+   if ( ptr->fileptr == NULL || ptr->flag & FLAG_SWAPPED )
+      return 0;
+
+   if ( ptr->flag & FLAG_SURVIVOR )
+   {
+      if ( ptr->flag & FLAG_WRITE )
+      {
+         if ( fflush( ptr->fileptr ) != 0 )
+         {
+            file_error( ptr, errno, NULL );
+            return -1;
+         }
+      }
+      return 0;
+   }
+
+   if ( fflush( ptr->fileptr ) != 0 )
+   {
+      h = errno;
+      fclose( ptr->fileptr );
+      ptr->fileptr = NULL;
+      ptr->flag |= FLAG_SWAPPED;
+      file_error( ptr, h, NULL );
+      return -1;
+   }
+   if ( fclose( ptr->fileptr ) == EOF )
+   {
+      h = errno;
+      ptr->fileptr = NULL;
+      ptr->flag |= FLAG_SWAPPED;
+      file_error( ptr, h, NULL );
+      return -1;
+   }
+
+   ptr->fileptr = NULL;
+   ptr->flag |= FLAG_SWAPPED;
+   return 0;
 }
 
 /*
@@ -1181,11 +1310,12 @@ static void flush_output( tsd_t *TSD, const streng *ptr )
  *
  * IMPORTANT!
  * The entry for stdin must be the same as the following #define for
- * DEFAULT_STDIN_INDEX below.
+ * DEFAULT_STDIN_INDEX below. Never changes it.
  * This assumption is used in readkbdline().
  */
 #define DEFAULT_STDIN_INDEX 0
 #define DEFAULT_STDOUT_INDEX 1
+#define DEFAULT_STDERR_INDEX 2
 int init_filetable( tsd_t *TSD )
 {
    int i=0 ;
@@ -1568,7 +1698,7 @@ static void reopen_file( tsd_t *TSD, fileboxptr ptr )
     * different anyway, so it will probably not create any problems.
     * Besides, we don't do exec() and system() on VMS.
     */
-#if !defined(VMS) && !defined(MAC) && !defined(OS2) && !defined(DOS) && !(defined(__WATCOMC__) && defined(__QNX__)) && !defined(_MSC_VER) && !(defined(WIN32) && defined(__IBMC__)) && !defined(__MINGW32__) && !defined(__BORLANDC__) && !defined(__EPOC32__) && !defined(__LCC__)
+#if !defined(VMS) && !defined(MAC) && !defined(OS2) && !defined(DOS) && !defined(__WATCOMC__) && !defined(_MSC_VER) && !(defined(WIN32) && defined(__IBMC__)) && !defined(__MINGW32__) && !defined(__BORLANDC__) && !defined(__EPOC32__) && !defined(__LCC__) && !defined(SKYOS)
    if (ptr && ptr->fileptr)
    {
       int flags, fno ;
@@ -1903,7 +2033,7 @@ try_to_open:
    else
       exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
 
-#if !defined(VMS) && !defined(MAC) && !defined(OS2) && !defined(DOS) && !(defined(__WATCOMC__) && defined(__QNX__)) && !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(__BORLANDC__) && !defined(__EPOC32__) && !defined(__LCC__)
+#if !defined(VMS) && !defined(MAC) && !defined(OS2) && !defined(DOS) && !defined(__WATCOMC__) && !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(__BORLANDC__) && !defined(__EPOC32__) && !defined(__LCC__) && !defined(SKYOS)
    /*
     * Then we check to see if this is a transient or persistent file.
     * We can remove a 'persistent' setting, but add one, since we
@@ -2001,7 +2131,7 @@ static fileboxptr get_file_ptr( tsd_t *TSD, const streng *name, int faccess, int
  * an area twice the size, and copy the data over. Afterwards, keep the
  * new area as the temporary area.
  *
- * This way, be normally use little memory, but we are still able to
+ * This way, we normally use little memory, but we are still able to
  * read as large lines as the memory allows, if it is needed.
  *
  * No error condition is raised if noerrors is set. Instead, NULL is returned.
@@ -2064,6 +2194,13 @@ static streng *readoneline( tsd_t *TSD, fileboxptr ptr )
   */
    errno = 0 ;
    SWITCH_OPER_READ(ptr);
+   /*
+    * Switch to the current readpos setting in case the current position
+    * is based on the write position.
+    */
+   ptr->thispos = ptr->readpos;
+   if ( ptr->flag & FLAG_PERSIST )
+      fseek(ptr->fileptr,ptr->thispos,SEEK_SET);
    for (i=0; ; i++)
    {
       j = getc(ptr->fileptr);
@@ -2245,6 +2382,28 @@ static int positionfile_SEEK_SET( tsd_t *TSD, const char *bif, int argno, filebo
     */
    from_line = 1 ;
    from_char = 0 ;
+
+   if ( oper & OPER_READ
+   &&   ptr->flag & FLAG_PERSIST )
+   {
+      if ( fseek( ptr->fileptr, ptr->readpos, SEEK_SET ) )
+      {
+         file_error( ptr, errno, NULL ) ;
+         return 0;
+      }
+      ptr->thispos = ptr->readpos ;
+   }
+   if ( oper & OPER_WRITE
+   &&   ptr->flag & FLAG_PERSIST )
+   {
+      if ( fseek( ptr->fileptr, ptr->writepos, SEEK_SET ) )
+      {
+         file_error( ptr, errno, NULL ) ;
+         return 0;
+      }
+      ptr->thispos = ptr->writepos ;
+   }
+
    /*
     * First, let's check to see if we gain anything from using the
     * read position instead. If the distance from the current read
@@ -2432,7 +2591,7 @@ static int positionfile_SEEK_CUR( tsd_t *TSD, const char *bif, int argno, filebo
    int tmp,ret;
 
    /*
-    * Do simple checks frst.
+    * Do simple checks first.
     * If we are seeking back before the first line, then set:
     * READ:
     * ptr->readline = 1
@@ -3160,16 +3319,19 @@ static streng *readbytes( tsd_t *TSD, fileboxptr fileptr, int length,
 /*
  * This routines write a string to a file pointed to by the Rexx file
  * table entry 'fileptr'. The string to be written is 'string', and the
- * length of the write is implicitly given avs the length of 'string'
+ * length of the write is implicitly given as the length of 'string'
  *
  * This routine is called from the Rexx built-in function CHAROUT().
- * It is a fairly streight forward implementation.
+ * It is a fairly straight forward implementation.
  *
  * No file_error() is thrown if noerrors is set.
  */
 static int writebytes( tsd_t *TSD, fileboxptr fileptr, const streng *string,
                                                                  int noerrors )
 {
+#ifdef WIN32
+   int rc=0;
+#endif
    int todo, done, written=0 ;
    const char *buf ;
 
@@ -3235,9 +3397,22 @@ static int writebytes( tsd_t *TSD, fileboxptr fileptr, const streng *string,
    buf = string->value ;
    todo = string->len ;
    fileptr->oper = OPER_WRITE ;
-   do {
+   do
+   {
       done = fwrite( buf, 1, todo, fileptr->fileptr ) ;
+      /*
+       * Win32 has a bug with fwrite and disk full. If the size of the
+       * chunk to write is < 4096 and the disk fills up, then you don't get
+       * an error indication. So flush the stream if the size of data is
+       * < 4096 and test the result of fflush(). Bug 731664
+       */
+#ifdef WIN32
+      if (string->len < 4096 )
+         rc = fflush( fileptr->fileptr );
+      if (done < 0 || rc != 0 )
+#else
       if (done < 0)
+#endif
       {
          written = -1 ;
          break ;
@@ -3285,13 +3460,13 @@ static int writebytes( tsd_t *TSD, fileboxptr fileptr, const streng *string,
 /*
  * This routine counts the complete lines remaining in the file
  * pointed to by the Rexx file table entry 'ptr'. The count starts
- * at the current read position, and the current line will be counted
+ * at the current read or write position, and the current line will be counted
  * even if the current read position points to the middle of a line.
  * The last line will only be counted if it was actually terminated
  * by a EOL marker. If the current line is the last line, but it was
  * not explicitly terminated by a EOL marker, zero is returned.
  */
-static int countlines( tsd_t *TSD, fileboxptr ptr, int actual )
+static int countlines( tsd_t *TSD, fileboxptr ptr, int actual, int oper )
 {
    long oldpoint=0L ;
    int left=0, ch=0;
@@ -3333,7 +3508,7 @@ static int countlines( tsd_t *TSD, fileboxptr ptr, int actual )
       /*
        * If, however, this is a persistent file, we have to read from
        * the current read position to the end-of-file, and count all
-       * the lines. First, make sure that wse position at the current
+       * the lines. First, make sure that we position at the current
        * read position.
        */
       errno = 0 ;
@@ -3349,6 +3524,14 @@ static int countlines( tsd_t *TSD, fileboxptr ptr, int actual )
        * read in the process.
        */
       SWITCH_OPER_READ(ptr);
+      /*
+       * Switch to the current read or write pos setting
+       */
+      if ( oper == OPER_READ )
+         ptr->thispos = ptr->readpos;
+      else
+         ptr->thispos = ptr->writepos;
+      fseek(ptr->fileptr,ptr->thispos,SEEK_SET);
 #if defined(UNIX) || defined(MAC)
       for(left=0;((ch=getc(ptr->fileptr))!=EOF);)
       {
@@ -3501,10 +3684,6 @@ static int calc_chars_left( tsd_t *TSD, fileboxptr ptr )
 }
 
 
-
-
-
-
 /*
  * This routine writes a line to the file indicated by 'ptr'. The line
  * to be written is 'data', and it will be terminated by an extra
@@ -3513,6 +3692,7 @@ static int calc_chars_left( tsd_t *TSD, fileboxptr ptr )
 static int writeoneline( tsd_t *TSD, fileboxptr ptr, const streng *data )
 {
    const char *i=NULL ;
+   int num_eol_chars=0;
 
    /*
     * First, make sure that the file is not in ERROR state. If it is
@@ -3599,6 +3779,7 @@ static int writeoneline( tsd_t *TSD, fileboxptr ptr, const streng *data )
       file_error( ptr, errno, NULL ) ;
       return 1 ;
    }
+   num_eol_chars++;
 #endif
 #if !defined(MAC)
    SWITCH_OPER_WRITE(ptr);
@@ -3607,6 +3788,7 @@ static int writeoneline( tsd_t *TSD, fileboxptr ptr, const streng *data )
       file_error( ptr, errno, NULL ) ;
       return 1 ;
    }
+   num_eol_chars++;
 #endif
 
    /*
@@ -3614,7 +3796,7 @@ static int writeoneline( tsd_t *TSD, fileboxptr ptr, const streng *data )
     * file table entry. We must do that in order to be able to keep
     * track of where we are.
     */
-   ptr->thispos += data->len + 1 ;
+   ptr->thispos += data->len + num_eol_chars ; /* fix 736578 */
    ptr->writepos = ptr->thispos ;
    ptr->oper = OPER_WRITE ;
 
@@ -3653,23 +3835,24 @@ static int writeoneline( tsd_t *TSD, fileboxptr ptr, const streng *data )
  * but quite useful. It is accessed through the built-in function
  * STREAM(), command 'FSTAT'
  * This is now also used for the "standard" STREAM() options.
+ * *Persistent will be set to 1 if the stream's type is a file. The setting
+ * happens on success and if Persistent isn't NULL.
  */
-static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
+static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand )
 {
    fileboxptr ptr=NULL ;
    int rc=0 ;
    int fno=0 ;
-#if defined(__EMX__) || defined(__WINS__) || defined(__EPOC32__)
-   int i;
-#endif
    long pos_read = -2L, pos_write = -2L, line_read = -2L, line_write = -2;
    int streamtype = STREAMTYPE_UNKNOWN;
    streng *result=NULL ;
    struct stat buffer ;
    struct tm tmdata, *tmptr ;
    char *fn=NULL;
+#if 0
    static const char *fmt = "%02d-%02d-%02d %02d:%02d:%02d" ;
    static const char *iso = "%04d-%02d-%02d %02d:%02d:%02d" ;
+#endif
    static const char *streamdesc[] = { "UNKNOWN", "PERSISTENT", "TRANSIENT" };
    char tmppwd[50];
    char tmpgrp[50];
@@ -3679,6 +3862,7 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
    struct group *pgrp;
 #endif
 
+   memset( &buffer, 0, sizeof(buffer) );
    /*
     * Nul terminate the input filename string, as stat() will barf if
     * it isn't and other functions stuff up!
@@ -3716,19 +3900,11 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
       rc = stat( fn, &buffer ) ;
       if ( rc != 0 )
          streamtype = STREAMTYPE_UNKNOWN;
-#if defined(S_ISREG)
-      else if ( (buffer.st_mode & S_IFMT) == S_IFDIR )
-         streamtype = STREAMTYPE_UNKNOWN;
-      else if ( S_ISREG(buffer.st_mode) )
-         streamtype = STREAMTYPE_PERSISTENT;
       else
-         streamtype = STREAMTYPE_TRANSIENT;
-#else
-      else if ( (buffer.st_mode & S_IFMT) == S_IFDIR )
-         streamtype = STREAMTYPE_UNKNOWN;
-      else
-         streamtype = STREAMTYPE_PERSISTENT;
-#endif
+         /*
+          * Resolves 802114.
+          */
+         streamtype = stream_types[determine_stream_type( buffer.st_mode )].streamtype;
    }
 
    /*
@@ -3744,111 +3920,50 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
       {
          case COMMAND_FSTAT:
 #ifdef HAVE_LSTAT
-         /*
-          * If we have lstat(), use it to gather details, this is the only
-          * way to determine if the file is a symlink.
-          */
-         lstat(fn, &buffer) ;
+            /*
+             * If we have lstat(), use it to gather details, this is the only
+             * way to determine if the file is a symlink.
+             */
+            lstat(fn, &buffer) ;
 #endif
 #if defined(VMS) || defined(MAC) || defined(OS2) || defined(DOS) || (defined (__WATCOMC__) && !defined(__QNX__)) || defined(_MSC_VER) || (defined(WIN32) && defined(__IBMC__)) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__EPOC32__) || defined(__LCC__)
-         ptmppwd = "USER";
-         ptmpgrp = "GROUP";
+            ptmppwd = "USER";
+            ptmpgrp = "GROUP";
 #else
-         ppwd = getpwuid( buffer.st_uid );
-         if ( ppwd )
-            ptmppwd = ppwd->pw_name;
-         else
-            sprintf( tmppwd, "%d", buffer.st_uid );
-         
-         pgrp = getgrgid( buffer.st_gid );
-         if ( pgrp )
-            ptmpgrp = pgrp->gr_name;
-         else
-            sprintf( tmpgrp, "%d", buffer.st_gid );
+            ppwd = getpwuid( buffer.st_uid );
+            if ( ppwd )
+               ptmppwd = ppwd->pw_name;
+            else
+               sprintf( tmppwd, "%d", buffer.st_uid );
+
+            pgrp = getgrgid( buffer.st_gid );
+            if ( pgrp )
+               ptmpgrp = pgrp->gr_name;
+            else
+               sprintf( tmpgrp, "%d", buffer.st_gid );
 #endif
-         result = Str_makeTSD( 128 ) ;
-         sprintf( result->value,
-            "%ld %ld %03o %d %s %s %ld",
-            (long)(buffer.st_dev), (long)(buffer.st_ino),
-            buffer.st_mode & ACCESSPERMS, buffer.st_nlink,
-            ptmppwd, ptmpgrp,
-            (long)(buffer.st_size) ) ;
-#ifdef S_ISDIR
-         if ( S_ISDIR( buffer.st_mode) )
-            strcat( result->value, " Directory" );
-#endif
-#ifdef S_ISCHR
-         if ( S_ISCHR( buffer.st_mode) )
-            strcat( result->value, " CharacterSpecial" );
-#endif
-#ifdef S_ISBLK
-         if ( S_ISBLK( buffer.st_mode) )
-            strcat( result->value, " BlockSpecial" );
-#endif
-#ifdef S_ISREG
-         if ( S_ISREG( buffer.st_mode) )
-            strcat( result->value, " RegularFile" );
-#endif
-#ifdef S_ISFIFO
-         if ( S_ISFIFO( buffer.st_mode) )
-            strcat( result->value, " FIFO" );
-#endif
-#ifdef S_ISLNK
-         if ( S_ISLNK( buffer.st_mode) )
-            strcat( result->value, " SymbolicLink" );
-#endif
-#ifdef S_ISSOCK
-         if ( S_ISSOCK( buffer.st_mode) )
-            strcat( result->value, " Socket" );
-#endif
-#ifdef S_ISNAM
-         if ( S_ISNAM( buffer.st_mode) )
-            strcat( result->value, " SpecialName" );
-#endif
+            result = Str_makeTSD( 128 ) ;
+            sprintf( result->value,
+               "%ld %ld %03o %d %s %s %ld",
+               (long)(buffer.st_dev), (long)(buffer.st_ino),
+               buffer.st_mode & ACCESSPERMS, buffer.st_nlink,
+               ptmppwd, ptmpgrp,
+               (long)(buffer.st_size) ) ;
+            /*
+             * Append the stream type name...
+             */
+            strcat( result->value, stream_types[determine_stream_type( buffer.st_mode )].streamname );
             break;
          case COMMAND_QUERY_EXISTS:
             if ( streamtype == STREAMTYPE_TRANSIENT )
             {
-               result = nullstringptr() ;
+               result = nullstringptr();
             }
             else
             {
-#if defined(HAVE__FULLPATH)
                result = Str_makeTSD( REXX_PATH_MAX );
-               _fullpath(result->value, fn, REXX_PATH_MAX);
-# if defined(__EMX__)
-               /*
-                * Convert / to \ as the API call doesn't do this for us
-                */
-               result->len = strlen( result->value ) ;
-               for ( i=0; i < result->len; i++)
-               {
-                  if ( result->value[i] == '/' )
-                     result->value[i] = '\\';
-               }
-# endif
-#elif defined(HAVE__TRUENAME)
-               result = Str_makeTSD( REXX_PATH_MAX ) ;
-               _truename(fn, result->value);
-#else
-               result = Str_makeTSD( REXX_PATH_MAX ) ;
-               if (my_fullpath(result->value, fn, REXX_PATH_MAX) == -1)
-                  result = nullstringptr() ;
-# if defined(__WINS__) || defined(__EPOC32__)
-               else
-               {
-                  /*
-                   * Convert / to \ as the API call doesn't do this for us
-                   */
-                  result->len = strlen( result->value ) ;
-                  for ( i=0; i < result->len; i++)
-                  {
-                     if ( result->value[i] == '/' )
-                        result->value[i] = '\\';
-                  }
-               }
-# endif
-#endif
+               my_fullpath( result->value, fn );
+               result->len = strlen( result->value );
             }
             break;
          case COMMAND_QUERY_SIZE:
@@ -3887,9 +4002,13 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
                else
                   memset(&tmdata,0,sizeof(tmdata)); /* what shall we do in this case? */
                result = Str_makeTSD( 20 ) ;
+#if 0
                sprintf( result->value, fmt, tmdata.tm_mon+1, tmdata.tm_mday,
                      (tmdata.tm_year % 100), tmdata.tm_hour, tmdata.tm_min,
                      tmdata.tm_sec ) ;
+#else
+               strftime( result->value, 20, "%m-%d-%y %H:%M:%S", &tmdata );
+#endif
             }
             break;
          case COMMAND_QUERY_TIMESTAMP:
@@ -3904,10 +4023,14 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
                else
                   memset(&tmdata,0,sizeof(tmdata)); /* what shall we do in this case? */
                result = Str_makeTSD( 20 ) ;
+#if 0
                sprintf( result->value, iso, tmdata.tm_year+1900, tmdata.tm_mon+1,
                      tmdata.tm_mday,
                      tmdata.tm_hour, tmdata.tm_min,
                      tmdata.tm_sec ) ;
+#else
+               strftime( result->value, 20, "%Y-%m-%d %H:%M:%S", &tmdata );
+#endif
             }
             break;
          case COMMAND_QUERY_POSITION_READ_CHAR:
@@ -3942,6 +4065,8 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
             if ( line_write == 0 )
             {
                long here;
+               long char_count;
+               int ch;
                /*
                 * When a file is first opened for both read and
                 * write (default for implicit open), it is inexpensive
@@ -3952,22 +4077,26 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand)
                 * cost when we may never use it, we have to pay the
                 * price the first time we need the value; this is
                 * one of the times we pay the price!
-                * Determine the total number of lines, and add 1.
                 */
                result = Str_makeTSD( 50 ) ;
                /*
-                * countlines() counts from the current position,
-                * so we have to move to the start of the file...
+                * We can't use countlines(), so do our our counting
+                * of lines form the beginning of the file to the current
+                * write pos...
                 */
-               ptr->linesleft = 0; /* force countlines() to NOT use this */
                here = ftell( ptr->fileptr );
                fseek( ptr->fileptr, 0L, SEEK_SET );
-               line_write = countlines( TSD, ptr, 1 ) ;
+               SWITCH_OPER_READ(ptr);
+               for( char_count = 0, line_write = 0; char_count < (long) ptr->writepos; char_count++ )
+               {
+                  ch = getc( ptr->fileptr );
+                  if ( ch == EOF )
+                     break;
+                  if ( ch == REGINA_EOL )
+                     line_write++;
+               }
                sprintf( result->value, "%ld", line_write+1 ) ;
                fseek( ptr->fileptr, here, SEEK_SET );
-               /*
-                * countlines() sets ptr->linesleft;
-                */
             }
             else if (line_write != (-2))
             {
@@ -4372,7 +4501,7 @@ static streng *getseek( tsd_t *TSD, const streng *filename, const streng *cmd )
    }
    for (i=0;i<(int)strlen(offset);i++)
    {
-      if (!isdigit(*(offset+i)))
+      if (!rx_isdigit(*(offset+i)))
          exiterror( ERR_INCORRECT_CALL, 924, "STREAM", 3, "n, +n, -n, =n or <n", word[0] );
    }
    seek_offset = atol(offset);
@@ -4564,15 +4693,7 @@ streng *std_charout( tsd_t *TSD, cparamboxptr parms )
    else
       pos = 0 ;
 
-   /*
-    * Get the filepointer, if necessary, open in in the right mode
-    */
-   if (pos || string)
-      ptr = get_file_ptr( TSD, filename, OPER_WRITE, ACCESS_WRITE ) ;
-#ifdef lint
-   else
-      ptr = NULL ;
-#endif
+   ptr = get_file_ptr( TSD, filename, OPER_WRITE, ACCESS_WRITE ) ;
 
    /*
     * If we are to position the write position somewhere, do that first.
@@ -4588,9 +4709,10 @@ streng *std_charout( tsd_t *TSD, cparamboxptr parms )
       length = string->len - writebytes( TSD, ptr, string, 0 ) ;
    else
    {
-      length = 0 ;
-      if (!pos)
-         flush_output( TSD, filename ) ;  /* Whatever that may mean */
+      length = 0;
+      if ( !pos )
+         if ( flush_output( TSD, ptr ) == -1 )
+            length = 1; /* simulate (at least) 1 byte not written */
    }
 
    return int_to_streng( TSD, length ) ;
@@ -4647,7 +4769,7 @@ streng *std_lines( tsd_t *TSD, cparamboxptr parms )
       actual = (opt == 'C') ? 1 : 0;
    else
       actual = (opt == 'C') ? 0 : 1;
-   result = countlines( TSD, ptr, actual ) ;
+   result = countlines( TSD, ptr, actual, OPER_READ ) ;
 
    if (was_closed)
       closefile( TSD, filename ) ;
@@ -4777,9 +4899,10 @@ streng *std_lineout( tsd_t *TSD, cparamboxptr parms )
       file = parms->value ;
    else
       file = ft->stdio_ptr[1]->filename0 ;
-/* superfluous
+   /*
+    * The file pointer is needed in ALL circumstances!
+    */
    ptr = get_file_ptr( TSD, file, OPER_WRITE, ACCESS_WRITE ) ;
-*/
 
    /*
     * Then, get the data to be written, if any.
@@ -4804,9 +4927,6 @@ streng *std_lineout( tsd_t *TSD, cparamboxptr parms )
    else
       lineno = 0 ;  /* illegal value */
 
-   if (string || lineno)
-      ptr = get_file_ptr( TSD, file, OPER_WRITE, ACCESS_WRITE ) ;
-
    /*
     * First, let's reposition the file if necessary.
     */
@@ -4822,9 +4942,9 @@ streng *std_lineout( tsd_t *TSD, cparamboxptr parms )
       result = writeoneline( TSD, ptr, string ) ;
    else
    {
-      if (!lineno)
-         flush_output( TSD, file ) ;
-      result = 0 ;
+      if ( !lineno )
+         flush_output( TSD, ptr );
+      result = 0;
    }
 
    return int_to_streng( TSD, result ) ;
@@ -5051,7 +5171,7 @@ streng* std_stream( tsd_t *TSD, cparamboxptr parms )
                result = getrexxstatus( TSD, ptr ) ;
                break;
             case COMMAND_FSTAT:
-               result = getstatus( TSD, filename , COMMAND_FSTAT) ;
+               result = getstatus( TSD, filename, COMMAND_FSTAT );
                break;
             case COMMAND_RESET:
                ptr = getfileptr( TSD, filename ) ;
@@ -5291,7 +5411,8 @@ streng *readkbdline( tsd_t *TSD )
    return readoneline( TSD, ft->stdio_ptr[DEFAULT_STDIN_INDEX] );
 }
 
-void *addr_reopen_file( tsd_t *TSD, const streng *filename, char code )
+void *addr_reopen_file( tsd_t *TSD, const streng *filename, char code,
+                        int iserror )
 /* This is the open routine for the ADDRESS WITH-redirection. filename is
  * the name of the file. code is either 'r' for "READ",
  * 'A' for "WRITE APPEND", 'R' for "WRITE REPLACE". In case of READ
@@ -5302,43 +5423,58 @@ void *addr_reopen_file( tsd_t *TSD, const streng *filename, char code )
  * The return value may be NULL in case of an error. A NOTREADY condition
  * may have been raised in this case.
  * filename may be NULL for a default file.
+ * iserror can be set or not. If set, stderr instead of stdout should be used.
  */
 {
-   fileboxptr ptr ;
+   fileboxptr ptr;
    fil_tsd_t *ft;
 
    ft = TSD->fil_tsd;
 
-   switch (code) {
+   iserror = ( iserror ) ? 1 : 0;
+   switch ( code )
+   {
       case 'r':
-         if ( filename == NULL )
-            filename = ft->stdio_ptr[ DEFAULT_STDIN_INDEX ]->filename0 ;
-         ptr = get_file_ptr( TSD, filename, OPER_READ, ACCESS_READ ) ;
+         if ( ( filename == NULL ) || ( Str_len( filename ) == 0 ) )
+            return ft->stdio_ptr[DEFAULT_STDIN_INDEX];
+         ptr = get_file_ptr( TSD, filename, OPER_READ, ACCESS_READ );
+         if ( ptr != NULL )
+            ptr->readpos = 0;
          break;
 
       case 'A':
-         if ( filename == NULL )
-            filename = ft->stdio_ptr[ DEFAULT_STDOUT_INDEX ]->filename0 ;
-         closefile( TSD, filename ) ;
-         ptr = openfile( TSD, filename, ACCESS_STREAM_APPEND ) ;
+         if ( ( filename == NULL ) || ( Str_len( filename ) == 0 ) )
+            return ft->stdio_ptr[DEFAULT_STDOUT_INDEX + iserror];
+         if ( ( ptr = getfileptr( TSD, filename ) ) != NULL )
+         {
+            if ( ptr->flag & FLAG_SURVIVOR )
+               return get_file_ptr( TSD, filename, OPER_WRITE, ACCESS_WRITE );
+         }
+         closefile( TSD, filename );
+         ptr = openfile( TSD, filename, ACCESS_STREAM_APPEND );
          break;
 
       case 'R':
-         if ( filename == NULL )
-            filename = ft->stdio_ptr[ DEFAULT_STDOUT_INDEX ]->filename0 ;
-         closefile( TSD, filename ) ;
-         ptr = openfile( TSD, filename, ACCESS_STREAM_REPLACE ) ;
+         if ( ( filename == NULL ) || ( Str_len( filename ) == 0 ) )
+            return ft->stdio_ptr[DEFAULT_STDOUT_INDEX + iserror];
+         if ( ( ptr = getfileptr( TSD, filename ) ) != NULL )
+         {
+            if ( ptr->flag & FLAG_SURVIVOR )
+               return get_file_ptr( TSD, filename, OPER_WRITE, ACCESS_WRITE );
+         }
+         closefile( TSD, filename );
+         ptr = openfile( TSD, filename, ACCESS_STREAM_REPLACE );
          break;
 
       default:
-         ptr = NULL ;
+         ptr = NULL;
          break;
    }
 
-   if ((ptr != NULL) && (ptr->fileptr == NULL))
+   if ( ( ptr != NULL ) && ( ptr->fileptr == NULL ) )
       ptr = NULL;
 
-   return( ptr ) ;
+   return ptr;
 }
 
 streng *addr_io_file( tsd_t *TSD, void *fileptr, const streng *buffer )
@@ -5353,12 +5489,94 @@ streng *addr_io_file( tsd_t *TSD, void *fileptr, const streng *buffer )
 {
    streng *retval = NULL ;
 
+   if ( fileptr == NULL ) /* fixes bug 806948 */
+      return retval;
+
    if ( buffer == NULL )
       retval = readbytes( TSD, fileptr, 0x1000, 1 ) ;
    else
       writebytes( TSD, fileptr, buffer, 1 ) ;
 
    return( retval ) ;
+}
+
+void addr_reset_file( tsd_t *TSD, void *fileptr )
+/* This is the "close" routine for the ADDRESS WITH-redirection. We don't close
+ * the stream, we simply perform a reset, that's enough to restart reading
+ * or writing.
+ */
+{
+   fileboxptr ptr = fileptr;
+
+   if ( fileptr == NULL ) /* fixes bug 806948 */
+      return;
+
+   if ( ptr->fileptr )
+   {
+      clearerr( ptr->fileptr );
+      if ( ptr->flag & FLAG_PERSIST )
+         fseek( ptr->fileptr, 0, SEEK_SET );
+      ptr->thispos = 0;
+      ptr->oper = OPER_NONE;
+   }
+
+   if ( ptr->flag & FLAG_SURVIVOR )
+      ptr->flag &= ~FLAG_ERROR;
+
+   ptr->flag &= ~FLAG_FAKE;
+}
+
+
+streng *addr_file_info( tsd_t *TSD, const streng *source, int defchannel )
+/*
+ * addr_file_info is a helper for the ADDRESS WITH-redirection. source is the
+ * name of the file and may be NULL for a default channel. The channel's number
+ * is used then, 0 = stdin, 1 = stdout, 2 = stderr.
+ * The return name is a fresh copy of the qualified name of the file.
+ */
+{
+   fil_tsd_t *ft;
+   streng *result;
+   fileboxptr p;
+
+   ft = TSD->fil_tsd;
+
+   /*
+    * We don't know anything about the default channels. So just return our
+    * internal name.
+    */
+   if ( source == NULL )
+      return Str_dupstrTSD( ft->stdio_ptr[ defchannel ]->filename0 );
+
+   /*
+    * Check for well known devices, the SURVIVORs. Return a comparable name
+    * which makes sure "<stdin>" is equal to "stdin".
+    */
+   if ( ( p = getfileptr( TSD, source ) ) != NULL )
+   {
+      if ( p->flag & FLAG_SURVIVOR )
+      {
+         if ( p->fileptr == stdin )
+            defchannel = 0;
+         else if ( p->fileptr == stdout )
+            defchannel = 1;
+         else
+            defchannel = 2;
+
+         return Str_dupstrTSD( ft->stdio_ptr[ defchannel ]->filename0 );
+      }
+   }
+
+   /*
+    * Even in case of character devices a name resolution makes sense, e.g.
+    * "tty" may expand to "/dev/tty" or the fifo "local" may expand to
+    * "/somethere/local".
+    */
+   result = Str_makeTSD( REXX_PATH_MAX );
+   my_fullpathstreng( TSD, result->value, source );
+   result->len = strlen( result->value );
+
+   return result;
 }
 
 
@@ -5431,112 +5649,328 @@ streng *arexx_exists( tsd_t *TSD, cparamboxptr parms )
    return retval;
 }
 
+/*
+ * get_external_routine_file opens a file in binary mode and returns the
+ * fully qualified path name on success. NULL is returned otherwise.
+ * The opened file pointer is returned in *fp.
+ */
+static streng *get_external_routine_file( const tsd_t *TSD,
+                                          const char *inname, FILE **fp )
+{
+   char buf[3 * REXX_PATH_MAX + 1];
 
+#ifdef VMS
+   *fp = fopen( inname, "r" );
+#else
+   *fp = fopen( inname, "rb" );
+#endif
+   if ( *fp == NULL )
+      return NULL;
+
+   my_fullpath( buf, inname );
+
+   return Str_crestrTSD( buf );
+}
 
 /*
- * The code in this function borrows heavily from code supplied by
- * Keith Patton (keith,patton@dssi-jcl.com)
+ * See get_external_routine for comments. This function processes one path
+ * element which is passed in path.
+ * suffixes is either NULL or the list of extra suffixes which should be
+ * tested. *fp must be NULL on entry.
+ * path may be NULL if no further directory processing shall happen.
  */
-/* FIXME, FGC:Nothing will happen here if *fp != NULL, is this a wanted side
- * effect?
- */
-/* FIXME, FGC: Is this the right search algorithm? Currently, we search
- * each suffix in the whole path before we check the next extension.
- * I prefer looking in each path element for each extension before we
- * check the next path element.
- */
-void get_external_routine(const tsd_t *TSD,const char *env, const char *inname, FILE **fp, char *retname, int startup)
+static streng *get_external_routine_path( const tsd_t *TSD,
+                                          const char *inname, FILE **fp,
+                                          const char *path,
+                                          const char *suffixes,
+                                          int emptySuffixAllowed )
 {
-   static const char *extensions[] = {"",".rexx",".rex",".cmd",".rx",NULL};
-   char *env_path;
-   char *paths = NULL;
    char outname[REXX_PATH_MAX+1];
-   int i;
-   int start_ext;
+   int i,ilen,hlen;
+   streng *retval;
+   static const char *default_suffixes = "rexx,rex,cmd,rx";
+   const char *suffixlist[2];
+   const char *suffix;
+   int suffixlen;
 
-   /*
-    * If we are searching PATH for Rexx programs, don't look for files
-    * without an extension.
-    * FIXME: What happens if the user supplies an extension like
-    *        foo.rexx? Checking for an existing extension isn't useful
-    *        for "i.like" as a synonym for the file "i.like.rexx".
-    */
-   if ( strcmp( env, "PATH" ) == 0 )
-      start_ext = 1;
+   ilen = strlen( inname );
+   if ( !path )
+      hlen = 0;
    else
-      start_ext = 0;
-   env_path = mygetenv( TSD, env, NULL, 0 ); /* fixes bug 595293 */
-   outname[0] = '\0';
-   for ( i = start_ext; extensions[i] != NULL && *fp == NULL; i++ )
+      hlen = strlen( path );
+   if ( !hlen )
    {
-      /*
-       * Try the filename without any path first
-       */
+      if ( ilen > REXX_PATH_MAX )
+         return NULL;
       strcpy( outname, inname );
-      strcat( outname, extensions[i] );
-#ifdef VMS
-      *fp = fopen(outname, "r");
-#else
-      *fp = fopen(outname, "rb");
-#endif
-      if ( *fp != NULL )
+   }
+   else
+   {
+      if ( ( strchr( FILE_SEPARATORS, inname[0] ) == NULL ) &&
+           ( strchr( FILE_SEPARATORS, path[hlen - 1] ) == NULL ) )
       {
-/*       if (startup) */
-         {
-#if defined(HAVE__FULLPATH)
-            _fullpath( retname, outname, REXX_PATH_MAX );
-#elif defined(HAVE__TRUENAME)
-            _truename( outname, retname );
-#else
-            if ( my_fullpath( retname, outname, REXX_PATH_MAX ) == -1 )
-               retname[0] = '\0';
-#endif
-         }
-         break;
-      }
-
-      paths = env_path;
-      while ( paths && !*fp )
-      {
-         int pathlen;
-         char *sep;
-
-         sep = strchr( paths, PATH_SEPARATOR );
-         pathlen = sep ? sep-paths : strlen(paths);
-         strncpy(outname, paths, pathlen);
-         outname[pathlen] = 0;
-
-         if ( ( pathlen > 0 ) && ( outname[pathlen-1] != FILE_SEPARATOR ) )
-            strcat( outname, FILE_SEPARATOR_STR );
+         if ( ilen + hlen + 1 > REXX_PATH_MAX )
+            return NULL;
+         strcpy( outname, path );
+         strcat( outname, FILE_SEPARATOR_STR );
          strcat( outname, inname );
-         strcat( outname, extensions[i] );
-         paths = sep ? sep+1 : 0; /* set up for next pass */
-#ifdef VMS
-         *fp = fopen( outname, "r" );
-#else
-         *fp = fopen( outname, "rb" );
-#endif
-         if ( *fp != NULL )
-         {
-            if ( startup )
-            {
-#if defined(HAVE__FULLPATH)
-               _fullpath( retname, outname, REXX_PATH_MAX );
-#elif defined(HAVE__TRUENAME)
-               _truename( outname, retname );
-#else
-               if ( my_fullpath( retname, outname, REXX_PATH_MAX ) == -1 )
-                  retname[0] = '\0';
-#endif
-            }
-            break;
-         }
+      }
+      else
+      {
+         if ( ilen + hlen > REXX_PATH_MAX )
+            return NULL;
+         strcpy( outname, path );
+         strcat( outname, inname );
       }
    }
-   if ( env_path )
-      FreeTSD( env_path );
 
-   return;
+   /*
+    * The filename is constructed. Try without fiddling with suffixes first.
+    */
+   if ( emptySuffixAllowed )
+   {
+      if ( ( retval = get_external_routine_file( TSD, outname, fp ) ) != NULL )
+         return retval;
+   }
+
+   /*
+    * Next try the supplied suffix list, then try the default list.
+    * First check if a known extension exists, after every check do the
+    * application.
+    */
+
+   suffixlist[0] = suffixes;
+   suffixlist[1] = default_suffixes;
+   ilen = strlen( outname );
+#define IsDelim(c) ( ( (c) == ',' ) || ( (c) == '.' ) || \
+                     ( (c) == PATH_SEPARATOR ) || rx_isspace(c) )
+   for ( i = 0; i < 2; i++ )
+   {
+      suffixes = suffixlist[i];
+
+      while ( suffixes )
+      {
+         while ( IsDelim(*suffixes) )
+            suffixes++;
+         if ( *suffixes == '\0' )
+            break;
+
+         for ( suffixlen = 1; !IsDelim(suffixes[suffixlen]); suffixlen++ )
+            if ( suffixes[suffixlen] == '\0' )
+               break;
+
+         suffix = suffixes;
+         suffixes += suffixlen;
+
+         if ( suffixlen + 1 > ilen )
+            continue;
+         if ( outname[ ilen - suffixlen - 1 ] != '.' )
+            continue;
+#ifdef CASE_SENSITIVE_FILENAMES
+         if ( memcmp( suffix, outname + ilen - suffixlen, suffixlen - 1 ) )
+#else
+         if ( mem_cmpic( suffix, outname + ilen - suffixlen, suffixlen - 1 ) )
+#endif
+            continue;
+
+         /*
+          * A matching suffix forces us to terminate every further seeking a
+          * proper file.
+          */
+         if ( !emptySuffixAllowed )
+            return get_external_routine_file( TSD, outname, fp );
+         return NULL;
+      }
+   }
+
+   /*
+    * Try the extensions.
+    */
+   for ( i = 0; i < 2; i++ )
+   {
+      suffixes = suffixlist[i];
+
+      while ( suffixes )
+      {
+         while ( IsDelim(*suffixes) )
+            suffixes++;
+         if ( *suffixes == '\0' )
+            break;
+
+         for ( suffixlen = 1; !IsDelim(suffixes[suffixlen]); suffixlen++ )
+            if ( suffixes[suffixlen] == '\0' )
+               break;
+
+         suffix = suffixes;
+         suffixes += suffixlen;
+
+         if ( suffixlen + 1 + ilen > REXX_PATH_MAX )
+            continue;
+         outname[ ilen ] = '.';
+         memcpy( outname + ilen + 1, suffix, suffixlen );
+         outname[ilen + 1 + suffixlen] = '\0';
+         if ( ( retval = get_external_routine_file( TSD, outname, fp ) ) !=
+                                                                         NULL )
+            return retval;
+      }
+   }
+
+#undef Delim
+   return NULL;
+}
+
+/*
+ * See get_external_routine for comments. This function processes a list of
+ * path elements delimited by the path separator which is passed in paths.
+ * suffixes is either NULL or the list of extra suffixes which should be
+ * tested. *fp must be NULL on entry.
+ * paths will be destroyed.
+ */
+static streng *get_external_routine_paths( const tsd_t *TSD,
+                                           const char *inname, FILE **fp,
+                                           char *paths, const char *suffixes,
+                                           int emptySuffixAllowed )
+{
+   char *path;
+   streng *retval;
+
+   if ( *paths == '\0' )
+      return NULL;
+
+   while ( paths )
+   {
+      path = paths;
+      paths = strchr( paths, PATH_SEPARATOR );
+      if ( paths != NULL )
+         *paths++ = '\0';
+
+      if ( *path == '\0')
+      {
+         /*
+          * An empty string is counted as "." in unix systems and ignored in
+          * all other systems.
+          */
+#ifdef UNIX
+         path = ".";
+#else
+         continue;
+#endif
+      }
+
+      retval = get_external_routine_path( TSD, inname, fp, path, suffixes,
+                                          emptySuffixAllowed );
+
+      if ( retval )
+         return retval;
+   }
+
+   return NULL;
+}
+
+/*
+ * get_external_routine searches for a script called inname. Some paths are
+ * search if the file is not found and an extension may be added if no file is
+ * found.
+ *
+ * On success *fp is set to the opened (binary) file and the return value is
+ * the fully qualified file name. If no file was found the return value is
+ * NULL and *fp will be NULL, too.
+ * The returned file name is extended by a terminating '\0' without counting
+ * is in the string's length.
+ *
+ * This is the search algorithm:
+ *
+ * First of all we process the environment variable REGINA_MACROS. If no file
+ * is found we proceed with the current directory and then with the environment
+ * variable PATH. The semantics of the use of REGINA_MACROS and PATH are the
+ * same, and the search in the current directory is omitted for the superuser
+ * in unix systems for security reasons. The current directory must be
+ * specified explicitely by the superuser.
+ * When processing an environment variable the content is split into the
+ * different paths and each path is processed separately.
+ * Note that the search algorithm to this point is ignored if the script name
+ * contains a file path specification. eg. If "CALL .\MYPROG" is called, then
+ * no searching of REGINA_MACROS or PATH is done; only the concatenation of
+ * suffixes is carried out.
+ *
+ * For each file name and path element a concatenated file name is created. If
+ * a known file extension is part of the file name only this file is searched,
+ * otherwise the file name is extended by the extensions "<empty>", ".rexx",
+ * ".rex", ".cmd", ".rx" in this order. The file name case is ignored on
+ * systems that ignore the character case for normal file operations like DOS,
+ * Windows, OS/2.
+ *
+ * The first matching file terminates the whole algorithm and the found file
+ * is returned.
+ *
+ * The environment variable REGINA_SUFFIXES extends the list of known suffixes
+ * as specified above, and is inserted after the "<empty"> extension in the
+ * process. REGINA_SUFFIXES has to contain a space or comma separated list of
+ * extensions, a dot in front of each entry is allowed, e.g.
+ * ".macro,.mac,regina" or "macro mac regina"
+ *
+ * Note that it is planned to extend the list of known suffixes by ".rxc" in
+ * version 3.4 to allow for seemless integration of precompiled macros.
+ */
+streng *get_external_routine( const tsd_t *TSD, const char *inname, FILE **fp )
+{
+   streng *retval=NULL;
+   char *paths;
+   char *suffixes;
+
+   *fp = NULL;
+
+   suffixes = mygetenv( TSD, "REGINA_SUFFIXES", NULL, 0 );
+
+   if ( strpbrk( inname, FILE_SEPARATORS ) != NULL )
+   {
+      retval = get_external_routine_path( TSD, inname, fp, NULL, suffixes, 1 );
+      if ( retval )
+      {
+         if ( suffixes )
+            FreeTSD( suffixes );
+         return retval;
+      }
+      return NULL;
+   }
+
+   if ( ( paths = mygetenv( TSD, "REGINA_MACROS", NULL, 0 ) ) != NULL )
+   {
+      retval = get_external_routine_paths( TSD, inname, fp, paths, suffixes, 1 );
+      FreeTSD( paths );
+      if ( retval )
+      {
+         if ( suffixes )
+            FreeTSD( suffixes );
+         return retval;
+      }
+   }
+
+   paths = ".";
+#ifdef UNIX
+   if ( geteuid() == 0 )
+      paths = NULL;
+#endif
+   if ( paths )
+   {
+      retval = get_external_routine_path( TSD, inname, fp, paths, suffixes, 1 );
+      if ( retval )
+      {
+         if ( suffixes )
+            FreeTSD( suffixes );
+         return retval;
+      }
+   }
+
+   if ( ( paths = mygetenv( TSD, "PATH", NULL, 0 ) ) != NULL )
+   {
+      retval = get_external_routine_paths( TSD, inname, fp, paths, suffixes, 0 );
+      FreeTSD( paths );
+   }
+
+   if ( suffixes )
+      FreeTSD( suffixes );
+   return retval;
 }
 
 /*
@@ -5598,7 +6032,10 @@ void CloseOpenFiles( const tsd_t *TSD )
       }
       ptr = ptr->previous;
    }
-   swapout_all( TSD ) ;
+   /*
+    * Cheat about the const-state.
+    */
+   swapout_all( ( tsd_t *) TSD );
    return;
 }
 
@@ -5607,18 +6044,62 @@ streng *ConfigStreamQualified( tsd_t *TSD, const streng *name )
    return( getstatus( TSD, name, COMMAND_QUERY_EXISTS ) );
 }
 
-#if !defined(HAVE__FULLPATH) && !defined(HAVE__TRUENAME)
+#if defined(HAVE__FULLPATH) || defined(__EMX__)
 /*
- * This function builds up the full pathname of a file
- * It is based heavily on code from splitpath() defined in
- * nonansi.c of Mark Hessling's THE
+ * my_fullpath tries to get the fully qualified name of a file or directory
+ * even if it doesn't exist. It tries to return a reasonable value even if
+ * a path element is missing.
+ * The return value is 0 on success, -1 in case of a severe error.
  */
-# ifdef VMS
+int my_fullpath( char *dst, const char *src )
+{
+   int rc = 0;
+# if defined(__EMX__)
+   int i, len;
+
+   if ( _fullpath( dst, src, REXX_PATH_MAX ) == -1)
+      strcpy( dst, src );
+   /*
+    * Convert / back to \.
+    */
+   len = strlen( dst );
+   for ( i = 0; i < len; i++ )
+   {
+      if ( dst[i] == '/' )
+         dst[i] = '\\';
+   }
+# else
+   if ( _fullpath( dst, src, REXX_PATH_MAX ) == NULL )
+   {
+      strcpy( dst, src );
+      rc = -1;
+   }
+# endif
+
+   return rc;
+}
+#elif defined(HAVE__TRUENAME)
+
+int my_fullpath( char *dst, const char *src )
+{
+   _truename( src, dst );
+
+   return 0;
+}
+#elif defined(HAVE_REALPATH)
+
+int my_fullpath( char *dst, const char *src )
+{
+   realpath( src, dst );
+
+   return 0;
+}
+#elif defined(VMS)
 #  include <ssdef.h>
 #  include <rmsdef.h>
 #  include <descrip.h>
 
-int my_fullpath( char *dst, const char *src, int size )
+int my_fullpath( char *dst, const char *src )
 {
    char *s;
    int status, context = 0;
@@ -5639,28 +6120,24 @@ int my_fullpath( char *dst, const char *src, int size )
    str$free1_dx(&result_dx);
    return(0);
 }
-#else
+#else /* neither _FULLPATH, _TRUENAME, REALNAME, VMS */
 
-int my_fullpath( char *dst, const char *src, int size )
+int my_fullpath( char *dst, const char *src )
 {
    char tmp[REXX_PATH_MAX+1];
    char curr_path[REXX_PATH_MAX+1];
    char path[REXX_PATH_MAX+1];
    char fname[REXX_PATH_MAX+1];
-   int i = 0, len = -1;
+   int i = 0, len = -1, retval;
    struct stat stat_buf;
 
-# ifdef __EMX__
-   _getcwd2(curr_path,REXX_PATH_MAX);
-# else
    getcwd(curr_path,REXX_PATH_MAX);
-# endif
 
    strcpy(tmp,src);
    /*
     * First determine if the supplied filename is a directory.
     */
-# if defined(__EMX__) || defined(DJGPP) || defined(__WINS__) || defined(__EPOC32__)
+# if defined(DJGPP) || defined(__WINS__) || defined(__EPOC32__)
    for ( i = 0; i < strlen( tmp ); i++ )
       if ( tmp[ i ] == '\\' )
          tmp[ i ] = '/';
@@ -5684,11 +6161,7 @@ int my_fullpath( char *dst, const char *src, int size )
       switch(len)
       {
          case (-1):
-# ifdef __EMX__
-            _getcwd2(path,REXX_PATH_MAX);
-# else
             getcwd(path,REXX_PATH_MAX);
-# endif
             strcpy(fname,tmp);
             break;
          case 0:
@@ -5708,23 +6181,16 @@ int my_fullpath( char *dst, const char *src, int size )
     * expanded path.
     * If an error, restore the current path.
     */
-# ifdef __EMX__
-   if (_chdir2(path) != 0)
-   {
-      _chdir2(curr_path);
-      return(-1);
-   }
-   _getcwd2(path,REXX_PATH_MAX);
-   _chdir2(curr_path);
-# else
    if (chdir(path) != 0)
    {
-      chdir(curr_path);
-      return(-1);
+      retval = -1;
    }
-   getcwd(path,REXX_PATH_MAX);
+   else
+   {
+      getcwd(path,REXX_PATH_MAX);
+      retval = 0;
+   }
    chdir(curr_path);
-# endif
    /*
     * Append the OS directory character to the path if it doesn't already
     * end in the character.
@@ -5734,15 +6200,15 @@ int my_fullpath( char *dst, const char *src, int size )
    {
 # if defined(__WINS__) || defined(__EPOC32__)
       if ( path[ len - 1 ] != '\\'
-#else
+# else
       if ( path[ len - 1 ] != '/'
-#endif
+# endif
       &&  strlen( fname ) != 0 )
       {
          strcat(path,"/");
          len++;
       }
-# if defined(__EMX__) || defined(DJGPP) || defined(__WINS__) || defined(__EPOC32__)
+# if defined(DJGPP) || defined(__WINS__) || defined(__EPOC32__)
       for ( i = 0; i < len; i++ )
          if ( path[ i ] == '/' )
             path[ i ] = '\\';
@@ -5750,11 +6216,22 @@ int my_fullpath( char *dst, const char *src, int size )
    }
    strcpy(dst,path);
    strcat(dst,fname);
-   size = size; /* keep compiler happy */
-   return(0);
+
+   return retval;
 }
-# endif
 #endif
+
+int my_fullpathstreng( const tsd_t *TSD, char *dst, const streng *src )
+{
+   char *copy;
+   int retval;
+
+   copy = str_ofTSD( src );
+   retval = my_fullpath( dst, copy );
+   FreeTSD( copy );
+
+   return retval;
+}
 
 #if !defined(HAVE__SPLITPATH2) && !defined(HAVE__SPLITPATH) && !defined(__EMX__) && !defined(DJGPP)
 int my_splitpath2( const char *in, char *out, char **drive, char **dir, char **name, char **ext )
@@ -5807,7 +6284,7 @@ int my_splitpath2( const char *in, char *out, char **drive, char **dir, char **n
       last_pos++;
       *name = out+last_pos;
       memcpy(*name, in, inlen);
-      *(name+inlen) = '\0';
+      *(*name+inlen) = '\0';
    }
    return(0);
 }
