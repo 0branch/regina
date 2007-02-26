@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.22 2003/03/16 04:20:03 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.23 2003/04/13 09:53:09 florian Exp $";
 #endif
 
 /*
@@ -878,7 +878,17 @@ whatever    : WHATEVER                 { $$ = (nodeptr)Str_cre_TSD(parser_data.T
 
 assignment  : ass_part nexpr seps      { $$ = $1 ;
                                          $$->p[1] = $2 ;
-                                         if (($2) && gettypeof($$->p[1])==IS_A_NUMBER)
+                                         /*
+                                          * An assignment is a numerical
+                                          * assignment if and only if we have
+                                          * to do a numerical operation, which
+                                          * is equivalent to the existence of
+                                          * one more argument to $2.
+                                          * This fixes bug 720166.
+                                          */
+                                         if ($2 &&
+                                             $2->p[0] &&
+                                             gettypeof($2) == IS_A_NUMBER)
                                             $$->type = X_NASSIGN ; }
             ;
 

@@ -1262,7 +1262,7 @@ int main( int argc, char *argv[] )
    version.strptr = NULL;
    /* This might not work if we check another Rexx: */
    versioncode = ReginaVersion(&version);
-   printf("Regina's version is %lu.%02lu",
+   printf("Regina's version is %lu.%lu",
           versioncode >> 8,
           versioncode & 0xFF);
    if (version.strptr)

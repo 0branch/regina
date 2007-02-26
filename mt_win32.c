@@ -107,7 +107,7 @@ static unsigned sizeof_ptr(void)
 }
 
 /* Lowest level memory allocation function for normal circumstances. */
-static void *MTMalloc(const tsd_t *TSD,size_t size)
+static void *MTMalloc( const tsd_t *TSD, size_t size )
 {
    mt_tsd_t *mt = TSD->mt_tsd;
 
@@ -118,9 +118,15 @@ static void *MTMalloc(const tsd_t *TSD,size_t size)
 }
 
 /* Lowest level memory deallocation function for normal circumstances. */
-static void MTFree(const tsd_t *TSD,void *chunk)
+static void MTFree( const tsd_t *TSD, void *chunk )
 {
    mt_tsd_t *mt = TSD->mt_tsd;
+
+   /*
+    * Just in case...
+    */
+   if ( chunk == NULL) 
+      return;
 
    if (mt == NULL)
       return; /* ??? */

@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: wrappers.c,v 1.14 2002/07/28 02:27:06 mark Exp $
+ * $Id: wrappers.c,v 1.18 2003/04/26 01:09:02 florian Exp $
  */
 
 /*
@@ -183,7 +183,6 @@ static void rxstrupr(unsigned char * s, unsigned char *e)
    }
 }
 
-
 void *wrapper_load( const tsd_t *TSD, const streng *module )
 {
    handle_type handle=(handle_type)NULL ;
@@ -227,13 +226,13 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    handle = dlopen( file_name, RTLD_LAZY ) ;
 
    /* deal with incorrect case in call */
-   if (handle == NULL) 
+   if (handle == NULL)
    {
       rxstrlwr(udpart,postfix);
       handle = dlopen(module_name, RTLD_LAZY);
 
-      if (handle == NULL) 
-      {                  
+      if (handle == NULL)
+      {
          rxstrupr(udpart,postfix);
          handle = dlopen(module_name, RTLD_LAZY);
          /*
@@ -261,13 +260,13 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    }
 #elif defined(DYNAMIC_HPSHLOAD)
    handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH, 0L ) ;
-   if (handle == NULL) 
+   if (handle == NULL)
    {
       rxstrlwr(udpart,postfix);
       find_shared_library(TSD,module_name,"SHLIB_PATH",buf);
       handle = shl_load( file_name, BIND_IMMEDIATE | DYNAMIC_PATH ,0L ) ;
 
-      if (handle == NULL) 
+      if (handle == NULL)
       {
          rxstrupr(udpart,postfix);
          find_shared_library(TSD,module_name,"SHLIB_PATH",buf);
@@ -286,7 +285,9 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
          handle = NULL ;
    }
    else
+   {
       set_err_message(TSD,  "load() failed: ", strerror( errno )) ;
+   }
 #elif defined(DYNAMIC_OS2)
    rc = DosLoadModule( LoadError, sizeof(LoadError),
                        file_name, &handle ) ;
@@ -316,7 +317,7 @@ void *wrapper_load( const tsd_t *TSD, const streng *module )
    return (void *)handle ;
 }
 
-PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng *name)
+PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng *name )
 {
    PFN addr;
    handle_type handle=(handle_type)lptr->handle;
@@ -360,6 +361,7 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    us_func->len = 1;
    Str_catTSD( us_func, name );
    funcname = str_of( TSD, us_func );
+   Free_stringTSD( us_func );
 # endif
    /*
     * Note, the following assignment is not allowed by ANSI, but SVR4.2
@@ -368,18 +370,18 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    addr = (PFN)(dlsym( handle, funcname )) ;
 
    /* deal with, eg 'SysLoadFuncs' when the function is 'sysloadfuncs' or 'SYSLOADFUNCS' */
-   if (addr == NULL) 
+   if (addr == NULL)
    {
       rxstrupr(funcname,NULL);
       addr = (PFN)(dlsym( handle, funcname )) ;
 
-      if (addr == NULL) 
+      if (addr == NULL)
       {
          rxstrlwr(funcname,NULL);
          addr = (PFN)(dlsym( handle, funcname )) ;
 
          if (addr==NULL)
-            set_err_message(TSD,  "dlsym() failed: ", dlerror()) ;
+            set_err_message( TSD,  "dlsym() failed: ", dlerror() );
       }
    }
 
@@ -397,7 +399,7 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
             if (rc = shl_findsym( &handle, funcname, TYPE_PROCEDURE, &eaddr ))
             {
                addr = NULL ;
-               set_err_message(TSD,  "shl_findsym() failed: ", strerror(errno)) ;
+               set_err_message( TSD,  "shl_findsym() failed: ", strerror(errno) );
             }
          }
       }
@@ -424,19 +426,19 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
     */
    addr = (PFN)GetProcAddress((HMODULE)handle,funcname);
 
-   if (addr == NULL) 
+   if (addr == NULL)
    {
       strlwr(funcname);
       addr = (PFN)GetProcAddress((HMODULE)handle,funcname);
 
-      if (addr == NULL) 
+      if (addr == NULL)
       {
          strupr(funcname);
          addr = (PFN)GetProcAddress((HMODULE)handle, funcname);
          if (addr == NULL)
          {
             FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT), LoadError, 256, NULL ) ;
-            set_err_message(TSD, "GetProcAddress() failed: ", LoadError ) ;
+            set_err_message( TSD, "GetProcAddress() failed: ", LoadError );
          }
       }
    }
@@ -447,12 +449,12 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    {
       char buf[150];
       sprintf(buf,"get_image_symbol() failed with %d looking for %s", rc, funcname );
-      set_err_message(TSD,  buf, "" ) ;
+      set_err_message( TSD,  buf, "" );
       addr = NULL;
    }
 #endif
 
-   FreeTSD( funcname ) ;
+   FreeTSD( funcname );
 
    if (addr)
       return (PFN)addr ;

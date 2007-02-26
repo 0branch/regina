@@ -32,6 +32,9 @@
 #include <stdlib.h>
 #include <process.h>
 #include <tchar.h>
+#ifdef __LCC__
+# include <winsvc.h>
+#endif
 
 #include "service.h"
 

@@ -13,8 +13,6 @@
 #              your LIB-variable.
 # regina.dll   dynamic link library of the REXX interpreter, place anywhere
 #              in a directory of your PATH.
-# reginats.dll thread-safe dynamic link library of the REXX interpreter, place anywhere
-#              in a directory of your PATH.
 # regina.exe   dynamically bound REXX interpreter
 #
 # rxstack.exe  daemon process that provides external queues
@@ -30,8 +28,8 @@ SRCDIR=$(REGINA_SRCDIR)
 #SRCDIR=path_to_this_file
 #
 
-VER=31
-VERDOT=3.1
+VER=32
+VERDOT=3.2
 
 CC = cl
 
@@ -57,9 +55,9 @@ NOFLISTS =
 !endif
 
 THREADING = /MT
-TSDYN_COMP = /LD /DDYNAMIC
 
 DYN_COMP = /LD /DDYNAMIC
+TSDYN_COMP = /LD /DDYNAMIC
 
 !ifdef "$(SOCKET)"
 REXXSOCKET="-DRXSOCKET=$(SOCKET)"
@@ -68,11 +66,10 @@ REXXSOCKET="-DRXSOCKET=$(SOCKET)"
 LIBS = advapi32.lib user32.lib #libc.lib
 WINSOCK = wsock32.lib
 SERVICELIBS = libcmt.lib kernel32.lib advapi32.lib shell32.lib
-SHL_TARGETS= regina.exe test1.dll test2.dll reginats.dll
+SHL_TARGETS= regina.exe test1.dll test2.dll
 LD     = link
 LIBFLAGS = /OUT:rexx.lib
 LIBLINK = regina.lib
-TSLIBLINK = reginats.lib
 LINKSHL = regina.lib
 LD_RXLIBPRE=link /NOLOGO /DLL /OUT:$@
 LD_RXLIB1= /DEF:$(SRCDIR)\test1_w32_dll.def
@@ -124,13 +121,6 @@ OFILES = funcs.obj builtin.obj error.obj variable.obj \
         strmath.obj signals.obj macros.obj envir.obj expr.obj instore.obj rexxbif.obj \
         extlib.obj yaccsrc.obj lexsrc.obj options.obj doscmd.obj wrappers.obj mt_notmt.obj #r2perl.obj
 
-SHOFILES = funcs.dll.obj builtin.dll.obj error.dll.obj variable.dll.obj extstack.dll.obj rexxbif.dll.obj \
-        interprt.dll.obj debug.dll.obj dbgfuncs.dll.obj memory.dll.obj parsing.dll.obj files.dll.obj \
-        misc.dll.obj unxfuncs.dll.obj arxfuncs.dll.obj cmsfuncs.dll.obj os2funcs.dll.obj shell.dll.obj rexxext.dll.obj stack.dll.obj \
-        tracing.dll.obj interp.dll.obj cmath.dll.obj convert.dll.obj strings.dll.obj library.dll.obj \
-        strmath.dll.obj signals.dll.obj macros.dll.obj envir.dll.obj expr.dll.obj instore.dll.obj \
-        extlib.dll.obj yaccsrc.dll.obj lexsrc.dll.obj wrappers.dll.obj options.dll.obj doscmd.dll.obj \
-        rexx.dll.obj client.dll.obj rexxsaa.dll.obj mt_notmt.dll.obj
 TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj extstack.ts.obj rexxbif.ts.obj \
         interprt.ts.obj debug.ts.obj dbgfuncs.ts.obj memory.ts.obj parsing.ts.obj files.ts.obj \
         misc.ts.obj unxfuncs.ts.obj arxfuncs.ts.obj cmsfuncs.ts.obj os2funcs.ts.obj shell.ts.obj rexxext.ts.obj stack.ts.obj \
@@ -178,7 +168,7 @@ rexx.exe : $(OFILES) rexx.obj rexxw32exe.obj nosaa.obj
          $(LD) $(LINKOPT) $(STATIC_LDFLAGS) /OUT:rexx.exe $(OFILES) rexx.obj rexxw32exe.obj nosaa.obj $(LIBS) $(WINSOCK)
 
 regina.exe : regina.dll regina.obj reginaw32exe.obj
-         $(LD) $(LINKOPT) $(DYNAMIC_LDFLAGS) /OUT:regina.exe regina.obj reginaw32exe.obj $(LINKSHL) $(LIBS) $(WINSOCK)
+         $(LD) $(LINKOPT) $(DYNAMIC_LDFLAGS) /OUT:regina.exe regina.obj reginaw32exe.obj $(LIBS) $(LIBLINK) $(WINSOCK)
 
 execiser.exe : execiser.obj regina.dll
          $(LD) $(LINKOPT) /OUT:execiser.exe execiser.obj $(LIBLINK)
@@ -189,18 +179,14 @@ rxqueue.exe : rxqueue.obj erexxbif.obj eextstack.obj rxqueuew32exe.obj
 rxstack.exe : rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstackw32exe.obj
          $(LD) $(LINKOPT) /OUT:rxstack.exe rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstackw32exe.obj $(WINSOCK) $(SERVICELIBS)
 
-threader.exe : threader.obj reginats.dll
-         $(LD) $(LINKOPT) /OUT:threader.exe threader.obj $(TSLIBLINK)
+threader.exe : threader.obj regina.dll
+         $(LD) $(LINKOPT) /OUT:threader.exe threader.obj $(LIBLINK)
 
 rexx.lib: $(OFILES) client.obj drexx.obj rexxsaa.obj
         lib $(LIBFLAGS) $(OFILES) client.obj drexx.obj rexxsaa.obj
 
-regina.dll: $(SHOFILES) reginaw32dll.obj
-        link $(LINKOPT) /DLL /BASE:0x6B000000 /OUT:regina.dll /MAP:regina_dd.map /IMPLIB:regina.lib /DEF:$(SRCDIR)\regina_w32_dll.def reginaw32dll.obj *.dll.obj $(LIBS) $(WINSOCK)
-
-reginats.dll: $(TSFILES) reginatsw32dll.obj
-        link $(LINKOPT) /DLL /BASE:0x6B000000 /OUT:reginats.dll /MAP:regina_ts.map /IMPLIB:reginats.lib /DEF:$(SRCDIR)\reginats_w32_dll.def reginatsw32dll.obj *.ts.obj $(LIBS) $(WINSOCK)
-
+regina.dll: $(TSFILES) reginaw32dll.obj
+        link $(LINKOPT) /DLL /BASE:0x6B000000 /OUT:regina.dll /MAP:regina_dd.map /IMPLIB:regina.lib /DEF:$(SRCDIR)\regina_w32_dll.def reginaw32dll.obj *.ts.obj $(LIBS) $(WINSOCK)
 
 #
 # Convert .mts to .mtb
@@ -326,7 +312,7 @@ rexxsaa.obj :    $(SRCDIR)/rexxsaa.c   $(SRCDIR)\rexxsaa.h
         $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/rexxsaa.c
 
 regina.obj :  $(SRCDIR)/regina.c
-        $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/regina.c
+        $(CC) $(TSCOPT) $(CC2O) -c $(SRCDIR)/regina.c
 
 drexx.obj : $(SRCDIR)/rexx.c
         $(CC) $(COPT) -c -DRXLIB $(CC2O) $(SRCDIR)/rexx.c
@@ -381,135 +367,6 @@ eextstack.obj : $(SRCDIR)/extstack.c $(SRCDIR)/rexx.h
 
 eextstack_mt.obj : $(SRCDIR)/extstack.c $(SRCDIR)/rexx.h
         $(CC) -DEXTERNAL_TO_REGINA $(TSCOPT) $(CC2O) -c $(SRCDIR)/extstack.c
-
-#
-# Rules for shared objects
-#
-funcs.dll.obj :   $(SRCDIR)/funcs.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/funcs.c
-
-builtin.dll.obj : $(SRCDIR)/builtin.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/builtin.c
-
-error.dll.obj :   $(SRCDIR)/error.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/error.c
-
-variable.dll.obj :$(SRCDIR)/variable.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/variable.c
-
-interprt.dll.obj :$(SRCDIR)/interprt.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/interprt.c
-
-debug.dll.obj :   $(SRCDIR)/debug.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/debug.c
-
-dbgfuncs.dll.obj :$(SRCDIR)/dbgfuncs.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/dbgfuncs.c
-
-memory.dll.obj :  $(SRCDIR)/memory.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/memory.c
-
-parsing.dll.obj : $(SRCDIR)/parsing.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/parsing.c
-
-files.dll.obj :   $(SRCDIR)/files.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/files.c
-
-misc.dll.obj :    $(SRCDIR)/misc.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/misc.c
-
-unxfuncs.dll.obj :$(SRCDIR)/unxfuncs.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/unxfuncs.c
-
-arxfuncs.dll.obj :$(SRCDIR)/arxfuncs.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/arxfuncs.c
-
-os2funcs.dll.obj :$(SRCDIR)/os2funcs.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/os2funcs.c
-
-cmsfuncs.dll.obj :$(SRCDIR)/cmsfuncs.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/cmsfuncs.c
-
-shell.dll.obj :   $(SRCDIR)/shell.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/shell.c
-
-rexxext.dll.obj : $(SRCDIR)/rexxext.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/rexxext.c
-
-stack.dll.obj :   $(SRCDIR)/stack.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/stack.c
-
-tracing.dll.obj : $(SRCDIR)/tracing.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/tracing.c
-
-interp.dll.obj :  $(SRCDIR)/interp.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/interp.c
-
-cmath.dll.obj :   $(SRCDIR)/cmath.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/cmath.c
-
-convert.dll.obj : $(SRCDIR)/convert.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/convert.c
-
-strings.dll.obj : $(SRCDIR)/strings.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/strings.c
-
-library.dll.obj : $(SRCDIR)/library.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/library.c
-
-strmath.dll.obj : $(SRCDIR)/strmath.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/strmath.c
-
-signals.dll.obj : $(SRCDIR)/signals.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/signals.c
-
-macros.dll.obj :  $(SRCDIR)/macros.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/macros.c
-
-envir.dll.obj :   $(SRCDIR)/envir.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/envir.c
-
-expr.dll.obj :    $(SRCDIR)/expr.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/expr.c
-
-extlib.dll.obj :  $(SRCDIR)/extlib.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/extlib.c
-
-wrappers.dll.obj :$(SRCDIR)/wrappers.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/wrappers.c
-
-options.dll.obj : $(SRCDIR)/options.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/options.c
-
-doscmd.dll.obj :  $(SRCDIR)/doscmd.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/doscmd.c
-
-client.dll.obj :  $(SRCDIR)/client.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/client.c
-
-rexxsaa.dll.obj :  $(SRCDIR)/rexxsaa.c  $(SRCDIR)\rexxsaa.h
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/rexxsaa.c
-
-rexx.dll.obj : $(SRCDIR)/rexx.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c -DRXLIB $(SRCDIR)/rexx.c
-
-instore.dll.obj :  $(SRCDIR)/instore.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/instore.c
-
-mt_notmt.dll.obj :$(SRCDIR)/mt_notmt.c
-        $(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/mt_notmt.c
-
-lexsrc.dll.obj : $(SRCDIR)/lexsrc.c $(SRCDIR)/rexx.h $(SRCDIR)/yaccsrc.h
-        $(CC) $(OTHERCOPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/lexsrc.c
-
-yaccsrc.dll.obj : $(SRCDIR)/yaccsrc.c $(SRCDIR)/defs.h $(SRCDIR)/rexx.h
-        $(CC) $(OTHERCOPT) $(CC2O) $(DYN_COMP) -c -DYYMAXDEPTH=10000 $(SRCDIR)/yaccsrc.c
-
-extstack.dll.obj : $(SRCDIR)/extstack.c $(SRCDIR)/rexx.h
-        $(CC) $(OTHERCOPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/extstack.c
-
-rexxbif.dll.obj : $(SRCDIR)/rexxbif.c $(SRCDIR)/rexx.h
-        $(CC) $(OTHERCOPT) $(CC2O) $(DYN_COMP) -c $(SRCDIR)/rexxbif.c
 
 #
 # Rules for thread-safe shared objects

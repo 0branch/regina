@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: unxfuncs.c,v 1.22 2002/12/28 09:38:34 mark Exp $";
+static char *RCSid = "$Id: unxfuncs.c,v 1.23 2003/04/16 10:45:56 mark Exp $";
 #endif
 
 /*
@@ -388,7 +388,7 @@ streng *unx_crypt( tsd_t *TSD, cparamboxptr parms )
    else
       retval = nullstringptr() ;
 #else
-   retval = parms->value ;
+   retval = Str_dup( parms->value );
 #endif
    TSD = TSD; /* keep compiler happy */
    return retval ;

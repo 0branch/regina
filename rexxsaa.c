@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rexxsaa.c,v 1.31 2003/04/03 11:01:18 mark Exp $";
+static char *RCSid = "$Id: rexxsaa.c,v 1.32 2003/04/16 10:46:13 mark Exp $";
 #endif
 /*
  *  The Regina Rexx Interpreter
@@ -686,6 +686,7 @@ int IfcDoExit( const tsd_t *TSD, int Code,
    MAKERXSTRING( siodtr.rxsiodtr_retc, NULL, 0) ; /* Make compiler happy */
    MAKERXSTRING( siotrd.rxsiotrd_retc, NULL, 0) ; /* Make compiler happy */
    MAKERXSTRING( envget.rxenv_value, NULL, 0) ; /* Make compiler happy */
+   MAKERXSTRING( cwdget.rxcwd_value, NULL, 0) ; /* Make compiler happy */
 
    switch (Code)
    {

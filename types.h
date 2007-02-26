@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: types.h,v 1.18 2002/09/07 13:25:15 florian Exp $
+ * $Id: types.h,v 1.19 2003/04/26 01:09:02 florian Exp $
  */
 
 
@@ -454,6 +454,7 @@ typedef unsigned long (*PFN)() ;
 struct library_func {
    streng *name ;
    PFN addr  ;
+   void *gci_info;
    unsigned long hash ;
    struct library *lib ;
    struct library_func *next, *prev ;

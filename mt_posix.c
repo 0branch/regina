@@ -93,7 +93,7 @@ static void ThreadGetKey(void)
 }
 
 /* Lowest level memory allocation function for normal circumstances. */
-static void *MTMalloc(const tsd_t *TSD,size_t size)
+static void *MTMalloc( const tsd_t *TSD, size_t size )
 {
    mt_tsd_t *mt;
    MT_mem *new = malloc(size + sizeof(MT_mem));
@@ -111,20 +111,30 @@ static void *MTMalloc(const tsd_t *TSD,size_t size)
 }
 
 /* Lowest level memory deallocation function for normal circumstances. */
-static void MTFree(const tsd_t *TSD,void *chunk)
+static void MTFree( const tsd_t *TSD, void *chunk )
 {
    mt_tsd_t *mt = TSD->mt_tsd;
    MT_mem *this;
+
+   /*
+    * Just in case...
+    */
+   if ( chunk == NULL) 
+      return;
 
    this = chunk;
    this--; /* Go to the header of the chunk */
 
    if (this->prev)
+   {
       if (this->prev->next != this)
          return;
+   }
    if (this->next)
+   {
       if (this->next->prev != this)
          return;
+   }
 
    /* This is a chunk allocated by MTMalloc */
    if (this->prev)

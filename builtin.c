@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: builtin.c,v 1.27 2003/02/23 09:39:55 florian Exp $";
+static char *RCSid = "$Id: builtin.c,v 1.28 2003/04/17 23:25:18 florian Exp $";
 #endif
 
 /*
@@ -1885,20 +1885,7 @@ streng *std_errortext( tsd_t *TSD, cparamboxptr parms )
 
    Free_stringTSD( tmp ) ;
 
-#if 0
-   if ( suberrnum == 0)
-      return Str_creTSD( errortext( errnum ) ) ;
-   else
-   {
-      err = suberrortext( errnum, suberrnum );
-      if (err == NULL )
-         return Str_creTSD( "" );
-      else
-         return Str_creTSD( err );
-   }
-#else
-   return Str_creTSD( errortext( TSD, errnum, suberrnum, (opt=='S')?1:0, 1 ) ) ;
-#endif
+   return Str_dupTSD( errortext( TSD, errnum, suberrnum, (opt=='S')?1:0, 1 ) ) ;
 }
 
 

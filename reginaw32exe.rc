@@ -1,8 +1,8 @@
 #include "winver.h"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,1,0,0
- PRODUCTVERSION 3,1,0,0
+ FILEVERSION 3,2,0,0
+ PRODUCTVERSION 3,2,0,0
  FILEFLAGSMASK 0x0L
  FILEFLAGS 0x0L
  FILEOS 0x40004L
@@ -15,14 +15,14 @@ BEGIN
         BEGIN
             VALUE "Author", "Anders Christensen\0"
             VALUE "FileDescription", "Regina Rexx Launcher\0"
-            VALUE "FileVersion", "3.1.0\0"
+            VALUE "FileVersion", "3.2.0\0"
             VALUE "InternalName", "Regina\0"
             VALUE "LegalCopyright", "Copyright © 1990 - 2003\0"
             VALUE "License", "GNU Library General Public License. See file COPYING-LIB for details.\0"
             VALUE "Maintainer", "Mark Hessling\0"
             VALUE "OriginalFilename", "REGINA.EXE\0"
             VALUE "ProductName", "Regina Rexx Interpreter\0"
-            VALUE "ProductVersion", "3.1.0\0"
+            VALUE "ProductVersion", "3.2.0\0"
         END
     END
 

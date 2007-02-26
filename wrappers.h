@@ -21,6 +21,7 @@
 #define IfcDeleteQueue               __regina_IfcDeleteQueue
 #define IfcDelFunc                   __regina_IfcDelFunc
 #define IfcDoExit                    __regina_IfcDoExit
+#define IfcExecCallBack              __regina_IfcExecCallBack
 #define IfcExecFunc                  __regina_IfcExecFunc
 #define IfcExecScript                __regina_IfcExecScript
 #define IfcFreeMemory                __regina_IfcFreeMemory
@@ -192,6 +193,7 @@
 #define drop_dirvar                  __regina_drop_dirvar
 #define drop_var                     __regina_drop_var
 #define dumptree                     __regina_dumptree
+#define dumpvarcontent               __regina_dumpvarcontent
 #define dumpvars                     __regina_dumpvars
 #define enter_macro                  __regina_enter_macro
 #define envir_exists                 __regina_envir_exists
@@ -360,6 +362,7 @@
 #define retlength                    __regina_retlength
 #define retvalue                     __regina_retvalue
 #define rex_rxfuncadd                __regina_rex_rxfuncadd
+#define rex_rxfuncdefine             __regina_rex_rxfuncdefine
 #define rex_rxfuncdlldrop            __regina_rex_rxfuncdlldrop
 #define rex_rxfuncdllquery           __regina_rex_rxfuncdllquery
 #define rex_rxfuncdrop               __regina_rex_rxfuncdrop

@@ -55,7 +55,10 @@ typedef long long int long_long;
 #endif
 
 #if !defined(HAVE_DRAND48)
-/* Random number generation using the linear congruential algorithm
+/* THIS CODE IS NOT REENTRANT AND IT WILL NEVER BE SINCE IT MAY OVERWRITES
+   EXISTING LIBRARY FUNCTIONS. THIS CODE'S USAGE HAS TO BE REWRITTEN! Florian
+
+   Random number generation using the linear congruential algorithm
    X(n+1) = (a * X(n) + c) mod m
    with a precision of 48 bits.
 
@@ -73,14 +76,14 @@ typedef long long int long_long;
    parm[6] is the value of c.
 */
 #define X0 0x1234 /* MSB * Initial value for Xn, obtained using seed48() */
-#define X1 0xABCD	/* on SunOS 4.1.3 */
+#define X1 0xABCD /* on SunOS 4.1.3 */
 #define X2 0x330E
 
 #define A0 0x0005 /* MSB * Default value for a, taken from the man page */
 #define A1 0xDEEC
 #define A2 0xE66D
 
-#define C0 0x000B	/* Default value for c, taken from the man page */
+#define C0 0x000B /* Default value for c, taken from the man page */
 
 static unsigned short parm[7] = {
   X2, X1, X0,
@@ -104,7 +107,7 @@ static unsigned short parm[7] = {
 
 */
 
-#define EPSILON	(double)ULONG_MAX*(1.0/(1.0-DBL_EPSILON)-1.0)
+#define EPSILON (double)ULONG_MAX*(1.0/(1.0-DBL_EPSILON)-1.0)
 
 
 /*--------------------------------------------------------------------------*
@@ -118,8 +121,8 @@ void
 srand48(long seed)
 {
   parm[0] = 0x330E;
-  parm[1] = ((unsigned long)seed) & 0xFFFF;
-  parm[2] = ((unsigned long)seed >> 16) & 0xFFFF;
+  parm[1] = (unsigned short)(((unsigned long)seed) & 0xFFFF);
+  parm[2] = (unsigned short)(((unsigned long)seed >> 16) & 0xFFFF);
   parm[3] = A2;
   parm[4] = A1;
   parm[5] = A0;
@@ -133,6 +136,10 @@ srand48(long seed)
 unsigned short *
 seed48(unsigned short *seed)
 {
+  /*
+   * Note: This function isn't reentrant. I hope we never get strange
+   * effects. Florian. PS: Why does this exist? It isn't referenced.
+   */
   static unsigned short oldparm[3];
   unsigned short tmpparm[3];
 
@@ -294,16 +301,15 @@ erand48(unsigned short seed[3])
  */
 int init_arexxf ( tsd_t *TSD )
 {
-  arexx_tsd_t *atsd = (arexx_tsd_t *)malloc( sizeof(arexx_tsd_t) );
+   arexx_tsd_t *at;
 
-  if (atsd==NULL) return 0;
+   if ( TSD->arx_tsd != NULL )
+      return 1;
 
-  TSD->arx_tsd = (void *)atsd;
-
-  /* Allocate later because systeminfo is not initialized at the moment */
-  atsd->amilevel = NULL;
-
-  return 1;
+   if ( ( at = TSD->arx_tsd = MallocTSD( sizeof( arexx_tsd_t ) ) ) == NULL )
+      return 0;
+   memset( at, 0, sizeof( arexx_tsd_t ) );
+   return 1;
 }
 
 
@@ -370,7 +376,7 @@ static FILE *getfile( tsd_t *TSD, const streng *name )
 static streng *getfilenames( tsd_t *TSD, const streng *sep )
 {
   proclevel oldlevel = setamilevel( TSD );
-  streng *retval, *tmpstr;
+  streng *retval = NULL, *tmpstr;
   int first = 1;
   variableptr var;
 
@@ -645,7 +651,6 @@ streng *arexx_readch( tsd_t *TSD, cparamboxptr parm1 )
   else
   {
     int count, error;
-    char *buffer;
     streng *ret;
 
     count = streng_to_int( TSD, parm2->value, &error );
@@ -655,13 +660,20 @@ streng *arexx_readch( tsd_t *TSD, cparamboxptr parm1 )
     if ( count<=0 )
       exiterror( ERR_INCORRECT_CALL, 14, "READCH", 2, tmpstr_of( TSD, parm2->value ) );
 
-    buffer = malloc( count + 1 );
+    ret = Str_makeTSD( count );
 
-    count = fread( buffer, 1, count, file );
-    buffer[count + 1] = 0;
+    count = fread( ret->value, 1, count, file );
+    if ( count == -1 )
+    {
+       /*
+        * Fixme: What shall happen in this case?
+        *        Setting count to 0 seems a little bit weak for me but better
+        *        than doing more strange things. FGC
+        */
+       count = 0;
+    }
+    Str_len( ret ) = count;
 
-    ret = Str_cre_TSD( TSD, buffer );
-    free(buffer);
     return ret;
   }
 }
@@ -864,7 +876,7 @@ static int firstbit(char c)
     if (c & 1)
       return i;
     else
-      c = c >> 1;
+      c = (char)(c >> 1);
   }
 
   return 8;
@@ -899,7 +911,7 @@ streng *arexx_bitcomp( tsd_t *TSD, cparamboxptr parm1 )
        cp1--, cp2--, i++ )
   {
     if ( *cp1 != *cp2 )
-      return int_to_streng( TSD, i*8 + firstbit( *cp1 ^ *cp2 ) );
+      return int_to_streng( TSD, i*8 + firstbit( ( char ) ( *cp1 ^ *cp2 ) ) );
   }
 
   parm3 = parm2->next;
@@ -913,7 +925,7 @@ streng *arexx_bitcomp( tsd_t *TSD, cparamboxptr parm1 )
   cp1--, i++ )
   {
     if ( *cp1 != pad )
-      return int_to_streng( TSD, i*8 + firstbit( *cp1 ^ pad ) );
+      return int_to_streng( TSD, i*8 + firstbit( ( char ) ( *cp1 ^ pad ) ) );
   }
 
   return int_to_streng( TSD, -1 );
@@ -1259,6 +1271,10 @@ streng *arexx_show( tsd_t *TSD, cparamboxptr parm1 )
             retval = int_to_streng( TSD, f != NULL );
          }
          break;
+
+      default:           /* We got an error in getoptionchar */
+         retval = NULL;
+
    }
    Free_string_TSD( TSD, sep );
 

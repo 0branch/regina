@@ -2,7 +2,7 @@
 # Makefile for Regina REXX Interpreter using Watcom C++ 10.6
 #
 
-VER=31
+VER=32
 
 #
 # good from here down

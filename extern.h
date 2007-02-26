@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: extern.h,v 1.49 2003/03/05 08:06:53 florian Exp $
+ * $Id: extern.h,v 1.51 2003/04/26 01:09:02 florian Exp $
  */
 /* JH 20-10-99 */  /* To make Direct setting of stems Direct and not Symbolic. */
 
@@ -230,7 +230,7 @@
  * Routines in error.c
  */
    int init_error( tsd_t *TSD ) ;
-   const char *errortext( const tsd_t *TSD, int errorno, int suberrnum, int request_english, int apply_inserts ) ;
+   const streng *errortext( const tsd_t *TSD, int errorno, int suberrnum, int request_english, int apply_inserts ) ;
    void exiterror( int errorno , int suberrorno, ... ) ;
    void __reginaerror( char *errtext ) ;
    const char *getsym( int numb ) ;
@@ -419,10 +419,11 @@
    void purge_library( const tsd_t *TSD );
    void *loaded_lib_func( const tsd_t *TSD, const streng *name ) ;
    void set_err_message( const tsd_t *TSD, const char *message1, const char *message2 ) ;
-   int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, const streng *objnam ) ;
+   int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, const streng *objnam, void *gci_info );
    streng *rex_rxfuncerrmsg( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncquery( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxfuncadd( tsd_t *TSD, cparamboxptr parms ) ;
+   streng *rex_rxfuncdefine( tsd_t *TSD, cparamboxptr parms );
    streng *rex_rxfuncdrop( tsd_t *TSD, cparamboxptr parms ) ;
    int rex_rxfuncdlldrop( tsd_t *TSD, const streng* ) ;
    int rex_rxfuncdllquery( tsd_t *TSD, const streng* ) ;

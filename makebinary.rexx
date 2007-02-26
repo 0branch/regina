@@ -2,10 +2,10 @@
  *
  */
 Trace O
-validargs = '-s -d -a -A -p -S -l -L -u -e -b -B -T'
-vars = '_srcdir _tmpdir _abiminor _abimajor _shlpre _shlpst _libpre _libpst _useabi _exe _shlfile _libfile _tslfile'
-mandatory = '1 1 1 1 1 1 1 1 1 1 1 1 1'
-valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1 1'
+validargs = '-s -d -a -A -p -S -l -L -u -e -b -B'
+vars = '_srcdir _tmpdir _abiminor _abimajor _shlpre _shlpst _libpre _libpst _useabi _exe _shlfile _libfile'
+mandatory = '1 1 1 1 1 1 1 1 1 1 1 1'
+valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1'
 If ValidOpts( Arg(1), validargs, mandatory, valuereq ) = 0 Then
 exes = 'rexx'_exe 'regina'_exe 'rxqueue'_exe 'rxstack'_exe 'regina-config'
 Parse Source os .
@@ -66,27 +66,20 @@ If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/lib'
  * Copy shared library
  */
 fn = _shlpre||_shlfile||_shlpst
-tslfn = _shlpre||_tslfile||_shlpst
 If _useabi = 'yes' Then
    Do
       fn_abi_major = fn'.'_abimajor
       fn_abi = fn_abi_major'.'_abiminor
       If Stream( fn_abi, 'C', 'QUERY EXISTS') \= '' Then Call copy fn_abi,_tmpdir'/'shldir
-      tslfn_abi_major = tslfn'.'_abimajor
-      tslfn_abi = tslfn_abi_major'.'_abiminor
-      If Stream( tslfn_abi, 'C', 'QUERY EXISTS') \= '' Then Call copy tslfn_abi,_tmpdir'/'shldir
       here = Directory()
       Call Directory _tmpdir'/'shldir
       Address System 'ln -s' fn_abi fn_abi_major
       Address System 'ln -s' fn_abi fn
-      Address System 'ln -s' tslfn_abi tslfn_abi_major
-      Address System 'ln -s' tslfn_abi tslfn
       Call Directory here
    End
 Else
    Do
       If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/'shldir
-      If Stream( tslfn, 'C', 'QUERY EXISTS') \= '' Then Call copy tslfn,_tmpdir'/'shldir
    End
 /*
  * Copy all files in 'from' variable to their appropriate

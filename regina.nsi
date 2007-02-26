@@ -91,7 +91,6 @@ Section "${LONGNAME} Core (required)" SecMain
   File rexx.exe
   File regina.exe
   File regina.dll
-  File reginats.dll
   File rxstack.exe
   File rxqueue.exe
   File de.mtb
@@ -99,16 +98,16 @@ Section "${LONGNAME} Core (required)" SecMain
   File es.mtb
   File no.mtb
   File pt.mtb
-  File /oname=README31.txt ..\README.31
+  File /oname=README32.txt ..\README.32
   File /oname=READMEW32.txt ..\README.W32
   File /oname=LICENSE.txt ..\COPYING-LIB
   Push $INSTDIR
   Call AddToPath
-  CreateDirectory "$SMPROGRAMS\${SHORTNAME}"
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\Release Notes.lnk" "$INSTDIR\README31.txt" "" "$INSTDIR\README31.txt" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\README.lnk" "$INSTDIR\READMEW32.txt" "" "$INSTDIR\READMEW32.txt" 0
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\LICENSE.lnk" "$INSTDIR\LICENSE.txt" "" "$INSTDIR\LICENSE.txt" 0
+  CreateDirectory "$SMPROGRAMS\${SHORTNAME} REXX"
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Uninstall.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\Release Notes.lnk" "$INSTDIR\README32.txt" "" "$INSTDIR\README32.txt" 0
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\README.lnk" "$INSTDIR\READMEW32.txt" "" "$INSTDIR\READMEW32.txt" 0
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\LICENSE.lnk" "$INSTDIR\LICENSE.txt" "" "$INSTDIR\LICENSE.txt" 0
   ; Write the installation path into the registry
   ;WriteRegStr HKLM SOFTWARE\NSIS_Example2 "Install_Dir" "$INSTDIR"
   ; Write the uninstall keys for Windows
@@ -147,17 +146,16 @@ SectionEnd
 ; Demos
 
 Section "${LONGNAME} Demos" SecDemo
-  CreateDirectory "$SMPROGRAMS\${SHORTNAME}\${SHORTNAME} Demos"
+  CreateDirectory "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos"
   ; Set output path to the installation directory.
-  SetOutPath $INSTDIR
+  SetOutPath $INSTDIR\demo
   File test1.dll
   File test2.dll
-  SetOutPath $INSTDIR\demo
   ; Distribution files...
   File /oname=rexxcps.rexx ..\demo\rexxcps.rexx
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\${SHORTNAME} Demos\Rexxcps.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\rexxcps.rexx"' "$INSTDIR\regina.exe"
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos\Rexxcps.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\rexxcps.rexx"' "$INSTDIR\regina.exe"
   File /oname=dynfunc.rexx ..\demo\dynfunc.rexx
-  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\${SHORTNAME} Demos\Dynfunc.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\dynfunc.rexx"' "$INSTDIR\regina.exe"
+  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Demos\Dynfunc.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\dynfunc.rexx"' "$INSTDIR\regina.exe"
 SectionEnd
 
 ;------------------------------------------------------------------------
@@ -168,7 +166,6 @@ Section "${LONGNAME} Development Kit" SecDev
   SetOutPath $INSTDIR\lib
   ; Distribution files...
   File regina.lib
-  File reginats.lib
   File rexx.lib
   SetOutPath $INSTDIR\include
   File /oname=rexxsaa.h ..\rexxsaa.h
@@ -182,7 +179,7 @@ Section "${LONGNAME} Documentation" SecDoc
   SetOutPath $INSTDIR\doc
 ;  File ..\doc\*.html
 ;  File ..\doc\logo1.jpg
-;  CreateShortCut "$SMPROGRAMS\${SHORTNAME}\${SHORTNAME} Documentation.lnk" "$INSTDIR\doc\index.html" "" "$INSTDIR\doc\index.html" 0
+;  CreateShortCut "$SMPROGRAMS\${SHORTNAME} REXX\${SHORTNAME} Documentation.lnk" "$INSTDIR\doc\index.html" "" "$INSTDIR\doc\index.html" 0
 SectionEnd
 
 Section ""

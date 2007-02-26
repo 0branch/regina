@@ -1,4 +1,4 @@
-                        Regina 3.1
+                        Regina 3.2
                     for Win9x/NT/2k/XP
 
 This distribution contains 32 bit executables of the Regina Rexx interpreter 
@@ -33,8 +33,6 @@ file_id.diz        - Description file for BBS use
 regina.exe         - 32bit Regina Rexx interpreter executable
 regina.dll         - 32bit Regina Rexx interpreter dynamic library
 regina.lib         - Import library for Visual C++
-reginats.dll       - Thread-safe 32bit Regina Rexx interpreter dynamic library
-reginats.lib       - Thread-safe Import library for Visual C++
 regina_borland.lib - Import Library for Borland C++
 rexx.lib           - Static library for Visual C++
 rexx.exe           - Regina executable - does not require regina.dll

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: doscmd.c,v 1.49 2003/04/04 21:52:59 mark Exp $";
+static char *RCSid = "$Id: doscmd.c,v 1.50 2003/04/17 23:26:31 florian Exp $";
 #endif
 
 /*
@@ -196,15 +196,19 @@ static BOOL MyCancelIo(HANDLE handle)
 
    if ( first )
    {
-      first = FALSE;
-
       /*
        * The kernel is always mapped, a LoadLibrary is useless
        */
-      if ((mod = GetModuleHandle( "kernel32" )) != NULL)
+      if ( ( mod = GetModuleHandle( "kernel32" ) ) != NULL )
       {
          DoCancelIo = (BOOL (WINAPI*)(HANDLE)) GetProcAddress( mod, "CancelIo" );
       }
+
+      /*
+       * It's safe now to set first. Never do it before the main work,
+       * otherwise we're not reentrant.
+       */
+      first = FALSE;
    }
 
    if ( DoCancelIo == NULL )
@@ -522,7 +526,7 @@ int __regina_wait(int process)
 int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
 {
 #define MAGIC_MAX 2000000 /* Much beyond maximum, see below */
-   static unsigned BaseIndex = MAGIC_MAX;
+   static volatile unsigned BaseIndex = MAGIC_MAX;
    char buf[40];
    unsigned i;
    unsigned start,run;
@@ -561,10 +565,14 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
     */
    if (BaseIndex == MAGIC_MAX)
    {
-      BaseIndex = (unsigned) getpid() * (unsigned) time(NULL);
-      BaseIndex %= 1000000;
-      if (!BaseIndex)
-         BaseIndex = 1;
+      /*
+       * We have to create (nearly) reentrant code.
+       */
+      i = (unsigned) getpid() * (unsigned) time(NULL);
+      i %= 1000000;
+      if (!i)
+         i = 1;
+      BaseIndex = i;
    }
    if (++BaseIndex >= 1000000)
       BaseIndex = 1;
@@ -1487,7 +1495,7 @@ int __regina_wait(int process)
 int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
 {
 #define MAGIC_MAX 2000000 /* Much beyond maximum, see below */
-   static unsigned BaseIndex = MAGIC_MAX;
+   static volatile unsigned BaseIndex = MAGIC_MAX;
    char buf[40];
    unsigned i;
    unsigned start,run;
@@ -1520,10 +1528,14 @@ int open_subprocess_connection(const tsd_t *TSD, environpart *ep)
     */
    if (BaseIndex == MAGIC_MAX)
    {
-      BaseIndex = (unsigned) getpid() * (unsigned) time(NULL);
-      BaseIndex %= 1000000;
-      if (!BaseIndex)
-         BaseIndex = 1;
+      /*
+       * We have to create (nearly) reentrant code.
+       */
+      i = (unsigned) getpid() * (unsigned) time(NULL);
+      i %= 1000000;
+      if (!i)
+         i = 1;
+      BaseIndex = i;
    }
    if (++BaseIndex >= 1000000)
       BaseIndex = 1;
@@ -3226,7 +3238,7 @@ static int local_mkstemp(const tsd_t *TSD, char *base)
    return(mkstemp(base));
 #else
 #define MAGIC_MAX 2000000 /* Much beyond maximum, see below */
-   static unsigned BaseIndex = MAGIC_MAX;
+   static volatile unsigned BaseIndex = MAGIC_MAX;
    int retval;
    char *slash;
    char buf[REXX_PATH_MAX]; /* enough space for largest path name */
@@ -3269,10 +3281,14 @@ static int local_mkstemp(const tsd_t *TSD, char *base)
     */
    if (BaseIndex == MAGIC_MAX)
    {
-      BaseIndex = (unsigned) getpid() * (unsigned) time(NULL);
-      BaseIndex %= 1000000;
-      if (!BaseIndex)
-         BaseIndex = 1;
+      /*
+       * We have to create (nearly) reentrant code.
+       */
+      i = (unsigned) getpid() * (unsigned) time(NULL);
+      i %= 1000000;
+      if (!i)
+         i = 1;
+      BaseIndex = i;
    }
    if (++BaseIndex >= 1000000)
       BaseIndex = 1;

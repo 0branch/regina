@@ -111,7 +111,7 @@ unsigned long _DLL_InitTerm (unsigned long mod_handle, unsigned long flag)
          if (_CRT_init () != 0)
             return 0;
          __ctordtorInit ();
-         printf("\nThe regina DLL is initializing. Check if per thread!\n\n");
+/*         printf("\nThe regina DLL is initializing. Check if per thread!\n\n"); */
          return 1;
       case 1:
          /* This will run ONLY if called per thread */
@@ -126,7 +126,7 @@ unsigned long _DLL_InitTerm (unsigned long mod_handle, unsigned long flag)
             }
          }
 #endif
-         printf("\nThe regina DLL is deinitializing. Check if per thread!\n\n");
+/*         printf("\nThe regina DLL is deinitializing. Check if per thread!\n\n"); */
          __ctordtorTerm ();
          _CRT_term ();
          return 1;
@@ -145,7 +145,7 @@ static unsigned sizeof_ptr(void)
 }
 
 /* Lowest level memory allocation function for normal circumstances. */
-static void *MTMalloc(const tsd_t *TSD,size_t size)
+static void *MTMalloc( const tsd_t *TSD, size_t size )
 {
    mt_tsd_t *mt;
    MT_mem *new;
@@ -165,10 +165,16 @@ static void *MTMalloc(const tsd_t *TSD,size_t size)
 }
 
 /* Lowest level memory deallocation function for normal circumstances. */
-static void MTFree(const tsd_t *TSD,void *chunk)
+static void MTFree( const tsd_t *TSD, void *chunk )
 {
    mt_tsd_t *mt = TSD->mt_tsd;
    MT_mem *this;
+
+   /*
+    * Just in case...
+    */
+   if ( chunk == NULL) 
+      return;
 
    this = chunk;
    this--; /* Go to the header of the chunk */

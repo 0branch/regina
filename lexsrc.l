@@ -1,6 +1,6 @@
 %{
 #ifndef lint
-static char *RCSid = "$Id: lexsrc.l,v 1.17 2002/10/11 07:57:57 florian Exp $";
+static char *RCSid = "$Id: lexsrc.l,v 1.18 2003/04/20 06:58:48 florian Exp $";
 #endif
 
 /*
@@ -170,9 +170,10 @@ dot               [.]
                   /*
                    * sigh, we need the reversed classes. flex isn't smart
                    * enough to provide it.
+                   * Added "0-9" to notGeneral... to fix bug 724390
                    */
-notGeneralDot     [^_!?A-Za-z#$@.]
-notGeneralParen   [^_!?A-Za-z#$@.(]
+notGeneralDot     [^_!?A-Za-z0-9#$@.]
+notGeneralParen   [^_!?A-Za-z0-9#$@.(]
 
 space             [ \t]
 blank             [\f\v\r]|{space}

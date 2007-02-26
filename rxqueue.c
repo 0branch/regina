@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: rxqueue.c,v 1.8 2002/07/25 09:55:31 florian Exp $";
+static char *RCSid = "$Id: rxqueue.c,v 1.9 2003/04/26 03:14:26 mark Exp $";
 #endif
 
 /*
@@ -59,6 +59,10 @@ static char *RCSid = "$Id: rxqueue.c,v 1.8 2002/07/25 09:55:31 florian Exp $";
 # ifdef HAVE_ARPA_INET_H
 #  include <arpa/inet.h>
 # endif
+#endif
+
+#ifdef __LCC__
+# include <winsock2.h>
 #endif
 
 #include <string.h>

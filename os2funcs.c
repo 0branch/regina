@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: os2funcs.c,v 1.13 2002/12/28 09:38:05 mark Exp $";
+static char *RCSid = "$Id: os2funcs.c,v 1.14 2003/04/17 23:27:24 florian Exp $";
 #endif
 
 /*
@@ -125,7 +125,7 @@ static char *RCSid = "$Id: os2funcs.c,v 1.13 2002/12/28 09:38:05 mark Exp $";
 
 streng *os2_directory( tsd_t *TSD, cparamboxptr parms )
 {
-   streng *result ;
+   streng *result=NULL ;
    int ok=HOOK_GO_ON ;
 #ifdef __EMX__
    int i;

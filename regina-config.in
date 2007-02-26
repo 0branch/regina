@@ -22,9 +22,9 @@ usage()
     echo "  --multithread  yes; if thread-safe library is available; no otherwise"
     echo "                 [@REGINAMULTITHREAD@]"
     echo "  --libs         library linking information"
-    echo "                 [-L$libdir -l@SHLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@]"
+    echo "                 [-L$libdir -l@SHLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@]"
     echo "  --libs_ts      library linking information for thread-safe library"
-    echo "                 [-L$libdir -l@TSLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@ @MH_MT_LIBS@]"
+    echo "                 [-L$libdir -l@SHLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@]"
     echo "  --prefix       Regina install prefix"
     echo "                 [$prefix]"
     echo "  --version      output version information"
@@ -68,11 +68,11 @@ while test $# -gt 0; do
           ;;
 
        --libs)
-          echo -L$libdir -l@SHLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@
+          echo -L$libdir -l@SHLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@
           ;;
 
        --libs_ts)
-          echo -L$libdir -l@TSLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@ @MH_MT_LIBS@
+          echo -L$libdir -l@TSLFILE@ @LDFLAGS@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@
           ;;
 
        *)

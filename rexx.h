@@ -18,7 +18,7 @@
  */
 
 /*
- * $Id: rexx.h,v 1.56 2003/03/23 10:36:17 mark Exp $
+ * $Id: rexx.h,v 1.58 2003/04/20 06:40:44 mark Exp $
  */
 #ifndef __REXX_H_INCLUDED
 #define __REXX_H_INCLUDED
@@ -256,13 +256,13 @@
 #endif
 
 #define REGINA_VERSION_MAJOR "3"
-#define REGINA_VERSION_MINOR "1"
+#define REGINA_VERSION_MINOR "2"
 #define REGINA_VERSION_SUPP  ""
 
 #define PARSE_VERSION_STRING    "REXX-Regina_" REGINA_VERSION_MAJOR "." \
                                 REGINA_VERSION_MINOR REGINA_VERSION_SUPP \
                                 REGINA_VERSION_THREAD \
-                                " 5.00 5 Apr 2003"
+                                " 5.00 25 Apr 2003"
 
 #define INSTORE_VERSION 4 /* Must be incremented each time the parser/lexer
                            * or data structure changes something.

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: tracing.c,v 1.17 2002/12/16 07:06:35 mark Exp $";
+static char *RCSid = "$Id: tracing.c,v 1.18 2003/04/17 23:29:49 florian Exp $";
 #endif
 
 /*
@@ -192,14 +192,13 @@ void starttrace( const tsd_t *TSD )
 
 static void tracemsg( const tsd_t *TSD )
 {
-   streng *message=NULL ;
-   int rc=0 ;
-   const char *msg;
+   streng *message;
+   const streng *msg;
 
-   rc = HOOK_GO_ON ;
    msg = errortext( TSD, 0, 3, 0, 0 );
-   message = Str_makeTSD( 12 + strlen( msg ) );
-   message->len = sprintf( message->value, "       +++ %s", msg );
+   message = Str_makeTSD( 12 + Str_len( msg ) );
+   Str_catstrTSD( message, "       +++ " );
+   Str_catTSD( message, msg );
    printout( TSD, message ) ;
    Free_stringTSD( message ) ;
 }

@@ -2,8 +2,8 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT(rexxsaa.h)
 AC_PREFIX_DEFAULT(/usr)
 
-VERSION=3.1
-VERSION_NODOT=31
+VERSION=3.2
+VERSION_NODOT=32
 
 dnl ---------------------- check for C compiler -----------------
 dnl Checks for one of the C compilers below - change if yours not there.
@@ -171,7 +171,7 @@ if test "$ac_cv_prog_CC" = "gcc"; then
    if test "$with_debug" = yes; then
       CFLAGS="${CFLAGS} -Wall"
    else
-      CFLAGS="-O3 -Wall -fomit-frame-pointer -fno-strict-aliasing"
+      CFLAGS="-O3 -Wall -fomit-frame-pointer -fno-strict-aliasing -Wno-char-subscripts"
    fi
 fi
 if test "$on_qnx4" = yes; then
@@ -223,14 +223,16 @@ else
 fi
 AC_SUBST(EFENCE)
 
-dnl --------------- allow --enable-posix-threads to enable multi-threading
-dnl AC_ARG_ENABLE(posix-threads,
-dnl         [  --enable-posix-threads  enable POSIX-style multi-threading],
-dnl         [enable_posix_threads=$enableval],
-dnl         [enable_posix_threads=no],
-dnl )
+dnl --------------- allow --disable-posix-threads to disable multi-threading
+AC_ARG_ENABLE(posix-threads,
+        [  --disable-posix-threads disable POSIX-style multi-threading],
+        [enable_posix_threads=no],
+        [enable_posix_threads=yes],
+)
 
-enable_posix_threads="yes"
+MH_CHECK_GCC_VERSION_SCRIPT
+
+dnl enable_posix_threads="yes"
 MH_CHECK_POSIX_THREADS
 if test "$mh_has_pthreads" = yes; then
    save_cflags="$CFLAGS"

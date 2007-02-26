@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: funcs.c,v 1.24 2003/03/14 11:42:05 mark Exp $";
+static char *RCSid = "$Id: funcs.c,v 1.25 2003/04/26 01:09:02 florian Exp $";
 #endif
 
 /*
@@ -186,6 +186,7 @@ static const struct function_type functions[] = {
   { 0,              std_right,             "RIGHT" },
 
   { 0,              rex_rxfuncadd,         "RXFUNCADD" },
+/*{ EXT_REGINA_BIFS,rex_rxfuncdefine,      "RXFUNCDEFINE" },*/
   { 0,              rex_rxfuncdrop,        "RXFUNCDROP" },
   { EXT_REGINA_BIFS,rex_rxfuncerrmsg,      "RXFUNCERRMSG" },
   { 0,              rex_rxfuncquery,       "RXFUNCQUERY" },

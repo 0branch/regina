@@ -13,7 +13,7 @@ THIS  = Makefile
 @SET_MAKE@
 
 ABI_MAJOR=3
-ABI_MINOR=1
+ABI_MINOR=2
 ABI=$(ABI_MAJOR).$(ABI_MINOR)
 VER=@VERSION_NODOT@
 VERDOT=@VERSION@
@@ -47,17 +47,15 @@ THREADING_COMPILE = @THREADING_COMPILE@
 THREADING_LINK = @THREADING_LINK@
 THREADSAFE_TARGET = @THREADSAFE_TARGET@
 SHL_SCRIPT = @SHL_SCRIPT@
-TSL_SCRIPT = @TSL_SCRIPT@
 MH_MT_LIBS = @MH_MT_LIBS@
 EEXTRA = @EEXTRA@
 EXECISER_DEP = @EXECISER_DEP@
 LIBPRE = @LIBPRE@
 LIBFILE = @LIBFILE@
 SHLFILE = @SHLFILE@
-TSLFILE = @TSLFILE@
 ALLOCA = @ALLOCA@
 ALLOCA_SHO = @ALLOCA_SHO@
-ALLOCA_TSO = @ALLOCA_TSO@
+MT_FILE = @MT_FILE@
 STATICLD_SHO = @STATICLD_SHO@
 STATICLIB = @STATICLIB@
 STATIC_LDFLAGS = @STATIC_LDFLAGS@
@@ -68,8 +66,8 @@ LIBPST = @LIBPST@
 LIBEXE = @LIBEXE@
 LIBFLAGS = @LIBFLAGS@
 LIBLINK = @LIBLINK@
-TSLLINK = @TSLLINK@
 LINKSHL = @LINKSHL@
+LINKREG = @LINKREG@
 SHLPRE = @SHLPRE@
 SHLPST = @SHLPST@
 MODPST = @MODPST@
@@ -87,7 +85,6 @@ LD_RXLIB_B1 = @LD_RXLIB_B1@
 LD_RXLIB_B2 = @LD_RXLIB_B2@
 DYNAMIC_LDFLAGS = @DYNAMIC_LDFLAGS@
 SHL_LD = @SHL_LD@
-TSL_LD = @TSL_LD@
 SHL_TARGETS = @SHL_TARGETS@
 OTHER_INSTALLS = @OTHER_INSTALLS@
 BASE_INSTALL = @BASE_INSTALL@
@@ -108,9 +105,9 @@ REGINAEXP = @REGINAEXP@
 MISCDEFS = -DHAVE_CONFIG_H $(TRACEMEM) $(FLISTS) -I. -I$(srcdir) $(SYS_DEFS) $(REXXSOCKET)
 
 COPT = $(DEBUG) $(CFLAGS) $(CEXTRA) $(MISCDEFS)
+TSCOPT = $(DEBUG) $(CFLAGS) $(CEXTRA) $(MISCDEFS) $(THREADING_COMPILE)
 COPTPROG = $(DEBUG) $(CFLAGS) $(CEXTRA) $(MISCDEFS)
 LINKOPT = $(DEBUG) $(CFLAGS) $(EEXTRA)
-TSCOPT = $(COPT) $(THREADING_COMPILE)
 TSLINKOPT = $(LINKOPT) $(THREADING_LINK)
 
 README = $(REG_DIR)/README.??? $(REG_DIR)/README.?? $(REG_DIR)/README.Unix \
@@ -157,15 +154,7 @@ SHOFILES = funcs.sho builtin.sho error.sho variable.sho \
 	tracing.sho interp.sho cmath.sho convert.sho strings.sho library.sho \
 	strmath.sho signals.sho macros.sho envir.sho expr.sho extstack.sho \
 	extlib.sho yaccsrc.sho lexsrc.sho wrappers.sho options.sho doscmd.sho rexxbif.sho \
-	drexx.sho client.sho rexxsaa.sho $(ALLOCA_SHO) $(STATICLD_SHO) mt_notmt.sho instore.sho arxfuncs.sho
-
-TSFILES = funcs.tso builtin.tso error.tso variable.tso \
-	interprt.tso debug.tso dbgfuncs.tso memory.tso parsing.tso files.tso \
-	misc.tso unxfuncs.tso cmsfuncs.tso shell.tso os2funcs.tso rexxext.tso stack.tso \
-	tracing.tso interp.tso cmath.tso convert.tso strings.tso library.tso \
-	strmath.tso signals.tso macros.tso envir.tso expr.tso extstack.tso \
-	extlib.tso yaccsrc.tso lexsrc.tso wrappers.tso options.tso doscmd.tso rexxbif.tso \
-	drexx.tso client.tso rexxsaa.tso $(ALLOCA_TSO) mt_posix.tso instore.tso arxfuncs.tso
+	drexx.sho client.sho rexxsaa.sho $(ALLOCA_SHO) $(STATICLD_SHO) $(MT_FILE).sho instore.sho arxfuncs.sho
 
 DEMODIR = $(REG_DIR)/demo
 ZIP_DEMODIR = demo
@@ -241,7 +230,7 @@ ZIP_CFILES = $(ZIP_CSRCFILES) yaccsrc.c lexsrc.c execiser.c threader.c \
 	 test1.c test2.c getopt.c \
 	 rxqueue.c rxstack.c rexxbif.c extstack.c mac.c msgcmp.c
 
-JUNK = *.o *.sho *.tso $(STATICLIB) execiser$(EXE) threader$(EXE) rxqueue$(EXE) rxstack$(EXE) rexx$(EXE) $(SHL_TARGETS) config.cache config.log
+JUNK = *.o *.sho $(STATICLIB) execiser$(EXE) threader$(EXE) rxqueue$(EXE) rxstack$(EXE) rexx$(EXE) $(SHL_TARGETS) config.cache config.log
 
 #.SUFFIXES: .sho $(SUFFIXES)
 #
@@ -260,15 +249,15 @@ rexx$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 	$(LDEXTRA)
 
 regina$(EXE) : $(SHL_BASE) regina.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(DYNAMIC_LDFLAGS) -o regina$(EXE) regina.$(OBJ) $(LINKSHL) $(BOTHLIBS)
+	$(PURIFY) $(CC) $(TSLINKOPT ) $(DYNAMIC_LDFLAGS) -o regina$(EXE) regina.$(OBJ) $(LINKREG) $(BOTHLIBS) $(MH_MT_LIBS)
 	$(LDEXTRA)
 
 execiser$(EXE) : execiser.$(OBJ) $(EXECISER_DEP)
-	$(PURIFY) $(CC) $(LINKOPT) -o execiser execiser.$(OBJ) $(LIBLINK) $(BOTHLIBS)
+	$(PURIFY) $(CC) $(TSLINKOPT) -o execiser execiser.$(OBJ) $(LINKSHL) $(BOTHLIBS) $(MH_MT_LIBS)
 	$(LDEXTRA)
 
-threader$(EXE) : threader.$(OBJ) $(SHLPRE)$(TSLFILE)$(SHLPST)
-	$(PURIFY) $(CC) $(TSLINKOPT) -o threader threader.$(OBJ) $(TSLLINK) $(BOTHLIBS) $(MH_MT_LIBS)
+threader$(EXE) : threader.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(PURIFY) $(CC) $(TSLINKOPT) -o threader threader.$(OBJ) $(LINKSHL) $(BOTHLIBS) $(MH_MT_LIBS)
 	$(LDEXTRA)
 
 rxstack$(EXE) : rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
@@ -287,9 +276,6 @@ $(SHLPRE)$(SHLFILE)$(SHLPST): $(SHOFILES) $(REGINAEXP)
 	$(SHL_LD)
 	$(RANLIB_DYNAMIC)
 
-$(SHLPRE)$(TSLFILE)$(SHLPST): $(TSFILES) $(REGINAEXP)
-	$(TSL_LD)
-
 $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI): $(SHOFILES)
 	$(SHL_LD)
 	-rm -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
@@ -297,18 +283,6 @@ $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI): $(SHOFILES)
 	-rm -f $(SHLPRE)$(SHLFILE)$(SHLPST)
 	-$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST)
 
-$(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI): $(TSFILES)
-	$(TSL_LD)
-	-rm -f $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI_MAJOR)
-	-$(LN_S) $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI_MAJOR)
-	-rm -f $(SHLPRE)$(TSLFILE)$(SHLPST)
-	-$(LN_S) $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(TSLFILE)$(SHLPST)
-
-#
-# Special rule for Mac OSX "bundle".
-#
-# MH $(SHLPRE)$(SHLFILE)$(BUNDLE): $(SHOFILES)
-# MH 	$(CC) -bundle -flat_namespace -undefined suppress -o $@ $(SHOFILES) -lc $(SHLIBS)
 
 #
 # Rules for lex and yacc source - not used at this stage
@@ -452,7 +426,7 @@ rexxsaa.$(OBJ) :    $(srcdir)/rexxsaa.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/rexxsaa.c
 
 regina.$(OBJ) :  $(srcdir)/regina.c $(srcdir)/rexx.h
-	$(CC) $(COPT) $(CC2O) -c $(srcdir)/regina.c
+	$(CC) $(COPT) $(CC2O) -c $(THREADING_COMPILE) $(srcdir)/regina.c
 
 drexx.$(OBJ) : $(srcdir)/rexx.c $(srcdir)/rexx.h
 	-mv rexx.$(OBJ) rexx$(OSAVE)
@@ -471,6 +445,9 @@ execiser.$(OBJ) : $(srcdir)/execiser.c $(srcdir)/rexx.h
 
 threader.$(OBJ) : $(srcdir)/threader.c $(srcdir)/rexxsaa.h
 	$(CC) $(COPTPROG) $(CC2O) -DPOSIX_THREADS -c $(srcdir)/threader.c
+
+regina_ts.$(OBJ) : $(srcdir)/regina.c $(srcdir)/rexx.h
+	$(CC) $(COPTPROG) $(CC2O) -DPOSIX_THREADS -c $(srcdir)/regina.c
 
 getopt.$(OBJ) : $(srcdir)/getopt.c
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/getopt.c
@@ -519,570 +496,285 @@ erexxbif.$(OBJ) : $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h $(srcdir)/rexx.h
 #
 funcs.sho :   $(srcdir)/funcs.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/funcs.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/funcs.c
 	$(O2SHO)
 	$(SAVE2O)
 
 builtin.sho : $(srcdir)/builtin.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/builtin.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/builtin.c
 	$(O2SHO)
 	$(SAVE2O)
 
 error.sho :   $(srcdir)/error.c $(srcdir)/rexx.h $(srcdir)/rexxmsg.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/error.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/error.c
 	$(O2SHO)
 	$(SAVE2O)
 
 variable.sho :$(srcdir)/variable.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/variable.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/variable.c
 	$(O2SHO)
 	$(SAVE2O)
 
 interprt.sho :$(srcdir)/interprt.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interprt.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interprt.c
 	$(O2SHO)
 	$(SAVE2O)
 
 debug.sho :   $(srcdir)/debug.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/debug.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/debug.c
 	$(O2SHO)
 	$(SAVE2O)
 
 dbgfuncs.sho :$(srcdir)/dbgfuncs.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/dbgfuncs.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/dbgfuncs.c
 	$(O2SHO)
 	$(SAVE2O)
 
 memory.sho :  $(srcdir)/memory.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/memory.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/memory.c
 	$(O2SHO)
 	$(SAVE2O)
 
 parsing.sho : $(srcdir)/parsing.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/parsing.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/parsing.c
 	$(O2SHO)
 	$(SAVE2O)
 
 files.sho :   $(srcdir)/files.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/files.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/files.c
 	$(O2SHO)
 	$(SAVE2O)
 
 misc.sho :    $(srcdir)/misc.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/misc.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/misc.c
 	$(O2SHO)
 	$(SAVE2O)
 
 unxfuncs.sho :$(srcdir)/unxfuncs.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/unxfuncs.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/unxfuncs.c
 	$(O2SHO)
 	$(SAVE2O)
 
 arxfuncs.sho :$(srcdir)/arxfuncs.c
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/arxfuncs.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/arxfuncs.c
 	$(O2SHO)
 	$(SAVE2O)
 
 os2funcs.sho :$(srcdir)/os2funcs.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/os2funcs.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/os2funcs.c
 	$(O2SHO)
 	$(SAVE2O)
 
 cmsfuncs.sho :$(srcdir)/cmsfuncs.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/cmsfuncs.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/cmsfuncs.c
 	$(O2SHO)
 	$(SAVE2O)
 
 shell.sho :   $(srcdir)/shell.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/shell.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/shell.c
 	$(O2SHO)
 	$(SAVE2O)
 
 rexxext.sho : $(srcdir)/rexxext.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxext.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxext.c
 	$(O2SHO)
 	$(SAVE2O)
 
 stack.sho :   $(srcdir)/stack.c $(srcdir)/extstack.h $(srcdir)/rexxbif.h $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/stack.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/stack.c
 	$(O2SHO)
 	$(SAVE2O)
 
 extstack.sho :   $(srcdir)/extstack.c $(srcdir)/extstack.h $(srcdir)/rexxbif.h $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/extstack.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/extstack.c
 	$(O2SHO)
 	$(SAVE2O)
 
 rexxbif.sho :   $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxbif.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxbif.c
 	$(O2SHO)
 	$(SAVE2O)
 
 tracing.sho : $(srcdir)/tracing.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/tracing.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/tracing.c
 	$(O2SHO)
 	$(SAVE2O)
 
 interp.sho :  $(srcdir)/interp.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interp.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interp.c
 	$(O2SHO)
 	$(SAVE2O)
 
 cmath.sho :   $(srcdir)/cmath.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/cmath.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/cmath.c
 	$(O2SHO)
 	$(SAVE2O)
 
 convert.sho : $(srcdir)/convert.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/convert.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/convert.c
 	$(O2SHO)
 	$(SAVE2O)
 
 strings.sho : $(srcdir)/strings.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/strings.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/strings.c
 	$(O2SHO)
 	$(SAVE2O)
 
 library.sho : $(srcdir)/library.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/library.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/library.c
 	$(O2SHO)
 	$(SAVE2O)
 
 strmath.sho : $(srcdir)/strmath.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/strmath.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/strmath.c
 	$(O2SHO)
 	$(SAVE2O)
 
 signals.sho : $(srcdir)/signals.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/signals.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/signals.c
 	$(O2SHO)
 	$(SAVE2O)
 
 macros.sho :  $(srcdir)/macros.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/macros.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/macros.c
 	$(O2SHO)
 	$(SAVE2O)
 
 envir.sho :   $(srcdir)/envir.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/envir.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/envir.c
 	$(O2SHO)
 	$(SAVE2O)
 
 expr.sho :    $(srcdir)/expr.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/expr.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/expr.c
 	$(O2SHO)
 	$(SAVE2O)
 
 extlib.sho :  $(srcdir)/extlib.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/extlib.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/extlib.c
 	$(O2SHO)
 	$(SAVE2O)
 
 wrappers.sho :$(srcdir)/wrappers.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/wrappers.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/wrappers.c
 	$(O2SHO)
 	$(SAVE2O)
 
 options.sho : $(srcdir)/options.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/options.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/options.c
 	$(O2SHO)
 	$(SAVE2O)
 
 doscmd.sho :  $(srcdir)/doscmd.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/doscmd.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/doscmd.c
 	$(O2SHO)
 	$(SAVE2O)
 
 rexx.sho :  $(srcdir)/rexx.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexx.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexx.c
 	$(O2SHO)
 	$(SAVE2O)
 
 client.sho :  $(srcdir)/client.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/client.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/client.c
 	$(O2SHO)
 	$(SAVE2O)
 
 rexxsaa.sho :  $(srcdir)/rexxsaa.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxsaa.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxsaa.c
 	$(O2SHO)
 	$(SAVE2O)
 
 drexx.sho : $(srcdir)/rexx.c
 	-mv rexx.$(OBJ) rexx.$(OBJ).save
-	$(CC) $(COPT) $(DYN_COMP) -c -DRXLIB $(srcdir)/rexx.c
+	$(CC) $(TSCOPT) $(DYN_COMP) -c -DRXLIB $(srcdir)/rexx.c
 	-mv rexx.$(OBJ) drexx.sho
 	-mv rexx.$(OBJ).save rexx.$(OBJ)
 
 lexsrc.sho : $(srcdir)/lexsrc.c $(srcdir)/rexx.h $(srcdir)/yaccsrc.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/lexsrc.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/lexsrc.c
 	$(O2SHO)
 	$(SAVE2O)
 
 yaccsrc.sho : $(srcdir)/yaccsrc.c $(srcdir)/defs.h $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c -DYYMAXDEPTH=10000 $(srcdir)/yaccsrc.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c -DYYMAXDEPTH=10000 $(srcdir)/yaccsrc.c
 	$(O2SHO)
 	$(SAVE2O)
 
 alloca.sho :  $(srcdir)/alloca.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/alloca.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/alloca.c
 	$(O2SHO)
 	$(SAVE2O)
 
 staticld.sho :  $(srcdir)/staticld.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/staticld.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/staticld.c
 	$(O2SHO)
 	$(SAVE2O)
 
 rxpack.sho :  $(commondir)/rxpack.c $(commondir)/rxpack.h
 	$(O2SAVE)
-	$(CC) -DUSE_REGINA -DHAVE_PROTO -DDYNAMIC_LIBRARY $(COPT) $(CC2O) $(DYN_COMP) -c $(commondir)/rxpack.c
+	$(CC) -DUSE_REGINA -DHAVE_PROTO -DDYNAMIC_LIBRARY $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(commondir)/rxpack.c
 	$(O2SHO)
 	$(SAVE2O)
 
 mt_notmt.sho : $(srcdir)/mt_notmt.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mt_notmt.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mt_notmt.c
 	$(O2SHO)
 	$(SAVE2O)
 
 mt_posix.sho : $(srcdir)/mt_posix.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mt_posix.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mt_posix.c
 	$(O2SHO)
 	$(SAVE2O)
 
 instore.sho : $(srcdir)/instore.c $(srcdir)/rexx.h
 	$(O2SAVE)
-	$(CC) $(COPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/instore.c
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/instore.c
 	$(O2SHO)
 	$(SAVE2O)
-
-#
-# Rules for thread-safe objects
-#
-funcs.tso :   $(srcdir)/funcs.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/funcs.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-builtin.tso : $(srcdir)/builtin.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/builtin.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-error.tso :   $(srcdir)/error.c $(srcdir)/rexx.h $(srcdir)/rexxmsg.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/error.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-variable.tso :$(srcdir)/variable.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/variable.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-interprt.tso :$(srcdir)/interprt.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interprt.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-debug.tso :   $(srcdir)/debug.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/debug.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-dbgfuncs.tso :$(srcdir)/dbgfuncs.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/dbgfuncs.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-memory.tso :  $(srcdir)/memory.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/memory.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-parsing.tso : $(srcdir)/parsing.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/parsing.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-files.tso :   $(srcdir)/files.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/files.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-misc.tso :    $(srcdir)/misc.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/misc.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-unxfuncs.tso :$(srcdir)/unxfuncs.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/unxfuncs.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-os2funcs.tso :$(srcdir)/os2funcs.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/os2funcs.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-arxfuncs.tso :$(srcdir)/arxfuncs.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/arxfuncs.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-cmsfuncs.tso :$(srcdir)/cmsfuncs.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/cmsfuncs.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-shell.tso :   $(srcdir)/shell.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/shell.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-rexxext.tso : $(srcdir)/rexxext.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxext.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-stack.tso :   $(srcdir)/stack.c $(srcdir)/extstack.h $(srcdir)/rexxbif.h $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/stack.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-extstack.tso :   $(srcdir)/extstack.c $(srcdir)/extstack.h $(srcdir)/rexxbif.h $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/extstack.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-rexxbif.tso :   $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxbif.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-tracing.tso : $(srcdir)/tracing.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/tracing.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-interp.tso :  $(srcdir)/interp.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interp.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-cmath.tso :   $(srcdir)/cmath.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/cmath.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-convert.tso : $(srcdir)/convert.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/convert.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-strings.tso : $(srcdir)/strings.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/strings.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-library.tso : $(srcdir)/library.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/library.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-strmath.tso : $(srcdir)/strmath.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/strmath.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-signals.tso : $(srcdir)/signals.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/signals.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-macros.tso :  $(srcdir)/macros.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/macros.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-envir.tso :   $(srcdir)/envir.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/envir.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-expr.tso :    $(srcdir)/expr.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/expr.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-extlib.tso :  $(srcdir)/extlib.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/extlib.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-wrappers.tso :$(srcdir)/wrappers.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/wrappers.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-options.tso : $(srcdir)/options.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/options.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-doscmd.tso :  $(srcdir)/doscmd.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/doscmd.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-rexx.tso :  $(srcdir)/rexx.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexx.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-client.tso :  $(srcdir)/client.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/client.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-rexxsaa.tso :  $(srcdir)/rexxsaa.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxsaa.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-drexx.tso : $(srcdir)/rexx.c
-	-mv rexx.$(OBJ) rexx.$(OBJ).save
-	$(CC) $(TSCOPT) $(DYN_COMP) -c -DRXLIB $(srcdir)/rexx.c
-	-mv rexx.$(OBJ) drexx.tso
-	-mv rexx.$(OBJ).save rexx.$(OBJ)
-
-lexsrc.tso : $(srcdir)/lexsrc.c $(srcdir)/rexx.h $(srcdir)/yaccsrc.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/lexsrc.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-yaccsrc.tso : $(srcdir)/yaccsrc.c $(srcdir)/defs.h $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c -DYYMAXDEPTH=10000 $(srcdir)/yaccsrc.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-alloca.tso :  $(srcdir)/alloca.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/alloca.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-staticld.tso :  $(srcdir)/staticld.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/staticld.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-rxpack.tso :  $(commondir)/rxpack.c $(commondir)/rxpack.h
-	$(O2TSAVE)
-	$(CC) -DUSE_REGINA -DHAVE_PROTO -DDYNAMIC_LIBRARY $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(commondir)/rxpack.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-mt_notmt.tso : $(srcdir)/mt_notmt.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mt_notmt.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-mt_posix.tso : $(srcdir)/mt_posix.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mt_posix.c
-	$(O2TSO)
-	$(TSAVE2O)
-
-instore.tso : $(srcdir)/instore.c $(srcdir)/rexx.h
-	$(O2TSAVE)
-	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/instore.c
-	$(O2TSO)
-	$(TSAVE2O)
 
 #
 # Rules for sample programs
@@ -1191,9 +883,6 @@ installlib: installregina
 	$(INSTALL) -m 755 -c ./$(SHLPRE)test1$(MODPST) $(libdir)/$(SHLPRE)test1$(MODPST)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)test2$(MODPST) $(libdir)/$(SHLPRE)test2$(MODPST)
 
-installtslib: installregina
-	$(INSTALL) -m 755 -c ./$(SHLPRE)$(TSLFILE)$(SHLPST) $(libdir)/$(SHLPRE)$(TSLFILE)$(SHLPST)
-
 installabilib: installregina
 	-$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
 	-rm -f $(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
@@ -1202,13 +891,6 @@ installabilib: installregina
 	-(cd $(libdir);$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST) )
 	$(INSTALL) -m 755 -c ./$(SHLPRE)test1$(MODPST) $(libdir)/$(SHLPRE)test1$(MODPST)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)test2$(MODPST) $(libdir)/$(SHLPRE)test2$(MODPST)
-
-installabitslib: installregina
-	-$(INSTALL) -m 755 -c ./$(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI) $(libdir)/$(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI)
-	-rm -f $(libdir)/$(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI_MAJOR)
-	-(cd $(libdir);$(LN_S) $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI_MAJOR) )
-	-rm -f $(libdir)/$(SHLPRE)$(TSLFILE)$(SHLPST)
-	-(cd $(libdir);$(LN_S) $(SHLPRE)$(TSLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(TSLFILE)$(SHLPST) )
 
 installmacosx: ./$(SHLPRE)$(SHLFILE)$(BUNDLE)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(BUNDLE) $(libdir)/$(SHLPRE)$(SHLFILE)$(BUNDLE)
@@ -1260,12 +942,10 @@ cygwininstall: all
 	$(INSTALL) -m 755 -c ./rxstack$(EXE) $(bindir)/rxstack$(EXE)
 	$(INSTALL) -m 755 -c ./regina-config $(bindir)/regina-config
 	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)$(TSLFILE)$(SHLPST) $(bindir)/$(SHLPRE)$(TSLFILE)$(SHLPST)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)test1$(MODPST) $(bindir)/$(SHLPRE)test1$(MODPST)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)test2$(MODPST) $(bindir)/$(SHLPRE)test2$(MODPST)
 	$(INSTALL) -m 755 -c ./$(LIBPRE)$(SHLFILE)$(LIBPST) $(libdir)/$(LIBPRE)$(SHLFILE)$(LIBPST)
 	$(INSTALL) -m 755 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
-	$(INSTALL) -m 755 -c ./$(LIBPRE)$(TSLFILE)$(LIBPST) $(libdir)/$(LIBPRE)$(TSLFILE)$(LIBPST)
 	$(INSTALL) -m 644 -c $(srcdir)/regina.1 $(mandir)/man1/regina.1
 	$(INSTALL) -m 644 -c $(srcdir)/rexxsaa.h $(includedir)/rexxsaa.h
 	$(INSTALL) -m 644 -c ./pt.mtb $(sharedir)/pt.mtb
@@ -1301,7 +981,7 @@ binarybase: all
 	-mkdir -p ./tmpdir/doc/regina
 	-mkdir -p ./tmpdir/share/regina
 	-mkdir -p ./tmpdir/rexx
-	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -T$(TSLFILE)
+	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)
 	(cd ./tmpdir; \
 	tar cvf - * | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
@@ -1313,7 +993,7 @@ cygwinbinary: all
 	-mkdir -p ./tmpdir/usr/man/man1
 	-mkdir -p ./tmpdir/usr/doc/regina
 	-mkdir -p ./tmpdir/usr/share/regina
-	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/usr -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)  -T$(TSLFILE)
+	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/usr -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)
 	(cd ./tmpdir; \
 	tar cvf - usr | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
@@ -1324,7 +1004,7 @@ beosbinary: all
 	-mkdir -p ./tmpdir/include
 	-mkdir -p ./tmpdir/add-ons/regina
 	-mkdir -p ./tmpdir/doc/regina
-	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)  -T$(TSLFILE)
+	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)
 	(cd ./tmpdir; \
 	zip -r Regina-REXX-$(VERDOT)-$(target).zip * )
 
@@ -1337,7 +1017,7 @@ atheosbinary: all
 	-mkdir -p ./tmpdir/regina/doc/regina
 	-mkdir -p ./tmpdir/regina/share/regina
 	-mkdir -p ./tmpdir/regina/rexx
-	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)  -T$(TSLFILE)
+	./rexx$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE)
 	(cd ./tmpdir; \
 	tar cvf - regina | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 

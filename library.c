@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: library.c,v 1.9 2002/07/28 02:27:06 mark Exp $";
+static char *RCSid = "$Id: library.c,v 1.10 2003/04/26 01:09:02 florian Exp $";
 #endif
 
 /*
@@ -77,11 +77,15 @@ static void insert_library( const tsd_t *TSD, struct library *ptr )
       ptr->next->prev = ptr ;
 }
 
-static void remove_function( const tsd_t *TSD, const struct library_func *fptr )
+static void remove_function( const tsd_t *TSD, struct library_func *fptr )
 {
    lib_tsd_t *lt;
 
    lt = TSD->lib_tsd;
+   if ( fptr->name )
+      Free_stringTSD( fptr->name );
+   if ( fptr->gci_info )
+      FreeTSD( fptr->gci_info );
    if (fptr->next)
       fptr->next->prev = fptr->prev ;
    if (fptr->prev)
@@ -95,6 +99,7 @@ static void remove_function( const tsd_t *TSD, const struct library_func *fptr )
       fptr->backw->forw = fptr->forw ;
    else
       fptr->lib->first = fptr->forw ;
+   FreeTSD( fptr );
 }
 
 static void remove_library( const tsd_t *TSD, struct library *ptr )
@@ -110,6 +115,7 @@ static void remove_library( const tsd_t *TSD, struct library *ptr )
    else
       lt->first_library = ptr->next ;
 
+   /* FIXME: We need a wrapper_unload function */
    assert( ptr->name ) ;
    Free_stringTSD( ptr->name ) ;
    FreeTSD( ptr ) ;
@@ -129,7 +135,6 @@ void purge_library( const tsd_t *TSD )
       {
          save_lptr = lptr->next ;
          remove_function( TSD, lptr ) ;
-         Free_stringTSD( lptr->name );
          lptr = save_lptr ;
       }
       remove_library( TSD, ptr );
@@ -214,7 +219,8 @@ void set_err_message( const tsd_t *TSD, const char *message1, const char *messag
    }
 }
 
-int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, const streng *objnam )
+int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname,
+                const streng *objnam, void *gci_info )
 {
    int result=1 ;
    PFN addr=NULL ;
@@ -233,6 +239,7 @@ int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, co
             fptr->hash = hashvalue(fptr->name->value, fptr->name->len);
             fptr->addr = addr ;
             fptr->lib = lptr ;
+            fptr->gci_info = gci_info;
             add_function( TSD, fptr ) ;
             result = 0 ;
            }
@@ -262,7 +269,8 @@ int loadrxfunc( const tsd_t *TSD, struct library *lptr, const streng *rxname, co
  *   3) name of the function to be added (in the object file)
  */
 static int rex_rxfuncdlladd( const tsd_t *TSD, const streng* rxname,
-                             const streng* module, const streng* objnam )
+                             const streng* module, const streng* objnam,
+                             void *gci_info )
 {
    struct library *lptr=NULL ;
    void *handle=NULL ;
@@ -285,7 +293,7 @@ static int rex_rxfuncdlladd( const tsd_t *TSD, const streng* rxname,
       }
       insert_library( TSD, lptr ) ;
    }
-   rc = loadrxfunc( TSD, lptr, rxname, objnam ) ;
+   rc = loadrxfunc( TSD, lptr, rxname, objnam, gci_info );
    return ( rc );
 }
 #endif /* DYNAMIC */
@@ -354,11 +362,49 @@ streng *rex_rxfuncadd( tsd_t *TSD, cparamboxptr parms )
    module = (parms=parms->next)->value ;
    objnam = parms->next->value ;
 
-   rc = rex_rxfuncdlladd( TSD, rxname, module, objnam ) ;
+   rc = rex_rxfuncdlladd( TSD, rxname, module, objnam, NULL );
    Free_stringTSD( rxname );
    return int_to_streng( TSD, rc ) ;
 #else
    checkparam(  parms,  3,  3 , "RXFUNCADD" ) ;
+   return int_to_streng( TSD, 1 ) ;
+#endif
+}
+
+/*
+ * parameters:
+ *   1) name of the function to be added (in Rexx)
+ *   2) name of object file to link in
+ *   3) name of the function to be added (in the object file)
+ *   4) name of a stem containing the definition of the function
+ */
+streng *rex_rxfuncdefine( tsd_t *TSD, cparamboxptr parms )
+{
+#ifdef DYNAMIC
+   streng *rxname,*module,*objnam,*def_stem;
+   void *gci_info;
+   int rc;
+
+   if ( TSD->restricted )
+      exiterror( ERR_RESTRICTED, 1, "RXFUNCDEFINE" );
+
+   checkparam(  parms,  3,  3 , "RXFUNCDEFINE" ) ;
+
+   rxname = Str_upper( Str_dupTSD( parms->value ) );
+   module = (parms=parms->next)->value ;
+   objnam = (parms=parms->next)->value ;
+   def_stem = parms->next->value ;
+
+   /* FIXME: */
+   gci_info = NULL;
+
+   rc = rex_rxfuncdlladd( TSD, rxname, module, objnam, NULL );
+   Free_stringTSD( rxname );
+   if ( rc )
+      FreeTSD( gci_info );
+   return int_to_streng( TSD, rc ) ;
+#else
+   checkparam(  parms,  4,  4 , "RXFUNCDEFINE" ) ;
    return int_to_streng( TSD, 1 ) ;
 #endif
 }
@@ -375,7 +421,7 @@ int IfcRegDllFunc( const tsd_t *TSD, const char* rxname, const char* module, con
    intr = Str_creTSD( objnam ) ;
    lib = Str_creTSD( module ) ;
 
-   rc = rex_rxfuncdlladd( TSD, ext, lib, intr ) ;
+   rc = rex_rxfuncdlladd( TSD, ext, lib, intr, NULL ) ;
    Free_stringTSD( ext );
    Free_stringTSD( intr );
    Free_stringTSD( lib );
@@ -392,66 +438,44 @@ int IfcRegDllFunc( const tsd_t *TSD, const char* rxname, const char* module, con
 
 streng *rex_rxfuncdrop( tsd_t *TSD, cparamboxptr parms )
 {
-   streng *name=NULL;
-   int rc=0;
-#ifdef DYNAMIC
-   struct library_func *fptr=NULL ;
-#endif
+   streng *name;
 
-   checkparam(  parms,  1,  1 , "RXFUNCDROP" ) ;
-   name = Str_upper( parms->value ) ;
-#ifdef DYNAMIC
-   fptr = find_library_func( TSD, name ) ;
+   checkparam(  parms,  1,  1 , "RXFUNCDROP" );
+   name = Str_upper( parms->value );
 
-   if (fptr)
-   {
-      /*
-       * if found OK, remove the function...
-       */
-      remove_function( TSD, fptr ) ;
-      FreeTSD( fptr );
-      return int_to_streng( TSD, 0 ) ;
-   }
-   /*
-    *... otherwise fall through and try to remove from function
-    * loaded via RexxRegisterFunctionExe()
-    */
-#endif
-   if (external_func( TSD, name ) )
-      rc = delfunc ( TSD, name ) ;
-   else
-      rc = 1;
-   return int_to_streng( TSD, rc ) ; /* value of 1 indicates failure */
+   return int_to_streng( TSD, rex_rxfuncdlldrop( TSD, name ) );
 }
 
 int rex_rxfuncdlldrop( tsd_t *TSD, const streng* objnam )
 {
-   int rc=0;
 #ifdef DYNAMIC
-   struct library_func *fptr=NULL ;
+   struct library_func *fptr;
+   struct library *lib;
    /*
     * try to find the function loaded from a dynamic library
     */
-   fptr=find_library_func(TSD, objnam);
-   if (fptr)
+   fptr = find_library_func( TSD, objnam );
+   if ( fptr )
    {
+      lib = fptr->lib;
       /*
-       * if found OK, remove the function...
+       * if found OK, remove the function. If this was the last function of the
+       * library, remove the library, too.
        */
       remove_function( TSD, fptr );
-      FreeTSD( fptr );
-      return(0);
+      if ( lib->first == NULL )
+         remove_library( TSD, lib );
+      return 0;
    }
    /*
     *... otherwise fall through and try to remove from function
     * loaded via RexxRegisterFunctionExe()
     */
 #endif
-   if (external_func( TSD, objnam ) )
-      rc = delfunc ( TSD, objnam );
-   else
-      rc = 1;
-   return rc;                   /* value of 0 indicates failure */
+   if ( external_func( TSD, objnam ) )
+      return delfunc( TSD, objnam );
+
+   return 1;                   /* value of 1 indicates failure */
 }
 
 int rex_rxfuncdllquery( tsd_t *TSD, const streng* objnam )
@@ -485,5 +509,3 @@ void *loaded_lib_func( const tsd_t *TSD, const streng *name )
    return NULL ;
 #endif
 }
-
-

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: files.c,v 1.56 2003/01/22 08:55:36 mark Exp $";
+static char *RCSid = "$Id: files.c,v 1.57 2003/04/24 11:32:12 mark Exp $";
 #endif
 
 /*
@@ -2009,9 +2009,9 @@ static fileboxptr get_file_ptr( tsd_t *TSD, const streng *name, int faccess, int
 static streng *readoneline( tsd_t *TSD, fileboxptr ptr )
 {
    int i=0, j=0, eolf=0, eolchars=1 ;
-#if !defined(UNIX)
+/*#if !defined(UNIX)*/
    int k=0;
-#endif
+/*#endif*/
    streng *ret=NULL ;
    fil_tsd_t *ft;
 
@@ -2072,7 +2072,11 @@ static streng *readoneline( tsd_t *TSD, fileboxptr ptr )
          eolf = REGINA_EOL;
          break;
       }
-#if !defined(UNIX) && !defined(MAC)
+/*#if !defined(UNIX) && !defined(MAC)*/
+      /*
+       * MH 25042003 - all platforms can read lines with
+       * CRLF, LF, or CR - consistent with ObjectRexx
+       */
       if (j == REGINA_CR)
       {
          k = getc(ptr->fileptr);
@@ -2089,7 +2093,7 @@ static streng *readoneline( tsd_t *TSD, fileboxptr ptr )
             break;
          }
       }
-#endif
+/*#endif*/
       /*
        * If we hit end-of-file, handle it carefully, and terminate the
        * reading. Note that this means that there we have read an
@@ -5529,7 +5533,8 @@ void get_external_routine(const tsd_t *TSD,const char *env, const char *inname, 
          }
       }
    }
-   FreeTSD( env_path );
+   if ( env_path )
+      FreeTSD( env_path );
 
    return;
 }
