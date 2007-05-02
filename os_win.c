@@ -1156,6 +1156,8 @@ int Win_uname(struct regina_utsname *name)              /* MH 10-06-96 */
             else
                strcpy( name->sysname, "WIN2K" );
          }
+         else if ( osinfo.dwMajorVersion == 6 )
+            strcpy( name->sysname, "WINVISTA" );
          else
             strcpy( name->sysname, "UNKNOWN" );
          break;
