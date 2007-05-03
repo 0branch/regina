@@ -19,6 +19,10 @@
 #
 # rxqueue.exe  program to access external queues
 #
+# Require the following env variables to be set:
+# REGINA_SRCDIR <- full path to source
+# REGINA_DOCDIR <- full path to location of Regina PDF documentation
+#
 SRCDIR=$(REGINA_SRCDIR)
 COMMONSRCDIR=$(SRCDIR)\common
 #
@@ -194,7 +198,7 @@ GCIHEADERS = $(SRCDIR)\gci\gci.h $(SRCDIR)\gci\embedded.h
 all : how rexx.exe rexx.lib execiser.exe $(SHL_TARGETS) rxstack.exe rxqueue.exe threader.exe mtb_files
 
 how:
-	echo nmake -f $(SRCDIR)\makefile.win32.vc DEBUG=$(DEBUG) TRACEMEM=$(TRACEMEM) FLISTS=$(FLISTS) SOCKET=$(SOCKET) %1 %2 > rebuild.bat
+	echo nmake -f $(SRCDIR)\makefile.win32.vc DEBUG=$(DEBUG) TRACEMEM=$(TRACEMEM) FLISTS=$(FLISTS) SOCKET=$(SOCKET) %%%1 %%%2 > rebuild.bat
 
 $(CSRCFILES) $(CFILES) : $(SRCDIR)/rexx.h
 
@@ -665,4 +669,32 @@ dist: all
 	copy $(SRCDIR)\regina_mt.ini .
 	copy $(SRCDIR)\regina.nsi .
 	copy $(SRCDIR)\common\uninstall.ico .
-	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DSRCDIR=$(SRCDIR) regina.nsi
+	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) regina.nsi
+
+binary: all
+	-mkdir dist
+	cd dist
+	-del /F /S *.*
+	copy ..\regina.exe
+	copy ..\regina.dll
+	copy ..\rexx.exe
+	copy ..\rxstack.exe
+	copy ..\rxqueue.exe
+	copy ..\*.mtb
+	copy $(SRCDIR)\COPYING-LIB
+	copy $(SRCDIR)\README.$(VER)
+	copy $(SRCDIR)\README.W32 READMEW32.txt
+	-mkdir include
+	copy $(SRCDIR)\rexxsaa.h include
+	-mkdir lib
+	copy ..\regina.lib lib
+	copy ..\rexx.lib lib
+	-mkdir demo
+	copy $(SRCDIR)\demo\*.rexx demo
+	copy ..\rxtest1.dll demo
+	copy ..\rxtest2.dll demo
+	-mkdir doc
+	copy $(REGINA_DOCDIR)\regina$(VER).pdf doc
+	-del rex??w32.zip
+	zip -r rex$(VER)w32 *
+	cd ..

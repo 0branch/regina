@@ -34,6 +34,8 @@ Name "${LONGNAME} ${VERSION}"
 !define MUI_UNINSTALLER
 !define MUI_UNCONFIRMPAGE
 
+!addplugindir ${SRCDIR}\nsis
+
 ; VERSION  ;Must be supplied on compile command line
 ; NODOTVER ;Must be supplied on compile command line
 
@@ -200,6 +202,7 @@ Section "${LONGNAME} Demos" SecDemo
   CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Demos\Rexxcps.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\rexxcps.rexx"' "$INSTDIR\regina.exe"
   File /oname=dynfunc.rexx ${SRCDIR}\demo\dynfunc.rexx
   CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Demos\Dynfunc.lnk" "$INSTDIR\regina.exe" '-p "$INSTDIR\demo\dynfunc.rexx"' "$INSTDIR\regina.exe"
+  File ${SRCDIR}\demo\*.rexx
 SectionEnd
 
 ;------------------------------------------------------------------------
@@ -221,7 +224,7 @@ SectionEnd
 Section "${LONGNAME} Documentation" SecDoc
   ; Set output path to the installation directory.
   SetOutPath $INSTDIR\doc
-  File ..\doc\regina${NODOTVER}.pdf
+  File ${DOCDIR}\regina${NODOTVER}.pdf
   CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} PDF Documentation.lnk" "$INSTDIR\doc\regina${NODOTVER}.pdf" "" "$INSTDIR\doc\regina${NODOTVER}.pdf" 0
 SectionEnd
 
