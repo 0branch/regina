@@ -682,7 +682,7 @@ binary: all
 	copy ..\rxqueue.exe
 	copy ..\*.mtb
 	copy $(SRCDIR)\COPYING-LIB
-	copy $(SRCDIR)\README.$(VER)
+	copy $(SRCDIR)\README.$(VER) README$(VER).txt
 	copy $(SRCDIR)\README.W32 READMEW32.txt
 	-mkdir include
 	copy $(SRCDIR)\rexxsaa.h include
@@ -695,6 +695,6 @@ binary: all
 	copy ..\rxtest2.dll demo
 	-mkdir doc
 	copy $(REGINA_DOCDIR)\regina$(VER).pdf doc
-	-del rex??w32.zip
-	zip -r rex$(VER)w32 *
+	-del ..\rex??w32.zip
+	zip -r ..\rex$(VER)w32 *
 	cd ..

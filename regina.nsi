@@ -360,12 +360,15 @@ Section "Uninstall"
   Call un.DeleteFileAssociation
   Push $INSTDIR
   Push $IsAdminUser ; pushes "true" or "false"
+  Push "PATH"
   Call un.RemoveFromPath
   DeleteRegKey HKCR "Regina"
   ; remove LANG environment variables
   Push "REGINA_LANG_DIR"
+  Push $IsAdminUser ; pushes "true" or "false"
   Call un.DeleteEnvStr
   Push "REGINA_LANG"
+  Push $IsAdminUser ; pushes "true" or "false"
   Call un.DeleteEnvStr
   ; stop and remove the rxstack service - ignore if we get errors
   Services::SendServiceCommand 'stop' 'Regina Stack'
@@ -398,7 +401,7 @@ Function un.DeleteFileAssociation
   ReadRegStr $R1 HKCR "$R0" ""
   StrCmp $R1 "Regina" 0 NoOwn ; only delete key if we own it
   DeleteRegKey HKCR "$R0"
-  DetailPrint "Deleteing file association for $R0"
+  DetailPrint "Deleting file association for $R0"
   NoOwn:
 FunctionEnd
 
