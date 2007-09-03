@@ -806,7 +806,7 @@ EXTNAME("RexxReorderMacro");
 #define REXXREORDERMACRO  RexxReorderMacro
 
 APIRET APIENTRY RexxClearMacroSpace(
-                VOID )
+                )
 EXTNAME("RexxClearMacroSpace");
 #define REXXCLEARMACROSPACE  RexxClearMacroSpace
 
@@ -871,7 +871,7 @@ EXTNAME("ReginaVersion");
  * It is allowed to reuse every API function after this call but this routine
  * must not be used when some parts of the Regina core are in use.
  */
-APIRET APIENTRY ReginaCleanup( VOID )
+APIRET APIENTRY ReginaCleanup( )
 EXTNAME("ReginaCleanup");
 #define REGINACLEANUP ReginaCleanup
 
