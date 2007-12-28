@@ -109,6 +109,10 @@
 # include <limits.h>
 #endif
 
+#ifdef HAVE_STDINT_H
+# include <stdint.h>
+#endif
+
 #define MAXNUMERIC 64           /* Max setting for NUMERIC DIGITS       */
 /* #define REXXDEBUG */         /* You probably don't want this ... :-) */
 

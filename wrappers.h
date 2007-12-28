@@ -524,6 +524,7 @@
 #define str_true                     __regina_str_true
 #define str_trunc                    __regina_str_trunc
 #define streng_to_int                __regina_streng_to_int
+#define streng_to_rx64               __regina_streng_to_rx64
 #define string_add                   __regina_string_add
 #define string_div                   __regina_string_div
 #define string_incr                  __regina_string_incr

@@ -35,13 +35,19 @@
 #  define rx_64         signed long long
 #  define rx_64u        unsigned long long
 #  define rx_mk64u(num) (rx_64u) num##ull
+#  define RX_64MAX      LLONG_MAX
+#  define RX_64UMAX     ULLONG_MAX
 # elif defined(ULONG_LONG_MAX) && (ULONG_LONG_MAX != ULONG_MAX)
 #  define rx_64         signed long long
 #  define rx_64u        unsigned long long
 #  define rx_mk64u(num) (rx_64u) num##ull
+#  define RX_64MAX      LONG_LONG_MAX
+#  define RX_64UMAX     ULONG_LONG_MAX
 # else
 #  define rx_64         signed long
 #  define rx_64u        unsigned long
 #  define rx_mk64u(num) (rx_64u) num##ul
+#  define RX_64MAX      LONG_MAX
+#  define RX_64UMAX     ULONG_MAX
 # endif
 #endif

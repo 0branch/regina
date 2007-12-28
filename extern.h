@@ -865,6 +865,7 @@ extern "C" {
    void str_strip( num_descr *num ) ;
    streng *str_norm( const tsd_t *TSD, num_descr *in, streng *trystr )  ;
    int streng_to_int( const tsd_t *TSD, const streng *input, int *error ) ;
+   rx_64 streng_to_rx64( const tsd_t *TSD, const streng *input, int *error ) ;
 
 /*
  * Routines in instore.c

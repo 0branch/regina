@@ -195,15 +195,20 @@ GCIHEADERS = $(SRCDIR)\gci\gci.h $(SRCDIR)\gci\embedded.h
 #
 .SUFFIXES:
 
-all : how rexx.exe rexx.lib execiser.exe $(SHL_TARGETS) rxstack.exe rxqueue.exe threader.exe mtb_files
+all : how trexx.exe rexx.exe rexx.lib $(SHL_TARGETS) rxstack.exe rxqueue.exe threader.exe execiser.exe mtb_files
 
 how:
-	echo nmake -f $(SRCDIR)\makefile.win32.vc DEBUG=$(DEBUG) TRACEMEM=$(TRACEMEM) FLISTS=$(FLISTS) SOCKET=$(SOCKET) %%%1 %%%2 > rebuild.bat
+	echo nmake -f $(SRCDIR)\makefile.win32.vc DEBUG=$(DEBUG) TRACEMEM=$(TRACEMEM) FLISTS=$(FLISTS) SOCKET=$(SOCKET) ^%1 ^%2 > rebuild.bat
 
 $(CSRCFILES) $(CFILES) : $(SRCDIR)/rexx.h
 
 $(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRCDIR)/regina_t.h $(SRCDIR)/mt.h
 
+#
+# trexx.exe is a temporary Rexx interpreter used to update version
+# information in .rc files
+trexx.exe : $(OFILES) rexx.obj nosaa.obj
+         $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(STATIC_LDFLAGS) /OUT:trexx.exe $(OFILES) rexx.obj nosaa.obj $(LIBS) $(WINSOCK)
 
 rexx.exe : $(OFILES) rexx.obj rexxw32exe.obj nosaa.obj
          $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(STATIC_LDFLAGS) /OUT:rexx.exe $(OFILES) rexx.obj rexxw32exe.obj nosaa.obj $(LIBS) $(WINSOCK)
@@ -611,44 +616,44 @@ rxtest2.lib: test2.obj
 # We assume we have an already functional regina.exe
 #
 .\reginaw32dll.rc: $(SRCDIR)\regina.ver $(SRCDIR)\reginaw32dll.rc
-        regina $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\reginaw32dll.rc $@ $(VERDOT) $(VERDATE)
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\reginaw32dll.rc $@ $(VERDOT) $(VERDATE)
 .\reginaw32exe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\reginaw32exe.rc
-        regina $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\reginaw32exe.rc $@ $(VERDOT) $(VERDATE)
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\reginaw32exe.rc $@ $(VERDOT) $(VERDATE)
 .\rxstackw32exe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\rxstackw32exe.rc
-        regina $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxstackw32exe.rc $@ $(VERDOT) $(VERDATE)
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxstackw32exe.rc $@ $(VERDOT) $(VERDATE)
 .\rxqueuew32exe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\rxqueuew32exe.rc
-        regina $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxqueuew32exe.rc $@ $(VERDOT) $(VERDATE)
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxqueuew32exe.rc $@ $(VERDOT) $(VERDATE)
 .\rexxw32exe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\rexxw32exe.rc
-        regina $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rexxw32exe.rc $@ $(VERDOT) $(VERDATE)
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rexxw32exe.rc $@ $(VERDOT) $(VERDATE)
 
 #
 # Rules for resources
 #
 reginaw32dll.obj reginaw32dll.res: .\reginaw32dll.rc
-        -copy $(SRCDIR)\reginaw32.ico .
-        rc /r /foreginaw32dll.res /i$(SRCDIR) .\reginaw32dll.rc
-        cvtres /MACHINE:IX86 /NOLOGO /OUT:reginaw32dll.obj reginaw32dll.res
+   -copy $(SRCDIR)\reginaw32.ico .
+   rc /r /foreginaw32dll.res /i$(SRCDIR) .\reginaw32dll.rc
+   cvtres /MACHINE:IX86 /NOLOGO /OUT:reginaw32dll.obj reginaw32dll.res
 #
 
 reginaw32exe.obj reginaw32exe.res: .\reginaw32exe.rc
-        -copy $(SRCDIR)\reginaw32.ico .
-        rc /r /foreginaw32exe.res /i$(SRCDIR)\ .\reginaw32exe.rc
-        cvtres /MACHINE:IX86 /NOLOGO /OUT:reginaw32exe.obj reginaw32exe.res
+   -copy $(SRCDIR)\reginaw32.ico .
+   rc /r /foreginaw32exe.res /i$(SRCDIR)\ .\reginaw32exe.rc
+   cvtres /MACHINE:IX86 /NOLOGO /OUT:reginaw32exe.obj reginaw32exe.res
 #
 rexxw32exe.obj rexxw32exe.res: .\rexxw32exe.rc
-        -copy $(SRCDIR)\reginaw32.ico .
-        rc /r /forexxw32exe.res /i$(SRCDIR)\ .\rexxw32exe.rc
-        cvtres /MACHINE:IX86 /NOLOGO /OUT:rexxw32exe.obj rexxw32exe.res
+   -copy $(SRCDIR)\reginaw32.ico .
+   rc /r /forexxw32exe.res /i$(SRCDIR)\ .\rexxw32exe.rc
+   cvtres /MACHINE:IX86 /NOLOGO /OUT:rexxw32exe.obj rexxw32exe.res
 #
 rxstackw32exe.obj rxstackw32exe.res: .\rxstackw32exe.rc
-        -copy $(SRCDIR)\reginaw32.ico .
-        rc /r /forxstackw32exe.res /i$(SRCDIR)\ .\rxstackw32exe.rc
-        cvtres /MACHINE:IX86 /NOLOGO /OUT:rxstackw32exe.obj rxstackw32exe.res
+   -copy $(SRCDIR)\reginaw32.ico .
+   rc /r /forxstackw32exe.res /i$(SRCDIR)\ .\rxstackw32exe.rc
+   cvtres /MACHINE:IX86 /NOLOGO /OUT:rxstackw32exe.obj rxstackw32exe.res
 #
 rxqueuew32exe.obj rxqueuew32exe.res: .\rxqueuew32exe.rc
-        -copy $(SRCDIR)\reginaw32.ico .
-        rc /r /forxqueuew32exe.res /i$(SRCDIR)\ .\rxqueuew32exe.rc
-        cvtres /MACHINE:IX86 /NOLOGO /OUT:rxqueuew32exe.obj rxqueuew32exe.res
+   -copy $(SRCDIR)\reginaw32.ico .
+   rc /r /forxqueuew32exe.res /i$(SRCDIR)\ .\rxqueuew32exe.rc
+   cvtres /MACHINE:IX86 /NOLOGO /OUT:rxqueuew32exe.obj rxqueuew32exe.res
 #
 
 ARCHIVE_FILES = $(ALLSRC) $(README) $(SRCDIR)/makefile.* \

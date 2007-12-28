@@ -131,6 +131,7 @@ AC_CHECK_HEADERS( \
    stdarg.h \
    stdio.h \
    stdlib.h \
+   stdint.h \
    string.h \
    sys/poll.h \
    sys/resource.h \

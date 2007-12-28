@@ -26,6 +26,7 @@ static char *RCSid = "$Id: strmath.c,v 1.27 2006/09/13 07:52:48 mark Exp $";
 #include <limits.h>
 #include <assert.h>
 #include <string.h>
+#include "regina64.h"
 
 
 #define log_xor(a,b)    (( (a)&&(!(b)) ) || ( (!(a)) && (b) ))
@@ -229,6 +230,55 @@ static int whole_number( const num_descr *input, int *value )
       {
          digit = input->num[i] - '0';
          if ( result > INT_MAX - digit )
+            return 0;
+         result += digit;
+      }
+   }
+   if (input->negative)
+      result = -result;
+
+   *value = result;
+   return 1;
+}
+
+/*
+ * ANSI chapter 7, beginning: "...matches that syntax and also has a value
+ * that is 'whole', that is has no non-zero fractional part." The syntax
+ * is that of a plain number.
+ * Thus, 1E1 or 1.00 are allowed.
+ * returns 0 on error, 1 on success. *value is set to the value on success.
+ */
+static int whole_rx64_number( const num_descr *input, rx_64 *value )
+{
+   /* number must be integer, and must be small enough */
+   rx_64 result;
+   int i,digit;
+
+   if ( input->size > input->exp )
+   {
+      /*
+       * Check for non-zeros in the fractional part of the number.
+       */
+      i = MAX( 0, input->exp );
+      for ( ; i < input->size; i++ )
+      {
+         if ( input->num[i] != '0' )
+            return 0;
+      }
+   }
+
+   /*
+    * The number is valid but may be too large. Keep care.
+    */
+   for ( i = 0, result = 0; i < input->exp; i++ )
+   {
+      if ( result > RX_64MAX / 10 )
+         return 0;
+      result *= 10;
+      if ( i < input->size )
+      {
+         digit = input->num[i] - '0';
+         if ( result > RX_64MAX - digit )
             return 0;
          result += digit;
       }
@@ -2948,6 +2998,30 @@ int streng_to_int( const tsd_t *TSD, const streng *number, int *error )
       return 0;
 
    if ( ( *error = !whole_number( &mt->fdescr, &result ) ) != 0 )
+      return 0;
+
+   return result;
+}
+
+/*
+ * Converts number to a 64bit integer. Sets *error to 1 on error (0 otherwise)
+ *
+ * ANSI chapter 7, beginning: "...matches that syntax and also has a value
+ * that is 'whole', that is has no non-zero fractional part." The syntax
+ * is that of a plain number.
+ * Thus, 1E1 or 1.00 are allowed.
+ */
+rx_64 streng_to_rx64( const tsd_t *TSD, const streng *number, int *error )
+{
+   rx_64 result = 0;
+   mat_tsd_t *mt;
+
+   mt = (mat_tsd_t *)TSD->mat_tsd;
+
+   if ( ( *error = getdescr( TSD, number, &mt->fdescr ) ) != 0 )
+      return 0;
+
+   if ( ( *error = !whole_rx64_number( &mt->fdescr, &result ) ) != 0 )
       return 0;
 
    return result;

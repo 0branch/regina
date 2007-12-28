@@ -877,7 +877,7 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          indate->tm_year = num1;
          break;
       case 'T': /* +|-999999... */
-         num64 = streng_to_int( TSD, suppdate, &rc );
+         num64 = streng_to_rx64( TSD, suppdate, &rc );
          if ( rc )
             return 1;
          tmpTime = gmtime( (time_t *)&num64 );
