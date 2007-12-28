@@ -1,9 +1,9 @@
                           Regina 3.4
-                        ?????????????
+                        15 September 2007
 
 Changes in this release (from 3.3)
 ----------------------------------
-o Fixed bugs 952229, 952380, 961301, 972850, 982062, 995505, 1000227,
+o Fixed bugs 918739, 952229, 952380, 961301, 972850, 982062, 995505, 1000227,
   1009248, 1021823, 1026572, 1107760, 1116894, 1107763, 1107759, 1107969,
   1109296, 1112956, 1113373
 o Cygwin port will now return "UNIX" as the first word from
@@ -45,6 +45,8 @@ o Documented 'J' TIME BIF format option.
 o Added Object Rexx line comment; "--" based on code from Robert Hodge.
 o Added .LINE reserved symbol which provides the line number of the current file
   based on code from Robert Hodge.
+o Builds as native 64bit application on Windows XP 64bit.
+o GCI builds under Cygwin.
 
 Cheers, Mark.
 ------------------------------------------------------------------------

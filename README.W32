@@ -20,8 +20,8 @@ Windows NT Resource Kit in two ways:
     Rexx under Win9x/NT/2k to be recompiled using Regina, and C programs
     written for Regina to be recompiled using Quercus Rexx or Object
     Rexx.
-    The Win32 functions that were built into Regina are available as
-    an external function package from http://www.interlog.com/~ptjm
+    The Win32 functions that were built into Regina on the Resource Kit are
+    available as an external function package from http://www.interlog.com/~ptjm
 
 The files in this archive are:
 
@@ -33,7 +33,6 @@ file_id.diz        - Description file for BBS use
 regina.exe         - 32bit Regina Rexx interpreter executable
 regina.dll         - 32bit Regina Rexx interpreter dynamic library
 regina.lib         - Import library for Visual C++
-regina_borland.lib - Import Library for Borland C++
 rexx.lib           - Static library for Visual C++
 rexx.exe           - Regina executable - does not require regina.dll
 rexxsaa.h          - Header file for access to regina.dll
@@ -76,12 +75,27 @@ Using this build of Regina with other Win32 Compilers
 Nearly every C compiler on the Win32 platforms generates object code that
 is incompatible with one another.  So using this build of Regina with a
 C compiler other than MS Visual C/C++ requires that you link with the
-import library appropriate to your compiler.  The import libraries supplied
-in this package are:
+import library appropriate to your compiler.  The following provides
+instructions on how to build import libraries for a couple of Win32
+compilers.
+Run these commands from a directory other than where the original regina.lib file exists.
+In the commands below that is assumed to be c:\regina.
 
-Compiler        Library Name
---------------------------------
-Borland C++     regina_borland.lib
+Cygwin and MingW32
+------------------
+Command:
+ dlltool -A -k --input-def c:\regina\regina_w32_dll.def --dllname c:\regina\regina.dll --output-lib libregina.a
+Import Library:
+ libregina.a
+
+Borland 5.5
+-----------
+Command:
+ impdef tmp.def c:\regina\regina.dll
+ -- you need to edit tmp.def with a text editor and remove lines containing a question mark: '?'
+ implib -w regina.lib tmp.def
+Import Library:
+ regina.lib
 
 ADRRESS WITH
 ============
@@ -139,9 +153,3 @@ Unix end of line characters to Win32 carriage return/end of line characters.
 With InfoZip, this is "unzip -a".
 
 Cheers, Mark.
-------------------------------------------------------------------------
-* Mark Hessling,  M.Hessling@qut.edu.au  http://www.lightlink.com/hessling/
-* Author of THE, a Free XEDIT/KEDIT editor and, Rexx/SQL
-* Maintainer of PDCurses: Public Domain Curses and, Regina Rexx interpreter
-* Use Rexx ? join the Rexx Language Association: http://www.rexxla.org
-------------------------------------------------------------------------
