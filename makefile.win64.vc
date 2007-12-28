@@ -674,7 +674,7 @@ dist: all
 	copy $(SRCDIR)\regina_mt.ini .
 	copy $(SRCDIR)\regina.nsi .
 	copy $(SRCDIR)\common\uninstall.ico .
-	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) regina.nsi
+	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) /DARCH=w64 regina.nsi
 
 binary: all
 	-mkdir dist
@@ -700,6 +700,6 @@ binary: all
 	copy ..\rxtest2.dll demo
 	-mkdir doc
 	copy $(REGINA_DOCDIR)\regina$(VER).pdf doc
-	-del ..\rex??w64.zip
-	zip -r ..\rex$(VER)w64 *
+	-del ..\regina??w64.zip
+	zip -r ..\regina$(VER)w64 *
 	cd ..

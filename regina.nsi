@@ -43,7 +43,7 @@ Name "${LONGNAME} ${VERSION}"
 ;Configuration
 
   ;General
-  OutFile "${SHORTNAME}${NODOTVER}.exe"
+  OutFile "${SHORTNAME}${NODOTVER}${ARCH}.exe"
   ShowInstdetails show
   SetOverwrite on
 
