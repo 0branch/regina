@@ -142,7 +142,8 @@ CSRCFILES = $(REG_DIR)/funcs.c $(REG_DIR)/builtin.c $(REG_DIR)/error.c $(REG_DIR
 	$(REG_DIR)/os2/*.c $(REG_DIR)/os2/*.def \
 	$(REG_DIR)/gci/*.c $(REG_DIR)/gci/*.h $(REG_DIR)/gci/00README \
 	$(REG_DIR)/gci/gci_convert.linux.* $(REG_DIR)/gci/gci_convert.win32.* $(REG_DIR)/gci/gci_convert.unsupported \
-	$(REG_DIR)/gci/gci_convert.os2.* $(REG_DIR)/gci/gci_convert.macX.* $(REG_DIR)/gci/gci_convert.solaris.*
+	$(REG_DIR)/gci/gci_convert.os2.* $(REG_DIR)/gci/gci_convert.macX.* $(REG_DIR)/gci/gci_convert.solaris.* $(REG_DIR)/gci/gci_convert.cygwin.* \
+	$(REG_DIR)/nsis/*.txt $(REG_DIR)/nsis/*.dll
 
 ZIP_CSRCFILES = funcs.c builtin.c error.c variable.c \
 	interprt.c debug.c dbgfuncs.c memory.c parsing.c files.c \
@@ -161,7 +162,8 @@ ZIP_CSRCFILES = funcs.c builtin.c error.c variable.c \
 	os2/*.c os2/*.def \
 	gci/*.c gci/*.h gci/00README \
 	gci/gci_convert.linux.* gci/gci_convert.win32.* gci/gci_convert.unsupported \
-	gci/gci_convert.os2.* gci/gci_convert.macX.* gci/gci_convert.solaris.*
+	gci/gci_convert.os2.* gci/gci_convert.macX.* gci/gci_convert.solaris.* gci/gci_convert.cygwin.* \
+	nsis/*.txt nsis/*.dll
 
 OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	interprt.$(OBJ) debug.$(OBJ) dbgfuncs.$(OBJ) memory.$(OBJ) parsing.$(OBJ) files.$(OBJ) \
