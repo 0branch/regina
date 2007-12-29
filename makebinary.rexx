@@ -2,15 +2,14 @@
  *
  */
 Trace O
-validargs = '-s -d -a -A -p -S -l -L -u -e -b -B -P'
-vars = '_srcdir _tmpdir _abiminor _abimajor _shlpre _shlpst _libpre _libpst _useabi _exe _shlfile _libfile _binprefix'
-mandatory = '1 1 1 1 1 1 1 1 1 1 1 1 1'
-valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1 0'
+validargs = '-s -d -a -A -p -S -l -L -u -e -b -B -P -t'
+vars = '_srcdir _tmpdir _abiminor _abimajor _shlpre _shlpst _libpre _libpst _useabi _exe _shlfile _libfile _binprefix _target'
+mandatory = '1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1 0 1'
 If ValidOpts( Arg(1), validargs, mandatory, valuereq ) = 0 Then
 exes = 'rexx'_binprefix||_exe 'regina'_binprefix||_exe 'rxqueue'_binprefix||_exe 'rxstack'_binprefix||_exe 'regina-config'
-Parse Source os .
 Select
-   When os = 'BEOS' Then
+   When Countstr( 'beos', _target ) \= 0 Then
       Do
          from = 'COPYING-LIB BUGS       TODO       README.BeOS README.'_abimajor'?  demo/*.rexx rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           bin         include'
@@ -18,7 +17,7 @@ Select
          shldir = 'lib'
          share_dir = _tmpdir'/'extn_dir
       End
-   When os = 'WIN32' Then
+   When Countstr( 'cygwin', _target ) \= 0 Then
       Do
          from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'

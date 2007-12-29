@@ -1153,7 +1153,6 @@ case "$target" in
                 TEST2EXP="${srcdir}/test2_w32_dll.def"
                 REGINAEXP="${srcdir}/regina_w32_dll.def"
                 BASE_INSTALL="cygwininstall"
-                BASE_BINARY="cygwinbinary"
                 OTHER_INSTALLS=""
                 ;;
         *apple-darwin*)

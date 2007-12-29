@@ -8508,7 +8508,6 @@ case "$target" in
                 TEST2EXP="${srcdir}/test2_w32_dll.def"
                 REGINAEXP="${srcdir}/regina_w32_dll.def"
                 BASE_INSTALL="cygwininstall"
-                BASE_BINARY="cygwinbinary"
                 OTHER_INSTALLS=""
                 ;;
         *apple-darwin*)
@@ -8537,7 +8536,7 @@ case "$target" in
 echo $ECHO_N "checking how to create a shared library... $ECHO_C" >&6; }
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8540 "configure"
+#line 8539 "configure"
 int foo()
 {
 return(0);
@@ -8628,7 +8627,7 @@ rm -f conftest*
 
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8631 "configure"
+#line 8630 "configure"
 int foo()
 {
 return(0);

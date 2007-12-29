@@ -360,7 +360,7 @@ error.$(OBJ) : $(srcdir)/error.c $(srcdir)/rexx.h $(srcdir)/rexxmsg.h
 variable.$(OBJ) :$(srcdir)/variable.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/variable.c
 
-interprt.$(OBJ) :$(srcdir)/interprt.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+interprt.$(OBJ) :$(srcdir)/interprt.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/interprt.c
 
 debug.$(OBJ) : $(srcdir)/debug.c $(srcdir)/rexx.h
@@ -378,7 +378,7 @@ parsing.$(OBJ) : $(srcdir)/parsing.c $(srcdir)/rexx.h
 files.$(OBJ) : $(srcdir)/files.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/files.c
 
-misc.$(OBJ) :  $(srcdir)/misc.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+misc.$(OBJ) :  $(srcdir)/misc.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/misc.c
 
 unxfuncs.$(OBJ) :$(srcdir)/unxfuncs.c $(srcdir)/rexx.h
@@ -444,19 +444,19 @@ options.$(OBJ) : $(srcdir)/options.c $(srcdir)/rexx.h
 os_unx.$(OBJ) :  $(srcdir)/os_unx.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/os_unx.c
 
-rexx.$(OBJ) :  $(srcdir)/rexx.c $(srcdir)/rexx.h  $(srcdir)/regina.ver
+rexx.$(OBJ) :  $(srcdir)/rexx.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/rexx.c
 
-client.$(OBJ) :    $(srcdir)/client.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+client.$(OBJ) :    $(srcdir)/client.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/client.c
 
-rexxsaa.$(OBJ) :    $(srcdir)/rexxsaa.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+rexxsaa.$(OBJ) :    $(srcdir)/rexxsaa.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/rexxsaa.c
 
 regina.$(OBJ) :  $(srcdir)/regina.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(THREADING_COMPILE) $(srcdir)/regina.c
 
-drexx.$(OBJ) : $(srcdir)/rexx.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+drexx.$(OBJ) : $(srcdir)/rexx.c $(srcdir)/rexx.h
 	-mv rexx.$(OBJ) rexx$(OSAVE)
 	$(CC) $(COPT) -c -DRXLIB $(srcdir)/rexx.c
 	-mv rexx.$(OBJ) drexx.$(OBJ)
@@ -489,7 +489,7 @@ mt_posix.$(OBJ) : $(srcdir)/mt_posix.c $(srcdir)/rexx.h
 nosaa.$(OBJ) : $(srcdir)/nosaa.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/nosaa.c
 
-instore.$(OBJ) : $(srcdir)/instore.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+instore.$(OBJ) : $(srcdir)/instore.c $(srcdir)/rexx.h
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/instore.c
 
 extstack.$(OBJ) : $(srcdir)/extstack.c $(srcdir)/extstack.h $(srcdir)/rexxbif.h $(srcdir)/rexx.h
@@ -543,7 +543,7 @@ variable.so.$(OBJ) :$(srcdir)/variable.c $(srcdir)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
-interprt.so.$(OBJ) :$(srcdir)/interprt.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+interprt.so.$(OBJ) :$(srcdir)/interprt.c $(srcdir)/rexx.h
 	$(O2SAVE)
 	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/interprt.c
 	$(O2SHO)
@@ -579,7 +579,7 @@ files.so.$(OBJ) :   $(srcdir)/files.c $(srcdir)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
-misc.so.$(OBJ) :    $(srcdir)/misc.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+misc.so.$(OBJ) :    $(srcdir)/misc.c $(srcdir)/rexx.h
 	$(O2SAVE)
 	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/misc.c
 	$(O2SHO)
@@ -729,19 +729,19 @@ rexx.so.$(OBJ) :  $(srcdir)/rexx.c $(srcdir)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
-client.so.$(OBJ) :  $(srcdir)/client.c $(srcdir)/rexx.h  $(srcdir)/regina.ver
+client.so.$(OBJ) :  $(srcdir)/client.c $(srcdir)/rexx.h
 	$(O2SAVE)
 	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/client.c
 	$(O2SHO)
 	$(SAVE2O)
 
-rexxsaa.so.$(OBJ) :  $(srcdir)/rexxsaa.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+rexxsaa.so.$(OBJ) :  $(srcdir)/rexxsaa.c $(srcdir)/rexx.h
 	$(O2SAVE)
 	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/rexxsaa.c
 	$(O2SHO)
 	$(SAVE2O)
 
-drexx.so.$(OBJ) : $(srcdir)/rexx.c  $(srcdir)/regina.ver
+drexx.so.$(OBJ) : $(srcdir)/rexx.c
 	-mv rexx.$(OBJ) rexx.$(OBJ).save
 	$(CC) $(TSCOPT) $(DYN_COMP) -c -DRXLIB $(srcdir)/rexx.c
 	-mv rexx.$(OBJ) drexx.so.$(OBJ)
@@ -789,7 +789,7 @@ mt_posix.so.$(OBJ) : $(srcdir)/mt_posix.c $(srcdir)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
-instore.so.$(OBJ) : $(srcdir)/instore.c $(srcdir)/rexx.h $(srcdir)/regina.ver
+instore.so.$(OBJ) : $(srcdir)/instore.c $(srcdir)/rexx.h
 	$(O2SAVE)
 	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/instore.c
 	$(O2SHO)
@@ -1023,46 +1023,6 @@ cygwininstall: installbase installregina installlib
 # Need to install libregina.a
 	$(INSTALL) -m 755 -c ./$(LIBPRE)$(SHLFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(SHLFILE)$(LIBPST)
 
-oldcygwin:
-	$(INSTALL) -m 755 -d $(bindir)
-	$(INSTALL) -m 755 -d $(libdir)
-	$(INSTALL) -m 755 -d $(includedir)
-	$(INSTALL) -m 755 -d $(sharedir)
-	$(INSTALL) -m 755 -d $(mandir)/man1
-	$(INSTALL) -m 755 -c ./rexx$(EXE) $(bindir)/rexx$(EXE)
-	$(INSTALL) -m 755 -c ./regina$(EXE) $(bindir)/regina$(EXE)
-	$(INSTALL) -m 755 -c ./rxqueue$(EXE) $(bindir)/rxqueue$(EXE)
-	$(INSTALL) -m 755 -c ./rxstack$(EXE) $(bindir)/rxstack$(EXE)
-	$(INSTALL) -m 755 -c ./regina-config $(bindir)/regina-config
-	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(bindir)/$(SHLPRE)rxtest1$(MODPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(bindir)/$(SHLPRE)rxtest2$(MODPST)
-	$(INSTALL) -m 755 -c ./$(LIBPRE)$(SHLFILE)$(LIBPST) $(libdir)/$(LIBPRE)$(SHLFILE)$(LIBPST)
-	$(INSTALL) -m 755 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
-	$(INSTALL) -m 644 -c $(srcdir)/regina.1 $(mandir)/man1/regina.1
-	$(INSTALL) -m 644 -c $(srcdir)/rexxsaa.h $(includedir)/rexxsaa.h
-	$(INSTALL) -m 644 -c ./en.mtb $(sharedir)/en.mtb
-	$(INSTALL) -m 644 -c ./pt.mtb $(sharedir)/pt.mtb
-	$(INSTALL) -m 644 -c ./no.mtb $(sharedir)/no.mtb
-	$(INSTALL) -m 644 -c ./de.mtb $(sharedir)/de.mtb
-	$(INSTALL) -m 644 -c ./es.mtb $(sharedir)/es.mtb
-	$(INSTALL) -m 644 -c ./pl.mtb $(sharedir)/pl.mtb
-	$(INSTALL) -m 644 -c ./tr.mtb $(sharedir)/tr.mtb
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/rexxcps.rexx  $(sharedir)/rexxcps.rexx
-	-chmod 755 $(sharedir)/rexxcps.rexx
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/animal.rexx   $(sharedir)/animal.rexx
-	-chmod 755 $(sharedir)/animal.rexx
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/block.rexx    $(sharedir)/block.rexx
-	-chmod 755 $(sharedir)/block.rexx
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/dateconv.rexx $(sharedir)/dateconv.rexx
-	-chmod 755 $(sharedir)/dateconv.rexx
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/timeconv.rexx $(sharedir)/timeconv.rexx
-	-chmod 755 $(sharedir)/timeconv.rexx
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/newstr.rexx   $(sharedir)/newstr.rexx
-	-chmod 755 $(sharedir)/newstr.rexx
-	$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/dynfunc.rexx  $(sharedir)/dynfunc.rexx
-	-chmod 755 $(sharedir)/dynfunc.rexx
-
 clean:
 	rm -f $(JUNK)
 
@@ -1080,21 +1040,9 @@ binarybase: all
 	-mkdir -p ./tmpdir/doc/regina
 	-mkdir -p ./tmpdir/share/regina
 	-mkdir -p ./tmpdir/rexx
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix)
+	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(TARGET)
 	(cd ./tmpdir; \
 	tar cvf - * | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
-
-cygwinbinary: all
-	-rm -fr ./tmpdir
-	-mkdir -p ./tmpdir/usr/bin
-	-mkdir -p ./tmpdir/usr/lib
-	-mkdir -p ./tmpdir/usr/include
-	-mkdir -p ./tmpdir/usr/man/man1
-	-mkdir -p ./tmpdir/usr/doc/regina
-	-mkdir -p ./tmpdir/usr/share/regina
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/usr -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix)
-	(cd ./tmpdir; \
-	tar cvf - usr | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
 beosbinary: all
 	-rm -fr ./tmpdir
@@ -1103,7 +1051,7 @@ beosbinary: all
 	-mkdir -p ./tmpdir/include
 	-mkdir -p ./tmpdir/add-ons/regina
 	-mkdir -p ./tmpdir/doc/regina
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix)
+	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(TARGET)
 	(cd ./tmpdir; \
 	zip -r Regina-REXX-$(VERDOT)-$(target).zip * )
 
@@ -1116,7 +1064,7 @@ atheosbinary: all
 	-mkdir -p ./tmpdir/regina/doc/regina
 	-mkdir -p ./tmpdir/regina/share/regina
 	-mkdir -p ./tmpdir/regina/rexx
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix)
+	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(TARGET)
 	(cd ./tmpdir; \
 	tar cvf - regina | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
