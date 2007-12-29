@@ -1040,7 +1040,7 @@ binarybase: all
 	-mkdir -p ./tmpdir/doc/regina
 	-mkdir -p ./tmpdir/share/regina
 	-mkdir -p ./tmpdir/rexx
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(TARGET)
+	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
 	tar cvf - * | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
@@ -1051,7 +1051,7 @@ beosbinary: all
 	-mkdir -p ./tmpdir/include
 	-mkdir -p ./tmpdir/add-ons/regina
 	-mkdir -p ./tmpdir/doc/regina
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(TARGET)
+	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
 	zip -r Regina-REXX-$(VERDOT)-$(target).zip * )
 
@@ -1064,7 +1064,7 @@ atheosbinary: all
 	-mkdir -p ./tmpdir/regina/doc/regina
 	-mkdir -p ./tmpdir/regina/share/regina
 	-mkdir -p ./tmpdir/regina/rexx
-	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(TARGET)
+	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
 	tar cvf - regina | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
