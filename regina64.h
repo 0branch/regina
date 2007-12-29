@@ -23,14 +23,32 @@
 #  define rx_64         signed
 #  define rx_64u        unsigned
 #  define rx_mk64u(num) (rx_64u) num##u
+#  ifdef INT64_MAX
+#   define RX_64MAX     INT64_MAX
+#  endif
+#  ifdef UINT64_MAX
+#   define RX_64UMAX    UINT64_MAX
+#  endif
 # elif defined(WORD_BIT) && (WORD_BIT >= 64)
 #  define rx_64         signed
 #  define rx_64u        unsigned
 #  define rx_mk64u(num) (rx_64u) num##u
+#  ifdef INT64_MAX
+#   define RX_64MAX     INT64_MAX
+#  endif
+#  ifdef UINT64_MAX
+#   define RX_64UMAX    UINT64_MAX
+#  endif
 # elif defined(LONG_BIT) && (LONG_BIT >= 64)
 #  define rx_64         signed long
 #  define rx_64u        unsigned long
 #  define rx_mk64u(num) (rx_64u) num##ul
+#  ifdef INT64_MAX
+#   define RX_64MAX     INT64_MAX
+#  endif
+#  ifdef UINT64_MAX
+#   define RX_64UMAX    UINT64_MAX
+#  endif
 # elif defined(ULLONG_MAX) && (ULLONG_MAX != ULONG_MAX)
 #  define rx_64         signed long long
 #  define rx_64u        unsigned long long
