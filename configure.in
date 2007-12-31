@@ -41,7 +41,11 @@ case "$target" in
       ;;
    *sequent-dynix*)
       ;;
-   *solaris*)
+   i*86*solaris*)
+      GCI_CONVERT_HEADER="gci_convert.solaris.i86"
+      gci_available=yes
+      ;;
+   sparc*solaris*)
       GCI_CONVERT_HEADER="gci_convert.solaris.sparc"
       gci_available=yes
       ;;
