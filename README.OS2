@@ -29,10 +29,14 @@ rexxsaa.h    - Header file for access to regina.lib
 test1.dll    - Sample external function packages; used by dynfunc.rexx
 test2.dll
 demo\*.rexx  - Sample Rexx programs
+demo\rexxapi.dll - Forwarding DLL for programs using OS/2 Rexx (experimental)
+demo\rexx.dll    - Forwarding DLL for programs using OS/2 Rexx (experimental)
 nls\*.mtb    - Native Language message files
 
 Copy the .EXE files into a directory in your PATH and copy the .DLL
 files into a directory in your LIBPATH.
+
+This version of Regina requires libc063.dll; the runtime for gcc 3.3.5.
 
 If you want to have Regina error messages displayed in you native
 language, set the environment variable; REGINA_LANG to the two-character
@@ -46,8 +50,8 @@ With InfoZip, this is "unzip -a".
 
 Cheers, Mark.
 ------------------------------------------------------------------------
-* Mark Hessling,  M.Hessling@qut.edu.au  http://www.lightlink.com/hessling/
-* Author of THE, a Free XEDIT/KEDIT editor and, Rexx/SQL
-* Maintainer of PDCurses: Public Domain Curses and, Regina Rexx interpreter
-* Use Rexx ? join the Rexx Language Association: http://www.rexxla.org
+* Mark Hessling,  mark@rexx.org  http://www.rexx.org/
+* Author of THE, a Free XEDIT/KEDIT editor and, Rexx/SQL, Rexx/CURL, etc.
+* Maintainer of Regina Rexx interpreter and Rexx/Tk
+* Use Rexx? join the Rexx Language Association: http://www.rexxla.org/
 ------------------------------------------------------------------------

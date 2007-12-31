@@ -153,3 +153,9 @@ Unix end of line characters to Win32 carriage return/end of line characters.
 With InfoZip, this is "unzip -a".
 
 Cheers, Mark.
+------------------------------------------------------------------------
+* Mark Hessling,  mark@rexx.org  http://www.rexx.org/
+* Author of THE, a Free XEDIT/KEDIT editor and, Rexx/SQL, Rexx/CURL, etc.
+* Maintainer of Regina Rexx interpreter and Rexx/Tk
+* Use Rexx? join the Rexx Language Association: http://www.rexxla.org/
+------------------------------------------------------------------------
