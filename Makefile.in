@@ -894,7 +894,7 @@ ZIP_ARCHIVE_FILES = $(ZIP_ALLSRC) $(ZIP_README) makefile.* \
 
 dist:
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
-	(cd $(srcdir)/..;ln -sf Regina $(REG_DIR))
+	(PWD=`pwd`;cd $(srcdir)/..;ln -sf ${PWD} $(REG_DIR))
 	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > Regina-REXX-$(VERDOT).tar.gz )
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 
@@ -931,6 +931,7 @@ installbase: all
 	-$(INSTALL) -m 755 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	-$(RANLIB) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	$(INSTALL) -m 644 -c $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/regina.1
+	gzip $(DESTDIR)$(mandir)/man1/regina.1
 	$(INSTALL) -m 644 -c $(srcdir)/rexxsaa.h $(DESTDIR)$(includedir)/rexxsaa.h
 	$(INSTALL) -m 644 -c ./en.mtb $(DESTDIR)$(sharedir)/en.mtb
 	$(INSTALL) -m 644 -c ./pt.mtb $(DESTDIR)$(sharedir)/pt.mtb

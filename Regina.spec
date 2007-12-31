@@ -38,14 +38,14 @@ make DESTDIR=%{buildroot} install
 /usr/bin/regina-config
 /usr/bin/rxqueue
 /usr/bin/rxstack
-/usr/lib/libregina.a
-/usr/lib/libregina.so.%{version}
-/usr/lib/libregina.so.%{vermajor}
-/usr/lib/libregina.so
-/usr/lib/librxtest1.so
-/usr/lib/librxtest2.so
+/usr/%{_lib}/libregina.a
+/usr/%{_lib}/libregina.so.%{version}
+/usr/%{_lib}/libregina.so.%{vermajor}
+/usr/%{_lib}/libregina.so
+/usr/%{_lib}/librxtest1.so
+/usr/%{_lib}/librxtest2.so
 /usr/include/rexxsaa.h
-/usr/man/man1/regina.1.gz
+/usr/share/man/man1/regina.1.gz
 /usr/etc/rc.d/init.d/rxstack
 /usr/share/regina/rexxcps.rexx
 /usr/share/regina/animal.rexx
@@ -63,7 +63,7 @@ make DESTDIR=%{buildroot} install
 /usr/share/regina/tr.mtb
 
 %post
-cd %{prefix}/lib
+cd %{prefix}/%{_lib}
 ln -sf ./libregina.so.%{version} ./libregina.so.%{vermajor}
 ln -sf ./libregina.so.%{version} ./libregina.so
-ldconfig %{prefix}/lib
+ldconfig %{prefix}/%{_lib}
