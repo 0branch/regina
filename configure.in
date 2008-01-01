@@ -45,7 +45,7 @@ case "$target" in
       GCI_CONVERT_HEADER="gci_convert.solaris.i86"
       gci_available=yes
       ;;
-   sparc*solaris*)
+   *solaris*)
       GCI_CONVERT_HEADER="gci_convert.solaris.sparc"
       gci_available=yes
       ;;

@@ -3064,7 +3064,7 @@ case "$target" in
       GCI_CONVERT_HEADER="gci_convert.solaris.i86"
       gci_available=yes
       ;;
-   sparc*solaris*)
+   *solaris*)
       GCI_CONVERT_HEADER="gci_convert.solaris.sparc"
       gci_available=yes
       ;;
@@ -3116,6 +3116,8 @@ case "$target" in
    *dec-osf*)
       ;;
    *sequent-dynix*)
+      ;;
+   i*86*solaris*)
       ;;
    *solaris*)
       rc=`isainfo -v | grep -c 64-bit`
@@ -8247,7 +8249,7 @@ if test "$DYN_COMP" = ""; then
 echo $ECHO_N "checking compiler flags for a dynamic object... $ECHO_C" >&6; }
 
 cat > conftest.$ac_ext <<EOF
-#line 8250 "configure"
+#line 8252 "configure"
 int a=0
 EOF
 
@@ -8540,7 +8542,7 @@ case "$target" in
 echo $ECHO_N "checking how to create a shared library... $ECHO_C" >&6; }
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8543 "configure"
+#line 8545 "configure"
 int foo()
 {
 return(0);
@@ -8631,7 +8633,7 @@ rm -f conftest*
 
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8634 "configure"
+#line 8636 "configure"
 int foo()
 {
 return(0);

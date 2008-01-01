@@ -22,6 +22,8 @@ case "$target" in
       ;;
    *sequent-dynix*)
       ;;
+   i*86*solaris*)
+      ;;
    *solaris*)
       rc=`isainfo -v | grep -c 64-bit`
       if test $rc -eq 1; then
