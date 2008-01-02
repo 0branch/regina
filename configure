@@ -3547,7 +3547,8 @@ fi
 LIBS="$mh_save_libs"
 
 
-for ac_prog in flex lex
+if test "$on_qnx4" = "no"; then
+  for ac_prog in flex lex
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -3750,6 +3751,7 @@ _ACEOF
 fi
 rm -f conftest.l $LEX_OUTPUT_ROOT.c
 
+fi
 fi
 BOTHLIBS="${LEXLIB} ${MH_EXTRA_LIBS}"
 
@@ -8249,7 +8251,7 @@ if test "$DYN_COMP" = ""; then
 echo $ECHO_N "checking compiler flags for a dynamic object... $ECHO_C" >&6; }
 
 cat > conftest.$ac_ext <<EOF
-#line 8252 "configure"
+#line 8254 "configure"
 int a=0
 EOF
 
@@ -8542,7 +8544,7 @@ case "$target" in
 echo $ECHO_N "checking how to create a shared library... $ECHO_C" >&6; }
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8545 "configure"
+#line 8547 "configure"
 int foo()
 {
 return(0);
@@ -8633,7 +8635,7 @@ rm -f conftest*
 
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8636 "configure"
+#line 8638 "configure"
 int foo()
 {
 return(0);

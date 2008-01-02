@@ -9,6 +9,14 @@ valuereq  = '1 1 1 1 0 0 0 0 1 0 1 1 0 1'
 If ValidOpts( Arg(1), validargs, mandatory, valuereq ) = 0 Then
 exes = 'rexx'_binprefix||_exe 'regina'_binprefix||_exe 'rxqueue'_binprefix||_exe 'rxstack'_binprefix||_exe 'regina-config'
 Select
+   When Countstr( 'qnx', _target ) \= 0 & Countstr( 'nto', _target ) = 0 Then
+      Do
+         from = 'COPYING-LIB BUGS       TODO       README.QNX4 README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
+         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
+         extn_dir = 'lib'
+         shldir = 'lib'
+         share_dir = _tmpdir'/share/regina'
+      End
    When Countstr( 'beos', _target ) \= 0 Then
       Do
          from = 'COPYING-LIB BUGS       TODO       README.BeOS README.'_abimajor'?  demo/*.rexx rexxsaa.h' /**/

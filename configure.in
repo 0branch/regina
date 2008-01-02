@@ -96,7 +96,9 @@ MH_EXTRA_LIBS=""
 MH_CHECK_LIB(m nsl nsl_s socket net)
 dnl -- check for crypt library and function
 MH_CHECK_CRYPT
-AC_PROG_LEX
+if test "$on_qnx4" = "no"; then
+  AC_PROG_LEX
+fi
 BOTHLIBS="${LEXLIB} ${MH_EXTRA_LIBS}"
 
 MH_HAVE_PROTO
