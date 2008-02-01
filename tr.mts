@@ -212,7 +212,7 @@
  40,922,[%s degistirgesini iceren %d. siradaki oge birkac taneden fazla alt-buyruk isaret etmektedir; en az %d tane beklenir; bulunan %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[%s degistirgesini iceren %d. siradaki oge bir hayli fazla alt-buyruk isaret etmektedir; en fazla %d tane beklenir; bulunan %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s degistirgesini iceren %d ogesi gecersiz konumsal belirtimini isaret etmektedir; "%s" ogelerinden bir tanesinin belirtilmesi beklenir; bulunan "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[RXQUEUE uzerinden kullanilan TIMEOUT islevinin -1 ile %d arasindaki bir tumsel sayiyi isaret etmesi beklenir; bulunan \"%s\"]|<value>,<value>
+ 40,930,[RXQUEUE uzerinden kullanilan TIMEOUT islevinin 0 ile %d arasindaki bir tumsel sayiyi isaret etmesi beklenir; bulunan \"%s\"]|<value>,<value>
  40,980,Beklenilmeyen giris, ya bilinmeyen tipten ya da kural disi %s%s verisinden kaynaklanmaktadir|: ,<location>
  40,981,Izin verilen %s%s araligin disindaki kadar sayi vardir|: ,<location>
  40,982,%s%s seklinde tanimli ara bolge icin cok buyuk dizgi soz konusu|: ,<location>
@@ -283,6 +283,7 @@
  93,  1,[%s seklindeki STREAM buyrugu "%s" ogelerinin bir tanesi tarafindan takip edilmelidir; bulunan "%s"]|<token>,<value>,<value>
  93,  3,[STREAM buyrugu "%s" ogelerinden bir tanesi olmalidir; bulunan "%s"]|<value>,<value>
  94,  0,[Dissal kuyruk arayuzu hatasi soz konusu]
+ 94,  1,[External queue timed out]
  94, 99,[Dissal kuyruk arayuzu ile icsel hata soz konusu: %d "%s"]|<description>,<systemerror>
  94,100,[Dissal kuyruk arayuzu ile genel dizge hatasi soz konusu. %s. %s]|<description>,<systemerror>
  94,101,[%s ogesini iceren %d kapiya yapilan baglantida hata ile karsilasildi: "%s"]|<machine>,<portnumber>,<systemerror>

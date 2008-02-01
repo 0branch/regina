@@ -208,7 +208,7 @@
  40,922,[Argument %s nr %d, za maào pod-polece‰; oczekiwane minimum to %d; znaleziono %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[Argument %s nr %d, za wiele pod-polece‰; oczekiwane maksimum to %d; znaleziono %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[Argument %s nr %d, niepoprawny parametr pozycjonowania; spodziewane jedno z "%s"; znaleziono "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[RXQUEUE, funkcja TIMEOUT, spodziewano liczby caàkowitej z zakresu od -1 do %d; znaleziono \"%s\"]|<value>,<value>
+ 40,930,[RXQUEUE, funkcja TIMEOUT, spodziewano liczby caàkowitej z zakresu od 0 do %d; znaleziono \"%s\"]|<value>,<value>
  40,980,Niespodziewana wartoòÜ na wejòciu, albo nieznany typ albo niedozwolone dane%s%s|:,<location>
  40,981,Liczba poza dozwolonym zakresem%s%s|:,<location>
  40,982,ùa‰cuch za duæy dla zdefiniowanego bufora%s%s|:,<location>
@@ -279,6 +279,7 @@
  93,  1,[Po komendzie STREAM %s musi wyst©powaÜ jedna z "%s"; znaleziono "%s"]|<token>,<value>,<value>
  93,  3,[Komenda STREAM musi byÜ jedn• z "%s"; znaleziono "%s"]|<value>,<value>
  94,  0,[Bà•d interfejsu zewn©trznej kolejki]
+ 94,  1,[External queue timed out]
  94, 99,[Wewn©trzny bà•d z interfejsem zewn©trznej kolejki: %d "%s"]|<description>,<systemerror
  94,100,[Podstawowy bà•d systemu z interfejsem zewn©trznej kolejki. %s. %s]|<description>,<systemerror>
  94,101,[Bà•d podczas à•czenia si© z %s na porcie %d: "%s"]|<machine>,<portnumber>,<systemerror>

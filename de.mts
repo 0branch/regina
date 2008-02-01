@@ -186,7 +186,7 @@
  40,922,[Routine %s, Argument %d: Zuwenig Folgebefehle; das Minimum ist %d; gefunden %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[Routine %s, Argument %d, Zuviele Folgebefehle; das Maximum ist %d; gefunden %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[Routine %s, Argument %d, ungültige Positionierungsbasis; erwartet wird ein Wort aus "%s"; gefunden "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[Routine RXQUEUE, Funktion TIMEOUT: Ein Ganzzahlwert zwischen -1 und %d erwartet; gefunden: \"%s\"]|<value>,<value>
+ 40,930,[Routine RXQUEUE, Funktion TIMEOUT: Ein Ganzzahlwert zwischen 0 und %d erwartet; gefunden: \"%s\"]|<value>,<value>
  40,980,Unerwartete Eingabe, entweder unbekannter Typ oder nicht erlaubte Daten%s%s|: ,<location>
  40,981,Zahl außerhalb des erlaubten Bereichs%s%s|: ,<location>
  40,982,Zeichenkette zu lang für den definierten Puffer%s%s|: ,<location>
@@ -257,6 +257,7 @@
  93,  1,[Das STREAM-Kommando %s fordert als Nachfolger eines der Worte "%s"; "%s" gefunden]|<token>,<value>,<value>
  93,  3,[Das STREAM-Kommando muss eines sein aus "%s"; "%s" gefunden]|<value>,<value>
  94,  0,[Schnittstellenfehler mit einer externen Warteschlange]
+ 94,  1,[Externe Warteschlange heraus gefestsetzt]
  94, 99,[Interner Fehler mit der Schnittstelle der externen Warteschlange: %d "%s"]|<description>,<systemerror>
  94,100,[Allgemeiner Systemfehler mit der Schnittstelle der externen Warteschlange. %s. %s]|<description>,<systemerror>
  94,101,[Fehler beim Verbinden mit %s auf Portnummer %d: "%s"]|<machine>,<portnumber>,<systemerror>

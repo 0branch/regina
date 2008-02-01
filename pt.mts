@@ -192,7 +192,7 @@
  40,922,[%s argumento %d, sub-comando insuficientes; minimo necessario eh %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[%s argumento %d, sub-comandos demais; maximo necessario eh %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s argumento %d, especificacao posicional invalida; eh necessario um dos "%s"; encontrado "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[RXQUEUE, funcao TIMEOUT, espera-se um numero total entre -1 e %d; encontrado \"%s\"]|<value>,<value>
+ 40,930,[RXQUEUE, funcao TIMEOUT, espera-se um numero total entre 0 e %d; encontrado \"%s\"]|<value>,<value>
  40,980,Unexpected input, either unknown type or illegal data%s%s|: ,<location>
  40,981,Number out of the allowed range%s%s|: ,<location>
  40,982,String too big for the defined buffer%s%s|: ,<location>
@@ -263,6 +263,7 @@
  93,  1,[o comando STREAM %s deve ser seguido por um dos "%s"; encontrado "%s"]|<token>,<value>,<value>
  93,  3,[o comando STREAM deve ser um dos "%s"; encontrado "%s"]|<value>,<value>
  94,  0,[erro de interface de fila externa]
+ 94,  1,[a fila externa cronometrou para fora]
  94, 99,[erro interno com interface de fila externa: %d "%s"]|<description>,<systemerror>
  94,100,[erro geral do sistema com interface de fila externa. %s. %s]|<description>,<systemerror>
  94,101,[Erro ao conectar a %s na porta %d: "%s"]|<machine>,<portnumber>,<systemerror>

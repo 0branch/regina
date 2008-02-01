@@ -228,7 +228,7 @@
  40,922,[Argumento de %s número %d, muy pocos sub-comandos; el mínimo esperado es %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[Argumento de %s número %d, demasiados sub-comandos; el máximo esperado es %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[Argumento de %s número %d, especificación posicional inválida; esperando uno de "%s"; encontrado "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between -1 and %d; found \"%s\"]|<value>,<value>
+ 40,930,[RXQUEUE, function TIMEOUT, expecting a whole number between 0 and %d; found \"%s\"]|<value>,<value>
  40,980,Unexpected input, either unknown type or illegal data%s%s|: ,<location>
  40,981,Number out of the allowed range%s%s|: ,<location>
  40,982,String too big for the defined buffer%s%s|: ,<location>
@@ -299,6 +299,7 @@
  93,  1,[El comando %s de STREAM debe estar seguido por uno de "%s"; encontrado "%s"]|<token>,<value>,<value>
  93,  3,[El comando de STREAM debe ser uno de "%s"; encontrado "%s"]|<value>,<value>
  94,  0,[Error de la interfaz de la cola externa]
+ 94,  1,[La coleta externa midió el tiempo hacia fuera]
  94, 99,[Error interno con la interfaz de la cola externa: %d "%s"]|<description>,<systemerror>
  94,100,[Error general del sistema con la interfaz de la cola externa. %s. %s]|<description>,<systemerror>
  94,101,[Error conectando con %s en la puerta %d: "%s"]|<machine>,<portnumber>,<systemerror>

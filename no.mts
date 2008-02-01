@@ -182,7 +182,7 @@
  40,922,[%s-argument %d, for få underkommandoer; ventet minst %d; fant %d]|<bif>,<argnumber>,<value>,<value>
  40,923,[%s-argument %d, for mange underkommandoer; ventet maksimalt %d; fant %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s-argument %d, ugyldig posisjonsspesifikasjon; ventet en av "%s"; fant "%s"]|<bif>,<argnumber>,<value>,<value>
- 40,930,[RXQUEUE, funksjon TIMEOUT, ventet et heltall mellom -1 og %d; fant \"%s\"]|<value>,<value>
+ 40,930,[RXQUEUE, funksjon TIMEOUT, ventet et heltall mellom 0 og %d; fant \"%s\"]|<value>,<value>
  40,980,Uventet input, enten ukjent type eller ugyldige data%s%s|: ,<location>
  40,981,Tall utenfor tillatt område%s%s|: ,<location>
  40,982,Streng for stor for det definerte bufferet%s%s|: ,<location>
@@ -253,6 +253,7 @@
  93,  1,[STREAM-kommando %s må etterfølges av en av "%s"; fant "%s"]|<token>,<value>,<value>
  93,  3,[STREAM-kommando må være en av "%s"; fant "%s"]|<value>,<value>
  94,  0,[Feil i grensesnitt mot ekstern kø]
+ 94,  1,[External queue timed out]
  94, 99,[Intern feil med grensesnitt mot ekstern kø: %d "%s"]|<description>,<systemerror>
  94,100,[Generell systemfeil med grensesnitt mot ekstern kø. %s. %s]|<description>,<systemerror>
  94,101,[Feil under tilkobling til %s på port %d: "%s"]|<machine>,<portnumber>,<systemerror>
