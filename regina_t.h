@@ -285,9 +285,11 @@ typedef struct {
           */
          int address;
          /*
-          * The server name of the current connection.
-          * Unused value: NULL
+          * A boolean value which indicates if the external queue has had a timeout
+          * set on it via RXQUEUE( 'Timeout' )
+          * Valid values: 0 or 1
           */
+         int timeoutSet;
          streng *name;
       } e ;
       Buffer t ; /* temp: t */

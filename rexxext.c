@@ -88,7 +88,7 @@ streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms )
    streng *result=NULL;
    int rc;
 
-   checkparam(  parms,  1,  2 , "RXQUEUE" ) ;
+   checkparam(  parms,  1,  3 , "RXQUEUE" ) ;
 
    opt = getoptionchar( TSD, parms->value, "RXQUEUE", 1, "CDGS", "T" ) ;
    switch ( opt )
@@ -140,7 +140,7 @@ streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms )
             result = int_to_streng( TSD, timeout_queue(TSD, parms->next->value, NULL ) );
             /* result created here */
          else
-            exiterror( ERR_INCORRECT_CALL, 5, "RXQUEUE", 2 );
+            exiterror( ERR_INCORRECT_CALL, 5, "RXQUEUE", 3 );
          break;
    }
    return result ;

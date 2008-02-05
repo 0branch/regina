@@ -547,7 +547,7 @@ int main( int argc, char *argv[])
       }
       else
       {
-         DEBUGDUMP(printf( "queue: <%.*s> server: %.*s<%d> Port:%d\n", PSTRENGLEN( queue ), PSTRENGVAL( queue ), PSTRENGLEN( q.u.e.name ), PSTRENGVAL( q.u.e.name ), q.u.e.address, q.u.e.portno ););
+         DEBUGDUMP(printf( "queue: <%.*s>\n", PSTRENGLEN( queue ), PSTRENGVAL( queue ) ););
          rc = 1;
       }
    }

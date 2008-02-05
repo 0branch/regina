@@ -1572,35 +1572,43 @@ void fixup_file( tsd_t *TSD, const streng *filename )
 {
    fileboxptr ptr=NULL ;
 
-   ptr = getfileptr( TSD, filename ) ;
-   if (ptr)
+   if ( filename )
    {
       /*
-       * If the file is open, try to clear it, first clear the error
-       * indicator, and then try to fseek() to a 'safe' point. If the
-       * seeking didn't work out, don't bother, it was worth a try.
+       * filename will be NULL when condition_hook() called with a NULL description
+       * argument. This happens when NOTREADY occurs when pulling from an external
+       * queue with a timeout and the timeout expires.
        */
-      if (ptr->fileptr)
+      ptr = getfileptr( TSD, filename ) ;
+      if (ptr)
       {
-         clearerr( ptr->fileptr ) ;
-         if ( ptr->flag & FLAG_PERSIST )
-            fseek( ptr->fileptr, 0, SEEK_SET ) ;
-         ptr->thispos = 0 ;
-         ptr->oper = OPER_NONE ;
-      }
-
-      if (ptr->flag & FLAG_SURVIVOR)
-      {
-         ptr->flag &= ~(FLAG_ERROR) ;
          /*
-          * MHES Added following 4 flag resets - 30-11-2004
+          * If the file is open, try to clear it, first clear the error
+          * indicator, and then try to fseek() to a 'safe' point. If the
+          * seeking didn't work out, don't bother, it was worth a try.
           */
-         ptr->flag &= ~(FLAG_RDEOF) ;
-         ptr->flag &= ~(FLAG_WREOF) ;
-         ptr->flag &= ~(FLAG_AFTER_RDEOF) ;
-      }
+         if (ptr->fileptr)
+         {
+            clearerr( ptr->fileptr ) ;
+            if ( ptr->flag & FLAG_PERSIST )
+               fseek( ptr->fileptr, 0, SEEK_SET ) ;
+            ptr->thispos = 0 ;
+            ptr->oper = OPER_NONE ;
+         }
 
-      ptr->flag &= ~(FLAG_FAKE) ;
+         if (ptr->flag & FLAG_SURVIVOR)
+         {
+            ptr->flag &= ~(FLAG_ERROR) ;
+            /*
+             * MHES Added following 4 flag resets - 30-11-2004
+             */
+            ptr->flag &= ~(FLAG_RDEOF) ;
+            ptr->flag &= ~(FLAG_WREOF) ;
+            ptr->flag &= ~(FLAG_AFTER_RDEOF) ;
+         }
+
+         ptr->flag &= ~(FLAG_FAKE) ;
+      }
    }
 }
 

@@ -219,3 +219,12 @@ int get_length_from_header( const tsd_t *TSD, const streng *header );
 #define ERR_RXSTACK_GENERAL_TMPL         "General system error with external queue interface. %s. %s"
 
 #define ERR_STORAGE_EXHAUSTED_TMPL       "System resources exhausted"
+
+/*
+ * Return codes from interacting with rxstack
+ */
+#define RXSTACK_OK      0
+#define RXSTACK_EMPTY   1
+#define RXSTACK_ERROR   2
+#define RXSTACK_WAITING 3
+#define RXSTACK_TIMEOUT 4

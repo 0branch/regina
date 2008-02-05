@@ -77,7 +77,7 @@ static char *RCSid = "$Id: rxstack.c,v 1.34 2006/02/21 11:22:24 mark Exp $";
  *       out-> 9xxxxxx (if error, eg queue already deleted)
  *       regina RXQUEUE('D'), rxqueue N/A
  *   E - empty data from specified queue
- *       in->  KFFFFFFxxx--queue name--xxx
+ *       in->  EFFFFFFxxx--queue name--xxx
  *       out-> 0000000 (if queue emptied)
  *       out-> 2xxxxxx (if error, eg queue deleted)
  *       out-> 3000000 (memory allocation error)
@@ -111,7 +111,7 @@ static char *RCSid = "$Id: rxstack.c,v 1.34 2006/02/21 11:22:24 mark Exp $";
  *       out-> 2xxxxxx (if error or queue doesn't exist - length ignored)
  *       regina QUEUED(), rxqueue N/A
  *   T - set timeout on queue pull
- *       in->  DFFFFFFTTTTTT
+ *       in->  TFFFFFFTTTTTT
  *       out-> 0000000 (if queue timeout set)
  *       out-> 2xxxxxx (if error, eg invalid argument)
  *       out-> 6000000 (queue name not passed)
@@ -377,6 +377,8 @@ typedef struct _Client
     * if queue_timeout is set, the client expects an error code after
     * this time instead of waiting until world's end.
     * The value is in milliseconds.
+    * A value of zero means no timeout; return immediately if no data
+    * A value of -1 means wait forever
     */
    long queue_timeout;
 
@@ -1048,13 +1050,13 @@ int rxstack_send_return( int sock, char *action, char *str, int len )
          rc = send( sock, PSTRENGVAL(header), PSTRENGLEN(header), 0 );
          if ( rc != PSTRENGLEN(header) )
          {
-            DEBUGDUMP(printf("Send failed: errno = %d\n", os_errno ););
+            DEBUGDUMP(printf("Send failed: rc> %d != PSTRENGLEN(header)> %d errno = %d\n", rc, PSTRENGLEN(header),os_errno ););
             retval = -1 ;
          }
          else if ( str )
          {
             rc = send( sock, str, len, 0 );
-            if ( rc != PSTRENGLEN(header) )
+            if ( rc != len )
             {
                DEBUGDUMP(printf("Send failed: errno = %d\n", os_errno ););
                retval = -1 ;
@@ -1115,7 +1117,7 @@ RxQueue *rxstack_set_default_queue( Client *client, streng *data )
    else
    {
       DEBUGDUMP(printf("Setting default queue for client: <%.*s> Prev: %p <%.*s>\n", PSTRENGLEN(q->name), PSTRENGVAL(q->name), prev, PSTRENGLEN(prev->name), PSTRENGVAL(prev->name) ););
-      /* SET or CREATE resets a timeout to 0 */
+      /* SET or CREATE resets a timeout to 0; effectively turns off any timeout */
       client->queue_timeout = 0 ;
    }
    return q;
@@ -1133,7 +1135,8 @@ int rxstack_timeout_queue( Client *client, const streng *data )
    val = REXX_X2D( data, &error );
    if ( error )
       return 2;
-
+   if ( val == 0 )
+      val = -1;
    client->queue_timeout = val;
    DEBUGDUMP(printf("Timeout on queue: %ld\n", client->queue_timeout ););
 
@@ -1335,7 +1338,7 @@ void bad_news_for_waiter( RxQueue *q, Client *c )
    dequeue_waiter( q, c ) ;
    DEBUGDUMP(printf("Sending negative response to waiting client %d\n", c->socket ););
 
-   rxstack_send_return( c->socket, "0", NULL, 0 ) ;
+   rxstack_send_return( c->socket, "4", NULL, 0 ) ;
 }
 
 int rxstack_queue_data( Client *client, streng *data, char order )
@@ -1452,19 +1455,27 @@ int rxstack_pull_line_off_queue( Client *client, streng **result, int nowait )
    {
       *result = NULL;
       if ( nowait )
-         rc = 1; /* queue empty */
+      {
+         rc = RXSTACK_EMPTY; /* queue empty */
+         DEBUGDUMP(printf("nowait set to 1\n" ););
+      }
       else
       {
          if ( client->queue_timeout == 0 )
-            rc = 1 ; /* queue empty */
+         {
+            rc = RXSTACK_EMPTY; /* queue empty */
+            DEBUGDUMP(printf("client timeout = 0\n" ););
+         }
          else
          {
             assert( client->deadline.milli == -1 );
             assert ( client->newer == NULL );
-            now = get_now( );
-            client->deadline = now;
-            time_add( &client->deadline, client->queue_timeout );
-
+            if ( client->queue_timeout != -1 )
+            {
+               now = get_now( );
+               client->deadline = now;
+               time_add( &client->deadline, client->queue_timeout );
+            }
             q = client->default_queue;
             client->newer = NULL;
             client->older = q->newest;
@@ -1473,7 +1484,8 @@ int rxstack_pull_line_off_queue( Client *client, streng **result, int nowait )
             q->newest = client;
             if ( q->oldest == NULL )
                q->oldest = client;
-            rc = 3; /* waiting */
+            rc = RXSTACK_WAITING; /* waiting */
+            DEBUGDUMP(printf("waiting until %ld\n", client->deadline ););
          }
       }
    }
@@ -1505,7 +1517,7 @@ int rxstack_process_command( Client *client )
    }
    rcode[1] = '\0';
    memset( cheader, 0, sizeof(cheader) );
-   DEBUGDUMP(printf("reading from socket %d\n", client->socket););
+   DEBUGDUMP(printf("\nreading from socket %d\n", client->socket););
    rc = recv( client->socket, cheader, RXSTACK_HEADER_SIZE, 0 );
    if ( rc < 0 )
    {
@@ -1691,11 +1703,11 @@ int rxstack_process_command( Client *client )
                rxstack_send_return( client->socket, "0", PSTRENGVAL( result ), PSTRENGLEN( result ) );
                DROPSTRENG( result );
                break;
+            case RXSTACK_WAITING: /* still waiting; don't return */
+               break;
             default: /* empty/error */
                rcode[0] = (char)(rc+'0');
                rxstack_send_return( client->socket, rcode, NULL, 0 );
-               break;
-            case 3: /* still waiting; don't return */
                break;
          }
          if ( buffer != NULL )

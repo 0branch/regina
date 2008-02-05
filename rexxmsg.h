@@ -34,7 +34,7 @@ struct textindex
  * error indicating that the error message files are corrupt will be
  * displayed instead of a real error message.
  */
-#define NUMBER_ERROR_MESSAGES 266
+#define NUMBER_ERROR_MESSAGES 267
 
 /*
  * Default language index

@@ -686,8 +686,7 @@ int stack_lifo( tsd_t *TSD, streng *line, const streng *queue_name )
       if ( ( work = open_external( TSD, queue_name, &q, &rc, 0, NULL ) ) == NULL )
          return rc;
 
-      if ( ( rc = queue_line_lifo_to_rxstack( TSD, work->u.e.socket, line ) )
-                                                                        == -1 )
+      if ( ( rc = queue_line_lifo_to_rxstack( TSD, work->u.e.socket, line ) ) == -1 )
          rc = 100;
       disconnect_from_rxstack( TSD, &q ) ;
    }
@@ -746,8 +745,7 @@ int stack_fifo( tsd_t *TSD, streng *line, const streng *queue_name )
       if ( ( work = open_external( TSD, queue_name, &q, &rc, 0, NULL ) ) == NULL )
          return rc;
 
-      if ( ( rc = queue_line_fifo_to_rxstack( TSD, work->u.e.socket, line ) )
-                                                                        == -1 )
+      if ( ( rc = queue_line_fifo_to_rxstack( TSD, work->u.e.socket, line ) ) == -1 )
          rc = 100;
       disconnect_from_rxstack( TSD, &q ) ;
    }
@@ -905,16 +903,26 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
             *result = rc;
          return NULL;
       }
-
+      /*
+       * waitflag is 0 if called from a Rexx program as [PARSE] PULL, but can be
+       * 1 when called from the Rexx API. We override the waitflag when the current
+       * queue is external and a timeout has been set for the queue
+       */
+      if ( work->u.e.timeoutSet )
+         waitflag = 1;
       rc = get_line_from_rxstack( TSD, work->u.e.socket, &contents, ( waitflag == 0 ) );
       switch ( rc )
       {
-         case -1:    rc = 100;  break;
-         case 2:     rc = 9;   break;  /* map generic error to RXQUEUE_NOTREG */
+         case -1:                rc = 100;  break;
+         case RXSTACK_ERROR:     rc = 9;   break;  /* map generic error to RXQUEUE_NOTREG */
          default:    ;
       }
       disconnect_from_rxstack( TSD, &q ) ;
-      if ( ( rc == 1 ) || ( rc == 4 ) ) /* empty or timeout */
+      if ( rc == RXSTACK_TIMEOUT )
+      {
+         condition_hook( TSD, SIGNAL_NOTREADY, 94, 1, -1, NULL, Str_cre_TSD( TSD, "Timeout on external queue" ) );
+      }
+      if ( ( rc == RXSTACK_EMPTY ) || ( rc == RXSTACK_TIMEOUT ) ) /* empty or timeout */
          need_line_from_stdin = 1;
    }
 #endif
@@ -925,7 +933,7 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
       {
          rc = 8; /* RXQUEUE_EMPTY */
       }
-      else if ( rc == 4 )
+      else if ( rc == RXSTACK_TIMEOUT )
       {
          rc = 8; /* RXQUEUE_EMPTY */
       }
@@ -939,8 +947,6 @@ streng *popline( tsd_t *TSD, const streng *queue_name, int *result, unsigned lon
             contents = readkbdline( TSD );
 
          assert( contents );
-
-         rc = 0;
       }
       rc = 0;
    }
@@ -1166,6 +1172,7 @@ static int get_socket_details_and_connect( tsd_t *TSD, Queue *q )
       if ( connect_to_rxstack( TSD, q ) == -1 )
          return 100; /* RXQUEUE_NETERROR */
    }
+   q->u.e.timeoutSet = 0;
    return 0;
 }
 
@@ -1493,11 +1500,15 @@ int timeout_queue( tsd_t *TSD, const streng *timeout, const streng *queue_name )
        * Convert incoming streng to positive (or zero) integer
        */
       val = streng_to_int( TSD, timeout, &err ) ;
-      if ( ( val < -1 ) || err )
+      if ( ( val < 0 ) || err )
       {
          disconnect_from_rxstack( TSD, &q ) ;
          exiterror( ERR_INCORRECT_CALL, 930, 999999999, tmpstr_of( TSD, timeout ) );
       }
+      /*
+       * Indicate that this queue has a timeout
+       */
+      work->u.e.timeoutSet = 1;
       rc = timeout_queue_on_rxstack( TSD, work->u.e.socket, val );
       disconnect_from_rxstack( TSD, &q ) ;
    }
