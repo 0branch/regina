@@ -280,7 +280,7 @@ rexx$(binarybitprefix)$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 	$(LDEXTRA)
 
 regina$(binarybitprefix)$(EXE) : $(SHL_BASE) regina.$(OBJ) $(SHOFILES)
-	$(PURIFY) $(CC) $(TSLINKOPT ) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ regina.$(OBJ) $(LINKREG) $(BOTHLIBS) $(MH_MT_LIBS)
+	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ regina.$(OBJ) $(LINKREG) $(BOTHLIBS) $(MH_MT_LIBS)
 	$(LDEXTRA)
 
 execiser$(binarybitprefix)$(EXE) : execiser.$(OBJ) $(EXECISER_DEP)

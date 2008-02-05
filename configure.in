@@ -37,6 +37,10 @@ case "$target" in
       SYS_DEFS="-D_ALL_SOURCE"
 #     mymakefile="Makefile.aix"
       ;;
+   *apple-darwin*)
+      MH_CHECK_OSX_ARCH()
+      SYS_DEFS="$valid_arch_flags"
+      ;;
    *dec-osf*)
       ;;
    *sequent-dynix*)
@@ -156,6 +160,7 @@ AC_CHECK_FUNCS(sysconf div raise putenv usleep random ftruncate \
    memcpy memmove strerror strerror_r gettimeofday ftime poll \
    _fullpath vsprintf _splitpath2 _splitpath sigaction \
    lstat mkstemp inet_ntop gmtime_r localtime_r \
+   getgrgid_r getpwuid_r gethostbyname_r \
    readlink realpath)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
@@ -238,66 +243,30 @@ if test "$mh_has_pthreads" = yes; then
 # Where we know the format of getgrgid_r() function
 # only test for that case
 #
-   case "$target" in
-      *solaris*)
-         MH_GETGRGID_R_STRUCT_RETURN
-         ;;
-      *linux*)
-         MH_GETGRGID_R_INT_RETURN_5_PARAMS
-         ;;
-      *dec-osf*)
-         MH_GETGRGID_R_INT_RETURN_5_PARAMS
-         ;;
-#
-# FreeBSD does not have a reentrant version of getgrgid
-#
-      *freebsd*)
-         ;;
-      *apple-darwin*)
-         ;;
-      *cygwin*)
-         ;;
-      *)
-         MH_GETGRGID_R_INT_RETURN_5_PARAMS
-         if test "$mh_cv_getgrgid_r_int5" = "no"; then
-            MH_GETGRGID_R_INT_RETURN_4_PARAMS
+   if test "$ac_cv_func_getgrgid_r" = yes; then
+      MH_GETGRGID_R_INT_RETURN_5_PARAMS
+      if test "$mh_cv_getgrgid_r_int5" = "no"; then
+         MH_GETGRGID_R_INT_RETURN_4_PARAMS
+         if test "$mh_cv_getgrgid_r_int4" = "no"; then
+            MH_GETGRGID_R_STRUCT_RETURN
             if test "$mh_cv_getgrgid_r_int4" = "no"; then
                MH_GETGRGID_R_STRUCT_RETURN
             fi
          fi
-   esac
-
-   case "$target" in
-#
-# FreeBSD does not have a reentrant version of getpwduid
-#
-      *freebsd*)
-         ;;
-      *apple-darwin*)
-         ;;
-      *)
-         MH_GETPWUID_R_INT_RETURN
-         if test "$mh_cv_getpwuid_r_int" = "no"; then
-            MH_GETPWUID_R_STRUCT_RETURN
-         fi
-   esac
-
-   case "$target" in
-#
-# FreeBSD does not have a reentrant version of gethostbyname
-#
-      *freebsd*)
-         ;;
-      *apple-darwin*)
-         ;;
-      *cygwin*)
-         ;;
-      *)
-         MH_GETHOSTBYNAME_R_INT_RETURN_6_PARAMS
-         if test "$mh_cv_gethostbyname_r_int6" = "no"; then
-            MH_GETHOSTBYNAME_R_STRUCT_RETURN_5_PARAMS
-         fi
-   esac
+      fi
+   fi
+   if test "$ac_cv_func_getpwuid_r" = yes; then
+      MH_GETPWUID_R_INT_RETURN
+      if test "$mh_cv_getpwuid_r_int" = "no"; then
+         MH_GETPWUID_R_STRUCT_RETURN
+      fi
+   fi
+   if test "$ac_cv_func_gethostbyname_r" = yes; then
+      MH_GETHOSTBYNAME_R_INT_RETURN_6_PARAMS
+      if test "$mh_cv_gethostbyname_r_int6" = "no"; then
+         MH_GETHOSTBYNAME_R_STRUCT_RETURN_5_PARAMS
+      fi
+   fi
 
    CFLAGS="$save_cflags"
    REGINAMULTITHREAD="yes"

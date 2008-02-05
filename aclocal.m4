@@ -138,9 +138,9 @@ AC_CACHE_VAL(
 [
 mh_save_libs="$LIBS"
 LIBS="-fno-strict-aliasing"
-AC_TRY_LINK(
-[#include <stdio.h>],
-[exit(0)],
+AC_LINK_IFELSE(
+[AC_LANG_PROGRAM([#include <stdio.h>],
+[exit(0)])],
 [mh_strict_aliasing=yes],
 [mh_strict_aliasing=no]
 )
@@ -243,15 +243,15 @@ echo "TEST {" > conftest.def
 echo "global:" >> conftest.def
 echo "Test;" >> conftest.def
 echo "};" >> conftest.def
-mh_save_libs="$LIBS"
-LIBS="-Wl,--version-script=conftest.def"
-AC_TRY_LINK(
-[#include <stdio.h>],
-[exit(0)],
+mh_save_libs="$LDFLAGS"
+LDFLAGS="$LDFLAGS -Wl,--version-script=conftest.def"
+AC_LINK_IFELSE(
+[AC_LANG_PROGRAM([#include <stdio.h>],
+[exit(0);])],
 [mh_version_script=yes],
 [mh_version_script=no]
 )
-LIBS="$mh_save_libs"
+LDFLAGS="$mh_save_libs"
 rm -f conftest.def
 ])
 if test "$mh_version_script" = yes; then
@@ -1162,15 +1162,16 @@ case "$target" in
                 #
 # MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
 # MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
-                LD_RXLIB_A1="${CC} -dynamiclib ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_A2="${CC} -dynamiclib ${LDFLAGS} -o \$(@)"
+                EEXTRA="-arch i386 -arch ppc -arch ppc64"
+                LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
+                LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 LD_RXLIB_B2="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 DYN_COMP="-DDYNAMIC -fno-common"
                 SHLPRE="lib"
 # MH                BUNDLE=".so"
                 BUNDLE=".junk"
-                SHL_LD="${CC} -dynamiclib ${LDFLAGS} -install_name ${SHLPRE}${SHLFILE}${SHLPST} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
+                SHL_LD="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -install_name ${SHLPRE}${SHLFILE}${SHLPST} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 SHL_BASE="${LIBPRE}${SHLFILE}${SHLPST}"
 # MH                EXTRATARGET="libregina$BUNDLE"
                 OTHER_INSTALLS="installlib"
@@ -1686,4 +1687,27 @@ AC_DEFUN([MH_CHECK_TYPE_SOCKLEN_T],
   if test $ac_cv_type_socklen_t = yes; then
     AC_DEFINE(HAVE_SOCKLEN_T, 1, [compiler has socklen_t])
   fi
+])
+
+dnl ---------------------------------------------------------------------------
+dnl Determines which -arch flags valid on Mac OSX with gcc
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_CHECK_OSX_ARCH],
+[AC_MSG_CHECKING(for which Mac OSX -arch flags are supported)
+valid_arch_flags=""
+found_arch_flags=""
+arch_flags="ppc ppc64 i386"
+for a in $arch_flags; do
+  save_ldflags="$LDFLAGS"
+  LDFLAGS="$LDFLAGS -arch $a"
+  AC_LINK_IFELSE(
+  [AC_LANG_PROGRAM([#include <stdio.h>],
+  [exit(0)])],
+  [valid_arch_flags="$valid_arch_flags -arch $a";found_arch_flags="$found_arch_flags $a"],
+  [a="$a"]
+  )
+  LDFLAGS="$save_ldflags"
+done
+AC_MSG_RESULT($found_arch_flags)
+AC_SUBST(valid_arch_flags)
 ])

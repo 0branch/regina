@@ -676,6 +676,7 @@ target
 target_cpu
 target_vendor
 target_os
+valid_arch_flags
 SYS_DEFS
 binarybitprefix
 libdir64
@@ -3056,6 +3057,67 @@ case "$target" in
       SYS_DEFS="-D_ALL_SOURCE"
 #     mymakefile="Makefile.aix"
       ;;
+   *apple-darwin*)
+      { echo "$as_me:$LINENO: checking for which Mac OSX -arch flags are supported" >&5
+echo $ECHO_N "checking for which Mac OSX -arch flags are supported... $ECHO_C" >&6; }
+valid_arch_flags=""
+found_arch_flags=""
+arch_flags="ppc ppc64 i386"
+for a in $arch_flags; do
+  save_ldflags="$LDFLAGS"
+  LDFLAGS="$LDFLAGS -arch $a"
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <stdio.h>
+int
+main ()
+{
+exit(0)
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext &&
+       $as_test_x conftest$ac_exeext; then
+  valid_arch_flags="$valid_arch_flags -arch $a";found_arch_flags="$found_arch_flags $a"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	a="$a"
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS="$save_ldflags"
+done
+{ echo "$as_me:$LINENO: result: $found_arch_flags" >&5
+echo "${ECHO_T}$found_arch_flags" >&6; }
+
+
+      SYS_DEFS="$valid_arch_flags"
+      ;;
    *dec-osf*)
       ;;
    *sequent-dynix*)
@@ -4824,10 +4886,14 @@ done
 
 
 
+
+
+
 for ac_func in sysconf div raise putenv usleep random ftruncate \
    memcpy memmove strerror strerror_r gettimeofday ftime poll \
    _fullpath vsprintf _splitpath2 _splitpath sigaction \
    lstat mkstemp inet_ntop gmtime_r localtime_r \
+   getgrgid_r getpwuid_r gethostbyname_r \
    readlink realpath
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
@@ -6444,8 +6510,8 @@ echo "TEST {" > conftest.def
 echo "global:" >> conftest.def
 echo "Test;" >> conftest.def
 echo "};" >> conftest.def
-mh_save_libs="$LIBS"
-LIBS="-Wl,--version-script=conftest.def"
+mh_save_libs="$LDFLAGS"
+LDFLAGS="$LDFLAGS -Wl,--version-script=conftest.def"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -6456,7 +6522,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 int
 main ()
 {
-exit(0)
+exit(0);
   ;
   return 0;
 }
@@ -6490,7 +6556,7 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-LIBS="$mh_save_libs"
+LDFLAGS="$mh_save_libs"
 rm -f conftest.def
 
 fi
@@ -6694,75 +6760,8 @@ if test "$mh_has_pthreads" = yes; then
 # Where we know the format of getgrgid_r() function
 # only test for that case
 #
-   case "$target" in
-      *solaris*)
-         { echo "$as_me:$LINENO: checking if getgrgid_r returns a struct group *" >&5
-echo $ECHO_N "checking if getgrgid_r returns a struct group *... $ECHO_C" >&6; }
-if test "${mh_cv_getgrgid_r_struct+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <sys/types.h>
-#include <grp.h>
-#include <pwd.h>
-int
-main ()
-{
-
-struct group *ptr,result;
-int rc;
-gid_t gid;
-char buf[100];
-ptr = getgrgid_r(gid,&result,buf,sizeof(buf));
-
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  mh_cv_getgrgid_r_struct=yes
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	mh_cv_getgrgid_r_struct=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-{ echo "$as_me:$LINENO: result: $mh_cv_getgrgid_r_struct" >&5
-echo "${ECHO_T}$mh_cv_getgrgid_r_struct" >&6; }
-if test $mh_cv_getgrgid_r_struct = yes; then
-  cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETGRGID_R_RETURNS_STRUCT 1
-_ACEOF
-
-fi
-
-         ;;
-      *linux*)
-         { echo "$as_me:$LINENO: checking if getgrgid_r has 5 args and returns an int" >&5
+   if test "$ac_cv_func_getgrgid_r" = yes; then
+      { echo "$as_me:$LINENO: checking if getgrgid_r has 5 args and returns an int" >&5
 echo $ECHO_N "checking if getgrgid_r has 5 args and returns an int... $ECHO_C" >&6; }
 if test "${mh_cv_getgrgid_r_int5+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -6826,149 +6825,8 @@ _ACEOF
 
 fi
 
-         ;;
-      *dec-osf*)
-         { echo "$as_me:$LINENO: checking if getgrgid_r has 5 args and returns an int" >&5
-echo $ECHO_N "checking if getgrgid_r has 5 args and returns an int... $ECHO_C" >&6; }
-if test "${mh_cv_getgrgid_r_int5+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <sys/types.h>
-#include <grp.h>
-#include <pwd.h>
-int
-main ()
-{
-
-struct group *ptr,result;
-int rc;
-gid_t gid;
-char buf[100];
-rc = getgrgid_r(gid,&result,buf,sizeof(buf),&ptr);
-
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  mh_cv_getgrgid_r_int5=yes
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	mh_cv_getgrgid_r_int5=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-{ echo "$as_me:$LINENO: result: $mh_cv_getgrgid_r_int5" >&5
-echo "${ECHO_T}$mh_cv_getgrgid_r_int5" >&6; }
-if test $mh_cv_getgrgid_r_int5 = yes; then
-  cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETGRGID_R_RETURNS_INT_5_PARAMS 1
-_ACEOF
-
-fi
-
-         ;;
-#
-# FreeBSD does not have a reentrant version of getgrgid
-#
-      *freebsd*)
-         ;;
-      *apple-darwin*)
-         ;;
-      *cygwin*)
-         ;;
-      *)
-         { echo "$as_me:$LINENO: checking if getgrgid_r has 5 args and returns an int" >&5
-echo $ECHO_N "checking if getgrgid_r has 5 args and returns an int... $ECHO_C" >&6; }
-if test "${mh_cv_getgrgid_r_int5+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <sys/types.h>
-#include <grp.h>
-#include <pwd.h>
-int
-main ()
-{
-
-struct group *ptr,result;
-int rc;
-gid_t gid;
-char buf[100];
-rc = getgrgid_r(gid,&result,buf,sizeof(buf),&ptr);
-
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  mh_cv_getgrgid_r_int5=yes
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	mh_cv_getgrgid_r_int5=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-{ echo "$as_me:$LINENO: result: $mh_cv_getgrgid_r_int5" >&5
-echo "${ECHO_T}$mh_cv_getgrgid_r_int5" >&6; }
-if test $mh_cv_getgrgid_r_int5 = yes; then
-  cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETGRGID_R_RETURNS_INT_5_PARAMS 1
-_ACEOF
-
-fi
-
-         if test "$mh_cv_getgrgid_r_int5" = "no"; then
-            { echo "$as_me:$LINENO: checking if getgrgid_r has 4 args and returns an int" >&5
+      if test "$mh_cv_getgrgid_r_int5" = "no"; then
+         { echo "$as_me:$LINENO: checking if getgrgid_r has 4 args and returns an int" >&5
 echo $ECHO_N "checking if getgrgid_r has 4 args and returns an int... $ECHO_C" >&6; }
 if test "${mh_cv_getgrgid_r_int4+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -7028,6 +6886,71 @@ echo "${ECHO_T}$mh_cv_getgrgid_r_int4" >&6; }
 if test $mh_cv_getgrgid_r_int4 = yes; then
   cat >>confdefs.h <<\_ACEOF
 #define HAVE_GETGRGID_R_RETURNS_INT_4_PARAMS 1
+_ACEOF
+
+fi
+
+         if test "$mh_cv_getgrgid_r_int4" = "no"; then
+            { echo "$as_me:$LINENO: checking if getgrgid_r returns a struct group *" >&5
+echo $ECHO_N "checking if getgrgid_r returns a struct group *... $ECHO_C" >&6; }
+if test "${mh_cv_getgrgid_r_struct+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <sys/types.h>
+#include <grp.h>
+#include <pwd.h>
+int
+main ()
+{
+
+struct group *ptr,result;
+int rc;
+gid_t gid;
+char buf[100];
+ptr = getgrgid_r(gid,&result,buf,sizeof(buf));
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  mh_cv_getgrgid_r_struct=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	mh_cv_getgrgid_r_struct=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ echo "$as_me:$LINENO: result: $mh_cv_getgrgid_r_struct" >&5
+echo "${ECHO_T}$mh_cv_getgrgid_r_struct" >&6; }
+if test $mh_cv_getgrgid_r_struct = yes; then
+  cat >>confdefs.h <<\_ACEOF
+#define HAVE_GETGRGID_R_RETURNS_STRUCT 1
 _ACEOF
 
 fi
@@ -7099,18 +7022,10 @@ fi
 
             fi
          fi
-   esac
-
-   case "$target" in
-#
-# FreeBSD does not have a reentrant version of getpwduid
-#
-      *freebsd*)
-         ;;
-      *apple-darwin*)
-         ;;
-      *)
-         { echo "$as_me:$LINENO: checking if getpwuid_r returns an int" >&5
+      fi
+   fi
+   if test "$ac_cv_func_getpwuid_r" = yes; then
+      { echo "$as_me:$LINENO: checking if getpwuid_r returns an int" >&5
 echo $ECHO_N "checking if getpwuid_r returns an int... $ECHO_C" >&6; }
 if test "${mh_cv_getpwuid_r_int+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -7174,8 +7089,8 @@ _ACEOF
 
 fi
 
-         if test "$mh_cv_getpwuid_r_int" = "no"; then
-            { echo "$as_me:$LINENO: checking if getpwuid_r returns a struct passwd *" >&5
+      if test "$mh_cv_getpwuid_r_int" = "no"; then
+         { echo "$as_me:$LINENO: checking if getpwuid_r returns a struct passwd *" >&5
 echo $ECHO_N "checking if getpwuid_r returns a struct passwd *... $ECHO_C" >&6; }
 if test "${mh_cv_getpwuid_r_struct+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -7239,21 +7154,10 @@ _ACEOF
 
 fi
 
-         fi
-   esac
-
-   case "$target" in
-#
-# FreeBSD does not have a reentrant version of gethostbyname
-#
-      *freebsd*)
-         ;;
-      *apple-darwin*)
-         ;;
-      *cygwin*)
-         ;;
-      *)
-         { echo "$as_me:$LINENO: checking if gethostbyname_r has 6 args and returns an int" >&5
+      fi
+   fi
+   if test "$ac_cv_func_gethostbyname_r" = yes; then
+      { echo "$as_me:$LINENO: checking if gethostbyname_r has 6 args and returns an int" >&5
 echo $ECHO_N "checking if gethostbyname_r has 6 args and returns an int... $ECHO_C" >&6; }
 if test "${mh_cv_gethostbyname_r_int6+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -7316,8 +7220,8 @@ _ACEOF
 
 fi
 
-         if test "$mh_cv_gethostbyname_r_int6" = "no"; then
-            { echo "$as_me:$LINENO: checking if gethostbyname_r has 5 args and returns a struct" >&5
+      if test "$mh_cv_gethostbyname_r_int6" = "no"; then
+         { echo "$as_me:$LINENO: checking if gethostbyname_r has 5 args and returns a struct" >&5
 echo $ECHO_N "checking if gethostbyname_r has 5 args and returns a struct... $ECHO_C" >&6; }
 if test "${mh_cv_gethostbyname_r_struct5+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -7380,8 +7284,8 @@ _ACEOF
 
 fi
 
-         fi
-   esac
+      fi
+   fi
 
    CFLAGS="$save_cflags"
    REGINAMULTITHREAD="yes"
@@ -8251,7 +8155,7 @@ if test "$DYN_COMP" = ""; then
 echo $ECHO_N "checking compiler flags for a dynamic object... $ECHO_C" >&6; }
 
 cat > conftest.$ac_ext <<EOF
-#line 8254 "configure"
+#line 8158 "configure"
 int a=0
 EOF
 
@@ -8525,15 +8429,16 @@ case "$target" in
                 #
 # MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
 # MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
-                LD_RXLIB_A1="${CC} -dynamiclib ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_A2="${CC} -dynamiclib ${LDFLAGS} -o \$(@)"
+                EEXTRA="-arch i386 -arch ppc -arch ppc64"
+                LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
+                LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 LD_RXLIB_B2="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 DYN_COMP="-DDYNAMIC -fno-common"
                 SHLPRE="lib"
 # MH                BUNDLE=".so"
                 BUNDLE=".junk"
-                SHL_LD="${CC} -dynamiclib ${LDFLAGS} -install_name ${SHLPRE}${SHLFILE}${SHLPST} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
+                SHL_LD="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -install_name ${SHLPRE}${SHLFILE}${SHLPST} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 SHL_BASE="${LIBPRE}${SHLFILE}${SHLPST}"
 # MH                EXTRATARGET="libregina$BUNDLE"
                 OTHER_INSTALLS="installlib"
@@ -8544,7 +8449,7 @@ case "$target" in
 echo $ECHO_N "checking how to create a shared library... $ECHO_C" >&6; }
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8547 "configure"
+#line 8452 "configure"
 int foo()
 {
 return(0);
@@ -8635,7 +8540,7 @@ rm -f conftest*
 
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8638 "configure"
+#line 8543 "configure"
 int foo()
 {
 return(0);
@@ -9746,6 +9651,7 @@ target!$target$ac_delim
 target_cpu!$target_cpu$ac_delim
 target_vendor!$target_vendor$ac_delim
 target_os!$target_os$ac_delim
+valid_arch_flags!$valid_arch_flags$ac_delim
 SYS_DEFS!$SYS_DEFS$ac_delim
 binarybitprefix!$binarybitprefix$ac_delim
 libdir64!$libdir64$ac_delim
@@ -9780,7 +9686,6 @@ THREADSAFE_TARGET!$THREADSAFE_TARGET$ac_delim
 MH_MT_LIBS!$MH_MT_LIBS$ac_delim
 MT_FILE!$MT_FILE$ac_delim
 REGINAMULTITHREAD!$REGINAMULTITHREAD$ac_delim
-TRACEMEM!$TRACEMEM$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -9822,6 +9727,7 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+TRACEMEM!$TRACEMEM$ac_delim
 FLISTS!$FLISTS$ac_delim
 REXXSOCKET!$REXXSOCKET$ac_delim
 regutil_config!$regutil_config$ac_delim
@@ -9888,7 +9794,7 @@ MH_UNSIGNED_CHAR_SWITCH!$MH_UNSIGNED_CHAR_SWITCH$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 64; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 65; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
