@@ -892,7 +892,7 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          /* should not get here */
          break;
    }
-   if (indate->tm_mday > MonthDays[indate->tm_mon] + leapyear(indate->tm_year)
+   if (indate->tm_mday > ( MonthDays[indate->tm_mon] + ( (indate->tm_mon == 1) ? leapyear(indate->tm_year) : 0 ) )
    ||  indate->tm_mday < 1
    ||  indate->tm_mon > 11
    ||  indate->tm_mon < 0
