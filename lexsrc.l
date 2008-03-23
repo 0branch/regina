@@ -1850,7 +1850,13 @@ static int get_next_line( char *line, int max, FILE *stream )
    line[pos++] = '\n';
 
    if (parser_data.incore_source)
-   {  /* We can use the incore string to describe a source line. */
+   {
+      /*
+       * We can use the incore string to describe a source line, but we
+       * MUST incement linenr otherwise .LINE doesn't work in instore macros.
+       * This will probably also allow errors to be reported for the correct line number.
+       */
+      linenr++;
       incore_newline = FreshLine() ;
       incore_newline->length = pos - 1 ;
       incore_newline->offset = last_interptr - parser_data.incore_source ;
