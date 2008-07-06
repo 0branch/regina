@@ -1070,8 +1070,10 @@ case "$target" in
         *linux*)
                 LD_RXLIB_A1="${CC} -shared ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_A2="${CC} -shared ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_B1="-L. -l${SHLFILE}"
-                LD_RXLIB_B2="-L. -l${SHLFILE}"
+#                LD_RXLIB_B1="-L. -l${SHLFILE}"
+#                LD_RXLIB_B2="-L. -l${SHLFILE}"
+                LD_RXLIB_B1="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
+                LD_RXLIB_B2="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
                 SHLPRE="lib"
                 SHL_LD="${CC} -o ${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI) -shared ${LDFLAGS} ${SHL_SCRIPT} \$(SHOFILES) -lc"
                 SHL_BASE="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
@@ -1206,6 +1208,10 @@ case "$target" in
                 #
                 # SkyOS requires linking with -L. -lregina format
                 #
+                LINKREG="${LINKSHL}"
+                ;;
+        *linux*)
+                LINKSHL="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
                 LINKREG="${LINKSHL}"
                 ;;
         *)

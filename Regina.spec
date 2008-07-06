@@ -1,8 +1,8 @@
 Summary: Regina Rexx Interpreter
-Name: Regina
+Name: Regina-REXX
 %define vermajor 3
-%define verminor 4
-Version: 3.4
+%define verminor 5
+Version: 3.5
 Release: 1
 Group: Development/Languages
 Source: Regina-REXX-%{version}.tar.gz
@@ -12,7 +12,7 @@ License: LGPL
 Vendor: Mark Hessling
 Packager: Mark Hessling
 URL: http://regina-rexx.sourceforge.net
-Provides: Regina-REXX %{name}
+Provides: %{name}
 Icon: regina64.xpm
 
 %description
@@ -25,7 +25,7 @@ For more information on Rexx, visit http://www.rexxla.org
 %setup
 
 %build
-./configure
+./configure --mandir=/usr/share/man
 make
 
 %install
@@ -33,11 +33,6 @@ rm -fr %{buildroot}
 make DESTDIR=%{buildroot} install
 
 %files
-/usr/bin/rexx
-/usr/bin/regina
-/usr/bin/regina-config
-/usr/bin/rxqueue
-/usr/bin/rxstack
 /usr/%{_lib}/libregina.a
 /usr/%{_lib}/libregina.so.%{version}
 /usr/%{_lib}/libregina.so.%{vermajor}
@@ -61,9 +56,14 @@ make DESTDIR=%{buildroot} install
 /usr/share/regina/pl.mtb
 /usr/share/regina/pt.mtb
 /usr/share/regina/tr.mtb
+/usr/bin/rexx
+/usr/bin/regina
+/usr/bin/regina-config
+/usr/bin/rxqueue
+/usr/bin/rxstack
 
 %post
 cd %{prefix}/%{_lib}
-ln -sf ./libregina.so.%{version} ./libregina.so.%{vermajor}
-ln -sf ./libregina.so.%{version} ./libregina.so
+#ln -sf ./libregina.so.%{version} ./libregina.so.%{vermajor}
+#ln -sf ./libregina.so.%{version} ./libregina.so
 ldconfig %{prefix}/%{_lib}
