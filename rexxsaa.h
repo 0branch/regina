@@ -335,8 +335,8 @@ typedef struct {
 
 typedef struct {
    struct {
-               unsigned rcfmlifo:1 ;
-   }                    rcmsq_flags ;
+               unsigned rxfmlifo:1 ;
+   }                    rxmsq_flags ;
    /* CONST */ RXSTRING rxmsq_value ;
 } RXMSQPSH_PARM ;
 
