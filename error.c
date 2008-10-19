@@ -337,6 +337,7 @@ static const char *errlang[] =
    "no", /* norwegian */
    "pt", /* portuguese */
    "pl", /* polish */
+   "sv", /* swedish */
    "tr", /* turkish */
    NULL
 } ;
@@ -349,6 +350,7 @@ static const char *err1prefix[] =
 /*no*/   "Feil %d under kjøring av \"%.*s\" linje %d: %.*s",
 /*pt*/   "Erro %d ao executar \"%.*s\", linha %d: %.*s",
 /*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\", linia %d: %.*s",
+/*sv*/   "Fel %d under k”rning av \"%.*s\", rad %d: %.*s",
 /*tr*/   "%d hatasi \"%.*s\" calisiyorken %d numarali satirda olustu: %.*s",
 } ;
 
@@ -360,6 +362,7 @@ static const char *suberrprefix[] =
 /*no*/   "Feil %d.%d: %.*s",
 /*pt*/   "Erro %d.%d: %.*s",
 /*pl*/   "Bˆ¥d %d.%d: %.*s",
+/*sv*/   "Fel %d.%d: %.*s",
 /*tr*/   "Hata %d.%d: %.*s",
 } ;
 
@@ -371,6 +374,7 @@ static const char *err2prefix[] =
 /*no*/   "Feil %d under kjøring av \"%.*s\": %.*s",
 /*pt*/   "Erro %d ao executar \"%.*s\": %.*s",
 /*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\": %.*s",
+/*sv*/   "Fel %d under k”rning av \"%.*s\": %.*s",
 /*tr*/   "%d hatasi \"%.*s\" calisiyorken olustu: %.*s",
 } ;
 
@@ -382,6 +386,7 @@ static const char *erropen[] =
 /*no*/   "Ikke i stand til å åpne språkfil: %s",
 /*pt*/   "nao eh possivel abrir arquivo de linguagem: %s",
 /*pl*/   "Nie mo¾na otworzy† pliku j©zyka: %s",
+/*sv*/   "Kan inte ”ppna spr†kfilen: %s",
 /*tr*/   "Dil dosyasinin acilmasinda hata ile karsilasildi: %s",
 } ;
 
@@ -393,6 +398,7 @@ static const char *errcount[] =
 /*no*/   "Uriktig antall meldinger i språkfil: %s",
 /*pt*/   "numero incorreto de mensagens no arquivo de linguagem: %s",
 /*pl*/   "Niepoprawna liczba komunikat¢w w pliku j©zyka: %s",
+/*sv*/   "Felaktigt antal meddelanden i spr†kfilen: %s",
 /*tr*/   "Dil dosyasindaki iletilerin sayisinda yanlislik var: %s",
 } ;
 
@@ -404,6 +410,7 @@ static const char *errread[] =
 /*no*/   "Ikke i stand til å lese fra språkfil: %s",
 /*pt*/   "nao eh possivel ler o arquivo de linguagem: %s",
 /*pl*/   "Nie mo¾na czyta† z pliku j©zyka: %s",
+/*sv*/   "Kan inte l„sa fr†n spr†kfilen: %s",
 /*tr*/   "Dil dosyasinin okunmasinda hata ile karsilasildi: %s",
 } ;
 
@@ -415,6 +422,7 @@ static const char *errmissing[] =
 /*no*/   "tekst mangler i språkfil: %s.mtb",
 /*pt*/   "falta texto no arquivo de linguagem: %s.mtb",
 /*pl*/   "Brakuje tekstu w pliku j©zyka: %s.mtb",
+/*sv*/   "Text saknas i spr†kfilen: %s.mtb",
 /*tr*/   "Dil dosyasinda eksik metin var: %s.mtb",
 } ;
 
@@ -426,6 +434,7 @@ static const char *errcorrupt[] =
 /*no*/   "språkfil: %s.mtb er ødelagt",
 /*pt*/   "arquivo de linguagem: %s.mtb estah corrompido",
 /*pl*/   "Plik j©zyka: %s.mtb jest znieksztaˆcony",
+/*sv*/   "Spr†kfilen: %s.mtb „r skadad",
 /*tr*/   "%s.mtb ismindeki dil dosyasinda kirilma hatasi var",
 } ;
 

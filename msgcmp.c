@@ -58,6 +58,7 @@ static const char *errlang[] =
    "no", /* norwegian */
    "pt", /* portuguese */
    "pl", /* polish */
+   "sv", /* swedish */
    "tr", /* turkish */
 #if 0
    "en","ca","cs","da","de","el","es","fi","fr","he","hu","is","it","ja","ko",

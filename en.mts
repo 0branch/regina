@@ -9,6 +9,7 @@
 # portuguese - brian <bcarpent@nucleus.com>
 # russian - Oleg Kulikov <kulikov@xanadu.ru>
 # spanish - Pablo Garcia-Abia <Pablo.Garcia@cern.ch>
+# svenska - Jan-Erik L„rka <jan-erik@os2ug.se>
 #
 # Guidelines for Translators
 # --------------------------
