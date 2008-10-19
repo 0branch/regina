@@ -1225,8 +1225,8 @@ int init_vars( tsd_t *TSD )
    buf[0] = 0x0d;
    buf[1] = 0x00;
 #else
-   buf[0] = 0x0a;
-   buf[1] = 0x0d;
+   buf[0] = 0x0d;
+   buf[1] = 0x0a;
    buf[2] = 0x00;
 #endif
    ptr = Str_creTSD( buf );
