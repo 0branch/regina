@@ -1050,10 +1050,19 @@ static int SetVariable( tsd_t *TSD, int Code, int *Lengths, char *Strings[] )
       varname = Str_upper( Str_dupTSD( varbl ) );
    else
    {
+      /*
+       * Setting reserved variables is not allowed :-(
+       */
+      if ( varbl->len && varbl->value[0] == '.' )
+      {
+         Free_stringTSD( varbl ) ;
+         return RX_CODE_INVNAME;
+      }
       varname = Str_dupTSD( varbl );
       /*
        * Bypass the dot test for the first character to allow reserved
        * variables.
+       * This bypass is not relevant anymore. See comment above.
        */
       if ( varname->len )
          varname->value[0] = (unsigned char) rx_toupper( varname->value[0] );

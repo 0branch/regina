@@ -504,7 +504,7 @@ int known_reserved_variable( const char *name, unsigned length )
     * a fast breakout switch
     */
    if ( ( length < 3 /* ".RC" */)
-     || ( length > 7 /* ".RESULT" */)
+     || ( length > 10 /* ".ENDOFLINE" */)
      || ( *name != '.' ) )
       return POOL0_NOT_RESERVED;
    name++;
@@ -525,6 +525,7 @@ int known_reserved_variable( const char *name, unsigned length )
    RET_IF( RS );
    RET_IF( MN );
    RET_IF( LINE );
+   RET_IF( ENDOFLINE );
 #undef REF_IF
 
    return POOL0_NOT_RESERVED;
@@ -1136,6 +1137,8 @@ int init_vars( tsd_t *TSD )
 {
    var_tsd_t *vt;
    int i, j;
+   char buf[3];
+   streng *ptr;
 
    if ( TSD->var_tsd != NULL )
       return 1;
@@ -1144,7 +1147,7 @@ int init_vars( tsd_t *TSD )
       return 0;
    vt = (var_tsd_t *)TSD->var_tsd;
    memset( vt, 0, sizeof( var_tsd_t ) );
-   vt->initialHashTableLength = 71;
+   vt->initialHashTableLength = 503;
 
 #ifdef DEBUG
    {
@@ -1202,6 +1205,7 @@ int init_vars( tsd_t *TSD )
    vt->pool0nodes[POOL0_RS][0].name     = Str_creTSD( ".RS" );
    vt->pool0nodes[POOL0_MN][0].name     = Str_creTSD( ".MN" );
    vt->pool0nodes[POOL0_LINE][0].name   = Str_creTSD( ".LINE" );
+   vt->pool0nodes[POOL0_ENDOFLINE][0].name   = Str_creTSD( ".ENDOFLINE" );
    for ( i = 0; i < POOL0_CNT; i++ )
    {
       for ( j = 0; j < 2; j++ )
@@ -1210,6 +1214,23 @@ int init_vars( tsd_t *TSD )
             vt->pool0nodes[i][j].type = X_SIM_SYMBOL;
       }
    }
+   /*
+    * We can set .ENDOFLINE here
+    * Yes its crude!
+    */
+#if defined(UNIX)
+   buf[0] = 0x0a;
+   buf[1] = 0x00;
+#elif defined(MAC)
+   buf[0] = 0x0d;
+   buf[1] = 0x00;
+#else
+   buf[0] = 0x0a;
+   buf[1] = 0x0d;
+   buf[2] = 0x00;
+#endif
+   ptr = Str_creTSD( buf );
+   set_reserved_value( TSD, POOL0_ENDOFLINE, ptr, 0, VFLAG_STR );
 
    DPRINTF((TSD,"init_vars"));
    return(1);
@@ -1574,9 +1595,9 @@ static int reorgHashtable( const tsd_t *TSD, var_hashtable *vars )
 
    /*
     * Try to use a low water mark of 33% capacity. If the collisions are
-    * the reason, go below 25% capacity.
+    * the reason, go below 25% capacity. (Now 20% G Fuchs 18/8/2008)
     */
-   newSize = vars->e * ( ( f2 ) ? 4 : 3 );
+   newSize = vars->e * ( ( f2 ) ? 5 : 3 );
    if ( vars->size >= newSize )
    {
       /*
@@ -1592,8 +1613,8 @@ static int reorgHashtable( const tsd_t *TSD, var_hashtable *vars )
 
    newTbl = (variableptr *)MallocTSD( sizeof(variableptr) * newSize );
    memset( newTbl, 0, sizeof(variableptr) * newSize );
-   DPRINTF((TSD,"reorgHashtable:    %p -> %p (%u)",
-                vars->tbl,newTbl,newSize));
+   DPRINTF((TSD,"reorgHashtable:    %p -> %p Old(%u) New(%u)",
+                vars->tbl,newTbl,vars->size, newSize));
    DPRINTF_2((TSD,"reorgHashtable:    changing size of %p/%p (%u) to %p/%p (%u), c=%u(%d)",
                   vars,vars->tbl,vars->size,vars,newTbl,newSize, vars->c,f2));
 
