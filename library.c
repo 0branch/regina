@@ -880,7 +880,7 @@ streng *rex_rxfuncerrmsg( tsd_t *TSD, cparamboxptr parms )
    else
       return nullstringptr();
 #else
-   return Str_creTSD( "Platform doesn't support dynamic linking" );
+   return Str_creTSD( "Module doesn't support dynamic linking; are you running the \"regina\" executable?" );
 #endif
 }
 

@@ -1098,5 +1098,6 @@ static void usage( char *argv0 )
    fprintf( stdout,"%s -c program(input) tokenisedfile(output)\n", argv0 );
    fprintf( stdout,"\nTo execute a tokenised file:\n" );
    fprintf( stdout,"%s -e tokenisedfile [arguments...]\n", argv0 );
+   fprintf( stdout,"\nIf you intend using external functions (using RxFuncAdd) you need to run the \"regina\" executable\n" );
    fflush( stdout );
 }
