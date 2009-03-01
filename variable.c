@@ -1147,7 +1147,7 @@ int init_vars( tsd_t *TSD )
       return 0;
    vt = (var_tsd_t *)TSD->var_tsd;
    memset( vt, 0, sizeof( var_tsd_t ) );
-   vt->initialHashTableLength = 503;
+   vt->initialHashTableLength = 2003;
 
 #ifdef DEBUG
    {
