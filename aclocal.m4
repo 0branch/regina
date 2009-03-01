@@ -1176,6 +1176,7 @@ case "$target" in
                 #
 # MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
 # MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
+                EEXTRA="$valid_arch_flags"
                 LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
