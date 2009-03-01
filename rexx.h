@@ -233,7 +233,7 @@
 #include "mt.h"                 /* multi-threading support */
 #include "extern.h"             /* function prototypes */
 
-#define FREE_IF_DEFINED(a) { if (a) Free(a); a=NULL ; }
+#define FREE_IF_DEFINED(a,b) { if (b) Free_TSD(a,b); b=NULL ; }
 
 #ifdef VMS  /* F*ck DEC */
 # ifdef EXIT_SUCCESS

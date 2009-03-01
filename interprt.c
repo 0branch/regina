@@ -1238,7 +1238,7 @@ endloop: if (s.increment)
          traps[type].on_off = (thisptr->p[0]->type == X_ON ) ;
 
          /* set the name of the variable to work on */
-         FREE_IF_DEFINED( traps[type].name ) ;
+         FREE_IF_DEFINED( TSD, traps[type].name ) ;
          if (thisptr->name)
             traps[type].name = Str_dupTSD( thisptr->name ) ;
          else if (thisptr->p[0]->type == X_ON)
@@ -1906,8 +1906,8 @@ fakerecurse:
 /*       if (stkidx)
  *          for (stkidx--;stkidx;stkidx--)
  *          {
- *             FREE_IF_DEFINED(stack[stkidx].increment) ;
- *             FREE_IF_DEFINED(stack[stkidx].stopval) ;
+ *             FREE_IF_DEFINED(TSD,stack[stkidx].increment) ;
+ *             FREE_IF_DEFINED(TSD,stack[stkidx].stopval) ;
  *          }
  */  /* hey, this should really be ok, .... must be a BUG */
          stackcleanup(TSD,stktrigger); /* think it, too. stackcleanup
@@ -1921,8 +1921,8 @@ fakerecurse:
          /* set the current condition information */
          if (TSD->currlevel->sig)
          {
-            FREE_IF_DEFINED( TSD->currlevel->sig->info ) ;
-            FREE_IF_DEFINED( TSD->currlevel->sig->descr ) ;
+            FREE_IF_DEFINED( TSD, TSD->currlevel->sig->info ) ;
+            FREE_IF_DEFINED( TSD, TSD->currlevel->sig->descr ) ;
             FreeTSD( TSD->currlevel->sig ) ;
          }
          TSD->currlevel->sig = TSD->nextsig ;
@@ -2061,19 +2061,19 @@ void removelevel( tsd_t *TSD, proclevel level )
    if (level->prev)
       level->prev->next = NULL ;
 
-   FREE_IF_DEFINED( level->signal_continue );
+   FREE_IF_DEFINED( TSD, level->signal_continue );
 
    if (level->sig)
    {
-      FREE_IF_DEFINED( level->sig->info ) ;
-      FREE_IF_DEFINED( level->sig->descr ) ;
+      FREE_IF_DEFINED( TSD, level->sig->info ) ;
+      FREE_IF_DEFINED( TSD, level->sig->descr ) ;
       FreeTSD( level->sig ) ;
    }
 
    if (level->traps)
    {
       for (i=0; i<SIGNALS; i++)
-         FREE_IF_DEFINED( level->traps[i].name ) ;
+         FREE_IF_DEFINED( TSD, level->traps[i].name ) ;
 
       FreeTSD( level->traps ) ;
    }
