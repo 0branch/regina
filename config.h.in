@@ -264,6 +264,9 @@
 /* Define if statically loading Rexx/SQL external function package */
 #undef HAVE_REXXSQL_PACKAGE
 
+/* Define if statically loading Rexx/EEC external function package */
+#undef HAVE_REXXEEC_PACKAGE
+
 /* Define if statically loading Rexx/CURL external function package */
 #undef HAVE_REXXCURL_PACKAGE
 

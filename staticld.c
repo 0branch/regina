@@ -59,6 +59,10 @@ extern void *getRexxCURLFunctionAddress( char *name );
 extern void *getRexxSQLFunctionAddress( char *name );
 #endif
 
+#ifdef HAVE_REXXEEC_PACKAGE
+extern void *getRexxEECFunctionAddress( char *name );
+#endif
+
 #ifdef HAVE_REXXDW_PACKAGE
 extern void *getRexxDWFunctionAddress( char *name );
 #endif
@@ -101,6 +105,9 @@ static struct
 #endif
 #ifdef HAVE_REXXSQL_PACKAGE
    { "rexxsql", getRexxSQLFunctionAddress },
+#endif
+#ifdef HAVE_REXXEEC_PACKAGE
+   { "rexxeec", getRexxEECFunctionAddress },
 #endif
 #ifdef HAVE_RXSOCK_PACKAGE
    { "rxsock", getRxSockFunctionAddress },
