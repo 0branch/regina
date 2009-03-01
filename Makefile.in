@@ -231,14 +231,14 @@ ALLSRC = $(CFILES) $(HFILES)
 ZIP_ALLSRC = $(ZIP_CFILES) $(ZIP_HFILES)
 
 MTSSRC = $(srcdir)/en.mts $(srcdir)/pt.mts $(srcdir)/no.mts \
-	$(srcdir)/de.mts $(srcdir)/es.mts  $(srcdir)/pl.mts \
+	$(srcdir)/de.mts $(srcdir)/es.mts $(srcdir)/pl.mts $(srcdir)/sv.mts \
 	$(srcdir)/tr.mts
 TAR_MTSSRC = $(REG_DIR)/en.mts $(REG_DIR)/pt.mts $(REG_DIR)/no.mts \
 	$(REG_DIR)/de.mts $(REG_DIR)/es.mts $(REG_DIR)/pl.mts \
-	$(REG_DIR)/tr.mts
-ZIP_MTSSRC = en.mts pt.mts no.mts de.mts es.mts pl.mts tr.mts
+	$(REG_DIR)/tr.mts $(REG_DIR)/sv.mts
+ZIP_MTSSRC = en.mts pt.mts no.mts de.mts es.mts pl.mts tr.mts sv.mts
 
-MTBFILES = en.mtb pt.mtb no.mtb de.mtb es.mtb pl.mtb tr.mtb
+MTBFILES = en.mtb pt.mtb no.mtb de.mtb es.mtb pl.mtb tr.mtb sv.mtb
 
 HFILES = $(REG_DIR)/rexx.h $(REG_DIR)/regina_c.h $(REG_DIR)/defs.h $(REG_DIR)/extern.h $(REG_DIR)/regina_t.h \
 	 $(REG_DIR)/strings.h $(REG_DIR)/configur.h $(REG_DIR)/yaccsrc.h $(REG_DIR)/wrappers.h \
@@ -940,6 +940,7 @@ installbase: all
 	$(INSTALL) -m 644 -c ./es.mtb $(DESTDIR)$(sharedir)/es.mtb
 	$(INSTALL) -m 644 -c ./pl.mtb $(DESTDIR)$(sharedir)/pl.mtb
 	$(INSTALL) -m 644 -c ./tr.mtb $(DESTDIR)$(sharedir)/tr.mtb
+	$(INSTALL) -m 644 -c ./sv.mtb $(DESTDIR)$(sharedir)/sv.mtb
 	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/rexxcps.rexx  $(DESTDIR)$(sharedir)/rexxcps.rexx
 	-chmod 755 $(DESTDIR)$(sharedir)/rexxcps.rexx
 	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/animal.rexx   $(DESTDIR)$(sharedir)/animal.rexx
@@ -972,8 +973,18 @@ installabilib: installregina
 	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
 
-installmacosx: ./$(SHLPRE)$(SHLFILE)$(BUNDLE)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(BUNDLE) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(BUNDLE)
+uninstall:
+	-rm -f $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
+	-rm -f $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
+	-rm -f $(DESTDIR)$(bindir)/rxstack$(binarybitprefix)$(EXE)
+	-rm -f $(DESTDIR)$(bindir)/regina-config
+	-rm -f $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
+	-rm -f $(DESTDIR)$(mandir)/man1/regina.1.gz
+	-rm -f $(DESTDIR)$(includedir)/rexxsaa.h
+	-rm -f $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
+	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
+	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+	-rm -fr $(DESTDIR)$(sharedir)
 
 # Note: beosinstall is not yet 'DESTDIRized'
 #
@@ -1001,6 +1012,7 @@ beosinstall: all
 	$(INSTALL) -m 644 -c ./es.mtb $(sharedir)/es.mtb
 	$(INSTALL) -m 644 -c ./pl.mtb $(sharedir)/pl.mtb
 	$(INSTALL) -m 644 -c ./tr.mtb $(sharedir)/tr.mtb
+	$(INSTALL) -m 644 -c ./sv.mtb $(sharedir)/sv.mtb
 	/boot/home/config/bin/rexx $(srcdir)/preinst.rexx /boot/home/config/bin/rexx $(srcdir)/demo/rexxcps.rexx   /boot/home/config/bin/rexxcps.rexx
 	-chmod 755 /boot/home/config/bin/rexxcps.rexx
 	/boot/home/config/bin/rexx $(srcdir)/preinst.rexx /boot/home/config/bin/rexx $(srcdir)/demo/animal.rexx    /boot/home/config/bin/animal.rexx

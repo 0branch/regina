@@ -13,6 +13,7 @@ Select
       Do
          from = 'COPYING-LIB BUGS       TODO       README.QNX4 README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
+         pp =   '-           -          -          -           -                    -        -            -      '
          extn_dir = 'lib'
          shldir = 'lib'
          share_dir = _tmpdir'/share/regina'
@@ -21,6 +22,7 @@ Select
       Do
          from = 'COPYING-LIB BUGS       TODO       README.BeOS README.'_abimajor'?  demo/*.rexx rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           bin         include'
+         pp =   '-           -          -          -           -                    -        -            -      '
          extn_dir = 'add-ons/regina'
          shldir = 'lib'
          share_dir = _tmpdir'/'extn_dir
@@ -29,6 +31,7 @@ Select
       Do
          from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
+         pp =   '-           -          -          -           -                    -        -            -      '
          extn_dir = 'bin'
          shldir = 'bin'
          share_dir = _tmpdir'/share/regina'
@@ -37,6 +40,7 @@ Select
       Do
          from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
+         pp =   '-           -          -          -           -                    gzip     -            -      '
          extn_dir = 'lib'
          shldir = 'lib'
          share_dir = _tmpdir'/share/regina'
@@ -51,9 +55,9 @@ End
 /*
  * Copy test libraries if they exist
  */
-fn = _shlpre || 'test1' || _shlpst
+fn = _shlpre || 'rxtest1' || _shlpst
 If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/'extn_dir
-fn = _shlpre || 'test2' || _shlpst
+fn = _shlpre || 'rxtest2' || _shlpst
 If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/'extn_dir
 
 /*
@@ -94,6 +98,10 @@ Else
  */
 Do i = 1 To Words(from)
   Call copy _srcdir'/'Word(from,i),_tmpdir'/'Word(to,i)
+  If Word(pp,i) \= '-' Then
+     Do
+        Address System Word(pp,i) _tmpdir'/'Word(to,i)'/'Word(from,i)
+     End
 End
 Return 0
 
@@ -115,6 +123,7 @@ Do i = 1 To Words(args)
             optval = Strip(Substr(optarg,1+Length(Word(validargs,j))))
             optvar = Word(vars,j)
             Interpret optvar "=optval"
+            Say optvar'='optval
             Leave j
          End
    End

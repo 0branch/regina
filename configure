@@ -8505,6 +8505,7 @@ case "$target" in
                 #
 # MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
 # MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
+                EEXTRA="$valid_arch_flags"
                 LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
@@ -8524,7 +8525,7 @@ case "$target" in
 echo $ECHO_N "checking how to create a shared library... $ECHO_C" >&6; }
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8527 "configure"
+#line 8528 "configure"
 int foo()
 {
 return(0);
@@ -8615,7 +8616,7 @@ rm -f conftest*
 
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8618 "configure"
+#line 8619 "configure"
 int foo()
 {
 return(0);
