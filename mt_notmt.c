@@ -162,7 +162,7 @@ tsd_t *ReginaInitializeProcess(void)
       extern OS_Dep_funcs __regina_OS_Other;
       __regina_tsd.OS = &__regina_OS_Other;
    }
-#elif defined(unix) || defined(__unix__) || defined(__unix) || defined(__QNX__) || defined(__BEOS__) || defined(SKYOS) || ( defined( __APPLE_CC__ ) && defined( __MACH__ ) )
+#elif defined(unix) || defined(__unix__) || defined(__unix) || defined(__QNX__) || defined(__BEOS__) || defined(SKYOS) || ( defined( __APPLE_CC__ ) && defined( __MACH__ ) ) || defined(AIX)
    {
       extern OS_Dep_funcs __regina_OS_Unx;
       __regina_tsd.OS = &__regina_OS_Unx;
