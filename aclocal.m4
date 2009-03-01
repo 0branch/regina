@@ -549,7 +549,7 @@ if test "$ac_cv_header_dlfcn_h" = "yes" -o "$HAVE_DLFCN_H" = "1"; then
    LIBS="$LIBS $DLFCNLIBDIR"
    CFLAGS="$CFLAGS $DLFCNINCDIR"
    AC_CACHE_VAL(mh_cv_uscore,[
-   AC_TRY_RUN([
+   AC_RUN_IFELSE([
    #include <dlfcn.h>
    int mh_underscore_test (void) { return 42; }
    int main() {
@@ -560,8 +560,9 @@ if test "$ac_cv_header_dlfcn_h" = "yes" -o "$HAVE_DLFCN_H" = "1"; then
        f2 = dlsym (handle, "_mh_underscore_test");
      } return (!f2 || f1);
    }],
-   mh_cv_uscore=yes,
-   mh_cv_uscore=no
+   [mh_cv_uscore=yes],
+   [mh_cv_uscore=no],
+   [mh_cv_uscore=no]
    )
    ])
    AC_MSG_RESULT($mh_cv_uscore)
@@ -767,8 +768,8 @@ case "$target" in
                 MODPST=".sl"
                 ;;
         *ibm-aix5*)
-                SHLPST=".so"
-                MODPST=".so"
+                SHLPST=".a"
+                MODPST=".a"
                 ;;
         *ibm-aix*)
                 SHLPST=".a"
@@ -982,23 +983,34 @@ case "$target" in
                 ;;
         *ibm-aix*)
 #                STATIC_LDFLAGS="-bnso -bI:/lib/syscalls.exp"
-                LD_RXLIB_A1="ld -bnoentry -bM:SRE ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_A2="ld -bnoentry -bM:SRE ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_B1="${SHLPRE}${SHLFILE}${SHLPST} -lc"
-                LD_RXLIB_B2="${SHLPRE}${SHLFILE}${SHLPST} -lc"
                 SHLPRE="lib"
-                TEST1EXPORTS="-bE:test1.exp"
-                TEST2EXPORTS="-bE:test2.exp"
-                TEST1EXP="test1.exp"
-                TEST2EXP="test2.exp"
+                if test "$ac_cv_prog_CC" = "gcc"; then
+                   LD_RXLIB_A1="${CC} -shared ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_A2="${CC} -shared ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_B1="-L. -l${SHLFILE}"
+                   LD_RXLIB_B2="-L. -l${SHLFILE}"
+                else
+                   LD_RXLIB_A1="ld -bnoentry -bM:SRE ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_A2="ld -bnoentry -bM:SRE ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_B1="${SHLPRE}${SHLFILE}${SHLPST} -lc"
+                   LD_RXLIB_B2="${SHLPRE}${SHLFILE}${SHLPST} -lc"
+                   TEST1EXPORTS="-bE:test1.exp"
+                   TEST2EXPORTS="-bE:test2.exp"
+                   TEST1EXP="test1.exp"
+                   TEST2EXP="test2.exp"
+                fi
                 REGINAEXP="regina.exp"
                 if test "$ac_cv_header_dlfcn_h" = "yes" -o "$HAVE_DLFCN_H" = "1"; then
-                        AIX_DYN="yes"
-                        DYN_COMP="-DDYNAMIC"
-                        SHL_LD="ld -o ${SHLPRE}${SHLFILE}${SHLPST} -bnoentry -bE:regina.exp -bM:SRE ${LDFLAGS} \$(SHOFILES) -lc \$(SHLIBS) \$(MH_MT_LIBS)"
+                   AIX_DYN="yes"
+                   DYN_COMP="-DDYNAMIC"
+                   if test "$ac_cv_prog_CC" = "gcc"; then
+                      SHL_LD="${CC} -shared -o ${SHLPRE}${SHLFILE}${SHLPST} -Wl,-bnoentry -Wl,-bE:regina.exp -Wl,-bM:SRE ${LDFLAGS} \$(SHOFILES) -lc \$(SHLIBS) \$(MH_MT_LIBS)"
+                   else
+                      SHL_LD="ld -o ${SHLPRE}${SHLFILE}${SHLPST} -bnoentry -bE:regina.exp -bM:SRE ${LDFLAGS} \$(SHOFILES) -lc \$(SHLIBS) \$(MH_MT_LIBS)"
+                   fi
                 else
-                        SHL_LD=" "'$('LIBEXE')'" "'$('LIBFLAGS')'" "'$('SHOFILES')'
-                        DYN_COMP=""
+                   SHL_LD=" "'$('LIBEXE')'" "'$('LIBFLAGS')'" "'$('SHOFILES')'
+                   DYN_COMP=""
                 fi
                 ;;
         *dec-osf*)
@@ -1164,7 +1176,6 @@ case "$target" in
                 #
 # MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
 # MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
-                EEXTRA="-arch i386 -arch ppc -arch ppc64"
                 LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
@@ -1537,6 +1548,24 @@ if test "$with_rexxsql" = "yes"; then
         fi
 fi
 dnl
+dnl Settings for Rexx/EEC
+dnl
+AC_ARG_WITH(rexxeec,
+    [     --with-rexxeec       enable static linking with Rexx/EEC external function package],
+    [with_rexxeec=$withval],
+    [with_rexxeec=no],
+)
+if test "$with_rexxeec" = "yes"; then
+        AC_CHECK_PROG(rexxeec_config, [rexxeec-config], yes, no)
+        if test "$ac_cv_prog_rexxeec_config" = yes; then
+           EXTRA_LIB=`rexxeec-config --libs`
+           MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
+           AC_DEFINE(HAVE_REXXEEC_PACKAGE)
+        else
+           AC_MSG_ERROR(rexxeec-config not found. Cannot use --with-rexxeec switch)
+        fi
+fi
+dnl
 dnl Settings for Rexx/ISAM
 dnl
 AC_ARG_WITH(rexxisam,
@@ -1702,7 +1731,7 @@ AC_DEFUN([MH_CHECK_OSX_ARCH],
 [AC_MSG_CHECKING(for which Mac OSX -arch flags are supported)
 valid_arch_flags=""
 found_arch_flags=""
-arch_flags="ppc ppc64 i386"
+arch_flags="ppc ppc64 x86_64 i386"
 for a in $arch_flags; do
   save_ldflags="$LDFLAGS"
   LDFLAGS="$LDFLAGS -arch $a"
