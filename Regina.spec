@@ -12,7 +12,11 @@ License: LGPL
 Vendor: Mark Hessling
 Packager: Mark Hessling
 URL: http://regina-rexx.sourceforge.net
-Provides: %{name}
+%ifarch x86_64 ia64 ppc64 s390x sparc64
+Provides: Regina-REXX %{name} libregina.so()(64bit)
+%else
+Provides: Regina-REXX %{name} libregina.so
+%endif
 Icon: regina64.xpm
 
 %description
