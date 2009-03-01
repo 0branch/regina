@@ -1219,15 +1219,11 @@ int init_vars( tsd_t *TSD )
     * Yes its crude!
     */
 #if defined(UNIX)
-   buf[0] = 0x0a;
-   buf[1] = 0x00;
+   buf[0] = 0x0a; buf[1] = 0x00;
 #elif defined(MAC)
-   buf[0] = 0x0d;
-   buf[1] = 0x00;
+   buf[0] = 0x0d; buf[1] = 0x00;
 #else
-   buf[0] = 0x0d;
-   buf[1] = 0x0a;
-   buf[2] = 0x00;
+   buf[0] = 0x0d; buf[1] = 0x0a; buf[2] = 0x00;
 #endif
    ptr = Str_creTSD( buf );
    set_reserved_value( TSD, POOL0_ENDOFLINE, ptr, 0, VFLAG_STR );
