@@ -270,6 +270,9 @@
 /* Define if statically loading Rexx/CURL external function package */
 #undef HAVE_REXXCURL_PACKAGE
 
+/* Define if statically loading Rexx/ISAM external function package */
+#undef HAVE_REXXISAM_PACKAGE
+
 /* Define if statically loading Rexx/DW external function package */
 #undef HAVE_REXXDW_PACKAGE
 
