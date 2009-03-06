@@ -80,7 +80,7 @@ TSFILES =   funcs.ts.o builtin.ts.o error.ts.o variable.ts.o extstack.ts.o rexxb
             options.ts.o os_win.ts.o os_other.ts.o rexx.ts.o client.ts.o rexxsaa.ts.o mt_win32.ts.o      \
             $(GCI_SHO)
 
-MTSSRC =    $(SRCDIR)/en.mts $(SRCDIR)/pt.mts $(SRCDIR)/no.mts $(SRCDIR)/de.mts $(SRCDIR)/es.mts $(SRCDIR)/pl.mts $(SRCDIR)/tr.mts
+MTSSRC =    $(SRCDIR)/en.mts $(SRCDIR)/pt.mts $(SRCDIR)/no.mts $(SRCDIR)/de.mts $(SRCDIR)/es.mts $(SRCDIR)/pl.mts $(SRCDIR)/tr.mts $(SRCDIR)/sv.mts
 
 CEXTRA = $(REXXSOCKET) $(HAVE_GCI) $(VEXTRA) -funsigned-char
 COPT = -MMD $(OPTIMIZE) $(CEXTRA) -I$(SRCDIR)/ $(MEMTRACE) $(NOFLISTS) $(THREADING)

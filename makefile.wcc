@@ -152,7 +152,7 @@ LIBFLAGS                = /q /n
 
 HFILES = $(SRC)\rexx.h $(SRC)\defs.h $(SRC)\extern.h $(SRC)\regina_t.h $(SRC)\strings.h
 
-MTSSRC = $(SRC)\en.mts $(SRC)\pt.mts $(SRC)\no.mts $(SRC)\de.mts $(SRC)\es.mts $(SRC)\pl.mts $(SRC)\tr.mts
+MTSSRC = $(SRC)\en.mts $(SRC)\pt.mts $(SRC)\no.mts $(SRC)\de.mts $(SRC)\es.mts $(SRC)\pl.mts $(SRC)\tr.mts $(SRC)\sv.mts
 
 all : rexx.exe execiser.exe $(DLLFILE) $(LIBFILE) rxtest1.lib rxtest2.lib regina.exe mtb_files
 
