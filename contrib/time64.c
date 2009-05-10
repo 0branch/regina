@@ -117,20 +117,29 @@ double difftime_64(t64 time1, t64 time0)
  return (double)(time1-time0);
 }
 
+/*
+ * mktime converts a time expressed in local time in individual fields
+ * to a calendar time as UTC
+ */
 t64 mktime_64( struct tm *today )
 {
- t64 t;
- SYSTEMTIME st;
- st.wDay=(WORD)today->tm_mday;
- st.wDayOfWeek=(WORD)today->tm_wday;
- st.wHour=(WORD)today->tm_hour;
- st.wMinute=(WORD)today->tm_min;
- st.wMonth=(WORD)(today->tm_mon+1);
- st.wSecond=(WORD)today->tm_sec;
- st.wYear=(WORD)(today->tm_year+1900);
- st.wMilliseconds=0;
- SystemTimeToT64(&st,&t);
- return t;
+   t64 t;
+   SYSTEMTIME st;
+   TIME_ZONE_INFORMATION TimeZoneInformation;
+
+   st.wDay = (WORD)today->tm_mday;
+   st.wDayOfWeek = (WORD)today->tm_wday;
+   st.wHour = (WORD)today->tm_hour;
+   st.wMinute = (WORD)today->tm_min;
+   st.wMonth = (WORD)(today->tm_mon+1);
+   st.wSecond = (WORD)today->tm_sec;
+   st.wYear = (WORD)(today->tm_year+1900);
+   st.wMilliseconds = 0;
+   SystemTimeToT64( &st, &t );
+   GetTimeZoneInformation( &TimeZoneInformation );
+   /* adjust time (local) to UTC */
+   t += (60 * TimeZoneInformation.Bias);
+   return t;
 }
 
 #define DAY_IN_SECS (60*60*24)
