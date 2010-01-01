@@ -15,9 +15,6 @@
  * License along with this library; if not, write to the Free
  * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-static char RCSid[] = "$Id: rxpack.c,v 1.55 2006/07/10 07:13:17 mark Exp $";
-
 #if defined(OS2) || defined(__OS2__)
 # define INCL_DOSMISC
 #endif
