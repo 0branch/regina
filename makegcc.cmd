@@ -28,6 +28,7 @@ If Translate( here ) \= Translate( src ) Then
 'copy ..\regina.a'
 'copy ..\regina.lib'
 'copy ..\test1.dll'
+'copy ..\regutil.dll'
 'copy ..\test2.dll'
 'copy' SRC || '\COPYING-LIB'
 'copy' SRC || '\rexxsaa.h'
