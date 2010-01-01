@@ -1,5 +1,10 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT(rexxsaa.h)
+dnl
+dnl *******************WARNING****************************
+dnl Using an autoconf later than 2.61 will result in configure
+dnl failing to run on QNX4
+dnl *******************WARNING****************************
+AC_INIT(Regina REXX Interpreter, "", mark@rexx.org, Regina-REXX)
 AC_PREFIX_DEFAULT(/usr/local)
 
 . $srcdir/regina.ver
@@ -68,6 +73,10 @@ case "$target" in
       GCI_CONVERT_HEADER="gci_convert.linux.alpha"
       gci_available=yes
       ;;
+   powerpc64-*linux*)
+      GCI_CONVERT_HEADER="gci_convert.linux.powerpc64"
+      gci_available=yes
+      ;;
    *cygwin*)
       GCI_CONVERT_HEADER="gci_convert.cygwin.i86"
       gci_available=yes
@@ -127,34 +136,45 @@ AC_CHECK_HEADERS( \
    dl.h \
    errno.h \
    fcntl.h \
+   fnmatch.h \
    grp.h \
+   iconv.h \
    limits.h \
    malloc.h \
    math.h \
+   ncurses.h \
    netdb.h \
    netinet/in.h \
+   paths.h \
    poll.h \
    process.h \
    pwd.h \
    setjmp.h \
    share.h \
    signal.h \
+   socket.h \
    stdarg.h \
    stdio.h \
+   statvfs.h \
    stdlib.h \
    stdint.h \
    string.h \
+   sys/mount.h \
    sys/poll.h \
    sys/resource.h \
    sys/select.h \
    sys/socket.h \
    sys/stat.h \
+   sys/statfs.h \
+   sys/statvfs.h \
+   sys/mman.h \
    sys/time.h \
    sys/utsname.h \
    sys/wait.h \
-   termios.h \
+   termcap.h \
    time.h \
-   unistd.h
+   unistd.h \
+   vfs.h
    )
 
 AC_CHECK_FUNCS(sysconf div raise putenv usleep random ftruncate \
@@ -162,7 +182,7 @@ AC_CHECK_FUNCS(sysconf div raise putenv usleep random ftruncate \
    _fullpath vsprintf _splitpath2 _splitpath sigaction \
    lstat mkstemp inet_ntop gmtime_r localtime_r \
    getgrgid_r getpwuid_r gethostbyname_r \
-   readlink realpath)
+   readlink realpath getbootfile tgetstr statfs mbstowcs mmap iconv)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -175,6 +195,12 @@ MH_STRUCT_RANDOM_DATA
 MH_CHECK_BUILTIN_RETURN_ADDRESS
 MH_C_LONG_LONG
 MH_CHECK_TYPE_SOCKLEN_T
+AC_CHECK_TYPES([union semun],[],[],
+[#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>])
+
+MH_CHECK_F_MNTFROMNAME
 
 dnl Checks for library functions.
 AC_FUNC_MEMCMP
@@ -191,6 +217,25 @@ fi
 AC_SUBST(ALLOCA)
 AC_SUBST(ALLOCA_SHO)
 AC_SUBST(ALLOCA_TSO)
+dnl
+dnl Test for fnmatch
+dnl
+if test $ac_cv_header_fnmatch_h = yes; then
+   FNMATCH=""
+   FNMATCH_SHO=""
+   FNMATCH_TSO=""
+else
+   FNMATCH="fnmatch.o"
+   FNMATCH_SHO="fnmatch.so.o"
+   FNMATCH_TSO="fnmatch.tso.o"
+fi
+AC_SUBST(FNMATCH)
+AC_SUBST(FNMATCH_SHO)
+AC_SUBST(FNMATCH_TSO)
+dnl
+dnl where are termcap functions
+AC_SEARCH_LIBS(tgetent, [ncurses termcap curses termlib],REGUTIL_TERM_LIB="$ac_cv_search_tgetent",REGUTIL_TERM_LIB="")
+AC_SUBST(REGUTIL_TERM_LIB)
 
 dnl
 dnl include our debugging switch checking
@@ -322,9 +367,13 @@ AC_ARG_WITH(staticfunctions,
    [with_staticfunctions=$withval],
    [with_staticfunctions=no],
 )
-if test "$with_staticfunctions" = "yes"; then
+if test "$with_staticfunctions" = "yes" -o "$on_qnx4" = "yes"; then
    STATICLD_SHO="staticld.so.o rxpack.so.o"
-   MH_STATIC_LOADING
+   if test "$with_staticfunctions" = "no"; then
+      MH_STATIC_LOADING(regutil)
+   else
+      MH_STATIC_LOADING
+   fi
 else
    STATICLD_SHO=""
 dnl --------------- Check how to make shared libraries -------------------
@@ -337,8 +386,8 @@ dnl MH_CHECK_LEADING_USCORE must be called after processing --with-dlfcn[inc,lib
 fi
 AC_SUBST(STATICLD_SHO)
 MH_SET_SHLPST
-
-MH_CHECK_RPM(/usr/src/rpm /usr/src/redhat)
+dnl
+MH_CHECK_RPM
 
 dnl --------------- Force definition of pre-compiler macro UNIX ----------
 AC_DEFINE(UNIX)
@@ -441,6 +490,7 @@ fi
 echo "  libraries will be installed in: $libdir"
 echo "                        {prefix}: $prefix"
 echo "                   {exec_prefix}: $exec_prefix"
+echo "                      RPM topdir: $RPMTOPDIR"
 echo
 echo "To build the Regina binaries, and dynamically loadable libraries, type 'make'"
 echo "To install Regina in the above directories, type 'make install'"

@@ -17,9 +17,6 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/*
- * $Id: extern.h,v 1.86 2006/09/03 09:51:18 mark Exp $
- */
 /* JH 20-10-99 */  /* To make Direct setting of stems Direct and not Symbolic. */
 
 
@@ -434,6 +431,8 @@ extern "C" {
    nodeptr treadit( cnodeptr ) ;
    void setup_system( tsd_t *TSD, int isclient );
    sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir );
+   void setGlobalTSD( tsd_t *TSD);
+   tsd_t *getGlobalTSD( void );
 
 
 /*

@@ -296,11 +296,6 @@
 /* Copy the first part of user declarations.  */
 #line 1 "./yaccsrc.y"
 
-
-#ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.39 2006/09/15 05:41:01 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -2409,7 +2404,7 @@ yyparse ()
 #endif
 #endif
 {
-  
+
   int yystate;
   int yyn;
   int yyresult;

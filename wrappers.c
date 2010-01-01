@@ -16,11 +16,6 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-/*
- * $Id: wrappers.c,v 1.38 2005/08/04 09:03:51 mark Exp $
- */
-
 /*
  * This file is 'a hell of a file'. It contain _anything_ that is neither
  * POSIX nor ANSI. The meaning is that when these things are needed in
@@ -520,9 +515,19 @@ PFN wrapper_get_addr( const tsd_t *TSD, const struct library *lptr, const streng
    rc = DosQueryProcAddr(handle,ordinal,entryname,&addr);
    if (rc)
    {
-      char buf[150];
-      sprintf(buf,"DosQueryProcAddr() failed with %lu looking for %.90s", (long) rc, funcname );
-      set_err_message(TSD, buf, "" ) ;
+      mem_upper( entryname, strlen( entryname ) );
+      rc = DosQueryProcAddr(handle,ordinal,entryname,&addr);
+      if (rc)
+      {
+         mem_lower( entryname, strlen( entryname ) );
+         rc = DosQueryProcAddr(handle,ordinal,entryname,&addr);
+         if (rc)
+         {
+            char buf[150];
+            sprintf(buf,"DosQueryProcAddr() failed with %lu looking for %.90s", (long) rc, funcname );
+            set_err_message(TSD, buf, "" ) ;
+         }
+      }
    }
 
 #elif defined(DYNAMIC_WIN32)

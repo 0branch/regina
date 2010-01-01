@@ -5,6 +5,7 @@
 #
 
 SRCDIR=$(REGINA_SRCDIR)
+REGUTILSRCDIR=$(SRCDIR)\regutil
 CC = gcc
 
 include $(SRCDIR)\regina.ver
@@ -81,8 +82,9 @@ EXE=.exe
 LD_RXLIB_PRE = $(CC) -Zdll -Zomf -Zcrtdll #-Zso -Zsys
 LD_RXLIB1 = -Zmap=test1.map -o rxtest1.dll $(SRCDIR)\test1_os2_dll.def $(SHLLIB).lib
 LD_RXLIB2 = -Zmap=test2.map -o rxtest2.dll $(SRCDIR)\test2_os2_dll.def $(SHLLIB).lib
+LD_REGUTIL = -Zmap=regutil.map -o regutil.dll $(REGUTILSRCDIR)\regutil.def $(SHLLIB).lib
 SHL_LD=gcc $(THREADING_LINK) -Zdll -Zcrtdll -Zomf -Zmap=regina.map -o $(SHLFILE).$(SHL) $(SHOFILES) $(SHLDEF) $(SOCKET)
-SHL_TARGETS = $(SHLFILE).$(SHL) $(SHLFILE)$(EXE) pmregina.exe rxtest1.$(SHL) rxtest2.$(SHL)
+SHL_TARGETS = $(SHLFILE).$(SHL) $(SHLFILE)$(EXE) pmregina.exe rxtest1.$(SHL) rxtest2.$(SHL) regutil.$(SHL)
 LDEXTRA=emxbind
 LIBPRE =
 LIBFILE = rexx
@@ -151,6 +153,9 @@ SHOFILES = funcs.obj builtin.obj error.obj variable.obj \
 	drexx.obj client.obj rexxsaa.obj instore.obj \
 	extstack.obj rexxbif.obj os_other.obj \
 	$(GCI_SHO)
+REGUTILOFILES = regfilesys.obj regini.obj inifile.obj regmacrospace.obj regscreenos2.obj \
+                regsemos2.obj regutil.obj rxsupport.obj regstem.obj \
+                regunicode.obj regcrypt.obj
 
 DEMODIR = $(SRCDIR)\demo
 DEMOFILES = $(DEMODIR)\*
@@ -738,6 +743,85 @@ gci_rxfuncdefine.obj : $(SRCDIR)\gci\gci_rxfuncdefine.c  $(GCIHEADERS)
 gci_tree.obj : $(SRCDIR)\gci\gci_tree.c  $(GCIHEADERS)
 	       $(O2SAVE)
 	       $(CC) $(COPT_DLL) $(CC2O) $(DYN_COMP) -c $(SRCDIR)\gci\gci_tree.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+#
+# Rules for Regutil
+#
+regutil.dll: $(REGUTILOFILES)
+	       $(LD_RXLIB_PRE) $(REGUTILOFILES) $(LD_REGUTIL)
+#	   del regutil.lib
+
+regfilesys.obj : $(REGUTILSRCDIR)/regfilesys.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT_DLL) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regfilesys.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regini.obj : $(REGUTILSRCDIR)/regini.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regini.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+inifile.obj : $(REGUTILSRCDIR)/inifile.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/inifile.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regmacrospace.obj : $(REGUTILSRCDIR)/regmacrospace.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regmacrospace.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regscreenos2.obj : $(REGUTILSRCDIR)/regscreenos2.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regscreenos2.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regsemos2.obj : $(REGUTILSRCDIR)/regsemos2.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regsemos2.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regsysparm.obj : $(REGUTILSRCDIR)/regsysparm.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regsysparm.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regutil.obj : $(REGUTILSRCDIR)/regutil.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regutil.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regstem.obj : $(REGUTILSRCDIR)/regstem.c $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regstem.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regunicode.obj : $(REGUTILSRCDIR)/regunicode.c $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regunicode.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+regcrypt.obj : $(REGUTILSRCDIR)/regcrypt.c $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regcrypt.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
+rxsupport.obj : $(REGUTILSRCDIR)/rxsupport.c $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/rxsupport.c
 	       $(O2SHO)
 	       $(SAVE2O)
 

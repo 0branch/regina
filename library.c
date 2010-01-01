@@ -1,7 +1,3 @@
-#ifndef lint
-static char *RCSid = "$Id: library.c,v 1.25 2005/08/04 11:28:40 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -521,7 +517,6 @@ static int load_entry( const tsd_t *TSD, struct library *lptr,
    assert( ( lptr != NULL ) ^ ( entry != NULL ) );
    assert( rxname != NULL );
    assert( slot >= FUNCS && slot <= SUBCOMS );
-
    /*
     * Check the exceptions first.
     */
@@ -750,6 +745,8 @@ static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
    void *handle;
    int newhandle = 0;
 #endif
+   streng *regutil=Str_crestr( "regutil" );
+   streng *rexxutil=Str_crestr( "rexxutil" );
 
    assert( rxname != NULL );
 
@@ -757,24 +754,53 @@ static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
    {
       assert( entry == NULL );
 #ifdef DYNAMIC
-      if ( ( lptr = find_library( TSD, module ) ) == NULL )
+      if ( Str_ccmp( module, rexxutil ) == 0 )
       {
-         newhandle = 1;
-         handle = wrapper_load( TSD, module ) ;
-         if ( handle )
+         if ( ( lptr = find_library( TSD, regutil ) ) == NULL )
          {
-            lptr = (struct library *)MallocTSD( sizeof( struct library )) ;
-            lptr->name = Str_dupstrTSD( module ) ;
-            lptr->handle = handle ;
-            lptr->used = 0l;
+            newhandle = 1;
+            handle = wrapper_load( TSD, regutil ) ;
+            if ( handle )
+            {
+               lptr = (struct library *)MallocTSD( sizeof( struct library )) ;
+               lptr->name = Str_dupstrTSD( regutil ) ;
+               lptr->handle = handle ;
+               lptr->used = 0l;
+            }
+            else
+            {
+               Free_stringTSD( regutil );
+               Free_stringTSD( rexxutil );
+               return 40; /* RXFUNC_MODNOTFND */
+            }
+            insert_library( TSD, lptr ) ;
          }
-         else
+      }
+      if ( lptr == NULL )
+      {
+         if ( ( lptr = find_library( TSD, module ) ) == NULL )
          {
-            return 40; /* RXFUNC_MODNOTFND */
+            newhandle = 1;
+            handle = wrapper_load( TSD, module ) ;
+            if ( handle )
+            {
+               lptr = (struct library *)MallocTSD( sizeof( struct library )) ;
+               lptr->name = Str_dupstrTSD( module ) ;
+               lptr->handle = handle ;
+               lptr->used = 0l;
+            }
+            else
+            {
+               Free_stringTSD( regutil );
+               Free_stringTSD( rexxutil );
+               return 40; /* RXFUNC_MODNOTFND */
+            }
+            insert_library( TSD, lptr ) ;
          }
-         insert_library( TSD, lptr ) ;
       }
 #else
+      Free_stringTSD( regutil );
+      Free_stringTSD( rexxutil );
       return 60; /* RXFUNC_NOTINIT */
 #endif
    }
@@ -789,6 +815,8 @@ static int rex_funcadd( const tsd_t *TSD, const streng *rxname,
          remove_library( TSD, lptr );
 #endif
    }
+   Free_stringTSD( regutil );
+   Free_stringTSD( rexxutil );
    return rc;
 }
 

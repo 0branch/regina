@@ -16,11 +16,6 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-/*
- * $Id: staticld.c,v 1.7 2004/05/26 03:50:43 mark Exp $
- */
-
 #include "rexx.h"
 
 #if defined( DYNAMIC_STATIC )
@@ -67,6 +62,10 @@ extern void *getRexxEECFunctionAddress( char *name );
 extern void *getRexxDWFunctionAddress( char *name );
 #endif
 
+#ifdef HAVE_RXSOCK_PACKAGE
+extern void *getRxSockFunctionAddress( char *name );
+#endif
+
 #ifndef max
 # define max(a,b)        (((a) > (b)) ? (a) : (b))
 #endif
@@ -86,6 +85,7 @@ static struct
    { "test2", getTest2FunctionAddress} ,
 #endif
 #ifdef HAVE_REXXUTIL_PACKAGE
+   { "regutil", getRexxUtilFunctionAddress} ,
    { "rexxutil", getRexxUtilFunctionAddress} ,
 #endif
 #ifdef HAVE_REXXTK_PACKAGE

@@ -11,36 +11,36 @@ exes = 'rexx'_binprefix||_exe 'regina'_binprefix||_exe 'rxqueue'_binprefix||_exe
 Select
    When Countstr( 'qnx', _target ) \= 0 & Countstr( 'nto', _target ) = 0 Then
       Do
-         from = 'COPYING-LIB BUGS       TODO       README.QNX4 README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
-         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
-         pp =   '-           -          -          -           -                    -        -            -      '
+         from = 'COPYING-LIB BUGS       TODO       README.QNX4 README.'_abimajor'?  regina.1 demo/*.rexx  regutil/*.rexx  rexxsaa.h' /**/
+         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina share/regina    include'
+         pp =   '-           -          -          -           -                    -        -            -               -'
          extn_dir = 'lib'
          shldir = 'lib'
          share_dir = _tmpdir'/share/regina'
       End
    When Countstr( 'beos', _target ) \= 0 Then
       Do
-         from = 'COPYING-LIB BUGS       TODO       README.BeOS README.'_abimajor'?  demo/*.rexx rexxsaa.h' /**/
-         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           bin         include'
-         pp =   '-           -          -          -           -                    -        -            -      '
+         from = 'COPYING-LIB BUGS       TODO       README.BeOS README.'_abimajor'?  demo/*.rexx regutil/*.rexx rexxsaa.h' /**/
+         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           bin         bin            include'
+         pp =   '-           -          -          -           -                    -           -              -      '
          extn_dir = 'add-ons/regina'
          shldir = 'lib'
          share_dir = _tmpdir'/'extn_dir
       End
    When Countstr( 'cygwin', _target ) \= 0 Then
       Do
-         from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
-         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
-         pp =   '-           -          -          -           -                    -        -            -      '
+         from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx   regutil/*.rexx  rexxsaa.h' /**/
+         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina  share/regina    include'
+         pp =   '-           -          -          -           -                    -        -             -               -      '
          extn_dir = 'bin'
          shldir = 'bin'
          share_dir = _tmpdir'/share/regina'
       End
    Otherwise
       Do
-         from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx  rexxsaa.h' /**/
-         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina include'
-         pp =   '-           -          -          -           -                    gzip     -            -      '
+         from = 'COPYING-LIB BUGS       TODO       README.Unix README.'_abimajor'?  regina.1 demo/*.rexx  regutil/*.rexx  rexxsaa.h' /**/
+         to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           man/man1 share/regina share/regina    include'
+         pp =   '-           -          -          -           -                    gzip     -            -               -      '
          extn_dir = 'lib'
          shldir = 'lib'
          share_dir = _tmpdir'/share/regina'
@@ -59,6 +59,14 @@ fn = _shlpre || 'rxtest1' || _shlpst
 If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/'extn_dir
 fn = _shlpre || 'rxtest2' || _shlpst
 If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/'extn_dir
+
+/*
+ * Copy regutil libraries if they exist
+ */
+fn = _shlpre || 'regutil' || _shlpst
+If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/'extn_dir
+fn = _libpre || 'regutil' || _libpst
+If Stream( fn, 'C', 'QUERY EXISTS') \= '' Then Call copy fn,_tmpdir'/lib'
 
 /*
  * Copy message binary files

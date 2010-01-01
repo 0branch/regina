@@ -44,4 +44,6 @@ regina_3.1 {
 } REXXSAA_API;
 regina_3.3 {
         ReginaCleanup;
+        ReginaGetThreadSafeData;
+        ReginaCallBack;
 } REXXSAA_API;

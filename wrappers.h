@@ -243,6 +243,7 @@
 #define flush_trace_chars            __regina_flush_trace_chars
 #define free_a_descr                 __regina_free_a_descr
 #define free_orphaned_libs           __regina_free_orphaned_libs
+#define getGlobalTSD                 __regina_getGlobalTSD
 #define get_a_chunk                  __regina_get_a_chunk
 #define get_a_chunkTSD               __regina_get_a_chunkTSD
 #define get_a_descr                  __regina_get_a_descr
@@ -407,6 +408,7 @@
 #define run_popen                    __regina_run_popen
 #define set_err_message              __regina_set_err_message
 #define send_command_to_rxstack      __regina_send_command_to_rxstack
+#define setGlobalTSD                 __regina_setGlobalTSD
 #define set_envir                    __regina_set_envir
 #define set_ignore_novalue           __regina_set_ignore_novalue
 #define set_locale_info              __regina_set_locale_info

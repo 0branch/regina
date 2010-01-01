@@ -1,7 +1,3 @@
-#ifndef lint
-static char *RCSid = "$Id: rxstack.c,v 1.34 2006/02/21 11:22:24 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -1485,7 +1481,7 @@ int rxstack_pull_line_off_queue( Client *client, streng **result, int nowait )
             if ( q->oldest == NULL )
                q->oldest = client;
             rc = RXSTACK_WAITING; /* waiting */
-            DEBUGDUMP(printf("waiting until %ld\n", client->deadline ););
+            DEBUGDUMP(printf("waiting until %ld.%d\n", client->deadline.seconds,client->deadline.milli ););
          }
       }
    }

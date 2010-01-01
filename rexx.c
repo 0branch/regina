@@ -1,7 +1,3 @@
-#ifndef lint
-static char *RCSid = "$Id: rexx.c,v 1.54 2005/08/16 07:41:44 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -147,6 +143,16 @@ const char *numeric_forms[] = { "SCIENTIFIC", "ENGINEERING" } ;
 const char *invo_strings[] = { "COMMAND", "FUNCTION", "SUBROUTINE" } ;
 
 const char *argv0 = NULL;
+
+/*
+ * The following global is to store the TSD of the currently running
+ * interpreter instance.
+ * Each API call checks this variable, and if not NULL, this is used
+ * as the TSD to use.
+ * This enables multiple threads to run within the one interpreter instance.
+ * Set by OPTIONS SINGLE_INTERPRETER
+ */
+tsd_t *__regina_global_TSD = NULL;
 
 static void usage( char * );
 
@@ -966,6 +972,19 @@ sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir )
    memset( &sinfo->tree, 0, sizeof( sinfo->tree ) );
 
    return sinfo;
+}
+/*
+ * The following two functions are used to set and retrieve the value of
+ * the global TSD
+ */
+void setGlobalTSD( tsd_t *TSD)
+{
+   __regina_global_TSD = TSD;
+}
+
+tsd_t *getGlobalTSD( void )
+{
+   return __regina_global_TSD;
 }
 
 #if !defined(RXLIB) && !defined(VMS)

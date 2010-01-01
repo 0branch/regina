@@ -29,7 +29,7 @@ For more information on Rexx, visit http://www.rexxla.org
 %setup
 
 %build
-./configure --mandir=/usr/share/man
+./configure --prefix=%{prefix} --mandir=%{prefix}/share/man
 make
 
 %install
@@ -43,6 +43,7 @@ make DESTDIR=%{buildroot} install
 /usr/%{_lib}/libregina.so
 /usr/%{_lib}/librxtest1.so
 /usr/%{_lib}/librxtest2.so
+/usr/%{_lib}/libregutil.so
 /usr/include/rexxsaa.h
 /usr/share/man/man1/regina.1.gz
 /usr/etc/rc.d/init.d/rxstack
@@ -59,6 +60,7 @@ make DESTDIR=%{buildroot} install
 /usr/share/regina/no.mtb
 /usr/share/regina/pl.mtb
 /usr/share/regina/pt.mtb
+/usr/share/regina/sv.mtb
 /usr/share/regina/tr.mtb
 /usr/bin/rexx
 /usr/bin/regina

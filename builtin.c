@@ -1,7 +1,3 @@
-#ifndef lint
-static char *RCSid = "$Id: builtin.c,v 1.54 2006/09/15 05:40:35 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -1068,6 +1064,9 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
          timediff = mktime(localtime(&now));
 #else
          timediff = (long)(mktime(localtime(&now))-mktime(gmtime(&now)));
+         tmptr = localtime(&now);
+         if ( tmptr->tm_isdst )
+            timediff += 3600;
 #endif
          sprintf(answer->value, "%ld%s",
                  timediff,(timediff)?"000000":"");

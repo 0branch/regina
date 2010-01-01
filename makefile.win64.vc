@@ -25,6 +25,7 @@
 #
 SRCDIR=$(REGINA_SRCDIR)
 COMMONSRCDIR=$(SRCDIR)\common
+REGUTILSRCDIR=$(SRCDIR)\regutil
 #
 #                      USER CONFIGURABLE VARIABLES
 #
@@ -90,7 +91,7 @@ SOCKET=5757
 LIBS = advapi32.lib user32.lib #libc.lib
 WINSOCK = wsock32.lib
 SERVICELIBS = libcmt.lib kernel32.lib advapi32.lib shell32.lib
-SHL_TARGETS= regina.exe rxtest1.dll rxtest2.dll rxtest1.lib rxtest2.lib
+SHL_TARGETS= regina.exe rxtest1.dll rxtest2.dll rxtest1.lib rxtest2.lib regutil.dll regutil.lib
 LD     = link
 LIBFLAGS = /OUT:rexx.lib
 LIBLINK = regina.lib
@@ -98,6 +99,7 @@ LINKSHL = regina.lib
 LD_RXLIBPRE=link /NOLOGO /DLL /OUT:$@ /MACHINE:X64
 LD_RXLIB1= /DEF:$(SRCDIR)\test1_w64_dll.def
 LD_RXLIB2= /DEF:$(SRCDIR)\test2_w64_dll.def
+LD_REGUTIL= /DEF:$(REGUTILSRCDIR)\regutil.def
 MV= -ren
 #
 CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\"
@@ -126,6 +128,7 @@ TSCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) 
 LINKOPT = $(EEXTRA) /NOLOGO /VERSION:$(VERDOT) /MACHINE:X64
 OTHERCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) -DREGINA_SINGLE_THREADED
 OTHERTSCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) $(THREADING)
+REGUTILCOPT = $(COPT) -DNOT_LIKE_IBM -DMAPVIEWOFFILE
 
 README = $(SRCDIR)/README.??? $(SRCDIR)/COPYING-LIB $(SRCDIR)/BUGS $(SRCDIR)/yaccsrc.bound
 
@@ -163,6 +166,14 @@ STATFILES = funcs.stat.obj builtin.stat.obj error.stat.obj variable.stat.obj ext
         yaccsrc.stat.obj lexsrc.stat.obj wrappers.stat.obj options.stat.obj os_win.stat.obj\
         rexx.stat.obj client.stat.obj rexxsaa.stat.obj mt_win32.stat.obj time64.stat.obj \
         os_other.stat.obj $(GCI_SHO)
+
+REGUTILOFILES = regfilesys.obj regini.obj regmacrospace.obj regscreen.obj \
+                regsem.obj regutil.obj rxsupport.obj random.obj regstem.obj regwin.obj \
+                regunicode.obj regcrypt.obj
+
+REGUTILSTATFILES = regfilesys.stat.obj regini.stat.obj regmacrospace.stat.obj regscreen.stat.obj \
+                regsem.stat.obj regutil.stat.obj rxsupport.stat.obj random.stat.obj regstem.stat.obj regwin.stat.obj \
+                regunicode.stat.obj regcrypt.stat.obj
 
 DEMODIR = $(SRCDIR)/demo
 DEMOFILES = $(DEMODIR)/*
@@ -583,6 +594,97 @@ time64.ts.obj : $(SRCDIR)/contrib/time64.c $(SRCDIR)/rexx.h $(SRCDIR)/contrib/ti
         $(CC) $(TSCOPT) $(CC2O) -c $(SRCDIR)/contrib/time64.c
 
 #
+# Rules for Regutil
+#
+# ole32.lib oleaut32.lib uuid.lib
+regutil.dll: $(REGUTILOFILES)
+   $(LD_RXLIBPRE) $(LD_REGUTIL) $(REGUTILOFILES) $(LINKSHL) kernel32.lib advapi32.lib user32.lib
+   del regutil.lib
+
+regfilesys.obj : $(REGUTILSRCDIR)/regfilesys.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regfilesys.c
+
+regini.obj : $(REGUTILSRCDIR)/regini.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regini.c
+
+regmacrospace.obj : $(REGUTILSRCDIR)/regmacrospace.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regmacrospace.c
+
+regscreen.obj : $(REGUTILSRCDIR)/regscreen.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regscreen.c
+
+regsem.obj : $(REGUTILSRCDIR)/regsem.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regsem.c
+
+regsysparm.obj : $(REGUTILSRCDIR)/regsysparm.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regsysparm.c
+
+regutil.obj : $(REGUTILSRCDIR)/regutil.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regutil.c
+
+rxsupport.obj : $(REGUTILSRCDIR)/rxsupport.c $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/rxsupport.c
+
+random.obj : $(REGUTILSRCDIR)/random.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/random.c
+
+regstem.obj : $(REGUTILSRCDIR)/regstem.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regstem.c
+
+regwin.obj : $(REGUTILSRCDIR)/regwin.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regwin.c
+
+regunicode.obj : $(REGUTILSRCDIR)/regunicode.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regunicode.c
+
+regcrypt.obj : $(REGUTILSRCDIR)/regcrypt.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regcrypt.c
+
+#
+#
+regutil.lib: $(REGUTILSTATFILES)
+   lib /OUT:regutil.lib $(REGUTILSTATFILES)
+
+regfilesys.stat.obj : $(REGUTILSRCDIR)/regfilesys.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regfilesys.c
+
+regini.stat.obj : $(REGUTILSRCDIR)/regini.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regini.c
+
+regmacrospace.stat.obj : $(REGUTILSRCDIR)/regmacrospace.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regmacrospace.c
+
+regscreen.stat.obj : $(REGUTILSRCDIR)/regscreen.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regscreen.c
+
+regsem.stat.obj : $(REGUTILSRCDIR)/regsem.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regsem.c
+
+regsysparm.stat.obj : $(REGUTILSRCDIR)/regsysparm.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regsysparm.c
+
+regutil.stat.obj : $(REGUTILSRCDIR)/regutil.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regutil.c
+
+rxsupport.stat.obj : $(REGUTILSRCDIR)/rxsupport.c $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/rxsupport.c
+
+random.stat.obj : $(REGUTILSRCDIR)/random.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/random.c
+
+regstem.stat.obj : $(REGUTILSRCDIR)/regstem.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regstem.c
+
+regwin.stat.obj : $(REGUTILSRCDIR)/regwin.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regwin.c
+
+regunicode.stat.obj : $(REGUTILSRCDIR)/regunicode.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regunicode.c
+
+regcrypt.stat.obj : $(REGUTILSRCDIR)/regcrypt.c
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regcrypt.c
+
+#
 # Rules for sample programs
 #
 test1.dll.obj: $(SRCDIR)/test1.c
@@ -682,6 +784,7 @@ binary: all
 	-del /F /S *.*
 	copy ..\regina.exe
 	copy ..\regina.dll
+	copy ..\regutil.dll
 	copy ..\rexx.exe
 	copy ..\rxstack.exe
 	copy ..\rxqueue.exe
@@ -696,6 +799,7 @@ binary: all
 	copy ..\rexx.lib lib
 	-mkdir demo
 	copy $(SRCDIR)\demo\*.rexx demo
+	copy $(SRCDIR)\regutil\*.rexx demo
 	copy ..\rxtest1.dll demo
 	copy ..\rxtest2.dll demo
 	-mkdir doc

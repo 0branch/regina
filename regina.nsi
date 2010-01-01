@@ -103,6 +103,7 @@ Section "${LONGNAME} Core (required)" SecMain
   File rexx.exe
   File regina.exe
   File regina.dll
+  File regutil.dll
   File rxstack.exe
   File rxqueue.exe
   File de.mtb
@@ -112,6 +113,7 @@ Section "${LONGNAME} Core (required)" SecMain
   File pt.mtb
   File pl.mtb
   File tr.mtb
+  File sv.mtb
   File /oname=README${NODOTVER}.txt ${SRCDIR}\README.${NODOTVER}
   File /oname=READMEW32.txt ${SRCDIR}\README.W32
   File /oname=LICENSE.txt ${SRCDIR}\COPYING-LIB
@@ -225,7 +227,9 @@ Section "${LONGNAME} Documentation" SecDoc
   ; Set output path to the installation directory.
   SetOutPath $INSTDIR\doc
   File ${DOCDIR}\regina${NODOTVER}.pdf
-  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} PDF Documentation.lnk" "$INSTDIR\doc\regina${NODOTVER}.pdf" "" "$INSTDIR\doc\regina${NODOTVER}.pdf" 0
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Interpreter PDF Documentation.lnk" "$INSTDIR\doc\regina${NODOTVER}.pdf" "" "$INSTDIR\doc\regina${NODOTVER}.pdf" 0
+  File ${DOCDIR}\regutil${NODOTVER}.pdf
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} RegUtil PDF Documentation.lnk" "$INSTDIR\doc\regutil${NODOTVER}.pdf" "" "$INSTDIR\doc\regutil${NODOTVER}.pdf" 0
 SectionEnd
 
 Section ""

@@ -1,7 +1,3 @@
-#ifndef lint
-static char *RCSid = "$Id: unxfuncs.c,v 1.32 2005/09/10 00:59:38 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992  Anders Christensen <anders@pvv.unit.no>

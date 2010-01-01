@@ -16,11 +16,6 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-/*
- * $Id: configur.h,v 1.57 2006/02/20 07:58:10 mark Exp $
- */
-
 /*
  * For platforms that don't use autoconf, put these here...
  */
@@ -689,6 +684,10 @@
  * Indicates if a failure in a call to an external routine halts the caller with error 40.1
  */
 #define DEFAULT_HALT_ON_EXT_CALL_FAIL   0
+/*
+ * Indicates if a new thread calls an API function the call occurs in the current (and only one) instance of an interpreter
+ */
+#define DEFAULT_SINGLE_INTERPRETER      0
 
 /*
  * The FILE_SEPARATOR is one character, and defines the char that separates

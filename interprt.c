@@ -1,7 +1,3 @@
-#ifndef lint
-static char *RCSid = "$Id: interprt.c,v 1.67 2006/09/08 06:58:56 mark Exp $";
-#endif
-
 /*
  *  The Regina Rexx Interpreter
  *  Copyright (C) 1992-1994  Anders Christensen <anders@pvv.unit.no>
@@ -2149,6 +2145,7 @@ proclevel newlevel( tsd_t *TSD, proclevel oldlevel )
          set_options_flag( level, EXT_CALLS_AS_FUNCS, DEFAULT_CALLS_AS_FUNCS );
          set_options_flag( level, EXT_QUEUES_301, DEFAULT_QUEUES_301 );
          set_options_flag( level, EXT_HALT_ON_EXT_CALL_FAIL, DEFAULT_HALT_ON_EXT_CALL_FAIL );
+         set_options_flag( level, EXT_SINGLE_INTERPRETER, DEFAULT_SINGLE_INTERPRETER );
 
          if ( ( str = mygetenv( TSD, "REGINA_OPTIONS", NULL, 0 ) ) != NULL )
          {

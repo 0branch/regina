@@ -16,11 +16,6 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-/*
- * $Id: defs.h,v 1.35 2006/09/15 04:06:07 mark Exp $
- */
-
 #define X_NULL            1
 #define X_PROGRAM         2
 #define X_STATS           3
@@ -382,6 +377,7 @@
 #define EXT_CALLS_AS_FUNCS                  19
 #define EXT_QUEUES_301                      20
 #define EXT_HALT_ON_EXT_CALL_FAIL           21
+#define EXT_SINGLE_INTERPRETER              22
 
 /*
  * Regina 3.1 introduced "pool 0" variables. There exist only some and they

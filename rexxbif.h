@@ -16,11 +16,6 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-/*
- * $Id: rexxbif.h,v 1.4 2003/03/11 10:40:05 florian Exp $
- */
-
 #ifndef _REXXBIF_H_INCLUDED
 #define _REXXBIF_H_INCLUDED
 
