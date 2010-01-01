@@ -582,6 +582,22 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
+											<string>../../tmpdir/lib/libregutil.dylib</string>
+											<key>Path Type</key>
+											<integer>2</integer>
+											<key>Privileges</key>
+											<integer>493</integer>
+											<key>Type</key>
+											<integer>3</integer>
+											<key>UID</key>
+											<integer>0</integer>
+										</dict>
+										<dict>
+											<key>Children</key>
+											<array/>
+											<key>GID</key>
+											<integer>0</integer>
+											<key>Path</key>
 											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/lib/librxtest1.dylib</string>
 											<key>Path Type</key>
 											<integer>1</integer>
@@ -736,9 +752,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/animal.rexx</string>
+													<string>../../tmpdir/share/regina/animal.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -752,9 +768,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/block.rexx</string>
+													<string>../../tmpdir/share/regina/block.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -768,9 +784,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/dateconv.rexx</string>
+													<string>../../tmpdir/share/regina/dateconv.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -784,9 +800,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/de.mtb</string>
+													<string>../../tmpdir/share/regina/de.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -800,9 +816,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/dynfunc.rexx</string>
+													<string>../../tmpdir/share/regina/dynfunc.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -816,9 +832,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/en.mtb</string>
+													<string>../../tmpdir/share/regina/en.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -832,9 +848,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/es.mtb</string>
+													<string>../../tmpdir/share/regina/es.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -848,9 +864,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/extqueue.rexx</string>
+													<string>../../tmpdir/share/regina/extqueue.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -864,9 +880,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/gci-try.rexx</string>
+													<string>../../tmpdir/share/regina/gci-try.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -880,9 +896,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/newstr.rexx</string>
+													<string>../../tmpdir/share/regina/newstr.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -896,9 +912,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/no.mtb</string>
+													<string>../../tmpdir/share/regina/no.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -912,9 +928,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/pl.mtb</string>
+													<string>../../tmpdir/share/regina/pl.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -928,9 +944,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/pt.mtb</string>
+													<string>../../tmpdir/share/regina/pt.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -944,9 +960,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/rexxcps.rexx</string>
+													<string>../../tmpdir/share/regina/regutil.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -960,9 +976,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/sv.mtb</string>
+													<string>../../tmpdir/share/regina/rexxcps.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -976,9 +992,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/testeof.rexx</string>
+													<string>../../tmpdir/share/regina/sv.mtb</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -992,9 +1008,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/testvms.rexx</string>
+													<string>../../tmpdir/share/regina/testeof.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -1008,9 +1024,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/timeconv.rexx</string>
+													<string>../../tmpdir/share/regina/testvms.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -1024,9 +1040,25 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina/tr.mtb</string>
+													<string>../../tmpdir/share/regina/timeconv.rexx</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
+													<key>Privileges</key>
+													<integer>420</integer>
+													<key>Type</key>
+													<integer>3</integer>
+													<key>UID</key>
+													<integer>0</integer>
+												</dict>
+												<dict>
+													<key>Children</key>
+													<array/>
+													<key>GID</key>
+													<integer>0</integer>
+													<key>Path</key>
+													<string>../../tmpdir/share/regina/tr.mtb</string>
+													<key>Path Type</key>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -1035,18 +1067,16 @@
 													<integer>0</integer>
 												</dict>
 											</array>
-											<key>Expanded</key>
-											<true/>
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/share/regina</string>
+											<string>regina</string>
 											<key>Path Type</key>
 											<integer>1</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
-											<integer>3</integer>
+											<integer>2</integer>
 											<key>UID</key>
 											<integer>0</integer>
 										</dict>
