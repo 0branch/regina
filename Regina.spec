@@ -41,9 +41,9 @@ make DESTDIR=%{buildroot} install
 /usr/%{_lib}/libregina.so.%{version}
 /usr/%{_lib}/libregina.so.%{vermajor}
 /usr/%{_lib}/libregina.so
+/usr/%{_lib}/libregutil.so
 /usr/%{_lib}/librxtest1.so
 /usr/%{_lib}/librxtest2.so
-/usr/%{_lib}/libregutil.so
 /usr/include/rexxsaa.h
 /usr/share/man/man1/regina.1.gz
 /usr/etc/rc.d/init.d/rxstack
@@ -54,6 +54,7 @@ make DESTDIR=%{buildroot} install
 /usr/share/regina/timeconv.rexx
 /usr/share/regina/newstr.rexx
 /usr/share/regina/dynfunc.rexx
+/usr/share/regina/regutil.rexx
 /usr/share/regina/de.mtb
 /usr/share/regina/en.mtb
 /usr/share/regina/es.mtb

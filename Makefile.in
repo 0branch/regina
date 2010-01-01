@@ -1023,6 +1023,8 @@ installregina:
 	$(INSTALL) -m 755 -c ./regina$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
 	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/demo/dynfunc.rexx  $(DESTDIR)$(sharedir)/dynfunc.rexx
 	-chmod 755 $(DESTDIR)$(sharedir)/dynfunc.rexx
+	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/regutil/regutil.rexx  $(DESTDIR)$(sharedir)/regutil.rexx
+	-chmod 755 $(DESTDIR)$(sharedir)/regutil.rexx
 
 installlib: installregina
 	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
@@ -1096,6 +1098,8 @@ beosinstall: all
 	-chmod 755 /boot/home/config/bin/dynfunc.rexx
 	/boot/home/config/bin/rexx $(srcdir)/preinst.rexx /boot/home/config/bin/rexx $(srcdir)/demo/newstr.rexx    /boot/home/config/bin/newstr.rexx
 	-chmod 755 /boot/home/config/bin/newstr.rexx
+	/boot/home/config/bin/rexx $(srcdir)/preinst.rexx /boot/home/config/bin/regina $(srcdir)/regutil/regutil.rexx /boot/home/config/bin/regutil.rexx
+	-chmod 755 /boot/home/config/bin/regutil.rexx
 
 cygwininstall: installbase installregina installlib
 	mv $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
