@@ -28,9 +28,9 @@
 						<key>Mode</key>
 						<integer>1</integer>
 						<key>Path</key>
-						<string>/Users/mark/regina-rexx/interpreter/trunk/COPYING-LIB.txt</string>
+						<string>../../COPYING-LIB.txt</string>
 						<key>Path Type</key>
-						<integer>1</integer>
+						<integer>2</integer>
 					</dict>
 				</dict>
 				<key>ReadMe</key>
@@ -78,9 +78,9 @@
 											<key>GID</key>
 											<integer>80</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/Mac/ReginaLauncher.app</string>
+											<string>../ReginaLauncher.app</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -420,9 +420,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/bin/regina</string>
+											<string>../../tmpdir/bin/regina</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -436,9 +436,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/bin/regina-config</string>
+											<string>../../tmpdir/bin/regina-config</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -452,9 +452,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/bin/rexx</string>
+											<string>../../tmpdir/bin/rexx</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -468,9 +468,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/bin/rxqueue</string>
+											<string>../../tmpdir/bin/rxqueue</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -484,9 +484,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/bin/rxstack</string>
+											<string>../../tmpdir/bin/rxstack</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -517,9 +517,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/include/rexxsaa.h</string>
+											<string>../../tmpdir/include/rexxsaa.h</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>420</integer>
 											<key>Type</key>
@@ -550,9 +550,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/lib/libregina.a</string>
+											<string>../../tmpdir/lib/libregina.a</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>420</integer>
 											<key>Type</key>
@@ -566,9 +566,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/lib/libregina.dylib</string>
+											<string>../../tmpdir/lib/libregina.dylib</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -598,9 +598,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/lib/librxtest1.dylib</string>
+											<string>../../tmpdir/lib/librxtest1.dylib</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -614,9 +614,9 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/lib/librxtest2.dylib</string>
+											<string>../../tmpdir/lib/librxtest2.dylib</string>
 											<key>Path Type</key>
-											<integer>1</integer>
+											<integer>2</integer>
 											<key>Privileges</key>
 											<integer>493</integer>
 											<key>Type</key>
@@ -682,9 +682,9 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/man/man1/regina.1.gz</string>
+													<string>../../tmpdir/man/man1/regina.1.gz</string>
 													<key>Path Type</key>
-													<integer>1</integer>
+													<integer>2</integer>
 													<key>Privileges</key>
 													<integer>420</integer>
 													<key>Type</key>
@@ -1271,9 +1271,9 @@
 					<key>CFBundleGetInfoString</key>
 					<string>Regina-Rexx 3.5 Copyright © 1998-2009 Mark Hessling</string>
 					<key>CFBundleIconFile</key>
-					<string>/Users/mark/regina-rexx/interpreter/trunk/Mac/regina-rexx.icns</string>
+					<string>../regina-rexx.icns</string>
 					<key>CFBundleIconFile Path Type</key>
-					<integer>1</integer>
+					<integer>2</integer>
 					<key>CFBundleIdentifier</key>
 					<string>org.rexx.pkg.Regina-Rexx</string>
 					<key>CFBundleName</key>
