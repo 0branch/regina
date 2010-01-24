@@ -1,0 +1,68 @@
+.TH rxstack 1
+.SH Name
+rxstack \- The Regina Rexx Interpreter stack daemon
+
+.SH Syntax
+.B rxstack
+[
+.I \-D
+]
+.I \-d | \-k
+
+.SH Description
+.B rxstack
+is a daemon that provides access to Regian Rexx external queues directly to
+Regina Rexx programs or indirectly (via rxqueue) to any other program via
+.I stdin
+and
+.I stdout
+Without any options, rxstack runs in the foreground.
+
+.SH Options
+.
+.IP \-D
+Sets debugging on
+
+.IP \-d
+Starts rxstack as a daemon
+
+.IP \-k
+Kills the running rxstack process.
+
+.SH Environment
+rxstack uses the following environment variables if set.
+
+.IP RXDEBUG
+Enables debugging. Same as specifying \-D option.
+
+.IP RXSTACK
+The port number on which rxstack listens. By default this is 5757.
+
+.IP RXQUEUE
+The name of the queue to be used if not specified by the client using rxstack.
+By default this is SESSION.
+
+
+
+.SH Copyright
+The Regina Rexx interpreter is distributed under the GNU Library
+General Public License, see the file `COPYING-LIB' in the source code
+distribution.
+
+.SH Author
+Anders Christensen, University of Trondheim, Norway
+<anders@pvv.unit.no>.
+
+.SH Maintainer
+Changes to Regina since 0.07a, Mark Hessling
+<mark (at) rexx.org>
+with significant assistance from Florian Grosse-Coosmann.
+
+.SH "See Also"
+.BR rxqueue (1)
+
+There are several good reference books on Rexx. The most famous is
+"The Rexx Language" by Mike Cowlishaw.
+Visit http://www.rexxla.org (The Rexx Language Association) for any Rexx
+related information.
+

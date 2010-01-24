@@ -1,0 +1,88 @@
+.TH rxqueue 1
+.SH Name
+rxqueue \- The Regina Rexx Interpreter external queue utility
+
+.SH Syntax
+.B rxqueue
+[
+.I queue
+] [
+.I /fifo | /lifo | /clear | /pull | /queued
+] [
+text
+]
+
+.SH Description
+.B rxqueue
+is utility that provides access to the Regian Rexx external queue daemon
+(rxstack) via
+.I stdin
+and
+.I stdout
+.
+
+.SH Options
+.
+.IP queue
+The name of the queue to use. By default this is SESSION.
+
+.IP /fifo
+Stacks the
+.I text
+onto the queue in first in, first out order.
+
+.IP /lifo
+Stacks the
+.I text
+onto the queue in last in, first out order.
+
+.IP /clear
+Removes all lines currently stacked in the queue.
+
+.IP /pull
+Extracts the next line from the queue to
+.I stdout
+and removes it from the queue.
+
+.IP /queued
+Returns the number of lines stacked on the queue to
+.I stdout
+.
+
+.SH Environment
+rxqueue uses the following environment variables if set.
+
+.IP RXDEBUG
+Enables debugging. Same as specifying \-D option.
+
+.IP RXSTACK
+The port number on which rxqueue listens. By default this is 5757.
+
+.IP RXQUEUE
+The name of the queue to be used if not specified by the client using rxqueue.
+By default this is SESSION.
+
+
+
+.SH Copyright
+The Regina Rexx interpreter is distributed under the GNU Library
+General Public License, see the file `COPYING-LIB' in the source code
+distribution.
+
+.SH Author
+Anders Christensen, University of Trondheim, Norway
+<anders@pvv.unit.no>.
+
+.SH Maintainer
+Changes to Regina since 0.07a, Mark Hessling
+<mark (at) rexx.org>
+with significant assistance from Florian Grosse-Coosmann.
+
+.SH "See Also"
+.BR rxstack (1)
+
+There are several good reference books on Rexx. The most famous is
+"The Rexx Language" by Mike Cowlishaw.
+Visit http://www.rexxla.org (The Rexx Language Association) for any Rexx
+related information.
+
