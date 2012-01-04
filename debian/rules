@@ -1,0 +1,129 @@
+#!/usr/bin/make -f
+
+SHELL=/bin/bash
+
+DESTDIR=$(shell pwd)/debian/tmp
+
+debversion=$(shell head -n1 debian/changelog | \
+                   cut -d" " -f2             | \
+                   sed -e "s/(//g"             \
+                       -e "s/)//g"           )
+
+version=$(shell echo $(debversion) | cut -d"-" -f1)
+
+soname=3
+soversion=3.6
+changelog=README.36
+
+package=libregina$(soname)
+rexxpackage=regina-rexx
+destprefix=usr
+
+export DEB_HOST_ARCH  ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+export DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+
+confflags=--prefix=/$(destprefix) --with-addon-dir=/$(destprefix)/lib/regina/$(version)
+# Enable Regina GCI only on supported platforms.
+ifneq ($(filter alpha amd64 i386,$(DEB_HOST_ARCH)), )
+  confflags+=--enable-gci
+endif
+
+ifeq ($(DEB_BUILD_ARCH), ia64)
+  CCOPTS=-g
+else
+  CCOPTS=-O2 -g
+endif
+
+build: stamp-configure stamp-build
+stamp-build:
+	$(checkdir)
+	$(MAKE)
+	touch stamp-build
+
+configure: stamp-configure
+stamp-configure:
+	$(checkdir)
+	./configure $(confflags)
+	touch stamp-configure
+
+clean:
+	$(checkdir)
+	-rm -f stamp-build stamp-configure
+	-$(MAKE) distclean
+	-chmod 644 debian/md5_sums
+	-rm -f `find . \( -name '*~' -o -name '*.bak' \) -print`
+	-rm -rf core debian/tmp* debian/files* debian/*substvars debian/shlibs.local
+
+binary-indep: checkroot build
+	$(checkdir)
+
+binary-arch: checkroot build
+	$(checkdir)
+	rm -rf debian/tmp{-lib,-dev,-rexx}
+	install -d -m 755 debian/tmp{-lib,-dev,-rexx}/DEBIAN
+	install -d -m 755 debian/tmp-lib/$(destprefix)/share/doc/$(package)
+	install -d -m 755 debian/tmp-rexx/$(destprefix)/share/doc/$(rexxpackage)
+	install -d -m 755 debian/tmp-dev/$(destprefix)/share/doc/$(package)-dev
+#
+	install -m 755 debian/postinst debian/tmp-lib/DEBIAN/postinst
+	install -m 755 debian/postrm debian/tmp-lib/DEBIAN/postrm
+	echo "libregina $(soname) $(package) (>= $(debversion))" > debian/shlibs.local
+	install -m 644 debian/shlibs.local debian/tmp-lib/DEBIAN/shlibs
+#
+	$(MAKE) install-lib prefix=debian/tmp-lib/$(destprefix)
+	$(MAKE) install-dev prefix=debian/tmp-dev/$(destprefix)
+	$(MAKE) install-rexx prefix=debian/tmp-rexx/$(destprefix) rexx_examples=share/$(rexxpackage)/examples
+#
+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+	strip --strip-unneeded --remove-section=.comment --remove-section=.note debian/tmp-lib/$(destprefix)/lib/libregina.so.$(version)
+	strip --strip-unneeded --remove-section=.comment --remove-section=.note debian/tmp-lib/usr/lib/regina/$(version)/libregutil.so
+	strip --strip-debug debian/tmp-dev/$(destprefix)/lib/libregina.a
+	strip --strip-all --remove-section=.comment --remove-section=.note debian/tmp-rexx/$(destprefix)/bin/*
+endif
+#
+#	cp README.[0-9]* debian/tmp-lib/$(destprefix)/share/doc/$(package)
+	cp $(changelog) debian/tmp-lib/$(destprefix)/share/doc/$(package)/changelog
+	cp debian/changelog  debian/tmp-lib/$(destprefix)/share/doc/$(package)/changelog.Debian
+	gzip -9f debian/tmp-lib/$(destprefix)/share/doc/$(package)/*
+	cp debian/copyright debian/tmp-lib/$(destprefix)/share/doc/$(package)
+#
+	gzip -9f debian/tmp-rexx/$(destprefix)/share/man/man1/*.1
+	ln -sf regina.1.gz debian/tmp-rexx/$(destprefix)/share/man/man1/rexx.1.gz
+	cp $(changelog) debian/tmp-rexx/$(destprefix)/share/doc/$(rexxpackage)/changelog
+	cp debian/changelog  debian/tmp-rexx/$(destprefix)/share/doc/$(rexxpackage)/changelog.Debian
+	gzip -9f debian/tmp-rexx/$(destprefix)/share/doc/$(rexxpackage)/changelog*
+	cp debian/copyright debian/tmp-rexx/$(destprefix)/share/doc/$(rexxpackage)
+#
+	gzip -9f debian/tmp-dev/$(destprefix)/share/man/man1/*.1
+	cp $(changelog) debian/tmp-dev/$(destprefix)/share/doc/$(package)-dev/changelog
+	cp debian/changelog  debian/tmp-dev/$(destprefix)/share/doc/$(package)-dev/changelog.Debian
+	gzip -9f debian/tmp-dev/$(destprefix)/share/doc/$(package)-dev/changelog*
+	cp debian/copyright debian/tmp-dev/$(destprefix)/share/doc/$(package)-dev
+#
+	LD_LIBRARY_PATH=/$(destprefix)/lib/libfakeroot:$(DESTDIR)-lib/$(destprefix)/lib dpkg-shlibdeps debian/tmp-lib/$(destprefix)/lib/libregina.so.$(soversion)
+	dpkg-gencontrol -isp -p$(package) -Pdebian/tmp-lib
+	echo "regver:Depends=$(package) (= $(debversion))" > debian/substvars
+	dpkg-gencontrol -isp -p$(package)-dev -Pdebian/tmp-dev
+#
+	LD_LIBRARY_PATH=/$(destprefix)/lib/libfakeroot:$(DESTDIR)-lib/$(destprefix)/lib dpkg-shlibdeps debian/tmp-rexx/$(destprefix)/bin/*
+	dpkg-gencontrol -isp -p$(rexxpackage) -Pdebian/tmp-rexx
+#
+	chown -R root.root debian/tmp-{lib,dev,rexx}
+	chmod -R go=rX,u+w debian/tmp-{lib,dev,rexx}
+	chmod 755 debian/md5_sums
+	debian/md5_sums tmp-{lib,dev,rexx}
+	dpkg --build debian/tmp-lib ..
+	dpkg --build debian/tmp-dev ..
+	dpkg --build debian/tmp-rexx ..
+
+define checkdir
+	test -f debian/rules
+endef
+
+binary: binary-indep binary-arch
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary binary-arch binary-indep clean checkroot

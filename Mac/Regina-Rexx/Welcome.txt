@@ -1,0 +1,5 @@
+This will install /Applications/ReginaLauncher
+and
+/usr/bin/regina
+/usr/bin/rexx
+etc
