@@ -1498,8 +1498,19 @@ streng *str_norm( const tsd_t *TSD, num_descr *in, streng *trystr )
    /*
     * Compute the exponent used to display. exp==0 -> don't show an exponent.
     * Respect the ENGINEERING format.
+    * TRL states that:
+    * We use Exponential format to display a number if the number of places
+    * before the decimal is greater than DIGITS or if the number of places
+    * after the decimal is greater than 2 * DIGITS (TRL2 page 136)
+    * if ( ( exp >= ccns ) || ( abs(exp) > (2*ccns) ) )
+    *
+    * ANSI states that:
+    * We use Exponential format to display a number if the number of places
+    * before the decimal is greater than DIGITS or if the number of places
+    * after the decimal is greater than 5 (ANSI page 52)
+    * if ( ( exp >= ccns ) || ( abs(exp) > (2*ccns) ) )
     */
-   if ( ( exp < -6 ) || ( exp >= ccns ) )
+   if ( ( exp < -6 ) || ( exp >= ccns ) ) /* ANSI rules for displaying exponent */
    {
       i = exp % 3;
       if ( ( TSD->currlevel->numform == NUM_FORM_ENG ) && i )

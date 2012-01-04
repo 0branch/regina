@@ -28,7 +28,7 @@
 						<key>Mode</key>
 						<integer>1</integer>
 						<key>Path</key>
-						<string>../../COPYING-LIB.txt</string>
+						<string>License.txt</string>
 						<key>Path Type</key>
 						<integer>2</integer>
 					</dict>
@@ -50,11 +50,11 @@
 					<key>International</key>
 					<dict>
 						<key>Mode</key>
-						<integer>0</integer>
-						<key>Path</key>
-						<string></string>
-						<key>Path Type</key>
 						<integer>1</integer>
+						<key>Path</key>
+						<string>Welcome.txt</string>
+						<key>Path Type</key>
+						<integer>2</integer>
 					</dict>
 				</dict>
 			</dict>
@@ -78,7 +78,7 @@
 											<key>GID</key>
 											<integer>80</integer>
 											<key>Path</key>
-											<string>../ReginaLauncher.app</string>
+											<string>../ReginaLauncher/build/Release/ReginaLauncher.app</string>
 											<key>Path Type</key>
 											<integer>2</integer>
 											<key>Privileges</key>
@@ -672,60 +672,6 @@
 								</dict>
 								<dict>
 									<key>Children</key>
-									<array>
-										<dict>
-											<key>Children</key>
-											<array>
-												<dict>
-													<key>Children</key>
-													<array/>
-													<key>GID</key>
-													<integer>0</integer>
-													<key>Path</key>
-													<string>../../tmpdir/man/man1/regina.1.gz</string>
-													<key>Path Type</key>
-													<integer>2</integer>
-													<key>Privileges</key>
-													<integer>420</integer>
-													<key>Type</key>
-													<integer>3</integer>
-													<key>UID</key>
-													<integer>0</integer>
-												</dict>
-											</array>
-											<key>Expanded</key>
-											<true/>
-											<key>GID</key>
-											<integer>0</integer>
-											<key>Path</key>
-											<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/man/man1</string>
-											<key>Path Type</key>
-											<integer>1</integer>
-											<key>Privileges</key>
-											<integer>493</integer>
-											<key>Type</key>
-											<integer>3</integer>
-											<key>UID</key>
-											<integer>0</integer>
-										</dict>
-									</array>
-									<key>Expanded</key>
-									<true/>
-									<key>GID</key>
-									<integer>0</integer>
-									<key>Path</key>
-									<string>/Users/mark/regina-rexx/interpreter/trunk/tmpdir/man</string>
-									<key>Path Type</key>
-									<integer>1</integer>
-									<key>Privileges</key>
-									<integer>493</integer>
-									<key>Type</key>
-									<integer>3</integer>
-									<key>UID</key>
-									<integer>0</integer>
-								</dict>
-								<dict>
-									<key>Children</key>
 									<array/>
 									<key>GID</key>
 									<integer>0</integer>
@@ -743,6 +689,56 @@
 								<dict>
 									<key>Children</key>
 									<array>
+										<dict>
+											<key>Children</key>
+											<array>
+												<dict>
+													<key>Children</key>
+													<array>
+														<dict>
+															<key>Children</key>
+															<array/>
+															<key>GID</key>
+															<integer>0</integer>
+															<key>Path</key>
+															<string>../../tmpdir/man/man1/regina.1.gz</string>
+															<key>Path Type</key>
+															<integer>2</integer>
+															<key>Privileges</key>
+															<integer>420</integer>
+															<key>Type</key>
+															<integer>3</integer>
+															<key>UID</key>
+															<integer>0</integer>
+														</dict>
+													</array>
+													<key>GID</key>
+													<integer>0</integer>
+													<key>Path</key>
+													<string>man1</string>
+													<key>Path Type</key>
+													<integer>1</integer>
+													<key>Privileges</key>
+													<integer>493</integer>
+													<key>Type</key>
+													<integer>2</integer>
+													<key>UID</key>
+													<integer>0</integer>
+												</dict>
+											</array>
+											<key>GID</key>
+											<integer>0</integer>
+											<key>Path</key>
+											<string>man</string>
+											<key>Path Type</key>
+											<integer>1</integer>
+											<key>Privileges</key>
+											<integer>493</integer>
+											<key>Type</key>
+											<integer>2</integer>
+											<key>UID</key>
+											<integer>0</integer>
+										</dict>
 										<dict>
 											<key>Children</key>
 											<array>
@@ -1024,22 +1020,6 @@
 													<key>GID</key>
 													<integer>0</integer>
 													<key>Path</key>
-													<string>../../tmpdir/share/regina/testvms.rexx</string>
-													<key>Path Type</key>
-													<integer>2</integer>
-													<key>Privileges</key>
-													<integer>420</integer>
-													<key>Type</key>
-													<integer>3</integer>
-													<key>UID</key>
-													<integer>0</integer>
-												</dict>
-												<dict>
-													<key>Children</key>
-													<array/>
-													<key>GID</key>
-													<integer>0</integer>
-													<key>Path</key>
 													<string>../../tmpdir/share/regina/timeconv.rexx</string>
 													<key>Path Type</key>
 													<integer>2</integer>
@@ -1259,17 +1239,17 @@
 						<key>IFPkgDescriptionDeleteWarning</key>
 						<string></string>
 						<key>IFPkgDescriptionDescription</key>
-						<string></string>
+						<string>The Regina Rexx Interpreter. An ANSI standard Rexx interpreter available on many platforms.</string>
 						<key>IFPkgDescriptionTitle</key>
 						<string>Regina-Rexx</string>
 						<key>IFPkgDescriptionVersion</key>
-						<string>3.5</string>
+						<string>3.6B1</string>
 					</dict>
 				</dict>
 				<key>Display Information</key>
 				<dict>
 					<key>CFBundleGetInfoString</key>
-					<string>Regina-Rexx 3.5 Copyright © 1998-2009 Mark Hessling</string>
+					<string>Regina-Rexx 3.6B1 Copyright © 1998-2009 Mark Hessling</string>
 					<key>CFBundleIconFile</key>
 					<string>../regina-rexx.icns</string>
 					<key>CFBundleIconFile Path Type</key>
@@ -1279,7 +1259,7 @@
 					<key>CFBundleName</key>
 					<string>Regina-Rexx</string>
 					<key>CFBundleShortVersionString</key>
-					<string>3.5</string>
+					<string>3.6B1</string>
 				</dict>
 				<key>Options</key>
 				<dict>
@@ -1307,7 +1287,7 @@
 					<key>IFMajorVersion</key>
 					<integer>3</integer>
 					<key>IFMinorVersion</key>
-					<integer>5</integer>
+					<integer>6</integer>
 				</dict>
 			</dict>
 		</dict>

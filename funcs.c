@@ -146,6 +146,7 @@ static const struct function_type functions[] = {
   { EXT_REGINA_BIFS,rex_gciprefixchar,     "GCIPREFIXCHAR" },
 #endif
   { EXT_REGINA_BIFS,unx_getenv,            "GETENV" },
+  { EXT_REGINA_BIFS,rex_getcallstack,      "GETCALLSTACK" },
   { EXT_REGINA_BIFS,unx_getpath,           "GETPATH" },
   { EXT_REGINA_BIFS,unx_getpid,            "GETPID" },
   { EXT_AREXX_BIFS, arexx_getspace,        "GETSPACE" },
@@ -549,6 +550,18 @@ static int myintatol( tsd_t *TSD, const streng *text, int suberr, const char *bi
    return num ;
 }
 
+static rx_64 myintatoll( tsd_t *TSD, const streng *text, int suberr, const char *bif, int argnum )
+{
+   rx_64 num;
+   int error ;
+
+   num = streng_to_rx64( TSD, text, &error ) ;
+   if ( error )
+      exiterror( ERR_INCORRECT_CALL, suberr, bif, argnum, tmpstr_of( TSD, text ) ) ;
+
+   return num ;
+}
+
 
 int atozpos( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 {
@@ -556,6 +569,16 @@ int atozpos( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 
    /* fixes bug 1108868 */
    if ( ( result = myintatol( TSD, text, 12, bif, argnum ) ) < 0 )
+      exiterror( ERR_INCORRECT_CALL, 13, bif, argnum, tmpstr_of( TSD, text ) )  ;
+
+   return result ;
+}
+
+rx_64 atozposrx64( tsd_t *TSD, const streng *text, const char *bif, int argnum )
+{
+   rx_64 result=0 ;
+
+   if ( ( result = myintatoll( TSD, text, 12, bif, argnum ) ) < 0 )
       exiterror( ERR_INCORRECT_CALL, 13, bif, argnum, tmpstr_of( TSD, text ) )  ;
 
    return result ;
@@ -628,12 +651,22 @@ int atopos( tsd_t *TSD, const streng *text, const char *bif, int argnum )
    return result ;
 }
 
+rx_64 atoposrx64( tsd_t *TSD, const streng *text, const char *bif, int argnum )
+{
+   rx_64 result=0 ;
+
+   if ( ( result = myintatoll( TSD, text, 12, bif, argnum ) ) <= 0 )
+      exiterror( ERR_INCORRECT_CALL, 14, bif, argnum, tmpstr_of( TSD, text ) ) ;
+
+   return result ;
+}
+
 int atoposorzero( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 {
    int result=0 ;
 
    if ( ( result = myintatol( TSD, text, 11, bif, argnum ) ) < 0 )
-      exiterror( ERR_INCORRECT_CALL, 17, bif, argnum, tmpstr_of( TSD, text ) ) ;
+      exiterror( ERR_INCORRECT_CALL, 13, bif, argnum, tmpstr_of( TSD, text ) ) ;
 
    return result ;
 }
@@ -641,6 +674,40 @@ int atoposorzero( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 
 
 streng *int_to_streng( const tsd_t *TSD, int input )
+{
+   streng *output=NULL ;
+   char *cptr=NULL, *start=NULL, *top=NULL ;
+
+   output = Str_makeTSD( sizeof(int)*3 + 2 ) ;
+   start = output->value ;
+   cptr = start + sizeof(int)*3 + 2 ;
+   if (input)
+   {
+      if (input<0)
+      {
+         input = - input ;
+         *(start++) = '-' ;
+      }
+
+      for (top=cptr;input;)
+      {
+         *(--cptr) = (char) (input % 10 + '0') ;
+         input = input / 10 ;
+      }
+
+      memmove( start, cptr, top-cptr ) ;
+      output->len = top-cptr + start-output->value ;
+   }
+   else
+   {
+      *start = '0' ;
+      output->len = 1 ;
+   }
+
+   return output ;
+}
+
+streng *rx64_to_streng( const tsd_t *TSD, rx_64 input )
 {
    streng *output=NULL ;
    char *cptr=NULL, *start=NULL, *top=NULL ;

@@ -1,8 +1,8 @@
 Summary: Regina Rexx Interpreter
 Name: Regina-REXX
 %define vermajor 3
-%define verminor 5
-Version: 3.5
+%define verminor 6
+Version: 3.6
 Release: 1
 Group: Development/Languages
 Source: Regina-REXX-%{version}.tar.gz
@@ -18,6 +18,9 @@ Provides: Regina-REXX %{name} libregina.so()(64bit)
 Provides: Regina-REXX %{name} libregina.so
 %endif
 Icon: regina64.xpm
+# if we don't have _extension define, define it
+# this is because Mandriva defines _extension
+%{!?_extension: %define _extension .gz}
 
 %description
 Regina is an implementation of a Rexx interpreter, compliant with
@@ -45,7 +48,10 @@ make DESTDIR=%{buildroot} install
 /usr/%{_lib}/librxtest1.so
 /usr/%{_lib}/librxtest2.so
 /usr/include/rexxsaa.h
-/usr/share/man/man1/regina.1.gz
+/usr/share/man/man1/regina.1%{_extension}
+/usr/share/man/man1/rxstack.1%{_extension}
+/usr/share/man/man1/rxqueue.1%{_extension}
+/usr/share/man/man1/regina-config.1%{_extension}
 /usr/etc/rc.d/init.d/rxstack
 /usr/share/regina/rexxcps.rexx
 /usr/share/regina/animal.rexx

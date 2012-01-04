@@ -170,7 +170,7 @@ streng *os2_beep( tsd_t *TSD, cparamboxptr parms )
 {
    int freq=0,dur=1;
 
-   checkparam(  parms,  2,  1 , "BEEP" ) ;
+   checkparam(  parms,  1,  2 , "BEEP" ) ;
 
    if (parms && parms->value)
    {

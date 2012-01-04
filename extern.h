@@ -375,10 +375,13 @@
    void checkparam( cparamboxptr params, int min, int max, const char *name ) ;
    char getoptionchar( tsd_t *TSD, const streng *param, const char *bif, int argnum, const char *ansi_options, const char *regina_options ) ;
    int atozpos( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
+   rx_64 atozposrx64( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    int atopos( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
+   rx_64 atoposrx64( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    int atoposorzero( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    char getonechar( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    streng *int_to_streng( const tsd_t *TSD, int input ) ;
+   streng *rx64_to_streng( const tsd_t *TSD, rx_64 input ) ;
    int convert_date(tsd_t *TSD, const streng *, char, struct tm *);
    int convert_time(const tsd_t *TSD,const streng *, char, struct tm *, time_t *);
    int basedays(int);
@@ -554,6 +557,7 @@ extern "C" {
    char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize ) ;
    void set_pause_at_exit( );
    streng *rex_userid( tsd_t *TSD, cparamboxptr parms ) ;
+   streng *rex_getcallstack( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms ) ;
 #if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
    void set_pause_at_exit( void );

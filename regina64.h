@@ -1,3 +1,5 @@
+#ifndef __REGINA64_H_INCLUDED
+#define __REGINA64_H_INCLUDED
 /*
  * Try and get a 64bit datatype...
  */
@@ -68,4 +70,34 @@
 #  define RX_64MAX      LONG_MAX
 #  define RX_64UMAX     ULONG_MAX
 # endif
+#endif
+
+/*
+ * Large file support
+ * Must have #included config.h before #including this file
+ */
+#if defined(HAVE__STATI64)
+# define rx_stat_buf  _stati64
+# define rx_stat      _stati64
+# define rx_fstat     _fstati64
+# define rx_fseek     _fseeki64
+# define rx_ftell     _ftelli64
+#else
+# define rx_stat_buf  stat
+# define rx_stat      stat
+# define rx_fstat     fstat
+# define rx_fseek     fseek
+# define rx_ftell     ftell
+#endif
+
+#if defined(HAVE_FSEEKO)
+# undef rx_fseek
+# define rx_fseek     fseeko
+#endif
+
+#if defined(HAVE_FTELLO)
+# undef rx_ftell
+# define rx_ftell     ftello
+#endif
+
 #endif

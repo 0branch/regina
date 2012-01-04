@@ -319,6 +319,10 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
    {  95,  4,"[STREAM argument 3: Opening files for WRITE access invalid in \"safe\" mode]" },
    {  95,  5,"[Running external commands invalid in \"safe\" mode]" },
    { 100,  0,"[Unknown filesystem error]" },
+   /*
+    * Do not use an error number > 100, these are treated as system errors (errno-100) and the
+    * error string is obtained from strerror().
+    */
 } ;
 
 /*

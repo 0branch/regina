@@ -266,6 +266,7 @@ else
 call funcDrop statvfs
 say ""
 /*******************************/
+
 say "We use qsort of the C library for sorting some strings using arrays."
 /*
  * This examples has removed all unnecessary stuff.

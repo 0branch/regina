@@ -2180,7 +2180,8 @@ repeated_nesting:
                   break ;
 
                case '-':    /* line "--" comments */
-                  if (line[pos + 1] == '-')
+                  if ( line[pos + 1] == '-'
+                  &&   get_options_flag( parser_data.TSD->currlevel, EXT_SINGLE_LINE_COMMENTS ) )
                   {
                      *dest++ = '`' ;
                      *dest++ = '`' ;

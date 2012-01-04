@@ -114,6 +114,9 @@ Section "${LONGNAME} Core (required)" SecMain
   File pl.mtb
   File tr.mtb
   File sv.mtb
+!if ${ARCH} == "w32"
+  File /oname=msvcr100.dll "c:\windows\system32\msvcr100.dll"
+!endif
   File /oname=README${NODOTVER}.txt ${SRCDIR}\README.${NODOTVER}
   File /oname=READMEW32.txt ${SRCDIR}\README.W32
   File /oname=LICENSE.txt ${SRCDIR}\COPYING-LIB
@@ -226,10 +229,10 @@ SectionEnd
 Section "${LONGNAME} Documentation" SecDoc
   ; Set output path to the installation directory.
   SetOutPath $INSTDIR\doc
-  File ${DOCDIR}\regina${NODOTVER}.pdf
-  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Interpreter PDF Documentation.lnk" "$INSTDIR\doc\regina${NODOTVER}.pdf" "" "$INSTDIR\doc\regina${NODOTVER}.pdf" 0
-  File ${DOCDIR}\regutil${NODOTVER}.pdf
-  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} RegUtil PDF Documentation.lnk" "$INSTDIR\doc\regutil${NODOTVER}.pdf" "" "$INSTDIR\doc\regutil${NODOTVER}.pdf" 0
+  File ${DOCDIR}\regina.pdf
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} Interpreter PDF Documentation.lnk" "$INSTDIR\doc\regina.pdf" "" "$INSTDIR\doc\regina.pdf" 0
+  File ${DOCDIR}\regutil.pdf
+  CreateShortCut "$SMPROGRAMS\${LONGNAME}\${LONGNAME} RegUtil PDF Documentation.lnk" "$INSTDIR\doc\regutil.pdf" "" "$INSTDIR\doc\regutil.pdf" 0
 SectionEnd
 
 Section ""

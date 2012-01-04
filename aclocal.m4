@@ -25,6 +25,8 @@ dnl MH_CHECK_RPM
 dnl MH_C_LONG_LONG
 dnl MH_CHECK_TYPE_SOCKLEN_T
 dnl MH_CHECK_F_MNTFROMNAME
+dnl MH_LARGE_FILE_SUPPORT
+dnl MH_CHECK_OSX_ARCH
 dnl
 dnl ---------------------------------------------------------------------------
 dnl Determine if C compiler handles ANSI prototypes
@@ -462,7 +464,7 @@ if test "$enable_posix_threads" = yes; then
    AC_MSG_CHECKING(whether Posix Threads are supported)
    tmpLIBS=$LIBS
    save_cflags="$CFLAGS"
-   pthread_libs="pthreads pthread c_r"
+   pthread_libs="pthreads pthread c_r c"
    case "$target" in
       *freebsd*)
          CFLAGS="$CFLAGS -pthread"
@@ -479,25 +481,25 @@ if test "$enable_posix_threads" = yes; then
       if test "$mh_has_pthreads" = yes; then
          MH_MT_LIBS="-l${mh_lib}"
          AC_REQUIRE([AC_CANONICAL_SYSTEM])
-         THREADING_COMPILE="-D_REENTRANT -DPOSIX"
+         THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
          THREADING_LINK=""
          THREADSAFE_TARGET="threader${binarybitprefix}${EXEEXT}"
          MT_FILE="mt_posix"
          case "$target" in
             *solaris*)
                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
-                  THREADING_COMPILE="-D_REENTRANT -DPOSIX"
+                  THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                   if test "$mh_rt_lib_found" = "yes"; then
                      THREADING_LINK="-lrt"
                   fi
                else
-                  THREADING_COMPILE="-mt -D_REENTRANT -DREENTRANT -D_PTHREAD_SEMANTICS"
+                  THREADING_COMPILE="-mt -D_REENTRANT -DREENTRANT -D_PTHREAD_SEMANTICS -DREGINA_REENTRANT"
                   THREADING_LINK="-mt"
                fi
                ;;
             *hp-hpux1*)
                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
-                  THREADING_COMPILE="-D_REENTRANT -DPOSIX"
+                  THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                fi
                if test "$mh_rt_lib_found" = "yes"; then
                   THREADING_LINK="-lrt"
@@ -506,16 +508,16 @@ if test "$enable_posix_threads" = yes; then
             *linux*)
                ;;
             *freebsd*)
-               THREADING_COMPILE="-pthread -D_REENTRANT -DPOSIX"
+               THREADING_COMPILE="-pthread -D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                THREADING_LINK="-pthread"
                ;;
             *cygwin*)
-               THREADING_COMPILE="-D_REENTRANT -DPOSIX"
+               THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                THREADING_LINK=""
                ;;
             *)
                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
-                  THREADING_COMPILE="-D_REENTRANT -DPOSIX"
+                  THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                fi
                ;;
          esac
@@ -745,15 +747,17 @@ AC_CACHE_VAL(
         )
 ])dnl
 AC_MSG_RESULT($mh_cv_func_crypt)
+STATIC_BINARY_LIBS=""
 if test "$mh_cv_func_crypt" = yes ; then
         AC_DEFINE(HAVE_CRYPT)
         if test "$mh_crypt_found" = yes; then
                 MH_EXTRA_LIBS="${MH_EXTRA_LIBS} -lcrypt"
+                STATIC_BINARY_LIBS="-lcrypt"
         fi
 fi
 
 LIBS="$mh_save_libs"
-
+AC_SUBST(STATIC_BINARY_LIBS)
 ])dnl
 
 dnl ---------------------------------------------------------------------------
@@ -1109,17 +1113,24 @@ case "$target" in
                 SHLPRE="lib"
                 SHL_LD="ld -assert pure-text -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
-        *freebsd*)
-                LD_RXLIB_A1="ld -Bdynamic -Bshareable ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_A2="ld -Bdynamic -Bshareable ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_UTILA="ld -Bdynamic -Bshareable ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_B1="-lc -L. -l${SHLFILE}"
-                LD_RXLIB_B2="-lc -L. -l${SHLFILE}"
-                LD_RXLIB_UTILB="-lc -L. -l${SHLFILE}"
+        *-freebsd* | *openbsd*)
+                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+                   LD_RXLIB_A1="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_A2="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_UTILA="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
+                   SHL_LD="$ac_cv_prog_CC -shared ${LDFLAGS} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
+                else
+                   LD_RXLIB_A1="ld -Bdynamic -Bshareable ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_A2="ld -Bdynamic -Bshareable ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_UTILA="ld -Bdynamic -Bshareable ${LDFLAGS} -o \$(@)"
+                   LD_RXLIB_B1="-lc -L. -l${SHLFILE}"
+                   LD_RXLIB_B2="-lc -L. -l${SHLFILE}"
+                   LD_RXLIB_UTILB="-lc -L. -l${SHLFILE}"
+                   SHL_LD="ld -Bdynamic -Bshareable ${LDFLAGS} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
+                fi
                 SHLPRE="lib"
-                SHL_LD="ld -Bdynamic -Bshareable ${LDFLAGS} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
-        *linux*)
+        *linux*|*kfreebsd*-gnu*)
                 LD_RXLIB_A1="${CC} -shared ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_A2="${CC} -shared ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_UTILA="${CC} -shared ${LDFLAGS} -o \$(@)"
@@ -1129,12 +1140,12 @@ case "$target" in
                 LD_RXLIB_B2="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
                 LD_RXLIB_UTILB="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
                 SHLPRE="lib"
-                SHL_LD="${CC} -o ${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI) -shared ${LDFLAGS} ${SHL_SCRIPT} \$(SHOFILES) -lc"
+                SHL_LD="${CC} -o ${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI) -shared ${LDFLAGS} ${SHL_SCRIPT} -Wl,-soname=${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI_MAJOR) \$(SHOFILES)"
                 SHL_BASE="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
                 OTHER_INSTALLS="installabilib"
                 USE_ABI="yes"
                 ;;
-        *hurd*)
+        *gnu*)
                 LD_RXLIB_A1="${CC} -shared -o \$(@)"
                 LD_RXLIB_A2="${CC} -shared -o \$(@)"
                 LD_RXLIB_UTILA="${CC} -shared -o \$(@)"
@@ -1147,7 +1158,7 @@ case "$target" in
                 OTHER_INSTALLS="installabilib"
                 USE_ABI="yes"
                 ;;
-        *atheos*)
+        *atheos* | *syllable*)
                 LD_RXLIB_A1="${CC} -shared ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_A2="${CC} -shared ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_UTILA="${CC} -shared ${LDFLAGS} -o \$(@)"
@@ -1159,7 +1170,7 @@ case "$target" in
                 SHL_BASE="${LIBPRE}${SHLFILE}${SHLPST}"
                 BASE_BINARY="atheosbinary"
                 ;;
-        *beos*)
+        *beos* | *haiku*)
                 LD_RXLIB_A1="${CC} -Wl,-shared -nostart -Xlinker -o\$(@)"
                 LD_RXLIB_A2="${CC} -Wl,-shared -nostart -Xlinker -o\$(@)"
                 LD_RXLIB_UTILA="${CC} -Wl,-shared -nostart -Xlinker -o\$(@)"
@@ -1245,18 +1256,17 @@ case "$target" in
                 #
 # MH                LD_RXLIB_A1="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
 # MH                LD_RXLIB_A2="${CC} -bundle -flat_namespace -undefined suppress -o \$(@)"
-                EEXTRA="$valid_arch_flags"
-                LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
-                LD_RXLIB_UTILA="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -o \$(@)"
+                LD_RXLIB_A1="${CC} ${EEXTRA} -dynamiclib -headerpad_max_install_names ${LDFLAGS} -o \$(@)"
+                LD_RXLIB_A2="${CC} ${EEXTRA} -dynamiclib -headerpad_max_install_names ${LDFLAGS} -o \$(@)"
+                LD_RXLIB_UTILA="${CC} ${EEXTRA} -dynamiclib -headerpad_max_install_names ${LDFLAGS} -o \$(@)"
                 LD_RXLIB_B1="-L. -l${SHLFILE} -lc \$(SHLIBS)"
                 LD_RXLIB_B2="-L. -l${SHLFILE} -lc \$(SHLIBS)"
-                LD_RXLIB_UTILB="-L. -l${SHLFILE} -lc \$(SHLIBS)"
+                LD_RXLIB_UTILB="-L. -l${SHLFILE} -lc \$(SHLIBS) $REGUTIL_TERM_LIB"
                 DYN_COMP="-DDYNAMIC -fno-common"
                 SHLPRE="lib"
 # MH                BUNDLE=".so"
                 BUNDLE=".junk"
-                SHL_LD="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -install_name ${SHLPRE}${SHLFILE}${SHLPST} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
+                SHL_LD="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -headerpad_max_install_names -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 SHL_BASE="${LIBPRE}${SHLFILE}${SHLPST}"
 # MH                EXTRATARGET="libregina$BUNDLE"
                 OTHER_INSTALLS="installlib"
@@ -1293,7 +1303,7 @@ case "$target" in
                 #
                 LINKREG="${LINKSHL}"
                 ;;
-        *linux*)
+        *linux*|*kfreebsd*-gnu*)
                 LINKSHL="${SHLPRE}${SHLFILE}${SHLPST}.\$(ABI)"
                 LINKREG="${LINKSHL}"
                 ;;
@@ -1447,10 +1457,10 @@ case "$target" in
         sparc*sunos*)
                 SYS_DEFS="-DSUNOS -DSUNOS_STRTOD_BUG"
                 ;;
-        *atheos*)
+        *atheos* | *syllable*)
                 BASE_BINARY="atheosbinary"
                 ;;
-        *beos*)
+        *beos* | *haiku*)
                 BASE_INSTALL="beosinstall"
                 BASE_BINARY="beosbinary"
                 OTHER_INSTALLS=""
@@ -1542,7 +1552,7 @@ AC_ARG_WITH(rexxcurses,
 if test "$with_rexxcurses" = "yes"; then
         AC_CHECK_PROG(rxcurses_config, [rxcurses-config], yes, no)
         if test "$ac_cv_prog_rxcurses_config" = yes; then
-           EXTRA_LIB=`rxcurses-config --libs`
+           EXTRA_LIB=`rxcurses-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXCURSES_PACKAGE)
         else
@@ -1560,7 +1570,7 @@ AC_ARG_WITH(rexxtk,
 if test "$with_rexxtk" = "yes"; then
         AC_CHECK_PROG(rexxtk_config, [rexxtk-config], yes, no)
         if test "$ac_cv_prog_rexxtk_config" = yes; then
-           EXTRA_LIB=`rexxtk-config --libs`
+           EXTRA_LIB=`rexxtk-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXTK_PACKAGE)
         else
@@ -1578,7 +1588,7 @@ AC_ARG_WITH(rexxgd,
 if test "$with_rexxgd" = "yes"; then
         AC_CHECK_PROG(rexxgd_config, [rexxgd-config], yes, no)
         if test "$ac_cv_prog_rexxgd_config" = yes; then
-           EXTRA_LIB=`rexxgd-config --libs`
+           EXTRA_LIB=`rexxgd-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXGD_PACKAGE)
         else
@@ -1596,7 +1606,7 @@ AC_ARG_WITH(rexxcurl,
 if test "$with_rexxcurl" = "yes"; then
         AC_CHECK_PROG(rexxcurl_config, [rexxcurl-config], yes, no)
         if test "$ac_cv_prog_rexxcurl_config" = yes; then
-           EXTRA_LIB=`rexxcurl-config --libs`
+           EXTRA_LIB=`rexxcurl-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXCURL_PACKAGE)
         else
@@ -1614,7 +1624,7 @@ AC_ARG_WITH(rexxsql,
 if test "$with_rexxsql" = "yes"; then
         AC_CHECK_PROG(rexxsql_config, [rexxsql-config], yes, no)
         if test "$ac_cv_prog_rexxsql_config" = yes; then
-           EXTRA_LIB=`rexxsql-config --libs`
+           EXTRA_LIB=`rexxsql-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXSQL_PACKAGE)
         else
@@ -1632,7 +1642,7 @@ AC_ARG_WITH(rexxeec,
 if test "$with_rexxeec" = "yes"; then
         AC_CHECK_PROG(rexxeec_config, [rexxeec-config], yes, no)
         if test "$ac_cv_prog_rexxeec_config" = yes; then
-           EXTRA_LIB=`rexxeec-config --libs`
+           EXTRA_LIB=`rexxeec-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXEEC_PACKAGE)
         else
@@ -1650,7 +1660,7 @@ AC_ARG_WITH(rexxisam,
 if test "$with_rexxisam" = "yes"; then
         AC_CHECK_PROG(rexxisam_config, [rexxisam-config], yes, no)
         if test "$ac_cv_prog_rexxisam_config" = yes; then
-           EXTRA_LIB=`rexxisam-config --libs`
+           EXTRA_LIB=`rexxisam-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXISAM_PACKAGE)
         else
@@ -1668,7 +1678,7 @@ AC_ARG_WITH(rxsock,
 if test "$with_rxsock" = "yes"; then
         AC_CHECK_PROG(rxsock_config, [rxsock-config], yes, no)
         if test "$ac_cv_prog_rxsock_config" = yes; then
-           EXTRA_LIB=`rxsock-config --libs`
+           EXTRA_LIB=`rxsock-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_RXSOCK_PACKAGE)
         else
@@ -1686,11 +1696,47 @@ AC_ARG_WITH(rexxdw,
 if test "$with_rexxdw" = "yes"; then
         AC_CHECK_PROG(rexxdw_config, [rexxdw-config], yes, no)
         if test "$ac_cv_prog_rexxdw_config" = yes; then
-           EXTRA_LIB=`rexxdw-config --libs`
+           EXTRA_LIB=`rexxdw-config --libs-static`
            MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
            AC_DEFINE(HAVE_REXXDW_PACKAGE)
         else
            AC_MSG_ERROR(rexxdw-config not found. Cannot use --with-rexxdw switch)
+        fi
+fi
+dnl
+dnl Settings for Rexx/CSV
+dnl
+AC_ARG_WITH(rexxcsv,
+    [     --with-rexxcsv       enable static linking with Rexx/CSV external function package],
+    [with_rexxcsv=$withval],
+    [with_rexxcsv=no],
+)
+if test "$with_rexxcsv" = "yes"; then
+        AC_CHECK_PROG(rexxcsv_config, [rexxcsv-config], yes, no)
+        if test "$ac_cv_prog_rexxcsv_config" = yes; then
+           EXTRA_LIB=`rexxcsv-config --libs-static`
+           MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
+           AC_DEFINE(HAVE_REXXCSV_PACKAGE)
+        else
+           AC_MSG_ERROR(rexxcsv-config not found. Cannot use --with-rexxcsv switch)
+        fi
+fi
+dnl
+dnl Settings for Rexx/PDF
+dnl
+AC_ARG_WITH(rexxpdf,
+    [     --with-rexxpdf       enable static linking with Rexx/PDF external function package],
+    [with_rexxpdf=$withval],
+    [with_rexxpdf=no],
+)
+if test "$with_rexxpdf" = "yes"; then
+        AC_CHECK_PROG(rexxpdf_config, [rexxpdf-config], yes, no)
+        if test "$ac_cv_prog_rexxpdf_config" = yes; then
+           EXTRA_LIB=`rexxpdf-config --libs-static`
+           MH_FUNC_LIBS="$MH_FUNC_LIBS $EXTRA_LIB"
+           AC_DEFINE(HAVE_REXXPDF_PACKAGE)
+        else
+           AC_MSG_ERROR(rexxpdf-config not found. Cannot use --with-rexxpdf switch)
         fi
 fi
 
@@ -1798,29 +1844,6 @@ AC_DEFUN([MH_CHECK_TYPE_SOCKLEN_T],
 ])
 
 dnl ---------------------------------------------------------------------------
-dnl Determines which -arch flags valid on Mac OSX with gcc
-dnl ---------------------------------------------------------------------------
-AC_DEFUN([MH_CHECK_OSX_ARCH],
-[AC_MSG_CHECKING(for which Mac OSX -arch flags are supported)
-valid_arch_flags=""
-found_arch_flags=""
-arch_flags="ppc ppc64 x86_64 i386"
-for a in $arch_flags; do
-  save_ldflags="$LDFLAGS"
-  LDFLAGS="$LDFLAGS -arch $a"
-  AC_LINK_IFELSE(
-  [AC_LANG_PROGRAM([#include <stdio.h>],
-  [exit(0)])],
-  [valid_arch_flags="$valid_arch_flags -arch $a";found_arch_flags="$found_arch_flags $a"],
-  [a="$a"]
-  )
-  LDFLAGS="$save_ldflags"
-done
-AC_MSG_RESULT($found_arch_flags)
-AC_SUBST(valid_arch_flags)
-])
-
-dnl ---------------------------------------------------------------------------
 dnl Determines is struct statvfs contains f_mntfromname member
 dnl ---------------------------------------------------------------------------
 AC_DEFUN([MH_CHECK_F_MNTFROMNAME],
@@ -1839,4 +1862,75 @@ AC_TRY_COMPILE([
 ], [
   AC_MSG_RESULT(no)
 ])
+])
+
+dnl ---------------------------------------------------------------------------
+dnl Check if large file support available
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_LARGE_FILE_SUPPORT],
+[
+LARGE_FILE_SUPPORT=""
+AC_CHECK_PROG(getconf, [getconf], yes, no)
+if test "$ac_cv_prog_getconf" = yes; then
+   AC_MSG_CHECKING(large file support flags)
+   LARGE_FILE_SUPPORT=`getconf LFS_CFLAGS`
+   AC_MSG_RESULT($LARGE_FILE_SUPPORT)
+fi
+if test "$LARGE_FILE_SUPPORT" = "undefined"; then
+   LARGE_FILE_SUPPORT=""
+fi
+AC_SUBST(LARGE_FILE_SUPPORT)
+])dnl
+
+dnl ---------------------------------------------------------------------------
+dnl Determines which -arch flags valid on Mac OSX with gcc
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_CHECK_OSX_ARCH],
+[
+valid_arch_flags=""
+found_arch_flags=""
+AC_ARG_WITH(arch,
+   [  --with-arch=option      build universal binaries on OS X, option: one of "all 32bit 64bit intel ppc ppc64 x86_64 i386"],
+   [with_arch=$withval],
+   [with_arch=none],
+)
+case "$with_arch" in
+   none)
+      arch_flags=""
+      ;;
+   all)
+      arch_flags="-arch ppc -arch ppc64 -arch x86_64 -arch i386"
+      ;;
+   32bit)
+      arch_flags="-arch ppc -arch i386"
+      ;;
+   64bit)
+      arch_flags="-arch ppc64 -arch x86_64"
+      ;;
+   intel)
+      arch_flags="-arch i386 -arch x86_64"
+      ;;
+   *)
+      arch_flags="-arch $with_arch"
+      ;;
+esac
+
+valid_arch_flags=""
+found_arch_flags=""
+if test $on_osx = "yes"; then
+  AC_MSG_CHECKING(for which Mac OSX -arch flags are supported for universal binaries)
+  for a in $arch_flags; do
+    save_ldflags="$LDFLAGS"
+    LDFLAGS="$LDFLAGS -arch $a"
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([#include <stdio.h>],
+    [exit(0)])],
+    [valid_arch_flags="$valid_arch_flags -arch $a";found_arch_flags="$found_arch_flags $a"],
+    [a="$a"]
+    )
+    LDFLAGS="$save_ldflags"
+  done
+  AC_MSG_RESULT($found_arch_flags)
+  AC_SUBST(valid_arch_flags)
+fi
 ])

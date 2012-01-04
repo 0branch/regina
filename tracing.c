@@ -34,7 +34,7 @@ typedef struct { /* tra_tsd: static variables of this module (thread-safe) */
    int  intercount;  /* number of times to execute trace without interaction */
    int  quiet;       /* boolean: run quietly in interaction trace */
    int  notnow;
-   char tracestr[LINELENGTH+1];
+   char tracestr[BUFFERSIZE+100];
    char buf0[32];
    int  bufptr0;
    char tracefmt[20];
@@ -497,6 +497,55 @@ void traceback( tsd_t *TSD )
    Free_stringTSD( message );
 }
 
+void getcallstack( tsd_t *TSD, streng *stem )
+{
+   sysinfo ss;
+   nodeptr ptr;
+   int i,j=0;
+   streng *varname=NULL, *value=NULL, *lineno=NULL;
+   int stemlen=0 ;
+   char *eptr=NULL ;
+   streng *tmpptr=NULL ;
+
+   varname = Str_makeTSD( (stemlen=stem->len) + 8 ) ;
+   memcpy( varname->value, stem->value, stemlen ) ;
+   mem_upper( varname->value, stemlen );
+   eptr = varname->value + stemlen ;
+
+   if (*(eptr-1)!='.')
+   {
+      *((eptr++)-1) = '.' ;
+      stemlen++ ;
+   }
+   for ( ss = TSD->systeminfo; ss; ss = ss->previous )
+   {
+      for ( i = ss->cstackcnt - 1; i >= 0; i-- )
+      {
+         ptr = ss->callstack[i];
+         if ( !ptr )
+            continue;
+         tmpptr = ptr->name;
+         /* get the value; lineno name */
+         value = Str_makeTSD( (tmpptr->len) + 10 ) ; /* should not be more than 999999999 levels in the call stack */
+         lineno = int_to_streng( TSD, ptr->lineno );
+         memcpy( value->value, lineno->value, lineno->len ) ;
+         value->len = lineno->len;
+         Str_catstr_TSD( TSD, value, " " );
+         Str_cat_TSD( TSD, value, tmpptr );
+         Free_stringTSD( lineno );
+         /* set the tail value */
+         sprintf(eptr, "%d", ++j ) ;
+         varname->len = strlen( varname->value ) ;
+         setvalue( TSD, varname, value, -1 ) ;
+      }
+   }
+   *eptr = '0' ;
+   varname->len = stemlen+1 ;
+   tmpptr = int_to_streng( TSD, j ) ;
+   setvalue( TSD, varname, tmpptr, -1 ) ;
+   Free_stringTSD( varname );
+}
+
 void queue_trace_char( const tsd_t *TSD, char ch2 )
 {
    tra_tsd_t *tt;
@@ -533,10 +582,10 @@ void set_trace_char( tsd_t *TSD, char ch2 )
             starttrace( TSD );
          break ;
 
-      case 'F':
       case 'A':
       case 'C':
       case 'E':
+      case 'F':
       case 'I':
       case 'L':
       case 'N':

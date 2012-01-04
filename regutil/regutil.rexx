@@ -14,9 +14,11 @@ say 'SysDropRexxMacro' SysDropRexxMacro(x)
 say 'SysQueryRexxMacro' SysQueryRexxMacro(x)
 say 'SysReorderRexxMacro' SysReorderRexxMacro(x,2)
 say 'SysSaveRexxMacroSpace' SysSaveRexxMacroSpace('tmp.macro')
-say 'SysCurState' SysCurState('off')
+Call Charout ,'SysCurState'
+Call SysCurState 'off'
 call MyPause 'cursor should be off'
-say 'SysCurState' SysCurState('on')
+Call Charout ,'SysCurState'
+Call SysCurState 'on'
 call MyPause 'cursor should be on'
 Say 'Press a key'
 say 'SysGetKey' SysGetKey('n')

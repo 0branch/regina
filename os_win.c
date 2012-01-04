@@ -736,11 +736,12 @@ static int Win_read(int handle, void *buf, unsigned size, void *async_info)
 
    /* Async IO */
    for (i = 0, w = ai->h; i < 3; i++, w++)
+   {
       if (w->hdl == hdl)
          break;
+   }
    if (i == 3)
       return(-EINVAL);
-
    ol = &w->ol;
 
    if (w->reading) /* pending IO? */
@@ -887,11 +888,12 @@ static int Win_write(int handle, const void *buf, unsigned size, void *async_inf
 
    /* Async IO */
    for (i = 0, w = ai->h; i < 3; i++, w++)
+   {
       if (w->hdl == hdl)
          break;
+   }
    if (i == 3)
       return(-EINVAL);
-
    ol = &w->ol;
 
    /*
@@ -1094,66 +1096,75 @@ static void Win_wait_async_info(void *async_info)
 int Win_uname(struct regina_utsname *name)              /* MH 10-06-96 */
 {                                                       /* MH 10-06-96 */
    SYSTEM_INFO sysinfo;
-   struct {
-      OSVERSIONINFO osinfo;
-      WORD          wServicePackMajor;
-      WORD          wServicePackMinor;
-      WORD          wSuiteMask;
-      BYTE          bProductType;
-      BYTE          bReserved;
-   } osinfoEX;
-
+   OSVERSIONINFOEX osinfo;
    char computername[MAX_COMPUTERNAME_LENGTH+1];
    DWORD namelen = sizeof(computername);
    char buf[128];
 
-   /*
-    * Modern Windows have support for OSVERSIONINFOEX, but this structure may
-    * not be defined in any case. We support it with our own structure and
-    * test whether it is supported or not.
-    */
-   memset( &osinfoEX, 0, sizeof(osinfoEX) );
-   osinfoEX.osinfo.dwOSVersionInfoSize = sizeof(osinfoEX);
-   if ( !GetVersionEx( &osinfoEX.osinfo ) )
-   {
-      osinfoEX.osinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-      GetVersionEx( &osinfoEX.osinfo );
-   }
+   ZeroMemory( &sysinfo, sizeof(SYSTEM_INFO) );
+   ZeroMemory( &osinfo, sizeof(OSVERSIONINFOEX) );
+   GetSystemInfo( &sysinfo );
+   osinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+   GetVersionEx( &osinfo );
 
-   sprintf( buf, "%u.%u", osinfoEX.osinfo.dwMajorVersion, osinfoEX.osinfo.dwMinorVersion );
-   if (osinfoEX.wServicePackMajor)
-      sprintf( buf + strlen(buf), "SP%u", ( unsigned ) osinfoEX.wServicePackMajor );
+   sprintf( buf, "%u.%u", osinfo.dwMajorVersion, osinfo.dwMinorVersion );
+   if (osinfo.wServicePackMajor)
+      sprintf( buf + strlen(buf), "SP%u", ( unsigned ) osinfo.wServicePackMajor );
    strncpy( name->version, buf, sizeof(name->version) - 1 );
-   sprintf( name->release, "%u", osinfoEX.osinfo.dwBuildNumber );
+   sprintf( name->release, "%u", osinfo.dwBuildNumber );
 
    /* get specific OS version... */
-   switch( osinfoEX.osinfo.dwPlatformId )
+   switch( osinfo.dwPlatformId )
    {
       case VER_PLATFORM_WIN32s:
          strcpy( name->sysname, "WIN32S" );
          break;
       case VER_PLATFORM_WIN32_WINDOWS:
-         if ( osinfoEX.osinfo.dwMinorVersion >= 90 )
+         if ( osinfo.dwMinorVersion >= 90 )
             strcpy( name->sysname, "WINME" );
-         else if ( osinfoEX.osinfo.dwMinorVersion >= 10 )
+         else if ( osinfo.dwMinorVersion >= 10 )
             strcpy( name->sysname, "WIN98" );
          else
             strcpy( name->sysname, "WIN95" );
          break;
       case VER_PLATFORM_WIN32_NT:
-         if ( osinfoEX.osinfo.dwMajorVersion == 4 )
+         if ( osinfo.dwMajorVersion == 4 )
             strcpy( name->sysname, "WINNT" );
-         else if ( osinfoEX.osinfo.dwMajorVersion == 5 )
+         else if ( osinfo.dwMajorVersion == 5 )
          {
-            if ( osinfoEX.osinfo.dwMinorVersion == 1 )
+            if ( osinfo.dwMinorVersion == 1 )
                strcpy( name->sysname, "WINXP" );
-            else if ( osinfoEX.osinfo.dwMinorVersion == 2 )
-               strcpy( name->sysname, "WIN2003" );
+            else if ( osinfo.dwMinorVersion == 2 )
+            {
+               if ( osinfo.wProductType == VER_NT_WORKSTATION
+               &&  sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 )
+                  strcpy( name->sysname, "WINXP64" );
+               else
+                  strcpy( name->sysname, "WIN2003" );
+            }
             else
                strcpy( name->sysname, "WIN2K" );
          }
-         else if ( osinfoEX.osinfo.dwMajorVersion == 6 )
-            strcpy( name->sysname, "WINVISTA" );
+         else if ( osinfo.dwMajorVersion == 6 )
+         {
+            if ( osinfo.dwMinorVersion == 0 )
+            {
+               if ( osinfo.wProductType == VER_NT_WORKSTATION )
+                  strcpy( name->sysname, "WINVISTA" );
+               else
+                  strcpy( name->sysname, "WIN2008" );
+            }
+            else if ( osinfo.dwMinorVersion == 1 )
+            {
+               if ( osinfo.wProductType == VER_NT_WORKSTATION
+               ||   osinfo.wProductType == 0 )
+                  strcpy( name->sysname, "WIN7" );
+               else
+                  strcpy( name->sysname, "WIN2008R2" );
+            }
+            else
+               strcpy( name->sysname, "UNKNOWN" );
+         }
          else
             strcpy( name->sysname, "UNKNOWN" );
          break;
@@ -1168,31 +1179,41 @@ int Win_uname(struct regina_utsname *name)              /* MH 10-06-96 */
       strcpy( name->nodename, computername );
    else
       strcpy( name->nodename, "UNKNOWN" );
-   GetSystemInfo( &sysinfo );
-   switch( sysinfo.dwProcessorType )
+
+   if ( sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL )
    {
-      case PROCESSOR_INTEL_386:
-         strcpy( name->machine, "i386" );
-         break;
-      case PROCESSOR_INTEL_486:
-         strcpy( name->machine, "i486" );
-         break;
-      case PROCESSOR_INTEL_PENTIUM:
-         strcpy( name->machine, "i586" );
-         break;
+      switch( sysinfo.dwProcessorType )
+      {
+         case PROCESSOR_INTEL_386:
+            strcpy( name->machine, "i386" );
+            break;
+         case PROCESSOR_INTEL_486:
+            strcpy( name->machine, "i486" );
+            break;
+         case PROCESSOR_INTEL_PENTIUM:
+            strcpy( name->machine, "i586" );
+            break;
 #if defined(PROCESSOR_INTEL_MIPS_R4000)
-      case PROCESSOR_INTEL_MIPS_R4000:
-         strcpy( name->machine, "mipsR4000" );
-         break;
+         case PROCESSOR_INTEL_MIPS_R4000:
+            strcpy( name->machine, "mipsR4000" );
+            break;
 #endif
-#if defined(PROCESSOR_INTEL_ALPHA_21064)
-      case PROCESSOR_INTEL_ALPHA_21064:
-         strcpy( name->machine, "alpha21064" );
-         break;
-#endif
-      default:
-         strcpy( name->machine, "UNKNOWN" );
-         break;
+         default:
+            strcpy( name->machine, "UNKNOWN" );
+            break;
+      }
+   }
+   else if ( sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64 )
+   {
+      strcpy( name->machine, "alpha21064" );
+   }
+   else if ( sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 )
+   {
+      strcpy( name->machine, "x86_64" );
+   }
+   else
+   {
+      strcpy( name->machine, "UNKNOWN" );
    }
 
    return 0;
@@ -1264,5 +1285,6 @@ static void Win_init(void)
       WIN.reset_async_info           = DOS.reset_async_info;
       WIN.add_async_waiter           = DOS.add_async_waiter;
       WIN.wait_async_info            = DOS.wait_async_info;
+      WIN.wait                       = DOS.wait;
    }
 }

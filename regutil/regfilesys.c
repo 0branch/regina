@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regfilesys.c,v 1.7 2009/12/10 10:15:49 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regfilesys.c,v 1.12 2011/05/10 06:19:33 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSFILEMGR
@@ -50,9 +50,25 @@
 # include <sys/utime.h>
 # include <io.h>
 # define MAX_USHORT 65535 /* or so they say */
-# define MAXPATHLEN _MAX_PATH
+# ifndef MAXPATHLEN
+#  ifndef PATH_MAX
+#   ifndef _POSIX_PATH_MAX
+#    ifndef _MAX_PATH
+#     define MAXPATHLEN 1024
+#    else
+#     define MAXPATHLEN _MAX_PATH
+#    endif
+#   else
+#    define MAXPATHLEN _POSIX_PATH_MAX
+#   endif
+#  else
+#   define MAXPATHLEN PATH_MAX
+#  endif
+# endif
 # define F_OK 0
 #endif
+
+#include "regina64.h"
 
 /* ******************************************************************** */
 /* ********************* File System Interaction ********************** */
@@ -390,11 +406,12 @@ static void get_matched_files(chararray * ca, const char * dir,
 {
     DIR * dirp = opendir(dir);
     struct dirent * thede;
-    struct stat st;
+    struct rx_stat st;
     struct tm * tm = NULL;
     rxbool may_have_subdirs, filename_matches;
     char pth[MAXPATHLEN], buf[MAXPATHLEN+40], *slash = "/";
     int l, dl, matchattr = 0, skipattr = 0, system_files = 0, check_links = 0;
+    char *fmt;
 
     if (dirp == NULL) return;
 
@@ -412,7 +429,7 @@ static void get_matched_files(chararray * ca, const char * dir,
      * sub-directories. This is because the .. of each sub-directory shows
      * up as a link, as does the . in the directory itself, and the name in
      * the parent directory. Trust me on this. */
-    stat(dir, &st);
+    rx_stat(dir, &st);
     may_have_subdirs = st.st_nlink > 2;
 
     /* if there are no sub-directories & we don't want files, get out */
@@ -553,7 +570,11 @@ static void get_matched_files(chararray * ca, const char * dir,
 #endif
                }
 
-               l = sprintf(buf, "%s %10d %c%c%c%c%c%c%c%c%c%c %s", dbuf, (int)st.st_size, ftype,
+               if ( sizeof( off_t ) > 4 )
+                  fmt = "%s %10lld %c%c%c%c%c%c%c%c%c%c %s";
+               else
+                  fmt = "%s %10ld %c%c%c%c%c%c%c%c%c%c %s";
+               l = sprintf(buf, fmt, dbuf, st.st_size, ftype,
                        (S_IRUSR&st.st_mode) ? 'r' : '-', (S_IWUSR&st.st_mode) ? 'w' : '-',
                        (S_IXUSR&st.st_mode) ? 'x' : '-',
                        (S_IRGRP&st.st_mode) ? 'r' : '-', (S_IWGRP&st.st_mode) ? 'w' : '-',
@@ -580,7 +601,11 @@ static void get_matched_files(chararray * ca, const char * dir,
                  else
                     strftime(dbuf, sizeof(dbuf), "%c", tm);
 
-                 l = sprintf(buf, "%s %10d d%c%c%c%c%c%c%c%c%c %s", dbuf, (int)st.st_size,
+                 if ( sizeof( off_t ) > 4 )
+                    fmt = "%s %10lld d%c%c%c%c%c%c%c%c%c %s";
+                 else
+                    fmt = "%s %10ld d%c%c%c%c%c%c%c%c%c %s";
+                 l = sprintf(buf, fmt, dbuf, st.st_size,
                              (S_IRUSR&st.st_mode) ? 'r' : '-', (S_IWUSR&st.st_mode) ? 'w' : '-',
                              (S_IXUSR&st.st_mode) ? 'x' : '-',
                              (S_IRGRP&st.st_mode) ? 'r' : '-', (S_IWGRP&st.st_mode) ? 'w' : '-',
@@ -608,7 +633,7 @@ static void get_matched_files(chararray * ca, const char * dir,
    HANDLE sh;
    FILETIME lft;
    SYSTEMTIME syst;
-   char pth[MAXPATHLEN], buf[MAXPATHLEN+40], pbuf[10], tdir[MAXPATHLEN], *slash = "";
+   char pth[MAXPATHLEN], buf[MAXPATHLEN+50], pbuf[10], tdir[MAXPATHLEN], *slash = "";
    BOOL rc = TRUE;
    rxbool really_do_subdirs = false;
    int l, dl, matchattr = 0, skipattr = 0;
@@ -674,11 +699,22 @@ static void get_matched_files(chararray * ca, const char * dir,
              cha_addstr(ca, pth, l);
          }
          else {
+            /*
+             * The following ridiculous use of intermediate variables is because
+             * the MS VS 2010 can't add up two large numbers after a multiplication!
+             */
+            unsigned __int64 mult = (unsigned __int64)(MAXDWORD)+1;
+            unsigned __int64 fsl = (unsigned __int64)fd.nFileSizeLow;
+            unsigned __int64 fsh = (unsigned __int64)fd.nFileSizeHigh;
+            unsigned __int64 fshmult = fsh*mult;
+            unsigned __int64 fsize = fshmult+fsl;
+
             FileTimeToLocalFileTime(&fd.ftLastWriteTime, &lft);
             FileTimeToSystemTime(&lft, &syst);
+
             if (time_format == TF_SORTABLE)
-            l = sprintf(buf, "%4d/%02d/%02d/%02d/%02d  %10d  %c%c%c%c%c %s", syst.wYear,
-                          syst.wMonth, syst.wDay, syst.wHour, syst.wMinute, (int)fd.nFileSizeLow,
+            l = sprintf(buf, "%4d/%02d/%02d/%02d/%02d  %10I64d  %c%c%c%c%c %s", syst.wYear,
+                          syst.wMonth, syst.wDay, syst.wHour, syst.wMinute, fsize,
                           (fd.dwFileAttributes&_A_ARCH) ? 'A' : '-',
                           (fd.dwFileAttributes&_A_SUBDIR) ? 'D' : '-',
                           (fd.dwFileAttributes&_A_HIDDEN) ? 'H' : '-',
@@ -686,8 +722,8 @@ static void get_matched_files(chararray * ca, const char * dir,
                           (fd.dwFileAttributes&_A_SYSTEM) ? 'S' : '-',
                           pth);
             else if (time_format == TF_SENSIBLE)
-            l = sprintf(buf, "%4d-%02d-%02d %02d:%02d:%02d  %10d  %c%c%c%c%c %s", syst.wYear,
-                          syst.wMonth, syst.wDay, syst.wHour, syst.wMinute, syst.wSecond, (int)fd.nFileSizeLow,
+            l = sprintf(buf, "%4d-%02d-%02d %02d:%02d:%02d  %10I64d  %c%c%c%c%c %s", syst.wYear,
+                          syst.wMonth, syst.wDay, syst.wHour, syst.wMinute, syst.wSecond, fsize,
                           (fd.dwFileAttributes&_A_ARCH) ? 'A' : '-',
                           (fd.dwFileAttributes&_A_SUBDIR) ? 'D' : '-',
                           (fd.dwFileAttributes&_A_HIDDEN) ? 'H' : '-',
@@ -697,9 +733,9 @@ static void get_matched_files(chararray * ca, const char * dir,
             else {
             int hour = syst.wHour%12;
             if (!hour) hour = 12;
-            l = sprintf(buf, "%2d/%02d/%02d  %2d:%02d%c  %10d  %c%c%c%c%c  %s", syst.wMonth,
+            l = sprintf(buf, "%2d/%02d/%02d  %2d:%02d%c  %10I64d  %c%c%c%c%c  %s", syst.wMonth,
                           syst.wDay, syst.wYear%100, hour, syst.wMinute, syst.wHour >=12 ? 'p' : 'a',
-                          (int)fd.nFileSizeLow,
+                          fsize,
                           (fd.dwFileAttributes&_A_ARCH) ? 'A' : '-',
                           (fd.dwFileAttributes&_A_SUBDIR) ? 'D' : '-',
                           (fd.dwFileAttributes&_A_HIDDEN) ? 'H' : '-',
@@ -806,7 +842,7 @@ rxfunc(sysfiletree)
 
         dir = pattern;
         pattern = strrchr(dir, '/');
-#if defined(_WIN32) || defined(__BEMX__)  /* win32 & OS/2 allows slashes in both directions */
+#if defined(_WIN32) || defined(__EMX__)  /* was BEMX win32 & OS/2 allows slashes in both directions */
         bpattern = strrchr(dir, '\\');
         if (pattern < bpattern) pattern = bpattern;
 #endif
@@ -816,7 +852,7 @@ rxfunc(sysfiletree)
             if (pattern == dir)
                dir = "/";
 
-#if defined(_WIN32) || defined(__BEMX__)
+#if defined(_WIN32) || defined(__EMX__) /* was BEMX */
             else if (pattern == (dir+2) && dir[1] == ':') {
                dir = alloca(4);
                memcpy(dir, pattern-2, 3);
@@ -1075,7 +1111,7 @@ static int copy(const char * from, const char * to)
    FILE * in, *out;
    char buf[32768];
    int rc, br;
-   struct stat st;
+   struct rx_stat st;
    struct utimbuf utb;
 
    if ((in = fopen(from, "rb")) == NULL) {
@@ -1087,7 +1123,7 @@ static int copy(const char * from, const char * to)
       return rc;
    }
 
-   fstat(fileno(in), &st);
+   rx_fstat(fileno(in), &st);
    utb.actime = st.st_atime;
    utb.modtime = st.st_mtime;
 
@@ -1214,7 +1250,7 @@ rxfunc(syscreateshadow)
 rxfunc(sysgetfiledatetime)
 {
    char * filename, * which;
-   struct stat st;
+   struct rx_stat st;
    struct tm * tm;
 
    checkparam(1,2);
@@ -1229,7 +1265,7 @@ rxfunc(sysgetfiledatetime)
       which = "modify";
    }
 
-   if (stat(filename, &st) == -1) {
+   if (rx_stat(filename, &st) == -1) {
       result->strlength = sprintf(result->strptr, "%d", errnotorc(errno));
    }
    else {
@@ -1256,7 +1292,7 @@ rxfunc(syssetfiledatetime)
 {
    char *filename, *thedate = NULL, *thetime = NULL, buf[10];
    struct utimbuf utb;
-   struct stat st;
+   struct rx_stat st;
    struct tm then;
    rxbool hasdate, hastime;
 
@@ -1297,7 +1333,7 @@ rxfunc(syssetfiledatetime)
    }
 
 
-   if (stat(filename, &st) == -1) {
+   if (rx_stat(filename, &st) == -1) {
       result->strlength = sprintf(result->strptr, "%d", errnotorc(errno));
    }
    else {

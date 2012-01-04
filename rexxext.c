@@ -74,8 +74,29 @@ streng *rex_userid( tsd_t *TSD, cparamboxptr parms )
    return nullstringptr( ) ;
 # endif
 #else
-   return( Str_creTSD( getpwuid( getuid( ) )->pw_name ) ) ;
+   {
+   struct passwd *pwuid;
+   pwuid = getpwuid( getuid( ) );
+   if ( pwuid )
+      return( Str_creTSD( pwuid->pw_name ) ) ;
+   else
+      return nullstringptr( ) ;
+   }
 #endif
+}
+
+streng *rex_getcallstack( tsd_t *TSD, cparamboxptr parms )
+{
+   char ch=0 ;
+   int i=0 ;
+
+   checkparam(  parms,  1,  1 , "GETCALLSTACK" ) ;
+   if (parms->value)
+      getcallstack( TSD, parms->value );
+   else
+      exiterror( ERR_INCORRECT_CALL, 28, "GETCALLSTACK", "ALN", tmpstr_of( TSD, parms->value ) )  ;
+
+   return nullstringptr( ) ;
 }
 
 streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms )

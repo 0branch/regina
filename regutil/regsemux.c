@@ -18,12 +18,12 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regsemux.c,v 1.5 2010/01/01 00:00:21 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regsemux.c,v 1.6 2010/01/11 12:50:24 mark Exp $
  */
 #include "regutil.h"
 
 #include <sys/types.h>
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
 # include <sys/ipc.h>
 # include <sys/sem.h>
 #endif
@@ -117,7 +117,7 @@ union semun {
 
 static const char sembasename[] = "/tmp/regutil.sem";
 
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
 /* return a check-sum of a string. This returned unique numbers
  * for every filename on my system, so I use this in place of ftok
  * which has some messy cleanup issues, and isn't any better at
@@ -152,7 +152,7 @@ static pthread_mutex_t lockmux = PTHREAD_MUTEX_INITIALIZER;
 static int makemetalock(void)
 {
    int rc = 0;
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    struct sembuf sbf;
 
 # ifdef THREAD_SAFE
@@ -208,7 +208,7 @@ static int makemetalock(void)
 
 static void metalock(void)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    struct sembuf sbf;
 
    sbf.sem_num = 0;
@@ -222,7 +222,7 @@ static void metalock(void)
 
 static void metaunlock(void)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    struct sembuf sbf;
 
    sbf.sem_num = 0;
@@ -236,7 +236,7 @@ static void metaunlock(void)
 
 static void dropmetalock(void)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    struct sembuf sbf;
    union semun arg;
 
@@ -290,7 +290,7 @@ typedef enum {
 
 int makesem(const char * name, const int namel, semtype_t type, rxbool create)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    struct sembuf sbf;
    union semun arg;
    key_t key = -1;
@@ -361,7 +361,7 @@ int makesem(const char * name, const int namel, semtype_t type, rxbool create)
 
 void dropsem(const int semid)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    struct sembuf sbf;
    register int i;
 
@@ -401,7 +401,7 @@ void dropsem(const int semid)
 
 int waitsem(const int semid, int mseconds)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    union semun arg;
    struct sembuf sbf = {0, -1, 0};
    u_short vals[3];
@@ -461,7 +461,7 @@ typedef enum {
 
 int setsem(const int semid, thingtodo_t thingtodo)
 {
-#if !defined(QNX4) && !defined(__BEOS__)
+#if !defined(__QNX__) && !defined(__BEOS__)
    union semun arg;
    u_short vals[3];
    semtype_t type;

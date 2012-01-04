@@ -538,8 +538,10 @@ streng *evaluate( tsd_t *TSD, nodeptr thisptr, streng **kill )
          }
          if ( ( entry = thisptr->u.node ) != NULL )
          {
-            set_reserved_value( TSD, POOL0_SIGL, NULL,
-                                TSD->currentnode->lineno, VFLAG_NUM );
+            /*
+             * We are in an internal routine...
+             */
+            set_reserved_value( TSD, POOL0_SIGL, NULL, TSD->currentnode->lineno, VFLAG_NUM );
             args = initplist( TSD, thisptr );
 
             ptr = CallInternalFunction( TSD, entry->next, TSD->currentnode,

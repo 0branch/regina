@@ -62,6 +62,14 @@ extern void *getRexxEECFunctionAddress( char *name );
 extern void *getRexxDWFunctionAddress( char *name );
 #endif
 
+#ifdef HAVE_REXXCSV_PACKAGE
+extern void *getRexxCSVFunctionAddress( char *name );
+#endif
+
+#ifdef HAVE_REXXPDF_PACKAGE
+extern void *getRexxPDFFunctionAddress( char *name );
+#endif
+
 #ifdef HAVE_RXSOCK_PACKAGE
 extern void *getRxSockFunctionAddress( char *name );
 #endif
@@ -114,6 +122,12 @@ static struct
 #endif
 #ifdef HAVE_REXXDW_PACKAGE
    { "rexxdw", getRexxDWFunctionAddress },
+#endif
+#ifdef HAVE_REXXCSV_PACKAGE
+   { "rexxcsv", getRexxCSVFunctionAddress },
+#endif
+#ifdef HAVE_REXXPDF_PACKAGE
+   { "rexxpdf", getRexxPDFFunctionAddress },
 #endif
    { "", NULL },
 };

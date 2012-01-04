@@ -1005,7 +1005,9 @@ endloop: if (s.increment)
          if (!TSD->systeminfo->trace_override)
          {
             if (thisptr->name)
+            {
                set_trace( TSD, thisptr->name ) ;
+            }
             else if (thisptr->p[0])
             {
                set_trace( TSD, evaluate(TSD,thisptr->p[0], &tptr ) );
@@ -1013,7 +1015,12 @@ endloop: if (s.increment)
                   Free_stringTSD( tptr ) ;
             }
             else
-               exiterror( ERR_INTERPRETER_FAILURE, 1, __FILE__, __LINE__, "" )  ;
+            {
+               /* default settiong for TRACE with no arguments is "N" */
+               streng *tmp = Str_ncre_TSD( TSD, "N", 1 );
+               set_trace( TSD, tmp );
+               Free_stringTSD( tmp );
+            }
          }
 
          break ;
@@ -1347,8 +1354,7 @@ endloop: if (s.increment)
 
             TSD->systeminfo->interactive = TSD->currlevel->traceint;
 
-            set_reserved_value( TSD, POOL0_RESULT, result, 0,
-                                ( result ) ? VFLAG_STR : VFLAG_NONE );
+            set_reserved_value( TSD, POOL0_RESULT, result, 0, ( result ) ? VFLAG_STR : VFLAG_NONE );
             break;
          }
       }
@@ -1358,12 +1364,21 @@ endloop: if (s.increment)
       {
          streng *result ;
 
+         /*
+          * Call a builtin procedure...
+          */
          if ((result = buildtinfunc( TSD, thisptr )) == NOFUNC)
          {
+            /*
+             * ... and it wasn't a builtin procedure so assume its an external function
+             */
             thisptr->type = X_IS_EXTERNAL ;
          }
          else
          {
+            /*
+             * ... and if it was a builtin procedure set RESULT and break
+             */
             set_reserved_value( TSD, POOL0_RESULT, result, 0,
                                 ( result ) ? VFLAG_STR : VFLAG_NONE );
 
@@ -2123,6 +2138,7 @@ proclevel newlevel( tsd_t *TSD, proclevel oldlevel )
          level->options = it->options;
       else
       {
+         /* never call set_options_flag() on MATAOP options */
          set_options_flag( level, EXT_LINEOUTTRUNC, DEFAULT_LINEOUTTRUNC );
          set_options_flag( level, EXT_FLUSHSTACK, DEFAULT_FLUSHSTACK );
          set_options_flag( level, EXT_MAKEBUF_BIF, DEFAULT_MAKEBUF_BIF );
@@ -2146,6 +2162,7 @@ proclevel newlevel( tsd_t *TSD, proclevel oldlevel )
          set_options_flag( level, EXT_QUEUES_301, DEFAULT_QUEUES_301 );
          set_options_flag( level, EXT_HALT_ON_EXT_CALL_FAIL, DEFAULT_HALT_ON_EXT_CALL_FAIL );
          set_options_flag( level, EXT_SINGLE_INTERPRETER, DEFAULT_SINGLE_INTERPRETER );
+         set_options_flag( level, EXT_SINGLE_LINE_COMMENTS, DEFAULT_SINGLE_LINE_COMMENTS );
 
          if ( ( str = mygetenv( TSD, "REGINA_OPTIONS", NULL, 0 ) ) != NULL )
          {

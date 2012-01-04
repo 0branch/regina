@@ -117,6 +117,10 @@
 # include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+# include <mach-o/dyld.h>
+#endif
+
 /*
  * Since development of Ultrix has ceased, and they never managed to
  * fix a few things, we want to define a few things, just in order
@@ -228,7 +232,19 @@ static const char *GetArgv0(const char *argv0)
 # endif
 #endif
 
-#ifdef HAVE_READLINK
+#ifdef __APPLE__
+   {
+      /*
+       * will work on MacOS X
+       */
+      char buf[1024];
+      uint32_t result=sizeof(buf);
+      if ( _NSGetExecutablePath( buf, &result ) == 0 )
+      {
+         return strdup( buf );
+      }
+   }
+#elif defined(HAVE_READLINK)
    {
       /*
        * will work on Linux 2.1+

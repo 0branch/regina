@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regstem.c,v 1.5 2009/11/23 23:24:35 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regstem.c,v 1.8 2011/12/31 01:55:26 mark Exp $
  */
 
 /* ******************************************************************** */
@@ -27,6 +27,7 @@
 
 #include "regutil.h"
 #include <ctype.h>
+#include <limits.h>
 
 /* compare two strings case-sensitively */
 static int rxstrcmp(const PRXSTRING l, const PRXSTRING r)
@@ -655,7 +656,7 @@ rxfunc(syssteminsert)
     * around */
    if (ind < (ca->count - 1)) {
       /* move the array over */
-      memmove(ca->array+ind+1, ca->array+ind, sizeof(*ca->array)*(ca->count-ind-2));
+      memmove(ca->array+ind+1, ca->array+ind, sizeof(*ca->array)*(ca->count-ind-1));
       /* and set the pointers again */
       ca->array[ind] = argv[2];
    }
@@ -667,16 +668,18 @@ rxfunc(syssteminsert)
    return 0;
 }
 
-/* stemread(filename, stemname) */
+/* stemread(filename, stemname[minlen[,[maxlen]) */
 rxfunc(regstemread)
 {
+   static char *smaxlen = NULL;
+   static char *sminlen = NULL;
    char * filname, *fdata, *cp;
-   int flen;
+   int flen, linelen;
    register int offs = 0, oldoffs = 0;
    chararray * ca;
-   register int count = 1;
+   register int count = 1, maxlen = 0, minlen = INT_MAX;
 
-   checkparam(2, 2);
+   checkparam(2, 4);
 
    rxstrdup(filname, argv[0]);
    fdata = mapfile(filname, &flen);
@@ -704,7 +707,18 @@ rxfunc(regstemread)
       if (cp[-1] == '\r')
          offs--;
 
-      cha_adddummy(ca, fdata+oldoffs, offs - oldoffs);
+      linelen = offs - oldoffs;
+      cha_adddummy(ca, fdata+oldoffs, linelen);
+      if ( argc > 2 && RXVALIDSTRING(argv[2]) )
+      {
+         if ( linelen < minlen )
+            minlen = linelen;
+      }
+      if ( argc > 3 && RXVALIDSTRING(argv[3]) )
+      {
+         if ( linelen > maxlen )
+            maxlen = linelen;
+      }
       oldoffs = cp - fdata + 1;
 
       /* set 1000 elements at a time to cut down on memory allocation */
@@ -730,6 +744,32 @@ rxfunc(regstemread)
    unmapfile(fdata, flen);
 
    result_zero();
+   /* set the min line length parameter */
+   if ( argc > 2 && RXVALIDSTRING(argv[2]) )
+   {
+      if ( sminlen )
+         free( sminlen );
+      sminlen = malloc( 50 ); /* enough for an integer */
+      if ( count )
+      {
+         int mylen;
+         mylen = sprintf( sminlen, "%d", minlen );
+         setavar( &argv[2], sminlen, mylen );
+      }
+   }
+   /* set the max line length parameter */
+   if ( argc > 3 && RXVALIDSTRING(argv[3]) )
+   {
+      if ( smaxlen )
+         free( smaxlen );
+      smaxlen = malloc( 50 ); /* enough for an integer */
+      if ( count )
+      {
+         int mylen;
+         mylen = sprintf( smaxlen, "%d", maxlen );
+         setavar( &argv[3], smaxlen, mylen );
+      }
+   }
    return 0;
 }
 
@@ -851,7 +891,7 @@ rxfunc(regstemdoover)
 static int stemcompare(PRXSTRING needle, PRXSTRING haystack,
                        int offset, rxbool exact, rxbool casesensitive)
 {
-   register int i, offs = 0, rc;
+   register int i, offs = 0, rc = 0;
    SHVBLOCK shv;
 
    /* get the value of offset */
@@ -946,7 +986,7 @@ rxfunc(regstemsearch)
    rxbool casesensitive = false, exact = false, sorted = false;
    register int i;
    int size;
-   int rc;
+   int rc = 0;
 
    checkparam(2, 4);
 

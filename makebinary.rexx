@@ -18,7 +18,7 @@ Select
          shldir = 'lib'
          share_dir = _tmpdir'/share/regina'
       End
-   When Countstr( 'beos', _target ) \= 0 Then
+   When Countstr( 'beos', _target ) \= 0  | Countstr( 'haiku', _target ) \= 0 Then
       Do
          from = 'COPYING-LIB BUGS       TODO       README.BeOS README.'_abimajor'?  demo/*.rexx regutil/*.rexx rexxsaa.h' /**/
          to =   'doc/regina  doc/regina doc/regina doc/regina  doc/regina           bin         bin            include'

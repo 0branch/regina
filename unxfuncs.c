@@ -206,11 +206,10 @@ streng *unx_uname( tsd_t *TSD, cparamboxptr parms )
    switch( option )
    {
       case 'A':
-         result = Str_makeTSD( 1+sizeof(struct regina_utsname)) ;
-         sprintf( result->value, "%s %s %s %s %s", utsbox.sysname,
-                  utsbox.nodename, utsbox.release, utsbox.version,
-                  utsbox.machine ) ;
-         result->len = strlen( result->value ) ;
+         result = Str_makeTSD( 5+sizeof(struct regina_utsname)) ;
+         result->len = sprintf( result->value, "%s %s %s %s %s", utsbox.sysname,
+                                utsbox.nodename, utsbox.release, utsbox.version,
+                                utsbox.machine ) ;
          assert( result->len <= result->max ) ;
          return result ;
 

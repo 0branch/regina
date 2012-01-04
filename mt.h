@@ -73,13 +73,13 @@ typedef struct _tsd_t {
    struct _OS_Dep_funcs   *OS;
 } tsd_t;
 
-#if (defined(POSIX) || defined(_POSIX_SOURCE) || defined(_PTHREAD_SEMANTICS)) && (defined(_REENTRANT) || defined(REENTRANT))
+#if (defined(POSIX) || defined(_POSIX_SOURCE) || defined(_PTHREAD_SEMANTICS)) && (defined(_REENTRANT) || defined(REENTRANT)) && defined(REGINA_REENTRANT)
 #  include "mt_posix.h"
-#elif defined(_WIN64) && defined(REGINA_SINGLE_THREADED)
+#elif ( defined(_WIN64) || defined(_WIN32) ) && defined(REGINA_SINGLE_THREADED)
 #  include "mt_notmt.h"
 #  define SINGLE_THREADED
 #elif defined(_WIN64) && defined(_MT)
-#  include "mt_win32.h"
+#  include "mt_win64.h"
 #elif defined(_WIN32) && defined(_MT)
 #  include "mt_win32.h"
 #elif defined(OS2) && defined(__EMX__) && defined(__MT__) && defined(REGINA_MULTI)

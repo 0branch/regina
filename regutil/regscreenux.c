@@ -18,11 +18,25 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.3 2009/12/30 22:42:49 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.8 2010/06/07 01:20:25 mark Exp $
  */
 #include "regutil.h"
 #ifdef USE_TERMCAP_DB
-# ifdef USE_TERM_H
+# ifdef HAVE_NCURSES_H
+#  include <ncurses.h>
+# elif defined( HAVE_TERM_H )
+#  include <term.h>
+# elif defined( HAVE_TERMCAP_H )
+#  include <termcap.h>
+# endif
+#endif
+#ifdef HAVE_SYS_IOCTL_H
+# include <sys/ioctl.h>
+#endif
+
+#if 0
+#ifdef USE_TERMCAP_DB
+# ifdef HAVE_TERM_H
 #  include <sys/ioctl.h>
 #  include <curses.h>
 #  include <term.h>
@@ -30,6 +44,8 @@
 #  include <termcap.h>
 # endif
 #endif
+#endif
+
 #include <unistd.h>
 #include <termios.h>
 #include <sys/time.h>
@@ -70,11 +86,11 @@ static void sethandles(void)
 rxfunc(syscls)
 {
 #ifdef USE_TERMCAP_DB
-   static char clrbuf[100], * clr = clrbuf;
+   static char clrbuf[100]="", * clr = clrbuf;
 
    if (!*clr) {
       sethandles();
-      clr = tgetstr("cl", &clr);
+      clr = tgetstr("cl", &clrbuf);
    }
 #else
    /* ansi terminal control for clearing the screen should work with any
@@ -111,7 +127,7 @@ rxfunc(syscurpos)
 #ifdef USE_TERMCAP_DB
    if (!*cpos) {
       sethandles();
-      cpos = tgetstr("cm", &cpos);
+      cpos = tgetstr("cm", &cposbuf);
    }
 #endif
 
@@ -162,8 +178,8 @@ rxfunc(syscurstate)
    if (!*css) {
       char *pcss = css;
       sethandles();
-      pcsson = tgetstr("ve", &pcss);
-      pcssoff = tgetstr("vi", &pcss);
+      pcsson = tgetstr("ve", &css);
+      pcssoff = tgetstr("vi", &css);
    }
 #endif
 
@@ -190,11 +206,25 @@ rxfunc(sysgetkey)
    fd_set readfds;
    struct timeval select_tv;
    struct timeval *pselect_tv = NULL;
+   char *echo;
 
    checkparam(0,2);
 
-   if (argc > 0 && argv[0].strptr && (argv[0].strptr[0] == 'N' || argv[0].strptr[0] == 'n'))
-      doecho = false;
+
+   /*
+    * opt can be "N", "NO", or "NOECHO", "ECHO"
+    * The last two to be consistent with ooRexx
+    */
+   if (argc > 0 && argv[0].strptr) {
+      rxstrdup(echo, argv[0]);
+      strupr(echo);
+      if (strcmp(echo,"N") != 0 || strcmp(echo,"NO") != 0 || strcmp(echo,"NOECHO") != 0 )
+         doecho = false;
+      else if (strcmp(echo,"ECHO") != 0 )
+         doecho = true;
+      else
+         return BADARGS;
+   }
 
    if (argc > 1 && argv[1].strptr) {
       select_tv.tv_sec = rxint(argv+1);
@@ -266,10 +296,10 @@ rxfunc(systextscreensize)
    /* if the window-size ioctl is not avaiable, use the COLUMNS and LINES
     * environment variables. These are specified by POSIX, but some systems
     * don't set them correctly. */
-   char * columns = getenv("COLUMNS"), * lines = getenv("LINES");
+   char * mycolumns = getenv("COLUMNS"), * mylines = getenv("LINES");
 
-   if (columns && lines) {
-      result->strlength = sprintf(result->strptr, "%s %s", lines, columns);
+   if (mycolumns && mylines) {
+      result->strlength = sprintf(result->strptr, "%s %s", mylines, mycolumns);
    }
    else {
       static const char commonsize[] = "24 80"; /* a common size... */

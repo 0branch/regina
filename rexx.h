@@ -117,9 +117,14 @@
 #define HAVE_CMATH              /* Do we have std. C math calls ?       */
 #define MATH_TYPES 1            /* How many different types available   */
 
-#define LINELENGTH 1024         /* max linelength of source code        */
+/*#define LINELENGTH 1024 not used */         /* max linelength of source code        */
 /* #define STACKSIZE 400 not used ? */           /* Was 256, then 512 (too much)         */
-#define BUFFERSIZE 1024 /* Was 512 */ /* Size of input buffer, longest line   */
+/*
+ * If you increase BUFFERSIZE you MUST ensure that YY_BUF_SIZE in lexsrc.c
+ * is made larger that BUFFERSIZE.
+ * Increasing this value will slow down parsing a bit.
+ */
+#define BUFFERSIZE 100000 /* Was 512 */ /* Size of input buffer, longest line   */
 #define LOOKAHEAD 256           /* Size of input lookahead              */
 
 #define SMALLSTR 5              /* For holding small integers           */

@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/inifile.c,v 1.1 2009/10/07 07:51:37 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/inifile.c,v 1.2 2011/10/09 01:13:06 mark Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,7 +93,7 @@ static void release_lock(inif_t fit)
 static int take_read_lock(inif_t fit)
 {
    struct stat st;
-   int rc; 
+   int rc;
    struct flock lk;
 
    lk.l_type = F_RDLCK;
@@ -105,7 +105,7 @@ static int take_read_lock(inif_t fit)
 
    rc = fstat(fileno(fit->fp), &st);
    if (rc == -1) return release_lock(fit), -1;
-   
+
    if (fit->mt == st.st_mtime && fit->len == st.st_size) {
       rc = 1;
    }
@@ -121,7 +121,7 @@ static int take_read_lock(inif_t fit)
 static int take_write_lock(inif_t fit)
 {
    struct stat st;
-   int rc; 
+   int rc;
    struct flock lk;
 
    /* file must be opened in write mode */
@@ -141,7 +141,7 @@ static int take_write_lock(inif_t fit)
    fcntl(fileno(fit->fp), F_SETLKW, &lk);
 
    fstat(fileno(fit->fp), &st);
-   
+
    if (fit->mt == st.st_mtime && fit->len == st.st_size) {
       rc = 0;
    }
@@ -193,7 +193,7 @@ static int read_ini_raw(inif_t fit)
 
    fseek(fit->fp, 0, SEEK_SET);
 
-   while ((oldoff = ftell(fit->fp)), 
+   while ((oldoff = ftell(fit->fp)),
           fgets(buf, sizeof(buf), fit->fp) != NULL) {
 
       /* skip leading whitespace */
@@ -369,7 +369,7 @@ static void write_section(inif_t fit, sec_t st)
    fprintf(fit->fp, "[%s]\n", st->name);
    if (st->comment) {
       fprintf(fit->fp, "%s", st->comment);
-   }   
+   }
    for (tvt = st->vals; tvt; tvt = tvt->N) {
       fprintf(fit->fp, "%s=%s\n", tvt->name, tvt->value);
       if (tvt->comment)
@@ -446,7 +446,7 @@ char ** ini_enum_val(inif_t fit, const char * secname, int * pcount)
 char * ini_get_val(inif_t fit, const char * secname, const char * valname)
 {
    value_t val;
-   
+
    read_ini(fit);
    val = find_val(fit, secname, valname);
 
@@ -480,6 +480,7 @@ void ini_set_val(inif_t fit, const char * secname, const char * valname, const c
       tst->name = (char *)(tst+1);
       memcpy(tst->name, secname, sl+1);
       tst->comment = NULL;
+      tst->vals = NULL;
       tst->N = NULL;
       fseek(fit->fp, 0, SEEK_END);
       tst->foff = ftell(fit->fp);
@@ -487,18 +488,18 @@ void ini_set_val(inif_t fit, const char * secname, const char * valname, const c
       if (!fit->sct) {
          fit->sct = tst;
       }
-      else
+      else {
          for (lst = fit->sct; lst->N; lst = lst->N)
             ;
-            
-      lst->N = tst;
+         lst->N = tst;
+      }
    }
 
-   
-   for (lvt = NULL, tvt = tst->vals; tvt; lvt = tvt, tvt = tvt->N)
+
+   for (lvt = NULL, tvt = tst->vals; tvt; lvt = tvt, tvt = tvt->N) {
       if (!strcasecmp(tvt->name, valname))
          break;
-
+   }
 
    /* build a new value structure */
    vl = strlen(valname);
@@ -559,7 +560,7 @@ void ini_del_val(inif_t fit, const char * secname, const char * valname)
       tvt = NULL;
    }
 
-   
+
    /* similarly, if ther is no such value, no need to delete it */
    if (tvt) {
       if (lvt) {
@@ -685,7 +686,7 @@ void ini_close(inif_t fit)
 
    if (fit->fp)
       fclose(fit->fp);
-   
+
    delete_section(fit->sct);
    free(fit);
-}   
+}

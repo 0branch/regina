@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.39 2006/09/15 05:41:01 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.40 2010/12/27 00:47:31 mark Exp $";
 #endif
 
 /*
@@ -964,7 +964,7 @@ s_action    : c_action                 { $$ = $1 ; }
 
 trace_stat  : trace VALUE expr         { $$ = $1 ;
                                          $$->p[0] = $3 ; }
-            | trace expr               { $$ = $1 ;
+            | trace nexpr              { $$ = $1 ;
                                          $$->p[0] = $2 ; }
             | trace whatever error { exiterror( ERR_EXTRA_DATA, 1, __reginatext ) ;}
             | trace whatever           { $$ = $1 ;

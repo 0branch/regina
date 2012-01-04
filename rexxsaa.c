@@ -762,7 +762,7 @@ int IfcDoExit( tsd_t *TSD, int Code,
 EXPORT_C APIRET APIENTRY RexxFreeMemory(PVOID MemoryBlock )
 {
    if (!MemoryBlock)
-      return(RXFUNC_BADTYPE);
+      return RXFUNC_BADTYPE;
 
    return IfcFreeMemory( MemoryBlock );
 }
@@ -1217,7 +1217,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
    StartupInterface(TSD);
 
    if (!RequestBlockList) /* FGC: I assume we must have at least one param */
-      return(RXFUNC_BADTYPE);
+      return RXFUNC_BADTYPE;
 
    if (TSD->systeminfo->tree.root==NULL) /* Doesn't the interpreter run? */
       return RXSHV_NOAVL ;
@@ -1327,7 +1327,7 @@ EXPORT_C APIRET APIENTRY RexxVariablePool(PSHVBLOCK RequestBlockList )
                   else
                      Req->shvret |= RXSHV_BADN ;
 
-                  if (!Req->shvret | RXSHV_BADN)
+                  if ((!Req->shvret) | RXSHV_BADN)
                   {
                      rc=IfcVarPool( TSD, Code, Lengths, Strings, &allocated );
                      FillReqValue( Req, Lengths[0], Strings[0] ) ;

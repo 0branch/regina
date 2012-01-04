@@ -19,7 +19,10 @@
 #ifndef _UTSNAME_ALREADY_DEFINED_
 #define _UTSNAME_ALREADY_DEFINED_
 
-#define _UTSNAME_LENGTH 32
+/*
+ * Make the fields very long. At least on OS X, these are this long!
+ */
+#define _UTSNAME_LENGTH 256
 
 struct regina_utsname
 {

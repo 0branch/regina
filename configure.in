@@ -17,6 +17,8 @@ AC_SUBST(VER_DATE)
 AC_SUBST(VER_MAJOR)
 AC_SUBST(VER_MINOR)
 AC_SUBST(VER_SUPP)
+cp $srcdir/common/config.guess $srcdir
+cp $srcdir/common/config.sub $srcdir
 
 dnl ---------------------- check for C compiler -----------------
 dnl Checks for one of the C compilers below - change if yours not there.
@@ -28,6 +30,16 @@ AC_ISC_POSIX
 
 dnl Checks for system first
 AC_CANONICAL_SYSTEM
+
+MH_HAVE_PROTO
+if test "$mh_have_proto" = "no"; then
+   AC_MSG_ERROR(Regina requires an ANSI compiler; cannot continue)
+fi
+
+dnl
+dnl include our 32/64bit tests
+dnl
+sinclude(common/inclibarch.m4)
 
 mymakefile="Makefile"
 on_qnx4=no
@@ -43,7 +55,7 @@ case "$target" in
 #     mymakefile="Makefile.aix"
       ;;
    *apple-darwin*)
-      MH_CHECK_OSX_ARCH()
+      dnl valid_arch_flags is set in inclibarch.m4
       SYS_DEFS="$valid_arch_flags"
       EEXTRA="$valid_arch_flags"
       ;;
@@ -90,35 +102,28 @@ case "$target" in
    *beos*)
       on_beos=yes
       ;;
+   *minix*)
+      SYS_DEFS="-D__MINIX__"
+      ;;
 esac
 AC_SUBST(SYS_DEFS)
-
-dnl
-dnl include our 32/64bit tests
-dnl
-sinclude(common/inclibarch.m4)
 
 AC_SUBST(GCI_CONVERT_HEADER)
 
 dnl Check for dynamic shared library support libraries
-MH_EXTRA_LIBS=""
-MH_CHECK_LIB(dld dl)
-SHLIBS="${MH_EXTRA_LIBS}"
+#MH_EXTRA_LIBS=""
+#MH_CHECK_LIB(dld dl)
+#SHLIBS="${MH_EXTRA_LIBS}"
 
 dnl Check for extra required libraries - don't include libfl or libl
-MH_EXTRA_LIBS=""
-MH_CHECK_LIB(m nsl nsl_s socket net)
+#MH_EXTRA_LIBS=""
+#MH_CHECK_LIB(m nsl nsl_s socket net network)
 dnl -- check for crypt library and function
-MH_CHECK_CRYPT
+#MH_CHECK_CRYPT
 if test "$on_qnx4" = "no"; then
   AC_PROG_LEX
 fi
-BOTHLIBS="${LEXLIB} ${MH_EXTRA_LIBS}"
-
-MH_HAVE_PROTO
-if test "$mh_have_proto" = "no"; then
-   AC_MSG_ERROR(Regina requires an ANSI compiler; cannot continue)
-fi
+#BOTHLIBS="${LEXLIB} ${MH_EXTRA_LIBS}"
 
 AC_PROG_RANLIB
 
@@ -159,6 +164,7 @@ AC_CHECK_HEADERS( \
    stdlib.h \
    stdint.h \
    string.h \
+   sys/ioctl.h \
    sys/mount.h \
    sys/poll.h \
    sys/resource.h \
@@ -171,6 +177,7 @@ AC_CHECK_HEADERS( \
    sys/time.h \
    sys/utsname.h \
    sys/wait.h \
+   term.h \
    termcap.h \
    time.h \
    unistd.h \
@@ -179,9 +186,10 @@ AC_CHECK_HEADERS( \
 
 AC_CHECK_FUNCS(sysconf div raise putenv usleep random ftruncate \
    memcpy memmove strerror strerror_r gettimeofday ftime poll \
-   _fullpath vsprintf _splitpath2 _splitpath sigaction \
+   _fullpath vsprintf _splitpath2 _splitpath sigaction strtof \
    lstat mkstemp inet_ntop gmtime_r localtime_r \
    getgrgid_r getpwuid_r gethostbyname_r \
+   atoll fseeko ftello \
    readlink realpath getbootfile tgetstr statfs mbstowcs mmap iconv)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
@@ -232,15 +240,69 @@ fi
 AC_SUBST(FNMATCH)
 AC_SUBST(FNMATCH_SHO)
 AC_SUBST(FNMATCH_TSO)
+
 dnl
 dnl where are termcap functions
-AC_SEARCH_LIBS(tgetent, [ncurses termcap curses termlib],REGUTIL_TERM_LIB="$ac_cv_search_tgetent",REGUTIL_TERM_LIB="")
-AC_SUBST(REGUTIL_TERM_LIB)
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(tgetent,[ncurses termcap curses termlib],REGUTIL_TERM_LIB="$ac_cv_search_tgetent",REGUTIL_TERM_LIB="")
+if test "$REGUTIL_TERM_LIB" = "none required" -o "$REGUTIL_TERM_LIB" = "no"; then
+  REGUTIL_TERM_LIB=""
+fi
+LIBS="$save_LIBS"
 
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(crypt,crypt,REGINA_CRYPT_LIB="$ac_cv_search_crypt",REGINA_CRYPT_LIB="")
+if test "$REGINA_CRYPT_LIB" = "none required" -o "$REGINA_CRYPT_LIB" = "no"; then
+  REGINA_CRYPT_LIB=""
+fi
+LIBS="$save_LIBS"
+
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(dlopen,dl,REGINA_DLOPEN_LIB="$ac_cv_search_dlopen",REGINA_DLOPEN_LIB="")
+if test "$REGINA_DLOPEN_LIB" = "none required" -o "$REGINA_DLOPEN_LIB" = "no"; then
+  REGINA_DLOPEN_LIB=""
+fi
+LIBS="$save_LIBS"
+
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(shl_load,dld,REGINA_SHL_LOAD_LIB="$ac_cv_search_shl_load",REGINA_SHL_LOAD_LIB="")
+if test "$REGINA_SHL_LOAD_LIB" = "none required" -o "$REGINA_SHL_LOAD_LIB" = "no"; then
+  REGINA_SHL_LOAD_LIB=""
+fi
+LIBS="$save_LIBS"
+
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(socket,[socket network],REGINA_SOCKET_LIB="$ac_cv_search_socket",REGINA_SOCKET_LIB="")
+if test "$REGINA_SOCKET_LIB" = "none required" -o "$REGINA_SOCKET_LIB" = "no"; then
+  REGINA_SOCKET_LIB=""
+fi
+LIBS="$save_LIBS"
+
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(gethostbyname,[nsl socket network],REGINA_GETHOSTBYNAME_LIB="$ac_cv_search_gethostbyname",REGINA_GETHOSTBYNAME_LIB="")
+if test "$REGINA_GETHOSTBYNAME_LIB" = "none required" -o "$REGINA_GETHOSTBYNAME_LIB" = "no"; then
+  REGINA_GETHOSTBYNAME_LIB=""
+fi
+LIBS="$save_LIBS"
+
+#MH_CHECK_LIB(m nsl nsl_s socket net network)
 dnl
 dnl include our debugging switch checking
 dnl
 sinclude(common/incdebug.m4)
+
+dnl --------------- allow --with-staticfunctions to enable linking external function packages statically
+dnl must be called before MH_SHARED_LIBRARY
+AC_ARG_WITH(staticfunctions,
+   [  --with-staticfunctions  enable static linking of external function packages],
+   [with_staticfunctions=$withval],
+   [with_staticfunctions=no],
+)
+if test "$with_staticfunctions" = "yes" -o "$on_qnx4" = "yes"; then
+   build_static="yes"
+else
+   build_static="no"
+fi
 
 dnl --------------- allow --enable-orexx-binary-compatible to enable binary compatibility with ORexx
 AC_ARG_ENABLE(orexx-binary-compatible,
@@ -259,6 +321,10 @@ AC_ARG_ENABLE(posix-threads,
         [enable_posix_threads=no],
         [enable_posix_threads=yes],
 )
+dnl if we are building statically, force thread support off
+if test "$build_static" = "yes"; then
+   enable_posix_threads="no"
+fi
 
 dnl --------------- allow --disable-gci to disable General Call Interface
 AC_ARG_ENABLE(gci,
@@ -283,6 +349,13 @@ fi
 dnl enable_posix_threads="yes"
 MH_CHECK_POSIX_THREADS
 if test "$mh_has_pthreads" = yes; then
+   AC_SEARCH_LIBS(pthread_exit,[pthread pthreads c_r],REGINA_PTHREAD_LIB="$ac_cv_search_pthread_exit",REGINA_PTHREAD_LIB="")
+   if test "$REGINA_PTHREAD_LIB" = "none required" -o "$REGINA_PTHREAD_LIB" = "no"; then
+     AC_SEARCH_LIBS(sem_init,[pthread pthreads c_r],REGINA_PTHREAD_LIB="$ac_cv_search_sem_init",REGINA_PTHREAD_LIB="")
+     if test "$REGINA_PTHREAD_LIB" = "none required" -o "$REGINA_PTHREAD_LIB" = "no"; then
+       REGINA_PTHREAD_LIB=""
+     fi
+   fi
    save_cflags="$CFLAGS"
    CFLAGS="$CFLAGS $THREADING_COMPILE"
 #
@@ -320,6 +393,81 @@ else
    REGINAMULTITHREAD="no"
 fi
 AC_SUBST(REGINAMULTITHREAD)
+if test "$build_static" = "yes"; then
+   STATICLD_SHO="staticld.so.o rxpack.so.o"
+   if test "$on_qnx4" = "yes"; then
+      with_regutil="yes"
+      MH_STATIC_LOADING(regutil)
+   else
+      MH_STATIC_LOADING
+   fi
+else
+   STATICLD_SHO=""
+dnl --------------- Check how to make shared libraries -------------------
+dnl MH_SHARED_LIBRARY must be called after determining if POSIX threads is specified
+   MH_SHARED_LIBRARY
+
+dnl --------------- Check if underscore is needed in loadable modules ----
+dnl MH_CHECK_LEADING_USCORE must be called after processing --with-dlfcn[inc,lib]dir switches
+   MH_CHECK_LEADING_USCORE
+fi
+AC_SUBST(STATICLD_SHO)
+MH_SET_SHLPST
+
+dnl
+dnl Check for large file support
+dnl
+MH_LARGE_FILE_SUPPORT
+dnl libraries for libregina.so.*
+#if test "$with_staticfunctions" = "yes"; then
+#   DYNAMIC_LIBRARY_LIBS=""
+#else
+#   DYNAMIC_LIBRARY_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_DLOPEN_LIB $REGINA_SHL_LOAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB"
+#   DYNAMIC_REGUTIL_TERM_LIB="$REGUTIL_TERM_LIB"
+#   AC_SUBST(DYNAMIC_REGUTIL_TERM_LIB)
+#fi
+#AC_SUBST(DYNAMIC_LIBRARY_LIBS)
+dnl libraries for regina, execiser
+#DYNAMIC_BINARY_LIBS="-L. -lregina"
+#AC_SUBST(DYNAMIC_BINARY_LIBS)
+
+
+dnl libraries for binaries associated with external queues; rxqueue, rxstack
+STACK_BINARY_LIBS="$REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB"
+AC_SUBST(STACK_BINARY_LIBS)
+dnl libraries for rexx
+REXX_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGINA_PTHREAD_LIB"
+AC_SUBST(REXX_BINARY_LIBS)
+#STATIC_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGINA_PTHREAD_LIB"
+#AC_SUBST(STATIC_BINARY_LIBS)
+if test "$build_static" = "yes"; then
+   dnl libraries for adding to regina-config --libs
+   REGINA_CONFIG_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB"
+   dnl libraries for libregina.lib
+   LIBREGINA_BINARY_LIBS=""
+   dnl libraries for regina
+   REGINA_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB"
+   dnl libraries for threader
+   THREADER_BINARY_LIBS="-L. -lrexx $REGINA_PTHREAD_LIB"
+   dnl libraries for execiser
+   EXECISER_BINARY_LIBS="-L. -lrexx $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB"
+else
+   dnl libraries for adding to regina-config --libs
+   REGINA_CONFIG_LIBS=""
+   dnl libraries for libregina.so
+   LIBREGINA_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_DLOPEN_LIB $REGINA_SHL_LOAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB"
+   dnl libraries for regina
+   REGINA_BINARY_LIBS="-L. -lregina"
+   dnl libraries for threader
+   THREADER_BINARY_LIBS="-L. -lregina $REGINA_PTHREAD_LIB"
+   dnl libraries for execiser
+   EXECISER_BINARY_LIBS="-L. -lregina"
+fi
+AC_SUBST(LIBREGINA_BINARY_LIBS)
+AC_SUBST(REGINA_BINARY_LIBS)
+AC_SUBST(THREADER_BINARY_LIBS)
+AC_SUBST(EXECISER_BINARY_LIBS)
+AC_SUBST(REGINA_CONFIG_LIBS)
 
 dnl --------------- allow --enable-tracemem to enable internal memory tracing
 AC_ARG_ENABLE(tracemem,
@@ -360,32 +508,15 @@ else
 fi
 AC_SUBST(REXXSOCKET)
 
-dnl --------------- allow --with-staticfunctions to enable linking external function packages statically
-dnl must be called before MH_SHARED_LIBRARY
-AC_ARG_WITH(staticfunctions,
-   [  --with-staticfunctions  enable static linking of external function packages],
-   [with_staticfunctions=$withval],
-   [with_staticfunctions=no],
+dnl --------------- allow --with-addon-dir to specify location of external function packages
+AC_ARG_WITH(addon-dir,
+   [  --with-addon-dir=dir    location of external function packages (default blank)],
+   [with_addon_dir=$withval],
+   [with_addon_dir=no],
 )
-if test "$with_staticfunctions" = "yes" -o "$on_qnx4" = "yes"; then
-   STATICLD_SHO="staticld.so.o rxpack.so.o"
-   if test "$with_staticfunctions" = "no"; then
-      MH_STATIC_LOADING(regutil)
-   else
-      MH_STATIC_LOADING
-   fi
-else
-   STATICLD_SHO=""
-dnl --------------- Check how to make shared libraries -------------------
-dnl MH_SHARED_LIBRARY must be called after determining if POSIX threads is specified
-   MH_SHARED_LIBRARY
-
-dnl --------------- Check if underscore is needed in loadable modules ----
-dnl MH_CHECK_LEADING_USCORE must be called after processing --with-dlfcn[inc,lib]dir switches
-   MH_CHECK_LEADING_USCORE
+if test "$with_addon_dir" != no; then
+   AC_DEFINE_UNQUOTED(HAVE_REGINA_ADDON_DIR,"$with_addon_dir")
 fi
-AC_SUBST(STATICLD_SHO)
-MH_SET_SHLPST
 dnl
 MH_CHECK_RPM
 
@@ -439,7 +570,7 @@ else
    myopts="$myopts SOCKET=$with_socket"
 fi
 
-if test "$with_staticfunctions" = "yes"; then
+if test "$build_static" = "yes"; then
    myfuncs=""
    if test "$with_testpackage" = "yes"; then
       myfuncs="$myfuncs test"
@@ -473,6 +604,12 @@ if test "$with_staticfunctions" = "yes"; then
    fi
    if test "$with_rexxdw" = "yes"; then
       myfuncs="$myfuncs rexxdw"
+   fi
+   if test "$with_rexxcsv" = "yes"; then
+      myfuncs="$myfuncs rexxcsv"
+   fi
+   if test "$with_rexxpdf" = "yes"; then
+      myfuncs="$myfuncs rexxpdf"
    fi
    echo "          Static Loaded Packages: $myfuncs"
 fi

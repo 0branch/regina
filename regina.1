@@ -13,6 +13,8 @@ regina \- The Regina Rexx Interpreter
 
 .B rexx
 [
+.I options
+] [
 .I script
 [
 .I scriptparams
@@ -22,7 +24,7 @@ regina \- The Regina Rexx Interpreter
 will read the file named as
 .I script
 and will assume the contents of that file to be a Rexx program and
-will interpret that program. Any parameters following 
+will interpret that program. Any parameters following
 .I script
 will be interpreted as the parameters to the Rexx program. If
 .I script
@@ -75,7 +77,7 @@ Displays Regina version and exits.
 .IP \-a
 Changes the way that arguments passed on the command line are made
 available to the called Rexx program. With this switch each parameter on the
-command line is available as a seperate argument, rather then the normal
+command line is available as a separate argument, rather then the normal
 behaviour of only making the combined command line arguments available as one
 internal argument.
 
@@ -104,16 +106,16 @@ more complete description of each function, see the documentation
 accompanying Regina.
 
 .IP ABBREV(long,short[,length])
-Returns `1' or 0', depending on whether 
+Returns `1' or 0', depending on whether
 .I short
 is an abbreviation of
 .I long
-, or at least 
+, or at least
 .I length
 characters.
 
 .IP ABS(number)
-Returns the absolute value of 
+Returns the absolute value of
 .I number.
 
 .IP ADDRESS()
@@ -124,7 +126,7 @@ Without parameters, it returns the number of parameters. If only
 `argno' is specified, it must be a number, and that parameter is
 returned. `Option' can be `E', `N' or `O', and then either `0' or
 `1' is returned, depending on whether the numbered parameter existed
-or was ommitted. The option `N' is the same as not specifying an
+or was omitted. The option `N' is the same as not specifying an
 option.
 
 .IP B2X(binstring)
@@ -150,7 +152,7 @@ Converts the character string `string' to a hex-string.
 .IP CENTER(string,length[,padchar])
 .IP CENTRE(string,length[,padchar])
 Centers `string' in a string of `length' characters, using `padchar'
-for padding, if neccessary.
+for padding, if necessary.
 
 .IP CHARIN([streamid][,[start][,length]])
 Read `length' (default is 1)
@@ -174,7 +176,7 @@ the standard input stream).
 .IP COMPARE(string1,string2[,padchar])
 Returns `0' or `1', depending on whether the two strings are equal.
 The shorter string is padded with `padchar', or space if padchar is
-ommitted.
+omitted.
 
 .IP CONDITION([option])
 Performs various operations on streams, see other documentation.
@@ -219,7 +221,7 @@ Converts the decimal number `integer' to a hex-string of length
 
 .IP ERRORTEXT(errno)
 Returns the error text associated with error number `errno'.
-'errno' can specify a sub-error number in the format n.n. eg. 40.1
+`errno' can specify a sub-error number in the format n.n. eg. 40.1
 
 .IP FORM()
 Returns the current setting of NUMERIC FORM.

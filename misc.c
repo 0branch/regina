@@ -438,7 +438,9 @@ const char *system_type( void )
    return "SKYOS" ;
 #elif defined(__CYGWIN__)
    return "UNIX" ;
-#elif defined(WIN32)
+#elif defined(WIN64) || defined(_WIN64)
+   return "WIN64" ;
+#elif defined(WIN32) || defined(_WIN32)
    return "WIN32" ;
 #elif defined(_AMIGA) || defined(AMIGA)
    return "AMIGA" ;
@@ -446,6 +448,8 @@ const char *system_type( void )
    return "QNX" ;
 #elif defined(__BEOS__)
    return "BEOS" ;
+#elif defined(__HAIKU__)
+   return "HAIKU" ;
 #elif defined(__WINS__)
    return "EPOC32-WINS" ;
 #elif defined(__EPOC32__)

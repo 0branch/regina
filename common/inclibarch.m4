@@ -4,6 +4,25 @@ dnl Determine if the platform can handle 64 bit binaries
 dnl
 dnl Assumes AC_CANONICAL_SYSTEM has already been called
 dnl assumes we are on a 32bit system
+
+dnl ---------------------- check 32/64 bit -----------------------
+dnl allow --with-32bit to ensure that 32bit libraries are used
+AC_ARG_ENABLE(32bit,
+   [  --enable-32bit          specify if 32bit libraries are to be used],
+   [bitflag32=yes],
+   [bitflag32=no],
+)
+dnl allow --with-64bit to ensure that 64bit libraries are used
+AC_ARG_ENABLE(64bit,
+   [  --enable-64bit          specify if 64bit libraries are to be used],
+   [bitflag64=yes],
+   [bitflag64=no],
+)
+
+#
+# Now do platform specific tests
+#
+on_osx="no"
 osis64bit=no
 bitflag=""
 case "$target" in
@@ -33,9 +52,16 @@ case "$target" in
       ;;
    sparc*sunos*)
       ;;
-   *linux*)
+   *linux*|*kfreebsd*-gnu*)
       mach="`uname -m`"
-      if test "$mach" = "x86_64" -o "$mach" = "ia86" -o "$mach" = "alpha" -o "$mach" = "ppc64"; then
+      if test "$mach" = "x86_64" -o "$mach" = "ia86" -o "$mach" = "alpha" -o "$mach" = "ppc64" -o "$mach" = "s390x"; then
+         bitflag="64"
+         osis64bit=yes
+      fi
+      ;;
+   *-freebsd*)
+      mach="`uname -m`"
+      if test "$mach" = "amd64"; then
          bitflag="64"
          osis64bit=yes
       fi
@@ -48,21 +74,15 @@ case "$target" in
       ;;
    *cygwin*)
       ;;
+   *apple-darwin*)
+      on_osx="yes"
+      osx_64bit=`sysctl hw.cpu64bit_capable | cut -f2 -d' '`
+      if test $osx_64bit -eq 1; then
+         bitflag="64"
+         osis64bit=yes
+      fi
+      ;;
 esac
-
-dnl ---------------------- check 32/64 bit -----------------------
-dnl allow --with-32bit to ensure that 32bit libraries are used
-AC_ARG_ENABLE(32bit,
-   [  --enable-32bit          specify if 32bit libraries are to be used],
-   [bitflag32=yes],
-   [bitflag32=no],
-)
-dnl allow --with-64bit to ensure that 64bit libraries are used
-AC_ARG_ENABLE(64bit,
-   [  --enable-64bit          specify if 64bit libraries are to be used],
-   [bitflag64=yes],
-   [bitflag64=no],
-)
 
 if test "x$bitflag32" = "xyes" -a "x$bitflag64" = "xyes"; then
    AC_MSG_ERROR(--enable-32bit and --enable-64bit flags cannot both be specified.)
@@ -85,6 +105,12 @@ dnl
 dnl following variable used to name 32bit binaries on a 64bit system
 dnl allows 32bit and 64bit binaries t co-exist on a 64bit system
 AC_SUBST(binarybitprefix)
+
+dnl --------------- allow --with-osx-universal to specify which architectures to build universal binaries
+dnl
+if test "$on_osx" = "yes"; then
+MH_CHECK_OSX_ARCH()
+else
 
 dnl
 dnl Now set the correct compiler flags
@@ -111,6 +137,8 @@ elif test "$ac_cv_prog_CC" = "xlc" -o "$ac_cv_prog_CC" = "xlC"; then
    fi
 fi
 
+fi
+
 dnl
 dnl If the user hasn't specified libdir, check if there is a /usr/lib32 or /usr/lib64
 dnl
@@ -123,7 +151,7 @@ if test "$libdir" = '${exec_prefix}/lib'; then
          libdir32='${exec_prefix}/lib32'
          libdir64='${exec_prefix}/lib'
       else
-         libdir64='${exec_prefix}/lib64'
+         libdir64='${exec_prefix}/lib'
          libdir32='${exec_prefix}/lib'
       fi
    else

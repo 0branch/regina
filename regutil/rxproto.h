@@ -18,11 +18,12 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/rxproto.h,v 1.5 2009/12/30 22:43:02 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/rxproto.h,v 1.7 2010/07/02 22:02:07 mark Exp $
  */
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+#include "configur.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -170,5 +171,7 @@ char * strlwr(char * s);
 #elif defined(HAVE_TERMCAP_H)
 # define USE_TERMCAP_DB 1
 #elif defined(HAVE_CURSES_H)
+# define USE_TERMCAP_DB 1
+#elif defined(HAVE_TERM_H)
 # define USE_TERMCAP_DB 1
 #endif

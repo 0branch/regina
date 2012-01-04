@@ -193,6 +193,9 @@
 # if defined(DYNAMIC)
 #  define DYNAMIC_WIN32
 # endif
+# define HAVE_I64U
+# define HAVE__STATI64
+# define HAVE__ATOI64
 #endif
 
 #if defined(DOS) && defined(__WATCOMC__)
@@ -241,6 +244,12 @@
 # if defined(DYNAMIC)
 #  define DYNAMIC_WIN32
 # endif
+/*
+ * Following for large file support
+ */
+# define HAVE_I64U
+# define HAVE__STATI64
+# define HAVE__ATOI64
 #endif
 
 #if defined(WIN32) && defined(__BORLANDC__)
@@ -320,6 +329,11 @@
 # if defined(DYNAMIC)
 #  define DYNAMIC_WIN32
 # endif
+/*
+ * Following for large file support
+ */
+# define HAVE_I64U
+# define HAVE__STATI64
 #endif
 
 #if defined(WIN32) && defined(__LCC__)
@@ -688,6 +702,10 @@
  * Indicates if a new thread calls an API function the call occurs in the current (and only one) instance of an interpreter
  */
 #define DEFAULT_SINGLE_INTERPRETER      0
+/*
+ * Indicates that Regina allows single line comments by default
+ */
+#define DEFAULT_SINGLE_LINE_COMMENTS    1
 
 /*
  * The FILE_SEPARATOR is one character, and defines the char that separates

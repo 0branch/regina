@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.10 2010/01/01 00:00:41 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.14 2011/12/31 08:41:20 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSMISC
@@ -34,7 +34,7 @@
 # include <sys/utsname.h>
 # include <sys/param.h>
 # include <sys/time.h>
-# if !defined(QNX4) && !defined(__EMX__) && !defined(__BEOS__)
+# if !defined(__QNX__) && !defined(__EMX__) && !defined(__BEOS__)
 #  include <sys/resource.h>
 #  include <poll.h>
 # endif
@@ -264,7 +264,7 @@ rxfunc(sysini)
    else
       key = NULL;
 
-   if (argc > 3 && argv[3].strlength > 0)
+   if (argc > 3)
       rxstrdup(val, argv[3]);
    else
       val = NULL;
@@ -434,8 +434,12 @@ rxfunc(sysutilversion)
    /* not sure what number to return. I'm not strictly compatible with IBM
     * 2.00, so I say 1.30. I'll always make my version numbers different
     * from IBM's (unless I actually catch up on the implementation) */
+    /* if building with Regina use its version */
+#ifdef REGINA_VERSION_MAJOR
+   static const char version[] = REGINA_VERSION_MAJOR "." REGINA_VERSION_MINOR REGINA_VERSION_SUPP;
+#else
    static const char version[] = "1.30";
-
+#endif
    memcpy(result->strptr, version, sizeof(version)-1);
    result->strlength = sizeof(version)-1;
    return 0;
@@ -775,8 +779,9 @@ rxfunc(syssetpriority)
    }
 
    rc = SetThreadPriority(GetCurrentThread(), prio);
-#elif defined(QNX4)
+#elif defined(__QNX__)
 #elif defined(__BEOS__)
+#elif defined(__HAIKU__)
 #elif defined(__EMX__)
 #else
    rc = setpriority(PRIO_PROCESS, 0, -prio);
@@ -948,7 +953,7 @@ rxfunc(sysvolumelabel)
 
 rxfunc(syswaitnamedpipe)
 {
-#if defined( QNX4 ) || defined(__EMX__) || defined(__BEOS__)
+#if defined( __QNX__ ) || defined(__EMX__) || defined(__BEOS__)
    strcpy(result->strptr, notimp);
    result->strlength = sizeof(notimp)-1;
 #else
