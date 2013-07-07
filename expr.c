@@ -541,6 +541,7 @@ streng *evaluate( tsd_t *TSD, nodeptr thisptr, streng **kill )
             /*
              * We are in an internal routine...
              */
+            traceline( TSD, entry, TSD->trace_stat, 0 );
             set_reserved_value( TSD, POOL0_SIGL, NULL, TSD->currentnode->lineno, VFLAG_NUM );
             args = initplist( TSD, thisptr );
 

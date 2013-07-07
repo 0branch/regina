@@ -49,10 +49,21 @@ typedef struct _nstackbox {
 } nstackbox;
 
 typedef struct _stackelem {
-   int                number ;
+#ifdef OPT_DO
+   int                strmath; /* 0 if we can do binary arithmetic for this DO loop */
+   /* DO ... FOR x: value of x */
+   num_descr *        do_for_val;
+   rx_64              do_for_val_num ;
+#else
+   int                number;
+#endif
    int                incrdir ;
    num_descr *        increment ;
+   /* DO ... TO x: value of x */
    num_descr *        stopval ;
+#ifdef OPT_DO
+   rx_64              stopval_num;
+#endif
    nodeptr            thisptr ;
    cnodeptr           incr_node;
    struct _stackelem *prev ; /* needed for a look back */
@@ -403,6 +414,13 @@ static void stack_destroyelement(const tsd_t *TSD,stackelem *se)
       free_a_descr(TSD,se->stopval);
       se->stopval = NULL;
    }
+#ifdef OPT_DO
+   if (se->do_for_val)
+   {
+      free_a_descr(TSD,se->do_for_val);
+      se->do_for_val = NULL;
+   }
+#endif
    if (se->increment)
    {
       free_a_descr(TSD,se->increment);
@@ -501,7 +519,7 @@ streng *interpret(tsd_t * volatile TSD, treenode * volatile thisptr)
    volatile unsigned stktrigger ;
    volatile unsigned nstktrigger ;
    nodeptr innerloop=NULL ;
-   num_descr *tdescr=NULL ;
+   num_descr *doiterdescr=NULL ;
    volatile nodeptr secure_this ;
    tsd_t * volatile secure_TSD ;
    itp_tsd_t * volatile it;
@@ -532,7 +550,7 @@ streng *interpret(tsd_t * volatile TSD, treenode * volatile thisptr)
          TSD = secure_TSD ;
          it = (itp_tsd_t *)TSD->itp_tsd ;
 
-         tdescr = NULL ;
+         doiterdescr = NULL ;
          innerloop = NULL ;
          memset(&s,0,sizeof(s));
 
@@ -545,7 +563,7 @@ streng *interpret(tsd_t * volatile TSD, treenode * volatile thisptr)
    }
    memset(&s,0,sizeof(s));
    no_next_interactive = 0 ;
-   tdescr = NULL ;
+   doiterdescr = NULL ;
    innerloop = NULL ;
 
 reinterpret:
@@ -632,14 +650,25 @@ reinterpret:
          }
 
          s.incr_node = NULL;
-         s.increment = s.stopval = tdescr = NULL ;
+#ifdef OPT_DO
+         s.increment = s.do_for_val = s.stopval = doiterdescr = NULL ;
+         s.do_for_val_num = -1 ;
+         s.strmath = 0; /* do numeric calculations by default */
+#else
+         s.increment = s.stopval = doiterdescr = NULL ;
+         s.number = -1;
+#endif
          s.incrdir = 1 ;
-         s.number = -1 ;
          tmpstr = NULL ;
-         tdescr = NULL ;
+         /*
+          * If we have a named variable as the iterator, get itl its in tmpstr
+          */
          if ((thisptr->p[0])&&(thisptr->p[0]->name))
             tmpstr = evaluate( TSD, thisptr->p[0]->p[0], &tmpkill );
-
+         /*
+          * For each of the 4 types of options for the DO command that involve evaluation of a number
+          * at the start of the loop, evaluate the starting value of that expression
+          */
          for (i=1;i<4;i++)
          {
             if ((thisptr->p[0])&&(thisptr->p[0]->p[i]))
@@ -648,33 +677,83 @@ reinterpret:
                switch( thisptr->p[0]->p[i]->type )
                {
                   case X_DO_TO:
+                  {
+#ifdef OPT_DO
+                     int error ;
+                     rx_64 iptr;
+                     streng *chptr,*chkill;
+                     num_descr *tmpnum;
+#endif
+                     /* DO ... TO x: s.stopval is the value of x; x evaluates to any decimal number */
                      tmpptr = thisptr->p[0]->p[i]->p[0] ;
+#ifdef OPT_DO
+                     chptr = evaluate(TSD, tmpptr, &chkill );
+                     if ( !myiswnumber( TSD, chptr, &s.stopval, 1 ) )
+                        exiterror( ERR_INVALID_INTEGER, (thisptr->p[0]->p[i]->type==X_DO_EXPR) ? 2 : 3, chptr->value );
+                     s.stopval_num = streng_to_rx64(TSD, chptr, &error);
+                     if ( error )
+                        s.strmath = 1; /* have to use string math for this loop */
+                     if ( chkill )
+                        Free_stringTSD( chkill );
+#else
                      s.stopval = calcul(TSD,tmpptr,NULL) ;
+#endif
                      break ;
-
+                  }
                   case X_DO_BY:
+                     /* DO ... BY x: s.increment is the value of x; x evaluates to any decimal number, s.incrdir is the "direction", +ve or -ve */
                      s.incr_node = thisptr->p[0]->p[i]->p[0] ;
                      tmpptr = thisptr->p[0]->p[i]->p[0] ;
                      s.increment = calcul(TSD,tmpptr,NULL) ;
                      s.incrdir = descr_sign( s.increment ) ;
+/*
+fprintf(stderr,"%s %d: direction: %d increment %s neg %d exp %d\n",__FILE__,__LINE__, s.incrdir,
+s.increment->num,
+s.increment->negative ,
+s.increment->exp
+);
+*/
                      break ;
 
                   case X_DO_FOR:
                   case X_DO_EXPR:
                   {
+                     /* DO x or DO .. FOR x: s.do_for_val_num is the value of x; x evaluates to any WHOLE number */
+#ifdef OPT_DO
+                     int error ;
+                     rx_64 iptr;
+#else
                      int iptr, error ;
+#endif
                      streng *chptr,*chkill;
+#ifdef OPT_DO
+                     num_descr *tmpnum;
+#endif
 
                      tmpptr = thisptr->p[0]->p[i]->p[0] ;
                      chptr = evaluate(TSD, tmpptr, &chkill );
+#ifdef OPT_DO
+                     if ( !myiswnumber( TSD, chptr, &tmpnum, 1 )
+                     ||  tmpnum->negative )
+                        exiterror( ERR_INVALID_INTEGER, (thisptr->p[0]->p[i]->type==X_DO_EXPR) ? 2 : 3, chptr->value );
+
+                     s.do_for_val = calcul(TSD,tmpptr,NULL) ;
+                     iptr = streng_to_rx64(TSD, chptr, &error);
+#else
                      iptr = streng_to_int(TSD, chptr, &error);
+#endif
                      if ( error )
+#ifdef OPT_DO
+                        s.strmath = 1; /* have to use string math for this loop */
+                     s.do_for_val_num = iptr ;
+#else
                         exiterror( ERR_INVALID_INTEGER, (thisptr->p[0]->p[i]->type==X_DO_EXPR) ? 2 : 3, chptr->value );
                      if ( iptr < 0 )
                         exiterror( ERR_INVALID_RESULT, 0 );
-                     s.number = iptr ;
+                     s.number = iptr;
+#endif
                      if ( chkill )
-                     Free_stringTSD( chkill );
+                        Free_stringTSD( chkill );
                      break ;
                   }
                }
@@ -686,11 +765,20 @@ reinterpret:
              * Normalise the iterator for the DO loop; must be a number.
              */
             setshortcut( TSD, thisptr->p[0], str_normalize( TSD, tmpstr ) );
-            tdescr = shortcutnum( TSD, thisptr->p[0] );
+            doiterdescr = shortcutnum( TSD, thisptr->p[0] );
             if ( tmpkill )
                Free_stringTSD( tmpkill );
+/*
+fprintf(stderr,"%s %d: After normalise: iter %s neg %d exp %d\n",__FILE__,__LINE__,
+doiterdescr->num,
+doiterdescr->negative ,
+doiterdescr->exp
+);
+*/
          }
-
+#ifdef OPT_DO
+fprintf(stderr,"%s %d: Using %s arithmetic for DO\n",__FILE__,__LINE__,(s.strmath) ? "string" : "numeric" );
+#endif
          if (TSD->systeminfo->interactive)
          {
             if (intertrace(TSD))
@@ -706,29 +794,61 @@ reinterpret:
                   free_a_descr( TSD, s.stopval ) ;
                   s.stopval = NULL ;
                }
+#ifdef OPT_DO
+               if (s.do_for_val)
+               {
+                  free_a_descr( TSD, s.do_for_val ) ;
+                  s.do_for_val = NULL ;
+               }
+#endif
                goto fakerecurse ;
             }
          }
 startloop:
          if (thisptr->p[0])
          {
+            /*
+             * If we have a TO value to terminate the loop, check if the value of the iterator (doiterdescr)
+             * ???
+             */
             if (s.stopval)
             {
                int tsign ;
 
-               tsign = string_test( TSD, tdescr, s.stopval ) ;
+               tsign = string_test( TSD, doiterdescr, s.stopval ) ;
+/*
+fprintf(stderr,"%s %d: tsign %d\n",__FILE__,__LINE__,tsign);
+*/
                if (!(tsign ^ s.incrdir))
                   goto endloop ;
+/*
+fprintf(stderr,"%s %d\n",__FILE__,__LINE__);
+*/
             }
 
+            /*
+             * If we have a FOR value to terminate the loop, check if it has decremented to less than
+             * or equal to zero
+             */
+#ifdef OPT_DO
+            if ((s.do_for_val_num>=0) && (s.do_for_val_num--<=0))
+#else
             if ((s.number>=0) && (s.number--<=0))
+#endif
                goto endloop ;
-         }
 
+         }
+         /*
+          * If there is WHILE clause, check if the expression is false before execution of the DO block
+          */
          if ((thisptr->p[1])&&((thisptr->p[1]->type)==X_WHILE))
+         {
             if (!isboolean(TSD,thisptr->p[1]->p[0],3, NULL))
                goto endloop ;
-
+         }
+         /*
+          * Execute the code in the DO block
+          */
          if (thisptr->p[2])
          {
             nstackpush(TSD,thisptr);
@@ -741,6 +861,9 @@ startloop:
 one:
             popcallstack(TSD,-1) ;
          }
+         /*
+          * If there is an UNTIL clause, check if the expression is false after execution of the DO block
+          */
          if ((thisptr->p[1])&&((thisptr->p[1]->type)==X_UNTIL))
          {
             if (isboolean(TSD,thisptr->p[1]->p[0],4, NULL))
@@ -749,33 +872,49 @@ one:
 
          if ((thisptr->p[0])&&(thisptr->p[0]->name))
          {
-            tdescr = shortcutnum( TSD, thisptr->p[0] ) ;
+            doiterdescr = shortcutnum( TSD, thisptr->p[0] ) ;
             /*
              * Check if we still have a valid number. If not
              * exit with arithmetic error.
              */
-            if (!tdescr)
+            if (!doiterdescr)
                exiterror( ERR_BAD_ARITHMETIC, 0 )  ;
 
+            /*
+             * Increment our loop iterator
+             */
             if (s.increment)
             {
-               string_add( TSD, tdescr, s.increment, tdescr, thisptr->p[0],
-                           s.incr_node ) ;
+               string_add( TSD, doiterdescr, s.increment, doiterdescr, thisptr->p[0], s.incr_node ) ;
+/*
+fprintf(stderr,"%s %d: After add: iter %s neg %d exp %d\n",__FILE__,__LINE__,
+doiterdescr->num,
+doiterdescr->negative ,
+doiterdescr->exp
+);
+*/
                /* fixes bug 1109729: */
-               str_round( tdescr, TSD->currlevel->currnumsize ) ;
+               str_round( doiterdescr, TSD->currlevel->currnumsize ) ;
+/*
+fprintf(stderr,"%s %d: After round: iter %s neg %d exp %d\n",__FILE__,__LINE__,
+doiterdescr->num,
+doiterdescr->negative ,
+doiterdescr->exp
+);
+*/
             }
             else
-               string_incr( TSD, tdescr, thisptr->p[0] ) ;
+               string_incr( TSD, doiterdescr, thisptr->p[0] ) ;
 
             if (thisptr->p[0]->u.varbx)
             {
-               thisptr->p[0]->u.varbx->num = tdescr ;
+               thisptr->p[0]->u.varbx->num = doiterdescr ;
                thisptr->p[0]->u.varbx->flag = VFLAG_NUM ;
                if ( TSD->trace_stat == 'I' )
-                  tracenumber( TSD, tdescr, 'V');
+                  tracenumber( TSD, doiterdescr, 'V');
             }
             else
-               setshortcut( TSD, thisptr->p[0], str_norm( TSD, tdescr, NULL )) ;
+               setshortcut( TSD, thisptr->p[0], str_norm( TSD, doiterdescr, NULL )) ;
          }
 
          if (TSD->nextsig)
@@ -806,6 +945,13 @@ endloop: if (s.increment)
             free_a_descr( TSD, s.stopval ) ;
             s.stopval = NULL ;
          }
+#ifdef OPT_DO
+         if (s.do_for_val)
+         {
+            free_a_descr( TSD, s.do_for_val ) ;
+            s.do_for_val = NULL ;
+         }
+#endif
          no_next_interactive = 1 ;
          nstackpop(TSD);
 
@@ -902,6 +1048,10 @@ endloop: if (s.increment)
                   s.increment = NULL;
                if (top->stopval == s.stopval)
                   s.stopval = NULL;
+#ifdef OPT_DO
+               if (top->do_for_val == s.do_for_val)
+                  s.do_for_val = NULL;
+#endif
             }
 
             stackcleanup(TSD,stktrigger);
@@ -1267,6 +1417,10 @@ endloop: if (s.increment)
                s.increment = NULL;
             if ( top->stopval == s.stopval )
                s.stopval = NULL;
+#ifdef OPT_DO
+            if ( top->do_for_val == s.do_for_val )
+               s.do_for_val = NULL;
+#endif
          }
 
          stackcleanup( TSD, stktrigger );
@@ -1632,6 +1786,10 @@ endloop: if (s.increment)
                s.increment = NULL;
             if (top->stopval == s.stopval)
                s.stopval = NULL;
+#ifdef OPT_DO
+            if (top->do_for_val == s.do_for_val)
+               s.do_for_val = NULL;
+#endif
          }
 
          stackcleanup(TSD,stktrigger);
@@ -1700,6 +1858,10 @@ endloop: if (s.increment)
             popcallstack( TSD, -1 );
             if ( top->stopval == s.stopval )
                s.stopval = NULL;
+#ifdef OPT_DO
+            if ( top->do_for_val == s.do_for_val )
+               s.do_for_val = NULL;
+#endif
             if ( top->increment == s.increment )
                s.increment = NULL;
             stack_destroyelement( TSD, top );
@@ -1717,6 +1879,10 @@ endloop: if (s.increment)
             popcallstack(TSD,-1) ;
             if (top->stopval == s.stopval )
                s.stopval = NULL ;
+#ifdef OPT_DO
+            if (top->do_for_val == s.do_for_val )
+               s.do_for_val = NULL ;
+#endif
             if ( top->increment == s.increment )
                s.increment = NULL ;
             stack_destroyelement(TSD,top);
@@ -2111,6 +2277,9 @@ proclevel newlevel( tsd_t *TSD, proclevel oldlevel )
 
    if ( oldlevel == NULL )
    {
+      /*
+       * This is executed only once on startup of the interpreter.
+       */
 #ifdef __CHECKER__
       /* There is a memcpy below which Checker don't like. The reason
        * may be the aligned "char"s which will use one machine word

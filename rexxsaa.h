@@ -686,6 +686,18 @@ APIRET APIENTRY RexxSetHalt(
 EXTNAME("RexxSetHalt");
 #define REXXSETHALT RexxSetHalt
 
+APIRET APIENTRY RexxSetTrace(
+                LONG pid,
+                LONG tid)
+EXTNAME("RexxSetTrace");
+#define REXXSETTRACE RexxSetTrace
+
+APIRET APIENTRY RexxResetTrace(
+                LONG pid,
+                LONG tid)
+EXTNAME("RexxResetTrace");
+#define REXXRESETTRACE RexxResetTrace
+
 #endif /* INCL_RXARI */
 
 /*

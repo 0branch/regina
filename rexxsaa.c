@@ -42,7 +42,9 @@
  *    RexxRegisterFunctionDll() --- ditto (from dynamic library)
  *    RexxQueryFunction()       --- query external function
  *    RexxDeregisterFunction()  --- deregister external function
- *    RexxSetHalt()             --- set Halt and Trace
+ *    RexxSetHalt()             --- set Halt
+ *    RexxSetTrace()            --- set Trace
+ *    RexxResetTrace()          --- reset Trace
  *    RexxCreateQueue()         --- create named queued
  *    RexxDeleteQueue()         --- delete named queued
  *    RexxQueryQueue()          --- query named queued
@@ -1702,8 +1704,46 @@ int IfcHaveFunctionExit(const tsd_t *TSD)
 /* ============================================================= */
 /* Asynchronous Rexx API interface */
 
+extern tsd_t *__regina_get_tsd_for_threadid( unsigned long threadid );
+extern tsd_t *__regina_get_next_tsd( int idx );
+extern int __regina_get_number_concurrent_regina_threads(void);
+
 EXPORT_C APIRET APIENTRY RexxSetHalt(LONG dummyProcess,
-                            LONG dummyThread )
+                                     LONG threadid )
+{
+   tsd_t *TSD;
+   int mcrt,i;
+   /*
+    * Only the current process can halt a running thread.
+    */
+   if ( threadid == 0 )
+   {
+      /*
+       * Halt every thread
+       */
+      mcrt = __regina_get_number_concurrent_regina_threads();
+      for ( i = 0; i < mcrt ; i++ )
+      {
+         TSD = __regina_get_next_tsd( i );
+         if ( TSD != NULL )
+            set_rexx_halt( TSD );
+      }
+   }
+   else
+   {
+      /*
+       * Only halt the specified thread
+       */
+      TSD = __regina_get_tsd_for_threadid( threadid );
+      if ( TSD == NULL )
+         return RXARI_NOT_FOUND;
+      set_rexx_halt( TSD );
+   }
+   return RXARI_OK ;
+}
+
+EXPORT_C APIRET APIENTRY RexxSetTrace(LONG dummyProcess,
+                                      LONG threadid )
 {
    tsd_t *TSD = getGlobalTSD();
 
@@ -1712,8 +1752,24 @@ EXPORT_C APIRET APIENTRY RexxSetHalt(LONG dummyProcess,
    StartupInterface(TSD);
    /*
     * Perform sanity check on the parameters; is process id me ?
+    * This is a nop at the moment
+    * Some form of calling tracing.c:set_trace_char() is required
     */
-   set_rexx_halt( TSD );
+   return RXARI_OK ;
+}
+
+EXPORT_C APIRET APIENTRY RexxResetTrace(LONG dummyProcess,
+                                        LONG dummyThread )
+{
+   tsd_t *TSD = getGlobalTSD();
+
+   if ( TSD == NULL )
+      TSD = GLOBAL_ENTRY_POINT();
+   StartupInterface(TSD);
+   /*
+    * Perform sanity check on the parameters; is process id me ?
+    * THis is a nop at the moment
+    */
    return RXARI_OK ;
 }
 

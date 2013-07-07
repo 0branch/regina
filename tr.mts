@@ -10,6 +10,7 @@
 # Portuguese - Brian Carpenter <bcarpent@nucleus.com>
 # Russian - Oleg Kulikov <kulikov@xanadu.ru>
 # Spanish - Pablo Garcia-Abia <Pablo.Garcia@cern.ch>
+# Swedish - Jan-Erik L„rka <jan-erik@os2ug.se>
 # Turkish - Haluk POLAT <bilgi@halukpolat.com>
 #
 # Guidelines for Translators
@@ -33,6 +34,10 @@
 #   please indicate this. I will retain your address as a contact for future
 #   individual message translations, but will only publish your name.
 # - And last but by no means least; thanks!
+#
+# TODO
+# 40.43
+# 40.44
 #
   0,  1,%s kaynaginda %s hatasi, satir no %d:|<value>,<source>,<linenumber>
   0,  2,Etkilesimli izlemede %s hatasi:|<value>
@@ -206,6 +211,8 @@
  40, 39,3. siradaki %s degistirgesi sifir (0) ya da bir (1) degildir; bulunan "%s"|<bif>,<value>
  40, 41,%s degistirgesini iceren %d. siradaki oge, akim (dosya) sinirsal degerleri icerisinde yer almalidir; bulunan "%s"|<bif>,<argnumber>,<value>
  40, 42,1. siradaki %s degistirgesi bu akim (dosya) uzerinde konumlandirilamaz; bulunan "%s"|<bif>,<value>
+ 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s degistirgesini iceren %d. siradaki oge, "%s" ogelerinden birisi olmalidir; bulunan "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: dusuk-seviye akim (dosya) G/C hatasi; %s]|<bif>,<description>
  40,921,[%s degistirgesini iceren %d. siradaki oge, "%s" akimina (dosyasina) ait konumlandirma kipi; akim (dosya) acma kipi ile uyumsuzdur]|<bif>,<argnumber>,<value>

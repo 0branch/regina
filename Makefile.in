@@ -12,15 +12,23 @@ THIS  = Makefile
 
 @SET_MAKE@
 
-ABI_MAJOR=3
-ABI_MINOR=6
-ABI=$(ABI_MAJOR).$(ABI_MINOR)
+PACKAGE=Regina-REXX
 VER=@VERSION_NODOT@
 VERDOT=@VERSION@
-REG_DIR=Regina-REXX-$(VERDOT)
+VERDOTUNQUOTED=@VERSION_UNQUOTED@
+VERSUPP=@VER_SUPP@
+REG_DIR=$(PACKAGE)-$(VERDOT)$(VERSUPP)
 DEBIAN_DIR=$(REG_DIR)/debian
+MYDISTRO=@MYDISTRO@
+MACH_ARCH=@MACH_ARCH@
 
+ABI_MAJOR=3
+ABI_MINOR=7
+ABI=$(ABI_MAJOR).$(ABI_MINOR)$(VERSUPP)
+
+datarootdir = @datarootdir@
 srcdir  = @srcdir@
+abs_srcdir  = @abs_srcdir@
 commondir = $(srcdir)/common
 regutildir = $(srcdir)/regutil
 prefix  = @prefix@
@@ -31,10 +39,10 @@ includedir  = @includedir@
 mandir  = @mandir@
 datadir = @datadir@
 sharedir = $(datadir)/regina
+addonsdir = @addonsdir@
 target = @target@
 gcidir = $(srcdir)/gci
 binarybitprefix=@binarybitprefix@
-datarootdir = @datarootdir@
 
 INSTALL  = $(srcdir)/install-sh
 
@@ -124,7 +132,7 @@ REGINAEXP = @REGINAEXP@
 RPMTOPDIR = @RPMTOPDIR@
 HAVE_GCI = @HAVE_GCI@
 GCI_CONVERT_HEADER = @GCI_CONVERT_HEADER@
-#REGUTIL_TERM_LIB=@REGUTIL_TERM_LIB@
+REGUTIL_TERM_LIB=@REGUTIL_TERM_LIB@
 
 MISCDEFS = -DHAVE_CONFIG_H $(HAVE_GCI) $(TRACEMEM) $(FLISTS) -I. -I$(srcdir) -I$(srcdir)/contrib $(SYS_DEFS) $(REXXSOCKET)
 LARGE_FILE_SUPPORT = @LARGE_FILE_SUPPORT@
@@ -200,7 +208,7 @@ SHOFILES = funcs.so.$(OBJ) builtin.so.$(OBJ) error.so.$(OBJ) variable.so.$(OBJ) 
 	drexx.so.$(OBJ) client.so.$(OBJ) rexxsaa.so.$(OBJ) $(ALLOCA_SHO) $(STATICLD_SHO) $(MT_FILE).so.$(OBJ) instore.so.$(OBJ) arxfuncs.so.$(OBJ) \
 	$(GCI_SHO)
 
-REGUTILOBJ = inifile.$(OBJ) regcrypt.$(OBJ) regfilesys.$(OBJ) regini.$(OBJ) regmacrospace.$(OBJ) regscreenux.$(OBJ) regsemux.$(OBJ) regstem.$(OBJ) regunicode.$(OBJ) regutil.$(OBJ) rxsupport.$(OBJ) $(FNMATCH_SHO)
+REGUTILOBJ = inifile.$(OBJ) regcrypt.$(OBJ) regfilesys.$(OBJ) regini.$(OBJ) regmacrospace.$(OBJ) regscreenux.$(OBJ) regsemux.$(OBJ) regstem.$(OBJ) regunicode.$(OBJ) regutil.$(OBJ) rxsupport.$(OBJ) regtrig.$(OBJ) $(FNMATCH_SHO)
 
 DEMODIR = $(REG_DIR)/demo
 ZIP_DEMODIR = demo
@@ -223,12 +231,12 @@ CONFFILES = $(REG_DIR)/configure.in $(REG_DIR)/config.h.in $(REG_DIR)/Makefile.i
 	$(REG_DIR)/install-sh $(REG_DIR)/common/config.guess $(REG_DIR)/common/config.sub $(REG_DIR)/aclocal.m4 \
 	$(REG_DIR)/configure $(REG_DIR)/descrip.mms $(REG_DIR)/build.com $(REG_DIR)/regina-config.in \
 	$(REG_DIR)/Regina.spec $(REG_DIR)/rxstack.init.d.in \
-	$(REG_DIR)/regina_*.ini $(REG_DIR)/regina.nsi $(REG_DIR)/regina.ver $(REG_DIR)/regina64.xpm
+	$(REG_DIR)/regina_*.ini $(REG_DIR)/regina.nsi.in $(REG_DIR)/regina.nsi.files $(REG_DIR)/regina.ver $(REG_DIR)/regina64.xpm
 ZIP_CONFFILES = configure.in config.h.in Makefile.in Makefile.aix.in \
 	install-sh common/config.guess common/config.sub aclocal.m4 \
 	configure descrip.mms build.com regina-config.in \
 	Regina.spec rxstack.init.d.in \
-	regina_*.ini regina.nsi regina.ver regina64.xpm
+	regina_*.ini regina.nsi.in regina.nsi.files regina.ver regina64.xpm
 
 EPOC32FILES = $(REG_DIR)/epoc32/bmarm/*.def \
 	$(REG_DIR)/epoc32/*.cpp $(REG_DIR)/epoc32/*.h \
@@ -284,8 +292,10 @@ ZIP_CFILES = $(ZIP_CSRCFILES) yaccsrc.c lexsrc.c execiser.c threader.c \
 	 regutil/*.c regutil/*.h regutil/regutil.def
 DEBIANFILES = $(DEBIAN_DIR)/rules $(DEBIAN_DIR)/control $(DEBIAN_DIR)/changelog $(DEBIAN_DIR)/md5_sums \
 	$(DEBIAN_DIR)/postinst $(DEBIAN_DIR)/postrm $(DEBIAN_DIR)/postrm-dev $(DEBIAN_DIR)/copyright
+ZIP_DEBIANFILES = debian/rules debian/control debian/changelog debian/md5_sums \
+	debian/postinst debian/postrm debian/postrm-dev debian/copyright
 
-JUNK = *.o *.so.$(OBJ) $(STATICLIB) execiser$(binarybitprefix)$(EXE) threader$(binarybitprefix)$(EXE) rxqueue$(binarybitprefix)$(EXE) rxstack$(binarybitprefix)$(EXE) rexx$(binarybitprefix)$(EXE) msgcmp$(binarybitprefix)$(EXE) $(SHL_TARGETS) $(SHLPRE)$(SHLFILE)$(SHLPST)* config.cache config.log gci_convert.h *.mtb regina-config rxstack.init.d $(LIBPRE)$(SHLFILE)$(LIBPST)
+JUNK = *.o *.so.$(OBJ) $(STATICLIB) execiser$(binarybitprefix)$(EXE) threader$(binarybitprefix)$(EXE) rxqueue$(binarybitprefix)$(EXE) rxstack$(binarybitprefix)$(EXE) rexx$(binarybitprefix)$(EXE) msgcmp$(binarybitprefix)$(EXE) $(SHL_TARGETS) $(SHLPRE)$(SHLFILE)$(SHLPST)* config.cache config.log gci_convert.h *.mtb $(LIBPRE)$(SHLFILE)$(LIBPST)
 
 #.SUFFIXES: .sho $(SUFFIXES)
 #
@@ -302,32 +312,26 @@ $(srcdir)/mt.h : $(srcdir)/mt_notmt.h $(srcdir)/mt_posix.h
 rexx$(binarybitprefix)$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(STATIC_LDFLAGS) -o $@ $(OBJECTS) rexx.$(OBJ) nosaa.$(OBJ) $(STATIC_BINARY_LIBS) $(REXX_BINARY_LIBS)
 	$(LDEXTRA)
-#	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(STATIC_LDFLAGS) -o $@ $(OBJECTS) rexx.$(OBJ) nosaa.$(OBJ) $(BOTHLIBS)
 
 regina$(binarybitprefix)$(EXE) : $(SHL_BASE) regina.$(OBJ) $(SHOFILES)
 	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ regina.$(OBJ) $(LINKREG) $(REGINA_BINARY_LIBS)
 	$(LDEXTRA)
-#	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ regina.$(OBJ) $(LINKREG) $(BOTHLIBS) $(MH_MT_LIBS)
 
 execiser$(binarybitprefix)$(EXE) : execiser.$(OBJ) $(EXECISER_DEP)
 	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) -o $@ execiser.$(OBJ) $(LINKSHL) $(EXECISER_BINARY_LIBS)
 	$(LDEXTRA)
-#	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) -o $@ execiser.$(OBJ) $(LINKSHL) $(BOTHLIBS) $(MH_MT_LIBS)
 
 threader$(binarybitprefix)$(EXE) : threader.$(OBJ) $(EXECISER_DEP)
 	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) -o $@ threader.$(OBJ) $(LINKSHL) $(THREADER_BINARY_LIBS)
 	$(LDEXTRA)
-#	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) -o $@ threader.$(OBJ) $(LINKSHL) $(BOTHLIBS) $(MH_MT_LIBS)
 
 rxstack$(binarybitprefix)$(EXE) : rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
 	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(GETOPT) $(STACK_BINARY_LIBS)
 	$(LDEXTRA)
-#	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(GETOPT) $(BOTHLIBS)
 
 rxqueue$(binarybitprefix)$(EXE) : rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
 	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(GETOPT) $(STACK_BINARY_LIBS)
 	$(LDEXTRA)
-#	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(GETOPT) $(BOTHLIBS)
 
 $(LIBPRE)$(LIBFILE)$(LIBPST): $(OFILES) client.$(OBJ) drexx.$(OBJ) rexxsaa.$(OBJ)
 	rm -f $(LIBPRE)$(LIBFILE)$(LIBPST)
@@ -922,11 +926,11 @@ regutil.$(OBJ): $(regutildir)/regutil.c
 rxsupport.$(OBJ): $(regutildir)/rxsupport.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(regutildir)/rxsupport.c
 
-#regtrig.$(OBJ): $(regutildir)/regtrig.c
-#	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(regutildir)/regtrig.c
+regtrig.$(OBJ): $(regutildir)/regtrig.c
+	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(regutildir)/regtrig.c
 
 $(SHLPRE)regutil$(MODPST): $(REGUTILOBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(REGUTILEXP)
-	$(LD_RXLIB_UTILA) $(REGUTILEXPORTS) $(REGUTILOBJ) $(LD_RXLIB_UTILB) $(BOTHLIBS)
+	$(LD_RXLIB_UTILA) $(REGUTILEXPORTS) $(REGUTILOBJ) $(LD_RXLIB_UTILB) $(BOTHLIBS) $(REGUTIL_TERM_LIB)
 	$(RANLIB_DYNAMIC)
 
 
@@ -970,7 +974,7 @@ ARCHIVE_FILES = $(ALLSRC) $(README) $(REG_DIR)/makefile.* \
 	$(EPOC32FILES) $(TAR_MTSSRC)
 
 ZIP_ARCHIVE_FILES = $(ZIP_ALLSRC) $(ZIP_README) makefile.* \
-	*.rsp $(ZIP_DEMOFILES) $(ZIP_TRIPFILES) $(ZIP_CONTRIBFILES) \
+	*.rsp $(ZIP_DEMOFILES) $(ZIP_TRIPFILES) $(ZIP_CONTRIBFILES) $(ZIP_DEBIANFILES) \
 	$(ZIP_CONFFILES) *.def *.ico *.rc *.info \
 	file_id* *.bat *.cmd $(ZIP_YACCLEX_FILES) \
 	*.rexx yaccsrc.bound rexx.make \
@@ -978,8 +982,9 @@ ZIP_ARCHIVE_FILES = $(ZIP_ALLSRC) $(ZIP_README) makefile.* \
 
 dist:
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
-	(cd $(srcdir);PWD=`pwd`;cd ..;ln -sf ${PWD} $(REG_DIR))
-	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > Regina-REXX-$(VERDOT).tar.gz )
+#	(cd $(srcdir);PWD=`pwd`;cd ..;ln -sf ${PWD} $(REG_DIR))
+	(cd $(srcdir)/..;ln -sf $(abs_srcdir) $(REG_DIR))
+	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > Regina-REXX-$(VERDOT)$(VERSUPP).tar.gz )
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 
 tar:
@@ -1159,7 +1164,7 @@ binarybase: all
 	-mkdir -p ./tmpdir/rexx
 	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
-	tar cvf - * | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
+	tar cvf - * | gzip > ../Regina-REXX-$(VERDOT)$(VERSUPP)-$(MACH_ARCH)-$(MYDISTRO).tgz )
 
 beosbinary: all
 	-rm -fr ./tmpdir
@@ -1170,7 +1175,7 @@ beosbinary: all
 	-mkdir -p ./tmpdir/doc/regina
 	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
-	zip -r Regina-REXX-$(VERDOT)-$(target).zip * )
+	zip -r Regina-REXX-$(VERDOT)$(VERSUPP)-$(target).zip * )
 
 atheosbinary: all
 	-rm -fr ./tmpdir
@@ -1187,8 +1192,15 @@ atheosbinary: all
 
 rpm: dist rpmtopdir
 	cp $(srcdir)/regina64.xpm $(RPMTOPDIR)/SOURCES
-	cp $(srcdir)/../Regina-REXX-$(VERDOT).tar.gz $(RPMTOPDIR)/SOURCES
-	rpmbuild -ba $(srcdir)/Regina.spec
+	cp $(srcdir)/../Regina-REXX-$(VERDOT)$(VERSUPP).tar.gz $(RPMTOPDIR)/SOURCES
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)*.rpm
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)*.rpm
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)*.rpm
+	rpmbuild -ba --clean $(srcdir)/Regina.spec
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	ls -l $(RPMTOPDIR)/RPMS/*/$(PACKAGE)*rpm
 
 rpmtopdir:
 	-mkdir -p $(RPMTOPDIR)/SOURCES
@@ -1251,10 +1263,13 @@ deb: dist
 	-rm -fr tmp
 	-mkdir tmp
 	(cd tmp; \
-	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOT).tar.gz; \
+	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOTUNQUOTED)$(VERSUPP).tar.gz; \
 	cd $(REG_DIR); \
 	dpkg-buildpackage -rfakeroot; \
 	cd ..; \
+	mv regina-rexx_$(VERDOTUNQUOTED)$(VERSUPP)*.deb `basename regina-rexx_$(VERDOTUNQUOTED)$(VERSUPP)*.deb .deb`-$(MYDISTRO).deb; \
+	mv libregina3_$(VERDOTUNQUOTED)$(VERSUPP)*.deb `basename libregina3_$(VERDOTUNQUOTED)$(VERSUPP)*.deb .deb`-$(MYDISTRO).deb; \
+	mv libregina3-dev_$(VERDOTUNQUOTED)$(VERSUPP)*.deb `basename libregina3-dev_$(VERDOTUNQUOTED)$(VERSUPP)*.deb .deb`-$(MYDISTRO).deb; \
 	ls -l )
 
 #
@@ -1267,8 +1282,7 @@ dmg: binary
 	make VERSION=$(VERDOT)@VER_SUPP@ )
 
 distclean:
-	rm -f $(JUNK) config.log config.h config.cache config.status Makefile \#*\#
-
+	rm -f $(JUNK) config.log config.h config.cache config.status Makefile regina-config rxstack.init.d \#*\#
 
 #
 # End of makefile

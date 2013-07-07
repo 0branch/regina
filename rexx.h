@@ -94,6 +94,11 @@
  */
 #define MAX_ARGS_TO_REXXSTART  32
 
+/*
+ * define MAX_CONCURRENT_REGINA_THREADS to change how many concurrent Regina
+ * instances (threads) can be running.
+ */
+#define MAX_CONCURRENT_REGINA_THREADS 1000
 
 #include "defs.h"
 #if defined(HAVE_CONFIG_H)
@@ -103,6 +108,10 @@
 
 #ifdef HAVE_LIMITS_H
 # include <limits.h>
+#endif
+
+#ifdef HAVE_INTTYPES_H
+# include <inttypes.h>
 #endif
 
 #ifdef HAVE_STDINT_H

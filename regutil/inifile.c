@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/inifile.c,v 1.2 2011/10/09 01:13:06 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/inifile.c,v 1.2 2011/10/09 01:13:06 mark Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>

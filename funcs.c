@@ -640,6 +640,18 @@ char getonechar( tsd_t *TSD, const streng *text, const char *bif, int argnum )
    return text->value[0] ;
 }
 
+char getonespecialchar( tsd_t *TSD, const streng *text, const char *bif, int argnum )
+{
+   if ( !text )
+      exiterror( ERR_INCORRECT_CALL, 43, bif, argnum, "" )  ;
+   if ( Str_len( text ) != 1 )
+      exiterror( ERR_INCORRECT_CALL, 43, bif, argnum, tmpstr_of( TSD, text ) ) ;
+   if ( rx_isalnum( text->value[0] ) )
+      exiterror( ERR_INCORRECT_CALL, 43, bif, argnum, tmpstr_of( TSD, text ) ) ;
+
+   return text->value[0] ;
+}
+
 int atopos( tsd_t *TSD, const streng *text, const char *bif, int argnum )
 {
    int result=0 ;
@@ -712,9 +724,9 @@ streng *rx64_to_streng( const tsd_t *TSD, rx_64 input )
    streng *output=NULL ;
    char *cptr=NULL, *start=NULL, *top=NULL ;
 
-   output = Str_makeTSD( sizeof(int)*3 + 2 ) ;
+   output = Str_makeTSD( sizeof(rx_64)*3 + 2 ) ;
    start = output->value ;
-   cptr = start + sizeof(int)*3 + 2 ;
+   cptr = start + sizeof(rx_64)*3 + 2 ;
    if (input)
    {
       if (input<0)
@@ -723,6 +735,34 @@ streng *rx64_to_streng( const tsd_t *TSD, rx_64 input )
          *(start++) = '-' ;
       }
 
+      for (top=cptr;input;)
+      {
+         *(--cptr) = (char) (input % 10 + '0') ;
+         input = input / 10 ;
+      }
+
+      memmove( start, cptr, top-cptr ) ;
+      output->len = top-cptr + start-output->value ;
+   }
+   else
+   {
+      *start = '0' ;
+      output->len = 1 ;
+   }
+
+   return output ;
+}
+
+streng *rx64u_to_streng( const tsd_t *TSD, rx_64u input )
+{
+   streng *output=NULL ;
+   char *cptr=NULL, *start=NULL, *top=NULL ;
+
+   output = Str_makeTSD( sizeof(rx_64u)*3 + 2 ) ;
+   start = output->value ;
+   cptr = start + sizeof(rx_64u)*3 + 2 ;
+   if (input)
+   {
       for (top=cptr;input;)
       {
          *(--cptr) = (char) (input % 10 + '0') ;
@@ -764,15 +804,16 @@ void checkparam( cparamboxptr params, int min, int max, const char *name )
  * into a struct tm (individual values for year, month, day, year_days and
  * base days).
  */
-int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm *indate)
+int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm *indate, char isep)
 {
-   int rc,i=0,off=0,save_year=indate->tm_year;
+   int rc,i=0,off=0,save_year=indate->tm_year,ilen;
    long num1=0,num2=0,num3=0;
    char buf[20];
    char *ptr=(char*)suppdate->value;
    struct tm *tmpTime;
    time_t num64;
 
+   ilen = (isep == '\0' ? 0 : 1);
    indate->tm_sec = indate->tm_min = indate->tm_hour = 0;
    switch(suppformat)
    {
@@ -812,27 +853,31 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          base2date(num1+basedays(1978)-1,indate);
          break;
 #endif
-      case 'E': /* dd/mm/yy */
-      case 'O': /* yy/mm/dd */
-      case 'U': /* mm/dd/yy */
-         if (suppdate->len != 8)
+      case 'E': /* dd/mm/yy or ddmmyy (where '/' is isep) */
+      case 'O': /* yy/mm/dd or yymmdd (where '/' is isep) */
+      case 'U': /* mm/dd/yy or mmddyy (where '/' is isep) */
+         if (suppdate->len != 6+(ilen*2))
             return(1);
-         if (*(ptr+2) != '/' && *(ptr+5) != '/')
-              return( 1 );
          memcpy(buf,ptr,2);
          buf[2] = '\0';
          if ( !rx_isdigit( buf[0] ) || !rx_isdigit( buf[1] ) )
             return( 1 );
          num1 = atol( buf );
-         memcpy(buf,(ptr+3),2);
+         memcpy(buf,(ptr+2+ilen),2);
          buf[2] = '\0';
          if ( !rx_isdigit( buf[0] ) || !rx_isdigit( buf[1] ) )
             return( 1 );
          num2 = atol( buf );
-         memcpy(buf,(ptr+6),2);
+         memcpy(buf,(ptr+4+(ilen*2)),2);
          buf[2] = '\0';
          if ( !rx_isdigit( buf[0] ) || !rx_isdigit( buf[1] ) )
             return( 1 );
+         /* if we have an input separator, validate that it matches */
+         if ( ilen )
+         {
+            if (*(ptr+2) != isep && *(ptr+5) != isep)
+               return( 2 );
+         }
          num3 = atol( buf );
          switch(suppformat)
          {
@@ -864,18 +909,16 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          if (indate->tm_year < 100)   /* do something with century ... */
             indate->tm_year += ( indate->tm_year <= (save_year - 2000 ) + 50 ) ? 2000 : 1900;
          break;
-      case 'N': /* dd mmm yyyy */
-         if (suppdate->len != 11 && suppdate->len != 10)
+      case 'N': /* dd mmm yyyy or d mmm yyyy or ddmmmyyyy or dmmmyyyy */
+         if (suppdate->len < 8 || suppdate->len > 11)
             return(1);
-         if (suppdate->len == 10)
+         if (suppdate->len == 10 || suppdate->len == 8)
             off = 1;
-         if (*(ptr+2-off) != ' ' && *(ptr+6-off) != ' ')
-            return(1);
          memcpy(buf,ptr,2-off);
          buf[2-off] = '\0';
          if ((num1 = atol(buf)) == 0)
             return(1);
-         memcpy(buf,(ptr+3-off),3);
+         memcpy(buf,(ptr+2-off+ilen),3);
          buf[3] = '\0';
          /* find month */
          num2 = (-1);
@@ -889,52 +932,42 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          }
          if (num2 == (-1))
             return(1);
-         memcpy(buf,(ptr+7-off),4);
+         memcpy(buf,(ptr+5-off+(ilen*2)),4);
          buf[4] = '\0';
          if ((num3 = atol(buf)) == 0 && strcmp("0000",buf) != 0)
             return(1);
+         /* if we have an input separator, validate that it matches */
+         if ( ilen )
+         {
+            if (*(ptr+2-off) != isep && *(ptr+6-off) != isep)
+               return( 2 );
+         }
          indate->tm_mday = num1;
          indate->tm_mon = num2;
          indate->tm_year = num3;
          break;
-      case 'S': /* yyyymmdd */
-         if ( suppdate->len != 8 )
+      case 'S': /* yyyymmdd   (where '' is isep) */
+      case 'I': /* yyyy-mm-dd (where '-' is isep */
+         if ( suppdate->len != 8+(ilen*2) )
             return(1);
          memcpy( buf, ptr, 4 );
          buf[4] = '\0';
          if ( ( num1 = atol( buf ) ) == 0 )
             return(1);
-         memcpy( buf, (ptr+4), 2 );
+         memcpy( buf, (ptr+4+(ilen)), 2 );
          buf[2] = '\0';
          if ( ( num2 = atol( buf ) ) == 0 )
             return(1);
-         memcpy( buf, (ptr+6), 2 );
+         memcpy( buf, (ptr+6+(ilen*2)), 2 );
          buf[2] = '\0';
          if ( ( num3 = atol( buf ) ) == 0 )
             return(1);
-         indate->tm_mday = num3;
-         indate->tm_mon = num2-1;
-         indate->tm_year = num1;
-         break;
-      case 'I': /* yyyy-mm-dd */
-         if ( suppdate->len != 10 )
-            return(1);
-         if ( ptr[4] != '-' )
-            return(1);
-         if ( ptr[7] != '-' )
-            return(1);
-         memcpy( buf, ptr, 4 );
-         buf[4] = '\0';
-         if ( ( num1 = atol( buf ) ) == 0 )
-            return(1);
-         memcpy( buf, (ptr+5), 2 );
-         buf[2] = '\0';
-         if ( ( num2 = atol( buf ) ) == 0 )
-            return(1);
-         memcpy( buf, (ptr+8), 2 );
-         buf[2] = '\0';
-         if ( ( num3 = atol( buf ) ) == 0 )
-            return(1);
+         /* if we have an input separator, validate that it matches */
+         if ( ilen )
+         {
+            if (*(ptr+4) != isep && *(ptr+7) != isep)
+               return( 2 );
+         }
          indate->tm_mday = num3;
          indate->tm_mon = num2-1;
          indate->tm_year = num1;

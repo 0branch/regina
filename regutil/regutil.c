@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regutil.c,v 1.4 2009/12/31 03:09:41 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regutil.c,v 1.5 2012/08/08 01:24:52 mark Exp $
  */
 #ifdef _WIN32
 # include <windows.h>
@@ -127,7 +127,6 @@ struct {
     {"SYSFROMUNICODE", sysfromunicode},
     {"SYSWINENCRYPTFILE", syswinencryptfile},
     {"SYSWINDECRYPTFILE", syswindecryptfile},
-#if 0
     {"SYSPI",     syspi},
     {"SYSSQRT",   syssqrt},
     {"SYSEXP",    sysexp},
@@ -144,8 +143,6 @@ struct {
     {"SYSARCSIN", sysarcsin},
     {"SYSARCCOS", sysarccos},
     {"SYSARCTAN", sysarctan},
-#endif
-
     {"SYSLOADFUNCS", sysloadfuncs},
     {"SYSDROPFUNCS", sysdropfuncs}
 };

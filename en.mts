@@ -205,6 +205,8 @@
  40, 39,%s argument 3 is not zero or one; found "%s"|<bif>,<value>
  40, 41,%s argument %d must be within the bounds of the stream; found "%s"|<bif>,<argnumber>,<value>
  40, 42,%s argument 1; cannot position on this stream; found "%s"|<bif>,<value>
+ 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s argument %d, must be one of "%s"; found "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: low-level stream I/O error; %s]|<bif>,<description>
  40,921,[%s argument %d, stream positioning mode "%s"; incompatible with stream open mode]|<bif>,<argnumber>,<value>

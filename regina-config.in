@@ -4,6 +4,7 @@
 # other packages, such as neon, libxml and gnome.
 #
 prefix=@prefix@
+datarootdir=@datarootdir@
 exec_prefix=@exec_prefix@
 includedir=@includedir@
 libdir=@libdir@
@@ -31,6 +32,8 @@ usage()
     echo "                 [-L$libdir64 -l@SHLFILE@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@ @MH_FUNC_LIBS@  @REGINA_CONFIG_LIBS@]"
     echo "  --prefix       Regina install prefix"
     echo "                 [$prefix]"
+    echo "  --addons       Directory where Regina will look for external function packages"
+    echo "                 [@addonsdir@]"
     echo "  --version      output version information"
     echo "                 [@VERSION@]"
     exit $1
@@ -85,6 +88,10 @@ while test $# -gt 0; do
 
        --libs64)
           echo -L$libdir64 -l@SHLFILE@ @BOTHLIBS@ @SHLIBS@ @DLFCNLIBDIR@ @THREADING_LINK@ @MH_FUNC_LIBS@ @REGINA_CONFIG_LIBS@
+          ;;
+
+       --addons)
+          echo @addonsdir@
           ;;
 
        *)

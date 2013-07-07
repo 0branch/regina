@@ -32,6 +32,10 @@
 #   av att uppdatera och l„gga till enskilda meddelanden, men publicerar endast ditt namn.
 # - Till sist men p† inget s„tt minst; Tack!
 #
+# TODO
+# 40.43
+# 40.44
+#
   0,  1,Fel %s k”r %s, rad %d:|<value>,<source>,<linenumber>
   0,  2,Fel %s vid interaktiv s”kning:|<value>
   0,  3,Interaktiv s”kning. Avsluta avlusning med "Trace Off". ENTER f”r att forts„tta.
@@ -204,6 +208,8 @@
  40, 39,%s argument 3 „r inte noll eller ett; hittade "%s"|<bif>,<value>
  40, 41,%s argument %d m†ste vara inom gr„nsen f”r filstr”mmen; hittade "%s"|<bif>,<argnumber>,<value>
  40, 42,%s argument 1; kan inte placera i denna filstr”m; hittade "%s"|<bif>,<value>
+ 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s argument %d, m†ste vara en av "%s"; hittade "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: L†g-niv† I/O-fel p† filstr”m; %s]|<bif>,<description>
  40,921,[%s argument %d, pekar p† placering "%s" i filstr”m; inkompatibel med filstr”m som „r ”ppen]|<bif>,<argnumber>,<value>

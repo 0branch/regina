@@ -7,7 +7,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 #
-# Regina erro messages - English
+# Regina error messages - English
 # Written by Mark Hessling <M.Hessling@qut.edu.au>
 #
 # portuguese - translation by Susana Carpenter,
@@ -186,6 +186,8 @@
  40, 39,%s argumento 3 nao eh zero ou um; encontrado "%s"|<bif>,<value>
  40, 41,%s argumento %d deve estar dentro dos limites do stream; encontrado "%s"|<bif>,<argnumber>,<value>
  40, 42,%s argumento 1; nao eh possivel posicionar neste stream; encontrado "%s"|<bif>,<value>
+ 40, 43,%s argumento %d deve ser um caractere nao-alfanumerico ou a linha nula;  encontrado "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argumento %d, "%s", eh um formato incompativel com o separador especificado no argumento %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s argumento  %d, deve ser um dos "%s"; encontrado "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: erro I/O de stream de nivel baixo; %s]|<bif>,<description>
  40,921,[%s argumento %d, modo de posicionamento do stream "%s"; incompativel com o modo stream aberto]|<bif>,<argnumber>,<value>
@@ -193,20 +195,20 @@
  40,923,[%s argumento %d, sub-comandos demais; maximo necessario eh %d; encontrado %d]|<bif>,<argnumber>,<value>,<value>
  40,924,[%s argumento %d, especificacao posicional invalida; eh necessario um dos "%s"; encontrado "%s"]|<bif>,<argnumber>,<value>,<value>
  40,930,[RXQUEUE, funcao TIMEOUT, espera-se um numero total entre 0 e %d; encontrado \"%s\"]|<value>,<value>
- 40,980,Unexpected input, either unknown type or illegal data%s%s|: ,<location>
- 40,981,Number out of the allowed range%s%s|: ,<location>
- 40,982,String too big for the defined buffer%s%s|: ,<location>
- 40,983,Illegal combination of type/size%s%s|: ,<location>
- 40,984,Unsupported number like NAN, +INF, -INF%s%s|: ,<location>
- 40,985,Structure too complex for static internal buffer%s%s|: ,<location>
- 40,986,An element of the structure is missing%s%s|: ,<location>
- 40,987,A value of the structure is missing%s%s|: ,<location>
- 40,988,The name or part of the name is illegal for the interpreter%s%s|: ,<location>
- 40,989,A problem occured at the interface between Regina and GCI%s%s|: ,<location>
- 40,990,The type won't fit the requirements for basic types (arguments/return value)%s%s|: ,<location>
- 40,991,The number of arguments is wrong or an argument is missing%s%s|: ,<location>
- 40,992,GCI's internal stack for arguments got an overflow%s%s|: ,<location>
- 40,993,GCI counted too many nested LIKE containers%s%s|: ,<location>
+ 40,980,Input inesperado, de tipo desconhecido ou dados ilegais%s%s|: ,<location>
+ 40,981,Numero fora do intervalo permitido%s%s|: ,<location>
+ 40,982,Linha muito grande para o buffer definido%s%s|: ,<location>
+ 40,983,Cominacao ilegal de tipo/tamanho%s%s|: ,<location>
+ 40,984,Numero nao suportado como NAN, +INF, -INF%s%s|: ,<location>
+ 40,985,Estrutura complexa demais para o buffer estatico interno buffer%s%s|: ,<location>
+ 40,986,Falta um elemento da estrutura%s%s|: ,<location>
+ 40,987,Falta um valor da estrutura%s%s|: ,<location>
+ 40,988,O nome ou parte do nome eh ilegal para o interprete%s%s|: ,<location>
+ 40,989,Houve um problema na interface entre Regina e GCI%s%s|: ,<location>
+ 40,990,Tipo nao se ajusta aos requisitos para tipos basicos (argumentos/valor de retorno)%s%s|: ,<location>
+ 40,991,O numero de argumentos estah errado ou falta um argumento%s%s|: ,<location>
+ 40,992,A pilha interna do GCI para argumentos recebeu sobrecarga%s%s|: ,<location>
+ 40,993,GCI contou um excesso de recipientes LIKE%s%s|: ,<location>
  41,  0,mah conversao aritmetica
  41,  1,valor nao-numerico ("%s") a esquerda da operacao aritmetica "%s"|<value>,<operator>
  41,  2,valor nao-numerico ("%s") a direita da operacao aritmetica "%s"|<value>,<operator>
@@ -284,3 +286,15 @@
  95,  4,[argumento STREAM 3: abrir arquivos para acesso WRITE invalido no modo "seguro"]
  95,  5,[executar comandos externos eh invalido no modo "seguro"]
 100,  0,[erro desconhecido de sistema de arquivos]
+#
+# frases que precisam ser traduzidas  - Extra geral:
+# O texto entre () eh o nome correspondente da matriz em error.c
+#
+# (err1prefix)   "Erro %d em execucao\"%.*s\", linha %d: %.*s",
+# (suberrprefix) "erro %d.%d: %.*s",
+# (err2prefix)   "erro %d em execucao\"%.*s\": %.*s",
+# (erropen)      "Nao eh possivel abrir arquivo de idiomas%s",
+# (errcount)     "numero incorreto de mensagens no arquivo de idioma: %s",
+# (errread)      "Nao eh possivel ler o arquivo de idioma: %s",
+# (errmissing)   "Falta texto no arquivo de idioma: %s.mtb",
+# (errcorrupt)   "Arquivo de idioma: %s.mtb  estah corrompido",

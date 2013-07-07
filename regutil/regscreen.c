@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regscreen.c,v 1.2 2009/11/02 22:40:18 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regscreen.c,v 1.2 2009/11/02 22:40:18 mark Exp $
  */
 #include "regutil.h"
 

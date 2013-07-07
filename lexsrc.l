@@ -215,7 +215,11 @@ bin_string        ({bin_string_start}{bin_digit_tuple}*)?
 text_string       '([^']|'')*'|\"([^"]|\"\")*\"
 mintext_string    '([^']|'')+'|\"([^"]|\"\")+\"
 
-trace_char        [a-zA-Z?]
+                  /*
+                   * Allow characters for any token in string passed back to TRACE instruction
+                   * Fixes bug 3564586.
+                   */
+trace_char        {symbol}
 
                   /*
                    * The list of keywords.
@@ -529,7 +533,7 @@ key_with          [wW][iI][tT][hH]
 <comm>{key_select}{between} {
    BEGIN other ;
    assert( do_level >= 0 ) ;
-   do_level++ ;
+   do_level++ ; parser_data.select_linenr = linenr - 1;
    SET_NEXTSTART() ;
    return SELECT ; }
 
@@ -2181,7 +2185,8 @@ repeated_nesting:
 
                case '-':    /* line "--" comments */
                   if ( line[pos + 1] == '-'
-                  &&   get_options_flag( parser_data.TSD->currlevel, EXT_SINGLE_LINE_COMMENTS ) )
+                  &&   get_options_flag( parser_data.TSD->currlevel, EXT_SINGLE_LINE_COMMENTS )
+                  &&   !get_options_flag( parser_data.TSD->currlevel, EXT_STRICT_ANSI ) )
                   {
                      *dest++ = '`' ;
                      *dest++ = '`' ;

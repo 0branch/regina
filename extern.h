@@ -380,9 +380,11 @@
    rx_64 atoposrx64( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    int atoposorzero( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    char getonechar( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
+   char getonespecialchar( tsd_t *TSD, const streng *text, const char *bif, int argnum ) ;
    streng *int_to_streng( const tsd_t *TSD, int input ) ;
    streng *rx64_to_streng( const tsd_t *TSD, rx_64 input ) ;
-   int convert_date(tsd_t *TSD, const streng *, char, struct tm *);
+   streng *rx64u_to_streng( const tsd_t *TSD, rx_64u input ) ;
+   int convert_date(tsd_t *TSD, const streng *, char, struct tm *, char);
    int convert_time(const tsd_t *TSD,const streng *, char, struct tm *, time_t *);
    int basedays(int);
 #ifdef TRACEMEM
@@ -836,7 +838,7 @@ extern "C" {
    streng *str_normalize( const tsd_t *TSD, const streng* ) ;
    streng *str_digitize( tsd_t *TSD, streng*, int, int, const char *, int ) ;
    streng *str_format( tsd_t *TSD, const streng*, int, int, int, int ) ;
-   streng *str_binerize( tsd_t *TSD, num_descr *, int ) ;
+   streng *str_binerize( tsd_t *TSD, num_descr *, int, int, int, const char *, int ) ;
    int str_true( const tsd_t *TSD, const streng* ) ;
    streng *str_abs( tsd_t *TSD, const streng* ) ;
    num_descr *get_a_descr( tsd_t *TSD, const char *big, int argno, const streng* ) ;
@@ -858,7 +860,7 @@ extern "C" {
    void str_round_lostdigits( tsd_t *TSD, num_descr *descr, int size );
    void string_pow( tsd_t *TSD, const num_descr *num, num_descr *acc,
                     num_descr *res, cnodeptr lname, cnodeptr rname);
-   int descr_to_int( const num_descr *input ) ;
+   int descr_to_int( const tsd_t *TSD, const num_descr *input, int, int, const char *, int ) ;
    num_descr *is_a_descr( const tsd_t *TSD, const streng *input ) ;
    int getdescr( const tsd_t *TSD, const streng *num, num_descr *descr ) ;
    int string_test( const tsd_t *TSD, const num_descr *fdescr,

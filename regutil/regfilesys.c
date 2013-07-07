@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regfilesys.c,v 1.12 2011/05/10 06:19:33 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regfilesys.c,v 1.13 2012/09/14 01:56:22 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSFILEMGR
@@ -50,22 +50,23 @@
 # include <sys/utime.h>
 # include <io.h>
 # define MAX_USHORT 65535 /* or so they say */
-# ifndef MAXPATHLEN
-#  ifndef PATH_MAX
-#   ifndef _POSIX_PATH_MAX
-#    ifndef _MAX_PATH
-#     define MAXPATHLEN 1024
-#    else
-#     define MAXPATHLEN _MAX_PATH
-#    endif
+# define F_OK 0
+#endif
+
+#ifndef MAXPATHLEN
+# ifndef PATH_MAX
+#  ifndef _POSIX_PATH_MAX
+#   ifndef _MAX_PATH
+#    define MAXPATHLEN 1024
 #   else
-#    define MAXPATHLEN _POSIX_PATH_MAX
+#    define MAXPATHLEN _MAX_PATH
 #   endif
 #  else
-#   define MAXPATHLEN PATH_MAX
+#   define MAXPATHLEN _POSIX_PATH_MAX
 #  endif
+# else
+#  define MAXPATHLEN PATH_MAX
 # endif
-# define F_OK 0
 #endif
 
 #include "regina64.h"

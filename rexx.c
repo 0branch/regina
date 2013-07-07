@@ -417,6 +417,13 @@ static int check_args( tsd_t *TSD, int argc, char **argv,
                   arg += strlen( arg );
                   break;
 
+               case 'o': /* command-line OPTIONS */
+               {
+                  streng *opts = Str_creTSD( arg );
+                  do_options( TSD, TSD->currlevel, opts, 0 );
+                  arg += strlen( arg );
+                  break;
+               }
                case 'h': /* usage */
                case '?': /* usage */
                   usage( argv[0] );
@@ -1120,15 +1127,18 @@ static void usage( char *argv0 )
    fprintf( stdout,"Regina is distributed under the terms of the GNU Library Public License \n" );
    fprintf( stdout,"and comes with NO WARRANTY. See the file COPYING-LIB for details.\n" );
    fprintf( stdout,"\nTo run a Rexx program:\n" );
-   fprintf( stdout,"%s [-h?vrt[ir]ap] program [arguments...]\n", argv0 );
-   fprintf( stdout,"where:\n\n" );
-   fprintf( stdout,"-h,-?                  show this message\n" );
-   fprintf( stdout,"-v                     display Regina version and exit\n" );
-   fprintf( stdout,"-r                     run Regina in \"safe\" mode\n" );
-   fprintf( stdout,"-t[trace_char]         set TRACE any valid TRACE character - default A\n" );
-   fprintf( stdout,"-a                     pass command line to Rexx program as separate arguments\n");
-   fprintf( stdout,"-p                     pause after execution (Win32 only)\n");
-   fprintf( stdout,"-l[locale]             use the system's default charset or a supplied one\n");
+   fprintf( stdout,"%s [switches] [program] [arguments...]\n", argv0 );
+   fprintf( stdout,"where switches are:\n\n" );
+   fprintf( stdout,"  -h,-?                  show this message\n" );
+   fprintf( stdout,"  -v                     display Regina version and exit\n" );
+   fprintf( stdout,"  -r                     run Regina in \"safe\" mode\n" );
+   fprintf( stdout,"  -t[trace_char]         set TRACE any valid TRACE character - default A\n" );
+   fprintf( stdout,"  -a                     pass command line to Rexx program as separate arguments\n");
+   fprintf( stdout,"  -p                     pause after execution (Win32 only)\n");
+   fprintf( stdout,"  -l[locale]             use the system's default charset or a supplied one\n");
+   fprintf( stdout,"  -oOPTIONS              specify OPTIONS in same format as OPTIONS instruction\n");
+   fprintf( stdout,"program is the file containing Rexx code to execute\n");
+   fprintf( stdout,"arguments are arguments passed to program\n");
    fprintf( stdout,"\nTo tokenise a Rexx program:\n" );
    fprintf( stdout,"%s -c program(input) tokenisedfile(output)\n", argv0 );
    fprintf( stdout,"\nTo execute a tokenised file:\n" );

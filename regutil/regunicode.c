@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regunicode.c,v 1.2 2009/11/23 23:24:35 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regunicode.c,v 1.3 2012/08/08 01:26:20 mark Exp $
  */
 #include "rxproto.h"
 
@@ -542,10 +542,10 @@ rxfunc(systounicode)
    /* for the same reason, perform utf-7 and utf-8 conversions here, rather
     * than using iconv() */
    else if (cp == CP_UTF7) {
-      outs.strlength = u7tou((unsigned short *)outs.strptr,  argv[0].strptr, argv[0].strlength);
+      outs.strlength = u7tou((unsigned short *)outs.strptr,  (const unsigned char *)argv[0].strptr, argv[0].strlength);
    }
    else if (cp == CP_UTF8) {
-      outs.strlength = u8tou((unsigned short *) outs.strptr, argv[0].strptr, argv[0].strlength);
+      outs.strlength = u8tou((unsigned short *) outs.strptr, (const unsigned char *)argv[0].strptr, argv[0].strlength);
    }
 
    /* if requesting a specific code page, we need iconv, or we return an
@@ -719,10 +719,10 @@ rxfunc(sysfromunicode)
    /* for the same reason, perform utf-7 and utf-8 conversions here, rather
     * than using iconv() */
    else if (cp == CP_UTF7) {
-      outs.strlength = utou7(outs.strptr,  (unsigned short *)argv[0].strptr, argv[0].strlength/2);
+      outs.strlength = utou7((unsigned char *)outs.strptr,  (unsigned short *)argv[0].strptr, argv[0].strlength/2);
    }
    else if (cp == CP_UTF8) {
-      outs.strlength = utou8(outs.strptr, (unsigned short *)argv[0].strptr, argv[0].strlength/2);
+      outs.strlength = utou8((unsigned char *)outs.strptr, (unsigned short *)argv[0].strptr, argv[0].strlength/2);
    }
 
    /* if requesting a specific code page, we need iconv, or we return an

@@ -4,6 +4,7 @@
 #
 # norwegian (bokmal) - Vidar Tysse <vtysse@broadpark.no>
 #
+#
   0,  1,Feil %s under kjøring av %s, linje %d:|<value>,<source>,<linenumber>
   0,  2,Feil %s i interaktiv sporing:|<value>
   0,  3,Interaktiv sporing.  "Trace Off" avslutter avlusning. ENTER fortsetter.
@@ -176,6 +177,8 @@
  40, 39,%s-argument 3 er ikke null eller en; fant "%s"|<bif>,<value>
  40, 41,%s-argument %d må være innenfor grensene for aktuell strøm; fant "%s"|<bif>,<argnumber>,<value>
  40, 42,%s-argument 1; kan ikke posisjonere på aktuell strøm; fant "%s"|<bif>,<value>
+ 40, 43,%s argument %d må være ett enkelt ikke-alfanumerisk tegn eller null-strengen; fant "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", er et format som ikke er kompatibelt med skilletegnet spesifisert i argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s-argument %d, må være en av "%s"; fant "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: lavnivå I/O-feil i strøm; %s]|<bif>,<description>
  40,921,[%s-argument %d, posisjoneringsmodus "%s"; ikke kompatibel med åpnemodus for aktuell strøm]|<bif>,<argnumber>,<value>

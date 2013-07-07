@@ -679,7 +679,7 @@ AC_DEFUN([MH_PROG_CC],
 [
 mh_sysv_incdir=""
 mh_sysv_libdir=""
-all_words="$CC_LIST"
+all_words="clang xlc c99 c89 acc gcc cc"
 ac_dir=""
 AC_MSG_CHECKING(for one of the following C compilers: $all_words)
 AC_CACHE_VAL(ac_cv_prog_CC,[
@@ -1427,7 +1427,7 @@ if test "$enable_posix_threads" = yes; then
          MT_FILE="rxmt_posix"
          case "$target" in
             *solaris*)
-               if test "$ac_cv_prog_CC" = "gcc"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   THREADING_COMPILE="-D_REENTRANT -DPOSIX"
                   if test "$mh_rt_lib_found" = "yes"; then
                      THREADING_LINK="-lrt"
@@ -1438,7 +1438,7 @@ if test "$enable_posix_threads" = yes; then
                fi
                ;;
             *hp-hpux1*)
-               if test "$ac_cv_prog_CC" = "gcc"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   THREADING_COMPILE="-D_REENTRANT -DPOSIX"
                fi
                if test "$mh_rt_lib_found" = "yes"; then
@@ -1457,7 +1457,7 @@ if test "$enable_posix_threads" = yes; then
                THREADING_LINK=""
                ;;
             *)
-               if test "$ac_cv_prog_CC" = "gcc"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   THREADING_COMPILE="-D_REENTRANT -DPOSIX"
                fi
                ;;

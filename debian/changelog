@@ -1,3 +1,38 @@
+regina (3.7-1) unstable; urgency=low
+
+  * Significant performance improvement with LINES BIF on large files; fixes bug 2663478.
+  * Significant performance improvement with compound variables with large numbers of tails; bug 2496099.
+  * TRACE L now traces internal subroutines called as functions. Regina used to
+    only trace internal subroutines if they were called by CALL. Still some
+    indenting issues. Bug 3564529.
+  * Added -o command-line switch to specify OPTIONS
+  * Update usage from 'rexx -h' and man page
+  * Fix bugs: 3089351, 3143101, 3175984, 3265645, 3376604, 3386045, 3511119, 3520068, 3524887, 3522738,
+    3531785, 3531812, 3539337, 3564585, 3560639, 3564570, 3564507, 3565673, 35655582, 2941670, 3489133,
+    1887965, 3037156, 3170743, 3400513
+  * Closed/Rejected bugs: 2873709, 2902600
+  * Implement date separator conversions in DATE BIF as per Object Rexx. Feature request #463689
+  * Added support for trigonometric functions in Regutil package
+  * Windows installers now defaults to install into %programfiles%\rexx.org\Regina
+  * Windows installers now uninstall only the files that are installed.
+  * This version of Regina now runs under Windows 2000; v3.6 did not.
+  * Added stubs for API functions; RexxSetTrace and RexxResetTrace.
+  * Added code to support RexxSetHalt API function
+
+ -- Mark Hessling <mark@rexx.org>  Sun, 14 Oct 2012 01:50:00 +1000
+
+regina (3.7RC2-1) unstable; urgency=low
+
+  * Updated to Regina 3.7RC2
+
+ -- Mark Hessling <mark@rexx.org>  Wed, 14 Sep 2012 08:35:38 +1000
+
+regina (3.7RC1-1) unstable; urgency=low
+
+  * Updated to Regina 3.7RC1
+
+ -- Mark Hessling <mark@rexx.org>  Wed,  5 Sep 2012 08:35:38 +1000
+
 regina (3.6-1) unstable; urgency=low
 
   * Updated to Regina 3.6

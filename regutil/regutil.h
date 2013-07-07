@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regutil.h,v 1.4 2009/12/31 03:09:45 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regutil.h,v 1.5 2012/08/08 01:25:25 mark Exp $
  */
 
 
@@ -130,7 +130,6 @@ rxfunc(SysSaveObject);
 rxfunc(SysSetIcon);
 rxfunc(SysSetObjectData);
 
-#if 0
 /* trigometry functions based on ooRexx equivalents */
 rxfunc(syspi);
 rxfunc(syssqrt);
@@ -148,5 +147,4 @@ rxfunc(syscotan);
 rxfunc(sysarcsin);
 rxfunc(sysarccos);
 rxfunc(sysarctan);
-#endif
 

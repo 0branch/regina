@@ -8,6 +8,11 @@
 #
 # Deutsch - <florian@grosse-coosmann.de>
 #
+#
+# TODO
+# 40.43
+# 40.44
+#
   0,  1,Fehler %s in %s, Zeile %d:|<value>,<source>,<linenumber>
   0,  2,Fehler %s in der interaktiven Debugging-Sitzung:|<value>
   0,  3,Interaktives Debugging.  "Trace Off" zum Beenden. ENTER zum Fortfahren.
@@ -180,6 +185,8 @@
  40, 39,Routine %s, Argument 3 ist weder Null noch Eins; "%s" gefunden|<bif>,<value>
  40, 41,Routine %s, Argument %d muss innerhalb der Dateigrenzen sein; "%s" gefunden|<bif>,<argnumber>,<value>
  40, 42,Routine %s, Argument 1: auf dieser Datei kann nicht positioniert werden; "%s" gefunden|<bif>,<value>
+ 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[Routine %s, Argument %d: muss ein Wert aus "%s" sein; gefunden: "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[Routine %s: Systemfehler bei der Ein-/Ausgabe auf der Datei; %s]|<bif>,<description>
  40,921,[Routine %s, Argument %d: Dateipositionierung im Modus "%s"; nicht kompatibel mit dem Öffnungsmodus]|<bif>,<argnumber>,<value>

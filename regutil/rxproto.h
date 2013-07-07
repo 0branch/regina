@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/rxproto.h,v 1.7 2010/07/02 22:02:07 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/rxproto.h,v 1.7 2010/07/02 22:02:07 mark Exp $
  */
 #ifdef HAVE_CONFIG_H
 # include "config.h"

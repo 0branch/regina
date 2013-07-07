@@ -34,10 +34,10 @@ typedef const struct varbox *cvariableptr ;
  */
 typedef struct {
    variableptr    *tbl;
-   unsigned        r;  /* read       */
-   unsigned        w;  /* write      */
-   unsigned        c;  /* collisions */
-   unsigned        e;  /* elements   */
+   unsigned        reads;
+   unsigned        writes;
+   unsigned        collisions;
+   unsigned        elements;
    unsigned        size;
 } var_hashtable;
 
@@ -378,6 +378,7 @@ typedef struct { /* internal_parser_type is a structure containing data from a
    int            tstart;            /* column number where error occured */
    int            if_linenr;         /* line number of last IF keyword */
    int            when_linenr;       /* line number of last WHEN keyword */
+   int            select_linenr;     /* line number of last SELECT keyword */
    labelboxptr    first_label;
    labelboxptr    last_label;
    unsigned long  numlabels;

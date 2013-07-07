@@ -3688,13 +3688,27 @@ static rx_64 countlines( tsd_t *TSD, fileboxptr ptr, int actual, int oper )
     * data or not (i.e. unless we are sure that there are no more data,
     * return "1"
     */
-   if (!(ptr->flag & FLAG_PERSIST) )
-   {
+   if (!(ptr->flag & FLAG_PERSIST))
       return (!feof(ptr->fileptr)) ;
-   }
-   else if ( !actual )
+   else if (!actual)
    {
-      return (calc_chars_left( TSD, ptr )) ? 1 : 0 ;
+      /*
+       * We just want to know of there are any lines left for a persistent
+       * file.  First check if we have reached EOF. Return 0 if so.
+       * Next check if the file size is 0; if so then return 0, otherwise
+       * there is at least 1 line left; return 1
+       */
+      if ( feof(ptr->fileptr ) )
+         return 0;
+      else
+      {
+         struct rx_stat buffer ;
+         int fno;
+         memset( &buffer, 0, sizeof(buffer) );
+         fno = fileno( ptr->fileptr ) ;
+         rx_fstat( fno, &buffer ) ;
+         return ((buffer.st_size==0) ? 0 : 1);
+      }
    }
    else
    {

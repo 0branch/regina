@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.40 2010/12/27 00:47:31 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.41 2012/08/08 01:18:44 mark Exp $";
 #endif
 
 /*
@@ -861,9 +861,9 @@ select_stat  : select ncl when_stats otherwise_stat sel_end
                                          $$->p[0] = optgluelast( $2, $3 );
                                          $$->p[0]->o.last = NULL;
                                          $$->p[1] = $4; }
-             | select ncl END error    {  exiterror( ERR_WHEN_EXPECTED, 0 ) ;}
+             | select ncl END error    {  exiterror( ERR_WHEN_EXPECTED, 1, parser_data.select_linenr, __reginatext ) ;}
              | select ncl otherwise error
-                                       {  exiterror( ERR_WHEN_EXPECTED, 0 ) ;}
+                                       {  exiterror( ERR_WHEN_EXPECTED, 2, parser_data.select_linenr, __reginatext ) ;}
              | select error            {  exiterror( ERR_EXTRA_DATA, 1, __reginatext )  ;}
              | select ncl THEN         {  exiterror( ERR_THEN_UNEXPECTED, 0 ) ;}
              | select ncl when_stats otherwise error
@@ -872,7 +872,7 @@ select_stat  : select ncl when_stats otherwise_stat sel_end
 
 when_stats   : when_stats when_stat    { $$ = optgluelast( $1, $2 ); }
              | when_stat               { $$ = $1 ; }
-             | error                   {  exiterror( ERR_WHEN_EXPECTED, 0 )  ;}
+             | error                   {  exiterror( ERR_WHEN_EXPECTED, 2, parser_data.select_linenr, __reginatext )  ;}
              ;
 
 when_stat    : when expr nlncl THEN nlncl statement
@@ -883,15 +883,19 @@ when_stat    : when expr nlncl THEN nlncl statement
                                          $$->p[1]->o.last = NULL; }
              | when expr nlncl THEN nlncl statement THEN
                                        {  exiterror( ERR_THEN_UNEXPECTED, 0 ) ;}
-             | when expr               {  exiterror( ERR_THEN_EXPECTED, 2, parser_data.when_linenr, __reginatext )  ; }
+             | when expr               {  exiterror( ERR_THEN_EXPECTED, 2, parser_data.select_linenr, __reginatext )  ; }
              | when error              {  exiterror( ERR_INVALID_EXPRESSION, 0 ) ;}
              ;
 
+/*
 when_or_other: when
              | otherwise
              ;
-
-ex_when_stat : gruff when_or_other     { exiterror( ERR_WHEN_UNEXPECTED, 0 ); }
+ex_when_stat : gruff when_or_other     { exiterror( ERR_WHEN_UNEXPECTED, 1 ); }
+             ;
+*/
+ex_when_stat : gruff when              { exiterror( ERR_WHEN_UNEXPECTED, 1 ); }
+             | gruff otherwise         { exiterror( ERR_WHEN_UNEXPECTED, 2 ); }
              ;
 
 otherwise_stat : otherwise nlncl nxstats { $$ = $1;

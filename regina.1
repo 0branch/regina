@@ -28,19 +28,15 @@ will interpret that program. Any parameters following
 .I script
 will be interpreted as the parameters to the Rexx program. If
 .I script
-is not specified, the Rexx program to interpret will be read
+is not specified, or is specified as `\-', the Rexx program to interpret will be read
 from standard input, and interpretation will start when the whole
 program has been read.
-
-If `\-' is specified as
-.I script
-then the script will be read from standard input.
 
 The
 .B regina
 executable supports the use of external function packages written
-to the SAA API, and called with the
-.B rxfuncadd
+to the SAA API, and loaded with the
+.B RxFuncAdd
 BIF.
 
 The
@@ -81,10 +77,28 @@ command line is available as a separate argument, rather then the normal
 behaviour of only making the combined command line arguments available as one
 internal argument.
 
+.IP \-l[locale]
+Allows the user to specify the
+.I locale
+to be used. Normally this switch is
+specified without the optional
+.I
+locale string which uses the system's locale.
+
 .IP \-p
 Relevant only on Win32 platforms. Results in a `Press ENTER key to exit...'
 prompt to be displayed at the end of execution. This is useful when a Rexx
-program is run from Explorer.
+program is run from Windows Explorer.
+
+.IP \-r
+Runs a Rexx program is a restricted mode where any no changes to the external
+environment are allowed. Writing to files, loading external function packages,
+and running external commands are prohibited.
+
+.IP \-ooptions
+Allows Regina OPTIONS to be passed to the Rexx program. The value of
+.I options
+is in the same format as the OPTIONS instruction.
 
 .IP \-c
 .I Compiles

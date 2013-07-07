@@ -165,6 +165,9 @@
 /* Define if you have the <iconv.h> header file.  */
 #undef HAVE_ICONV_H
 
+/* Define if you have the <inttypes.h> header file.  */
+#undef HAVE_INTTYPES_H
+
 /* Define if you have the <limits.h> header file.  */
 #undef HAVE_LIMITS_H
 

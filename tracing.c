@@ -352,10 +352,8 @@ void tracevalue( tsd_t *TSD, const streng *str, char type )
 
    indent = TSD->systeminfo->cstackcnt + TSD->systeminfo->ctrlcounter;
    message = Str_makeTSD( str->len + 30 + indent );
-   sprintf( tt->tracestr, "       >%%c> %%%ds  \"%%.%ds\"",
-                          indent, str->len );
-   message->len = sprintf( message->value, tt->tracestr,
-                                           type, "", str->value );
+   sprintf( tt->tracestr, "       >%%c> %%%ds  \"%%.%ds\"", indent, str->len );
+   message->len = sprintf( message->value, tt->tracestr, type, "", str->value );
    printout( TSD, message );
    Free_stringTSD( message );
 }
@@ -644,6 +642,13 @@ void set_trace( tsd_t *TSD, const streng *setting )
    {
       for ( cptr = 0; cptr < Str_len( setting ); cptr++ )
       {
+         /*
+          * Check each character in the string. Toggle interactive trace for
+          * each ? until there is an alpha character in the string when we
+          * stop processing the string.  So if you TRACE '???IGNORE'
+          * and interactive tracing is currently off, this will turn interactive
+          * tracing on (intermediates) and ignore the remaining string 'GNORE'
+          */
          set_trace_char( TSD, setting->value[cptr] );
          if ( rx_isalpha( setting->value[cptr] ) )
             return;

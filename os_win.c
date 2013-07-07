@@ -107,6 +107,18 @@ static int IsWin9X(void)
       return retval;
    }
 #endif
+   /*
+    Win32/Win64 code to handle inout/output via overlapped I/O is broken.
+    This temporary workaround uses the Windows 95/DOS mechanism of temporary
+    files. It is slower, but it produces the correct results.
+    Works around bugs:
+    3400513, 3170743, 3037156, 1887965
+   */
+   if ( 1 )
+   {
+      retval = 1;
+      return retval;
+   }
 
    osinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
    GetVersionEx( &osinfo );

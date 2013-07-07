@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regcrypt.c,v 1.1 2009/10/07 07:51:45 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regcrypt.c,v 1.1 2009/10/07 07:51:45 mark Exp $
  */
 #include "rxproto.h"
 

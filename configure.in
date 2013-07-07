@@ -4,14 +4,16 @@ dnl *******************WARNING****************************
 dnl Using an autoconf later than 2.61 will result in configure
 dnl failing to run on QNX4
 dnl *******************WARNING****************************
-AC_INIT(Regina REXX Interpreter, "", mark@rexx.org, Regina-REXX)
+AC_INIT(Regina Rexx Interpreter, m4_esyscmd_s([grep VER_DOT ./regina.ver | cut -f 2 -d '=']),mark@rexx.org, Regina-REXX)
 AC_PREFIX_DEFAULT(/usr/local)
 
 . $srcdir/regina.ver
 VERSION_NODOT=\"$VER\"
 VERSION=\"$VER_DOT\"
+VERSION_UNQUOTED=$VER_DOT
 VER_DATE=\"$VER_DATE\"
 AC_SUBST(VERSION)
+AC_SUBST(VERSION_UNQUOTED)
 AC_SUBST(VERSION_NODOT)
 AC_SUBST(VER_DATE)
 AC_SUBST(VER_MAJOR)
@@ -22,7 +24,6 @@ cp $srcdir/common/config.sub $srcdir
 
 dnl ---------------------- check for C compiler -----------------
 dnl Checks for one of the C compilers below - change if yours not there.
-CC_LIST="xlC xlc gcc cc c89 acc"
 MH_PROG_CC
 
 AC_CONFIG_HEADER(config.h)
@@ -73,11 +74,11 @@ case "$target" in
       ;;
    sparc*sunos*)
       ;;
-   i*86-*linux*)
+   i*86-*linux*|*-k*bsd-gnu*|*-gnu*)
       GCI_CONVERT_HEADER="gci_convert.linux.i86"
       gci_available=yes
       ;;
-   *86_64-*linux*)
+   *86_64-*linux*|*-k*bsd-gnu*|*-gnu*)
       GCI_CONVERT_HEADER="gci_convert.linux.86_64"
       gci_available=yes
       ;;
@@ -91,6 +92,10 @@ case "$target" in
       ;;
    *cygwin*)
       GCI_CONVERT_HEADER="gci_convert.cygwin.i86"
+      gci_available=yes
+      ;;
+   *apple-darwin*)
+      GCI_CONVERT_HEADER="gci_convert.macX.all"
       gci_available=yes
       ;;
    *nto-qnx*)
@@ -144,6 +149,7 @@ AC_CHECK_HEADERS( \
    fnmatch.h \
    grp.h \
    iconv.h \
+   inttypes.h \
    limits.h \
    malloc.h \
    math.h \
@@ -284,6 +290,7 @@ if test "$REGINA_GETHOSTBYNAME_LIB" = "none required" -o "$REGINA_GETHOSTBYNAME_
   REGINA_GETHOSTBYNAME_LIB=""
 fi
 LIBS="$save_LIBS"
+AC_SUBST(REGUTIL_TERM_LIB)
 
 #MH_CHECK_LIB(m nsl nsl_s socket net network)
 dnl
@@ -511,14 +518,15 @@ AC_SUBST(REXXSOCKET)
 dnl --------------- allow --with-addon-dir to specify location of external function packages
 AC_ARG_WITH(addon-dir,
    [  --with-addon-dir=dir    location of external function packages (default blank)],
-   [with_addon_dir=$withval],
-   [with_addon_dir=no],
+   [addonsdir=$withval],
+   [addonsdir=$datadir/regina/addons],
 )
-if test "$with_addon_dir" != no; then
-   AC_DEFINE_UNQUOTED(HAVE_REGINA_ADDON_DIR,"$with_addon_dir")
-fi
+AC_DEFINE_DIR(HAVE_REGINA_ADDON_DIR,"$addonsdir")
+AC_SUBST(addonsdir)
+
 dnl
 MH_CHECK_RPM
+MH_GET_DISTRO_NAME()
 
 dnl --------------- Force definition of pre-compiler macro UNIX ----------
 AC_DEFINE(UNIX)

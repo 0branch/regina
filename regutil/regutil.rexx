@@ -64,26 +64,27 @@ say 'SysVolumeLabel' SysVolumeLabel()
 say 'SysFileSystemType' SysFileSystemType('/')
 say 'SysGetErrorText' SysGetErrorText(36)
 
-call sysfilesearch 'sysfilesearch','regutil/regfilesys.c','NOODLE.'
-do i = 1 to noodle.0
-  say noodle.i
-  end
+if sysfilesearch( 'sysfilesearch','regutil/regfilesys.c','NOODLE.' ) = 0 then
+   do i = 1 to noodle.0
+      say noodle.i
+      end
 
-call sysfilesearch 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'c'
-do i = 1 to noodle.0
-  say noodle.i
-  end
+if sysfilesearch( 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'c' ) = 0 then
+   do i = 1 to noodle.0
+      say noodle.i
+      end
 
-call sysfilesearch 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'cn'
-do i = 1 to noodle.0
-  say noodle.i
-  end
+if sysfilesearch( 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'cn' ) = 0 then
+   do i = 1 to noodle.0
+      say noodle.i
+      end
 
-call sysfilesearch 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'n'
-do i = 1 to noodle.0
-  say noodle.i
-  end
+if sysfilesearch( 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'n' ) = 0 then
+   do i = 1 to noodle.0
+      say noodle.i
+      end
 
+say 'SysPi' SysPi()
 say 'SysDropFuncs' SysDropFuncs()
 Return
 

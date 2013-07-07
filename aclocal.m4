@@ -27,6 +27,7 @@ dnl MH_CHECK_TYPE_SOCKLEN_T
 dnl MH_CHECK_F_MNTFROMNAME
 dnl MH_LARGE_FILE_SUPPORT
 dnl MH_CHECK_OSX_ARCH
+dnl MH_GET_DISTRO_NAME
 dnl
 dnl ---------------------------------------------------------------------------
 dnl Determine if C compiler handles ANSI prototypes
@@ -51,7 +52,7 @@ AC_DEFUN([MH_PROG_CC],
 [
 mh_sysv_incdir=""
 mh_sysv_libdir=""
-all_words="$CC_LIST"
+all_words="clang xlc gcc c99 c89 acc cc"
 ac_dir=""
 AC_MSG_CHECKING(for one of the following C compilers: $all_words)
 AC_CACHE_VAL(ac_cv_prog_CC,[
@@ -487,7 +488,7 @@ if test "$enable_posix_threads" = yes; then
          MT_FILE="mt_posix"
          case "$target" in
             *solaris*)
-               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                   if test "$mh_rt_lib_found" = "yes"; then
                      THREADING_LINK="-lrt"
@@ -498,7 +499,7 @@ if test "$enable_posix_threads" = yes; then
                fi
                ;;
             *hp-hpux1*)
-               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                fi
                if test "$mh_rt_lib_found" = "yes"; then
@@ -516,7 +517,7 @@ if test "$enable_posix_threads" = yes; then
                THREADING_LINK=""
                ;;
             *)
-               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   THREADING_COMPILE="-D_REENTRANT -DPOSIX -DREGINA_REENTRANT"
                fi
                ;;
@@ -548,7 +549,7 @@ if test "$ac_cv_header_dlfcn_h" = "yes" -o "$HAVE_DLFCN_H" = "1"; then
    LIBS="$LIBS $DLFCNLIBDIR"
    CFLAGS="$CFLAGS $DLFCNINCDIR"
    AC_CACHE_VAL(mh_cv_uscore,[
-   AC_RUN_IFELSE([
+   AC_RUN_IFELSE([AC_LANG_SOURCE([
    #include <dlfcn.h>
    int mh_underscore_test (void) { return 42; }
    int main() {
@@ -563,6 +564,7 @@ if test "$ac_cv_header_dlfcn_h" = "yes" -o "$HAVE_DLFCN_H" = "1"; then
    [mh_cv_uscore=no],
    [mh_cv_uscore=no]
    )
+   ])
    ])
    AC_MSG_RESULT($mh_cv_uscore)
    if test "x$mh_cv_uscore" = "xyes"; then
@@ -1934,3 +1936,41 @@ if test $on_osx = "yes"; then
   AC_SUBST(valid_arch_flags)
 fi
 ])
+
+dnl ---------------------------------------------------------------------------
+dnl Determines the Linux distribution name
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_GET_DISTRO_NAME],
+[
+AC_CHECK_PROG(lsb_release, [lsb_release], yes, no)
+if test "$ac_cv_prog_lsb_release" = yes; then
+   AC_MSG_CHECKING(OS distribution name)
+   MYDISTRO="`lsb_release -i | cut -f 2`-`lsb_release -r | cut -f 2`"
+   MYDISTRO="`echo $MYDISTRO | sed \"s/ /_/g\"`"
+   AC_MSG_RESULT($MYDISTRO)
+else
+   case "$target" in
+      *freebsd* | *openbsd*)
+         MYDISTRO="`echo $target | cut -f3 -d-`"
+      ;;
+      *darwin*)
+         MYDISTRO="`echo $target | cut -f2-3 -d-`"
+      ;;
+      *pc-solaris2*)
+         MYDISTRO="`echo $target | cut -f2- -d-`"
+      ;;
+      *cygwin*)
+         MYDISTRO="`echo $target | cut -f2- -d-`"
+      ;;
+      *)
+         MYDISTRO="$target"
+      ;;
+   esac
+fi
+AC_SUBST(MYDISTRO)
+])
+
+dnl
+dnl add our expansion macro for addonsdir
+dnl
+sinclude(common/ac_define_dir.m4)

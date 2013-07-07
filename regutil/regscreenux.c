@@ -18,13 +18,14 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.8 2010/06/07 01:20:25 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regscreenux.c,v 1.9 2012/08/08 01:23:45 mark Exp $
  */
 #include "regutil.h"
 #ifdef USE_TERMCAP_DB
 # ifdef HAVE_NCURSES_H
 #  include <ncurses.h>
-# elif defined( HAVE_TERM_H )
+# endif
+# if defined( HAVE_TERM_H )
 #  include <term.h>
 # elif defined( HAVE_TERMCAP_H )
 #  include <termcap.h>

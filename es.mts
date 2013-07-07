@@ -50,6 +50,26 @@
 #    This has been found to be the only possible solution. I guess it will
 #    also be the case for French, Portuguese and other Latin languages.
 #
+#
+# TODO
+# 40.43
+# 40.44
+# 40,930
+# 40,980
+# 40,981
+# 40,982
+# 40,983
+# 40,984
+# 40,985
+# 40,986
+# 40,987
+# 40,988
+# 40,989
+# 40,990
+# 40,991
+# 40,992
+# 40,993
+#
   0,  1,Error %s ejecutando %s, línea %d:|<value>,<source>,<linenumber>
   0,  2,Error %s en el trazado interactivo:|<value>
   0,  3,Trazado interactivo.  "Trace Off" para finalizar el "debug". ENTER para continuar.
@@ -222,6 +242,8 @@
  40, 39,El argumento 3 de %s no es cero ni uno; encontrado "%s"|<bif>,<value>
  40, 41,El argumento de %s número %d debe estar dentro de los límites del fichero; encontrado "%s"|<bif>,<argnumber>,<value>
  40, 42,El argumento 1 de %s; no se puede posicionar en este fichero; encontrado "%s"|<bif>,<value>
+ 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[El argumento de %s número %d, debe ser uno de "%s"; encontrado "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: error de bajo nivel de E/S del fichero; %s]|<bif>,<description>
  40,921,[Argumento de %s número %d, modo "%s" de posicionado en fichero; incompatible con el modo de fichero abierto]|<bif>,<argnumber>,<value>

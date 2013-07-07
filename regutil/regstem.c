@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regstem.c,v 1.8 2011/12/31 01:55:26 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regstem.c,v 1.9 2012/08/08 01:26:22 mark Exp $
  */
 
 /* ******************************************************************** */
@@ -54,7 +54,7 @@ static int rxstrcasecmp(const PRXSTRING l, const PRXSTRING r)
 {
    register int len = min(l->strlength, r->strlength),
                 d = l->strlength - r->strlength,
-                c = casecmp(l->strptr, r->strptr, len);
+                c = casecmp((const unsigned char *)l->strptr, (const unsigned char *)r->strptr, len);
 
    return (len && c) ? c : d;
 }
@@ -668,7 +668,7 @@ rxfunc(syssteminsert)
    return 0;
 }
 
-/* stemread(filename, stemname[minlen[,[maxlen]) */
+/* stemread(filename, stemname[,minlen[,[maxlen]) */
 rxfunc(regstemread)
 {
    static char *smaxlen = NULL;

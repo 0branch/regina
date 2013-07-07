@@ -61,7 +61,7 @@ GCI_SHO = gci_call.obj gci_convert.obj gci_execute.obj gci_helper.obj \
 HAVE_GCI = -DHAVE_GCI -I$(SRCDIR)\gci -I.
 endif
 
-DYN_CRT =  -Zcrtdll -Zomf -mprobe
+DYN_CRT =  -Zcrtdll -Zomf
 CEXTRA = -DOS2 -DEMX -funsigned-char $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\"
 EEXTRA =
 DYN_COMP = -DDYNAMIC -Zdll $(DYN_CRT)
@@ -70,7 +70,7 @@ SOCKET = -lsocket
 SHLIBS = $(SHLLIB).$(SHLPST)
 SHLIMPLIB = $(SHLLIB).$(SHLPST)
 SHLLIB = $(SHLFILE)
-DYNAMIC_LDFLAGS = $(THREADING_LINK) $(STRIP_FLAG) -Zcrtdll -Zomf -mprobe
+DYNAMIC_LDFLAGS = $(THREADING_LINK) $(STRIP_FLAG) -Zcrtdll -Zomf
 SHLDEF = $(SRCDIR)\$(SHLLIB)_os2_dll.def
 SHL1 = emximp -o $(SHLLIB).$(LIBPST) $(SHLDEF)
 SHL2 = emximp -o $(SHLLIB).lib $(SHLDEF)
@@ -155,7 +155,7 @@ SHOFILES = funcs.obj builtin.obj error.obj variable.obj \
 	$(GCI_SHO)
 REGUTILOFILES = regfilesys.obj regini.obj inifile.obj regmacrospace.obj regscreenos2.obj \
                 regsemos2.obj regutil.obj rxsupport.obj regstem.obj \
-                regunicode.obj regcrypt.obj
+                regunicode.obj regcrypt.obj regtrig.obj
 
 DEMODIR = $(SRCDIR)\demo
 DEMOFILES = $(DEMODIR)\*
@@ -184,7 +184,10 @@ GCIHEADERS = $(SRCDIR)\gci\gci.h $(SRCDIR)\gci\embedded.h gci_convert.h
 #
 .SUFFIXES:
 
-all : rexx$(EXE) $(LIBFILE).$(LIBPST) execiser$(EXE) rxstack$(EXE) rxqueue$(EXE) $(SHL_TARGETS) mtb_files threader$(EXE) rexx.dll rexxapi.dll
+all : how rexx$(EXE) $(LIBFILE).$(LIBPST) execiser$(EXE) rxstack$(EXE) rxqueue$(EXE) $(SHL_TARGETS) mtb_files threader$(EXE) rexx.dll rexxapi.dll
+
+how:
+	echo make -f $(SRCDIR)\makefile.os2.gcc DEBUG=$(DEBUG) TRACEMEM=$(TRACEMEM) FLISTS=$(FLISTS) SOCKET=$(SOCKET) ^%1 ^%2 > rebuild.cmd
 
 $(CSRCFILES) : $(SRCDIR)\rexx.h
 
@@ -819,6 +822,12 @@ regcrypt.obj : $(REGUTILSRCDIR)/regcrypt.c $(REGUTILSRCDIR)/rxproto.h
 	       $(O2SHO)
 	       $(SAVE2O)
 
+regtrig.obj : $(REGUTILSRCDIR)/regtrig.c $(REGUTILSRCDIR)/rxproto.h
+	       $(O2SAVE)
+	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regtrig.c
+	       $(O2SHO)
+	       $(SAVE2O)
+
 rxsupport.obj : $(REGUTILSRCDIR)/rxsupport.c $(REGUTILSRCDIR)/rxproto.h
 	       $(O2SAVE)
 	       $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/rxsupport.c
@@ -853,6 +862,10 @@ tar:
 
 zip:
 	        zip regna$(VER) $(ARCHIVE_FILES)
+
+binary:
+	echo run makegcc.cmd ver from Regina source directory
+
 
 #
 # below here not tested

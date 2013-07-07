@@ -12,7 +12,7 @@
  *
  * The Original Code is regutil.
  *
- * $Header: /opt/cvs/Regina/regutil/regtrig.c,v 1.2 2009/11/01 00:43:43 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regtrig.c,v 1.2 2009/11/01 00:43:43 mark Exp $
  */
 /**************************************************************************
 *

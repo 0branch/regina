@@ -174,7 +174,7 @@ streng *unx_getpid( tsd_t *TSD, cparamboxptr parms )
 streng *unx_gettid( tsd_t *TSD, cparamboxptr parms )
 {
    checkparam(  parms,  0,  0 , "GETTID" ) ;
-   return int_to_streng( TSD, TSD->thread_id ) ;
+   return rx64u_to_streng( TSD, (rx_64u)TSD->thread_id ) ;
 }
 
 

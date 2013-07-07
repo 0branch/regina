@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/rxsupport.c,v 1.1 2009/10/07 07:52:25 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/rxsupport.c,v 1.3 2012/09/14 01:56:31 mark Exp $
  */
 #include "rxproto.h"
 
@@ -26,8 +26,22 @@
 #include <ctype.h>
 #ifndef _WIN32
 # include <sys/param.h>
-#else
-# define MAXPATHLEN _MAX_PATH
+#endif
+
+#ifndef MAXPATHLEN
+# ifndef PATH_MAX
+#  ifndef _POSIX_PATH_MAX
+#   ifndef _MAX_PATH
+#    define MAXPATHLEN 1024
+#   else
+#    define MAXPATHLEN _MAX_PATH
+#   endif
+#  else
+#   define MAXPATHLEN _POSIX_PATH_MAX
+#  endif
+# else
+#  define MAXPATHLEN PATH_MAX
+# endif
 #endif
 
 /* it's preferable to set these things in one big blow, but sometimes
@@ -612,7 +626,7 @@ int cha_adddummy(chararray *ca, const char * str, int len)
     }
 
     ca->array[ca->count].strlength = len;
-    ca->array[ca->count++].strptr = (unsigned char *)str;
+    ca->array[ca->count++].strptr = (char *)str;
 
     return 0;
 }

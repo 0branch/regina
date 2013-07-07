@@ -29,6 +29,12 @@
 #
 #
 #
+# TODO
+# 40.43
+# 40.44
+# 40,992
+# 40,993
+#
   0,  1,Bˆ¥d %s podczas dziaˆania %s, linia %d:|<value>,<source>,<linenumber>
   0,  2,Bˆ¥d %s w interaktywnym ˜ladzie:|<value>
   0,  3,Interaktywny ˜lad.  "Trace Off", aby zakoäczy† "debugowanie". ENTER, by kontynuowa†.
@@ -202,6 +208,8 @@
  40, 39,Argument %s nr 3 nie jest zerem lub jedynk¥; znaleziono "%s"|<bif>,<value>
  40, 41,W %s argument %d musi zawiera† si© w ograniczeniach strumienia; znaleziono "%s"|<bif>,<argnumber>,<value>
  40, 42,Argument %s nr 1; nie powinien wyst¥pi† w strumieniu; znaleziono "%s"|<bif>,<value>
+ 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[Argument %s nr %d, musi by† jednym z "%s"; znaleziono "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: niskopoziomowy bˆ¥d I/O strumienia; %s]|<bif>,<description>
  40,921,[Argument %s nr %d, tryb pozycjonowania strumienia "%s"; niekompatybilny z trybem otwarcia strumienia]|<bif>,<argnumber>,<value>

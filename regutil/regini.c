@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.14 2011/12/31 08:41:20 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regini.c,v 1.16 2012/09/09 05:31:51 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSMISC
@@ -63,28 +63,75 @@
 static const char notimp[] = "not implemented",
                    error[] = "ERROR:";
 #ifdef _WIN32
-static const int list_keys(const char * const inifile, const char * const app,
-                           chararray * ca)
+static const int list_keys(const char * const inifile, const char * const app, chararray * ca)
 {
-   char buf[32768], *cp;
-   int l, rc;
+   char *pBuffer = NULL;
+   char *pStr;
+   char *pp;
+   int len, rc = 1, next;
+   int size = 4096;
 
-   rc = !GetPrivateProfileSection(app, buf, sizeof(buf), inifile);
-   for (cp = buf; cp; cp += l+1)
-      cha_addstr(ca, cp, l = strlen(cp));
+   pBuffer = malloc( size );
+   if ( pBuffer )
+   {
+      for( ;; )
+      {
+         rc = GetPrivateProfileSection( app, pBuffer, size, inifile );
+         if ( rc != ( size - 2 ) )
+            break;
+         size *= 2;
+         pBuffer = realloc( pBuffer, size );
+      }
 
+      for( pStr = pBuffer; *pStr; )
+      {
+         pp = strchr( pStr, '=' );
+         next = strlen( pStr );
+         if ( pp )
+         {
+            *pp = '\0';
+            len = strlen( pStr );
+         }
+         else
+            len = next;
+
+         cha_addstr( ca, pStr, len );
+         pStr += (1+next);
+      }
+      rc = 0;
+      free( pBuffer );
+   }
    return rc;
 }
 
 static const int list_apps(const char * const inifile, chararray * ca)
 {
-   char buf[32768], *cp;
-   int l, rc;
+   char *pBuffer = NULL;
+   char *pStr;
+   int len, rc=1;
+   int size = 4096;
 
-   rc = !GetPrivateProfileSectionNames(buf, sizeof(buf), inifile);
-   for (cp = buf; cp; cp += l+1)
-      cha_addstr(ca, cp, l = strlen(cp));
+   pBuffer = malloc( size );
+   if ( pBuffer )
+   {
+      for( ;; )
+      {
+         rc = GetPrivateProfileSectionNames( pBuffer, size, inifile );
+         if ( rc != ( size - 2 ) )
+            break;
+         size *= 2;
+         pBuffer = realloc( pBuffer, size );
+      }
 
+      for( pStr = pBuffer; *pStr; )
+      {
+         len = strlen( pStr );
+         cha_addstr( ca, pStr, len );
+         pStr += (len+1);
+      }
+      rc = 0;
+      free( pBuffer );
+   }
    return rc;
 }
 
@@ -226,7 +273,7 @@ static int get_key(const char * const inifile, const char * const app,
 
 
 
-/* sysini([inifile],app,key,val,stem--)
+/* sysini([inifile],app,key,val|stem[,sensitive])
  *  allowable combinations:
  *    app, key, and value -- set app.key to value
  *    app, key, value='DELETE:' -- delete app.key
@@ -239,11 +286,12 @@ rxfunc(sysini)
 {
    static const char all[] = "ALL:", delete[] = "DELETE:";
    char * inifile, *app, *key, *val;
+   int insensitive = 1;
    chararray * ca;
    PRXSTRING stem = NULL;
    int rc = 0, rcc = 0;
 
-   checkparam(2, 4);
+   checkparam(2, 5);
 
    if (argv[1].strlength == 0)
       return BADARGS;
@@ -253,13 +301,22 @@ rxfunc(sysini)
    else
       inifile = NULL;
 
+   /* default to case-insensitive values for app and key(ie set to uppercase),
+    * but go sensitive if the fifth arg is given and the first character is `s' */
+   if (argc == 5 && argv[4].strptr && toupper(argv[4].strptr[0]) == 'S')
+      insensitive = 0;
+
    rxstrdup(app, argv[1]);
-   strupr(app);
+   if ( insensitive == 1 ) {
+      strupr(app);
+   }
 
    if (argc > 2 && argv[2].strlength > 0)
    {
       rxstrdup(key, argv[2]);
-      strupr(key);
+      if ( insensitive == 1 ) {
+         strupr(key);
+      }
    }
    else
       key = NULL;
@@ -294,7 +351,7 @@ rxfunc(sysini)
    }
 
    /* set or delete a value */
-   else if (argc == 4) {
+   else if (argc > 3) {
       if (!strcasecmp(val, delete))
          rcc = delete_key(inifile, app, key);
       else

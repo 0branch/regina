@@ -44,6 +44,8 @@ regina_3.1 {
 } REXXSAA_API_MT;
 regina_3.3 {
         ReginaCleanup;
-        ReginaGetThreadSafeData;
-        ReginaCallBack;
 } REXXSAA_API_MT;
+regina_3.7 {
+        RexxSetTrace;
+        RexxResetTrace;
+} REXXSAA_API;

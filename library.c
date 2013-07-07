@@ -42,7 +42,7 @@
  * NULL.
  */
 
-#define EP_COUNT 133    /* should be a prime for distribution */
+#define EP_COUNT 1361   /* should be a prime for distribution */
 
 #define FUNCS   0
 #define EXITS   1
@@ -56,7 +56,15 @@ typedef struct { /* lib_tsd: static variables of this module (thread-safe) */
 } lib_tsd_t; /* thread-specific but only needed by this module. see
               * init_library
               */
-
+/*
+ * External functions, exits etc should be global; fixes bug 3489415
+ * This is not implemented yet as doing this would require all access
+ * to ltGlobal to be protected so multiple threads can't be adding/deleting
+ * items fro the list of external functions/exits - TODO
+ */
+#ifdef TODO_WHEN_TS
+static lib_tsd_t *ltGlobal=NULL;
+#endif
 /*
  * init_library initializes the module.
  * Currently, we set up the thread specific data.
@@ -64,6 +72,18 @@ typedef struct { /* lib_tsd: static variables of this module (thread-safe) */
  */
 int init_library( tsd_t *TSD )
 {
+#ifdef TODO_WHEN_TS
+   if ( TSD->lib_tsd != NULL )
+      return 1;
+
+   if ( ltGlobal == NULL )
+   {
+      if ( ( ltGlobal = MallocTSD( sizeof( lib_tsd_t ) ) ) == NULL )
+         return 0;
+      memset( ltGlobal, 0, sizeof( lib_tsd_t ) );  /* correct for all values */
+   }
+   TSD->lib_tsd = ltGlobal;
+#else
    lib_tsd_t *lt;
 
    if ( TSD->lib_tsd != NULL )
@@ -73,6 +93,7 @@ int init_library( tsd_t *TSD )
       return 0;
    lt = (lib_tsd_t *)TSD->lib_tsd;
    memset( lt, 0, sizeof( lib_tsd_t ) );  /* correct for all values */
+#endif
    return 1;
 }
 

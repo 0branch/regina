@@ -34,7 +34,7 @@ MEMTRACE =
 TRACEMEM = N
 ! endif
 !else
-EEXTRA = /release /pdb:nul /incremental:no
+EEXTRA = /release /PDB:nul /incremental:no
 DEBUGFLAG  = /DNDEBUG
 OPTIMIZE = /Ox /J #-O2gityb1 -J
 DEBUG = N
@@ -73,7 +73,7 @@ SOCKET=5757
 
 LIBS = advapi32.lib #user32.lib #libc.lib
 WINSOCK = wsock32.lib
-SERVICELIBS = libcmt.lib kernel32.lib advapi32.lib shell32.lib
+SERVICELIBS = kernel32.lib advapi32.lib shell32.lib #libcmt.lib
 SHL_TARGETS= regina.exe rxtest1.dll rxtest2.dll rxtest1.lib rxtest2.lib regutil.dll regutil.lib
 LD     = link
 LIBFLAGS = /OUT:rexx.lib
@@ -82,10 +82,10 @@ LINKSHL = regina.lib
 LD_RXLIBPRE=link /NOLOGO /DLL /OUT:$@
 LD_RXLIB1= /DEF:$(SRCDIR)\test1_$(LARCH)_dll.def
 LD_RXLIB2= /DEF:$(SRCDIR)\test2_$(LARCH)_dll.def
-LD_REGUTIL= /DEF:$(REGUTILSRCDIR)\regutil.def
+LD_REGUTIL = /PDB:regutil.pdb /DEF:$(REGUTILSRCDIR)\regutil.def $(EEXTRA)
 MV= -ren
 #
-CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\"
+CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\" -D_CRT_SECURE_NO_WARNINGS
 
 CC2O=-Fo$@
 #
@@ -111,7 +111,7 @@ TSCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) 
 LINKOPT = $(EEXTRA) /NOLOGO /VERSION:$(VERDOT)
 OTHERCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) -DREGINA_SINGLE_THREADED
 OTHERTSCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) $(THREADING)
-REGUTILCOPT = $(COPT) -DNOT_LIKE_IBM -DMAPVIEWOFFILE
+REGUTILCOPT = $(COPT) -DNOT_LIKE_IBM -DMAPVIEWOFFILE $(DEBUGFLAG)
 
 README = $(SRCDIR)/README.??? $(SRCDIR)/COPYING-LIB $(SRCDIR)/BUGS $(SRCDIR)/yaccsrc.bound
 
@@ -152,11 +152,11 @@ STATFILES = funcs.stat.obj builtin.stat.obj error.stat.obj variable.stat.obj ext
 
 REGUTILOFILES = regfilesys.obj regini.obj regmacrospace.obj regscreen.obj \
                 regsem.obj regutil.obj rxsupport.obj random.obj regstem.obj regwin.obj \
-                regunicode.obj regcrypt.obj
+                regunicode.obj regcrypt.obj regtrig.obj
 
 REGUTILSTATFILES = regfilesys.stat.obj regini.stat.obj regmacrospace.stat.obj regscreen.stat.obj \
                 regsem.stat.obj regutil.stat.obj rxsupport.stat.obj random.stat.obj regstem.stat.obj regwin.stat.obj \
-                regunicode.stat.obj regcrypt.stat.obj
+                regunicode.stat.obj regcrypt.stat.obj regtrig.stat.obj
 
 DEMODIR = $(SRCDIR)/demo
 DEMOFILES = $(DEMODIR)/*
@@ -623,6 +623,9 @@ regunicode.obj : $(REGUTILSRCDIR)/regunicode.c
 regcrypt.obj : $(REGUTILSRCDIR)/regcrypt.c
    $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regcrypt.c
 
+regtrig.obj : $(REGUTILSRCDIR)/regtrig.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) $(DYN_COMP) $(REGUTILSRCDIR)/regtrig.c
+
 #
 #
 regutil.lib: $(REGUTILSTATFILES)
@@ -666,6 +669,9 @@ regunicode.stat.obj : $(REGUTILSRCDIR)/regunicode.c
 
 regcrypt.stat.obj : $(REGUTILSRCDIR)/regcrypt.c
    $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regcrypt.c
+
+regtrig.stat.obj : $(REGUTILSRCDIR)/regtrig.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
+   $(CC) -c $(REGUTILCOPT) $(CC2O) /DDYNAMIC_STATIC $(REGUTILSRCDIR)/regtrig.c
 
 #
 # Rules for sample programs
@@ -753,13 +759,13 @@ zip:
 #
 # Build NSIS package...
 #
-dist: all
+exe: all
 	copy $(SRCDIR)\regina_ss.ini .
 	copy $(SRCDIR)\regina_fa.ini .
 	copy $(SRCDIR)\regina_mt.ini .
-	copy $(SRCDIR)\regina.nsi .
+	rexx $(COMMONSRCDIR)\generatensi.rexx $(SRCDIR)\regina.nsi.in $(SRCDIR)\regina.nsi.files .\regina.nsi
 	copy $(SRCDIR)\common\uninstall.ico .
-	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) /DARCH=$(LARCH) regina.nsi
+	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DVERSUPP=$(VER_SUPP) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) /DARCH=$(LARCH) regina.nsi
 
 binary: all
 	-mkdir dist
@@ -788,6 +794,6 @@ binary: all
 	-mkdir doc
 	copy $(REGINA_DOCDIR)\regina.pdf doc
 	copy $(REGINA_DOCDIR)\regutil.pdf doc
-	-del ..\Regina??$(LARCH).zip
-	zip -r ..\Regina$(VER)$(LARCH) *
+	-del ..\Regina*$(LARCH).zip
+	zip -r ..\Regina$(VER)$(VER_SUPP)$(LARCH) *
 	cd ..

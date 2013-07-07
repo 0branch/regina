@@ -286,12 +286,30 @@ static int whole_rx64_number( const num_descr *input, rx_64 *value )
    return 1;
 }
 
-int descr_to_int( const num_descr *input )
+int descr_to_int( const tsd_t *TSD, const num_descr *input, int errnum, int suberrnum, const char *bif, int argno )
 {
    int result = 0;
 
    if ( !whole_number( input, &result ) )
-       exiterror( ERR_INVALID_INTEGER, 0 );
+   {
+      volatile char *fs;
+      streng *h;
+
+      h = name_of_node( TSD, NULL, input );
+      fs = tmpstr_of( TSD, h );
+      Free_stringTSD( h );
+      switch( errnum )
+      {
+         case ERR_INCORRECT_CALL:
+            exiterror( errnum, suberrnum, bif, argno, fs );
+            break;
+         case ERR_INVALID_INTEGER:
+            exiterror( errnum, suberrnum, fs );
+            break;
+      }
+      /* should NOT get here */
+      exiterror( ERR_INVALID_INTEGER, 0 );
+   }
 
    return result;
 }
@@ -2313,7 +2331,7 @@ void string_pow( tsd_t *TSD, const num_descr *num, num_descr *acc,
 
    LOSTDIGITS_CHECK( num, ccns, lname );
    LOSTDIGITS_CHECK( acc, ccns, rname );
-   power = descr_to_int( acc ) ;
+   power = descr_to_int( TSD, acc, ERR_INVALID_INTEGER, 8, NULL, 0 ) ;
 
    IS_AT_LEAST( acc->num, acc->max, ccns+1 ) ;
    acc->exp = 1 ;
@@ -2783,7 +2801,7 @@ streng *str_digitize( tsd_t *TSD, streng *input, int start, int sign,
    return str_norm( TSD, &mt->edescr, NULL );
 }
 
-streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
+streng *str_binerize( tsd_t *TSD, num_descr *num, int length, int errnum, int suberrnum, const char *bif, int argno )
 {
    int i,ccns;
    streng *result;
@@ -2854,7 +2872,7 @@ streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
           * before it escapes :-) (don't we have to cast lvalue here?)
           * Afterwards, check to see if there are more digits to extract.
           */
-         result->value[i] = (char) descr_to_int( &mt->fdescr );
+         result->value[i] = (char) descr_to_int( TSD, &mt->fdescr, errnum, suberrnum, bif, argno );
          if ( ( num->num[0] == '0' ) && ( num->size == 1 ) )
             break;
       }
@@ -2904,7 +2922,7 @@ streng *str_binerize( tsd_t *TSD, num_descr *num, int length )
             str_strip( num );
             string_add2( TSD, &mt->fdescr, &byte, &mt->fdescr, ccns );
          }
-         result->value[i] = (char) descr_to_int( &mt->fdescr );
+         result->value[i] = (char) descr_to_int( TSD, &mt->fdescr, errnum, suberrnum, bif, argno );
       }
       /*
        * That's it, store the length

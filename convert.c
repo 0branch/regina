@@ -756,13 +756,12 @@ streng *std_d2c( tsd_t *TSD, cparamboxptr parms )
        * second doesn't exist.
        */
       if ( num->negative )
-         exiterror( ERR_INCORRECT_CALL, 13, "D2C", 1,
-                    tmpstr_of( TSD, parms->value ) );
+         exiterror( ERR_INCORRECT_CALL, 13, "D2C", 1, tmpstr_of( TSD, parms->value ) );
 
       length = -1;
    }
 
-   return str_binerize( TSD, num, length );
+   return str_binerize( TSD, num, length, ERR_INCORRECT_CALL, 12, "D2C", 1 );
 }
 
 
@@ -795,8 +794,7 @@ streng *std_d2x( tsd_t *TSD, cparamboxptr parms )
        * second doesn't exist.
        */
       if ( num->negative )
-         exiterror( ERR_INCORRECT_CALL, 13, "D2X", 1,
-                    tmpstr_of( TSD, parms->value ) );
+         exiterror( ERR_INCORRECT_CALL, 13, "D2X", 1, tmpstr_of( TSD, parms->value ) );
 
       length = -1;
    }
@@ -806,7 +804,7 @@ streng *std_d2x( tsd_t *TSD, cparamboxptr parms )
     * First it is converted into a char string, and then that char string
     * is converted into a hexstring.
     */
-   packed = str_binerize( TSD, num, ( length == -1 ) ? -1 : ( length+1 ) / 2 );
+   packed = str_binerize( TSD, num, ( length == -1 ) ? -1 : ( length+1 ) / 2, ERR_INCORRECT_CALL, 12, "D2X", 1 );
    result = unpack_hex( TSD, packed );
    Free_stringTSD( packed );
 

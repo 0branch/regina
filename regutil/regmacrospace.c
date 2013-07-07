@@ -20,7 +20,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regmacrospace.c,v 1.1 2009/10/07 07:51:51 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regmacrospace.c,v 1.1 2009/10/07 07:51:51 mark Exp $
  */
 #include "regutil.h"
 
