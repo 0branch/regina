@@ -116,8 +116,7 @@
 #define YY_END_OF_BUFFER_CHAR 0
 
 /* Size of default input buffer. */
-/* Default as set by yacc/flex
-#define YY_BUF_SIZE 16384
+/*
  *
  * This value MUST be larger than BUFFERSIZE in rexx.h
  * It is not set automatically because certain variables
@@ -126,6 +125,8 @@
  * This value will be blown away if you regenerate this file
  * from lexsrc.l
  */
+/* Default as set by yacc/flex */
+/*#define YY_BUF_SIZE 16384 */
 #define YY_BUF_SIZE 101000
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
@@ -322,7 +323,7 @@ static void yy_fatal_error YY_PROTO(( yyconst char msg[] ));
  */
 #define YY_DO_BEFORE_ACTION \
         yytext_ptr = yy_bp; \
-   yyleng = (int) (yy_cp - yy_bp); \
+yyleng = (int) (yy_cp - yy_bp); \
         yy_hold_char = *yy_cp; \
         *yy_cp = '\0'; \
         yy_c_buf_p = yy_cp;
@@ -597,7 +598,7 @@ static yyconst int yy_ec[256] =
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,   52,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
 

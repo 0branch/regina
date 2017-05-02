@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regstem.c,v 1.9 2012/08/08 01:26:22 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regstem.c,v 1.10 2013/11/07 23:02:50 mark Exp $
  */
 
 /* ******************************************************************** */
@@ -994,7 +994,7 @@ rxfunc(regstemsearch)
 
    /* make sure the stem name is null terminated */
    if (haystack.strptr[haystack.strlength-1] != '.') {
-      rxstrdup(haystack.strptr, haystack);
+      rxstrdup(haystack.strptr, argv[1]);
       haystack.strptr[haystack.strlength++] = '.';
    }
 

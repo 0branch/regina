@@ -36,6 +36,8 @@ typedef struct /* err_tsd: static variables of this module (thread-safe) */
    FILE *nls_fp;
    streng *buffer[2];
    struct textindex nls_tmi[NUMBER_ERROR_MESSAGES]; /* indexes for native language messages */
+   int number_prefix_messages; /* new */
+   struct textindex nls_tpi[NUMBER_PREFIX_MESSAGES]; /* indexes for prefix messages */
    int conditions;
    streng *errornum;
 } err_tsd_t;   /* thread-specific but only needed by this module. see init_error */
@@ -54,7 +56,7 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
 {
    {   0,  1,"Error %s running %s, line %d:|<value>,<source>,<linenumber>" },
    {   0,  2,"Error %s in interactive trace:|<value>" },
-   {   0,  3,"Interactive trace.  \"Trace Off\" to end debug. ENTER to continue." },
+   {   0,  3,"Interactive trace. \"Trace Off\" to end debug. ENTER to continue." },
    {   2,  0,"Failure during finalization" },
    {   2,  1,"Failure during finalization: %s|<description>" },
    {   3,  0,"Failure during initialization" },
@@ -147,7 +149,7 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
    {  26,  2,"Value of repetition count expression in DO instruction must be zero or a positive whole number; found \"%s\"|<value>" },
    {  26,  3,"Value of FOR expression in DO instruction must be zero or a positive whole number; found \"%s\"|<value>" },
    {  26,  4,"Positional parameter of parsing template must be a whole number; found \"%s\"|<value>" },
-   {  26,  5,"NUMERIC DIGITS value must be zero or a positive whole number; found \"%s\"|<value>" },
+   {  26,  5,"NUMERIC DIGITS value must be a positive whole number; found \"%s\"|<value>" },
    {  26,  6,"NUMERIC FUZZ value must be zero or a positive whole number; found \"%s\"|<value>" },
    {  26,  7,"Number used in TRACE setting must be a whole number; found \"%s\"|<value>" },
    {  26,  8,"Operand to right of power operator (\"**\") must be a whole number; found \"%s\"|<value>" },
@@ -171,8 +173,8 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
    {  31,  3,"Variable symbol must not start with a \".\"; found \"%s\"|<token>" },
    {  32,  0,"[Invalid use of stem]" },
    {  33,  0,"Invalid expression result" },
-   {  33,  1,"Value of NUMERIC DIGITS \"%d\" must exceed value of NUMERIC FUZZ \"(%d)\"|<value>,<value>" },
-   {  33,  2,"Value of NUMERIC DIGITS \"%d\" must not exceed %d|<value>,#Limit_Digits" },
+   {  33,  1,"Value of NUMERIC DIGITS (\"%d\") must exceed value of NUMERIC FUZZ (\"%d\")|<value>,<value>" },
+   {  33,  2,"Value of NUMERIC DIGITS (\"%d\") must not exceed %d|<value>,#Limit_Digits" },
    {  33,  3,"Result of expression following NUMERIC FORM must start with \"E\" or \"S\"; found \"%s\"|<value>" },
    {  34,  0,"Logical value not \"0\" or \"1\"" },
    {  34,  1,"Value of expression following IF keyword must be exactly \"0\" or \"1\"; found \"%s\"|<value>" },
@@ -301,7 +303,7 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
    {  93,  3,"[STREAM command must be one of \"%s\"; found \"%s\"]|<value>,<value>" },
    {  94,  0,"[External queue interface error]" },
    {  94,  1,"[External queue timed out]" },
-   {  94, 99,"[Internal error with external queue interface: %d \"%s\"]|<description>,<systemerror>" },
+   {  94, 99,"[Internal error with external queue interface: %d \"%s\"]|<errcode>,<systemerror>" },
    {  94,100,"[General system error with external queue interface. %s. %s]|<description>,<systemerror>" },
    {  94,101,"[Error connecting to %s on port %d: \"%s\"]|<machine>,<portnumber>,<systemerror>" },
    {  94,102,"[Unable to obtain IP address for %s]|<machine>" },
@@ -344,101 +346,18 @@ static const char *errlang[] =
    NULL
 } ;
 
-static const char *err1prefix[] =
-{
-/*en*/   "Error %d running \"%.*s\", line %d: %.*s",
-/*de*/   "Fehler %d während des Ausführens von \"%.*s\", Zeile %d: %.*s",
-/*es*/   "Error %d ejecutando \"%.*s\" línea %d: %.*s",
-/*no*/   "Feil %d under kjøring av \"%.*s\" linje %d: %.*s",
-/*pt*/   "Erro %d ao executar \"%.*s\", linha %d: %.*s",
-/*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\", linia %d: %.*s",
-/*sv*/   "Fel %d under k”rning av \"%.*s\", rad %d: %.*s",
-/*tr*/   "%d hatasi \"%.*s\" calisiyorken %d numarali satirda olustu: %.*s",
-} ;
+#define ERR1PREFIX_IDX   0
+#define SUBERRPREFIX_IDX 1
+#define ERR2PREFIX_IDX   2
+static const char *err1prefix = "Error %d running \"%.*s\", line %d: %.*s";
+static const char *suberrprefix = "Error %d.%d: %.*s";
+static const char *err2prefix = "Error %d running \"%.*s\": %.*s";
 
-static const char *suberrprefix[] =
-{
-/*en*/   "Error %d.%d: %.*s",
-/*de*/   "Fehler %d.%d: %.*s",
-/*es*/   "Error %d.%d: %.*s",
-/*no*/   "Feil %d.%d: %.*s",
-/*pt*/   "Erro %d.%d: %.*s",
-/*pl*/   "Bˆ¥d %d.%d: %.*s",
-/*sv*/   "Fel %d.%d: %.*s",
-/*tr*/   "Hata %d.%d: %.*s",
-} ;
-
-static const char *err2prefix[] =
-{
-/*en*/   "Error %d running \"%.*s\": %.*s",
-/*de*/   "Fehler %d während des Ausführens von \"%.*s\": %.*s",
-/*es*/   "Error %d ejecutando \"%.*s\": %.*s",
-/*no*/   "Feil %d under kjøring av \"%.*s\": %.*s",
-/*pt*/   "Erro %d ao executar \"%.*s\": %.*s",
-/*pl*/   "Bˆ¥d %d podczas dziaˆania \"%.*s\": %.*s",
-/*sv*/   "Fel %d under k”rning av \"%.*s\": %.*s",
-/*tr*/   "%d hatasi \"%.*s\" calisiyorken olustu: %.*s",
-} ;
-
-static const char *erropen[] =
-{
-/*en*/   "Unable to open language file: %s",
-/*de*/   "Kann die sprachspezifische Datei nicht öffnen: %s",
-/*es*/   "Incapaz de abrir el fichero de lenguaje: %s",
-/*no*/   "Ikke i stand til å åpne språkfil: %s",
-/*pt*/   "nao eh possivel abrir arquivo de linguagem: %s",
-/*pl*/   "Nie mo¾na otworzy† pliku j©zyka: %s",
-/*sv*/   "Kan inte ”ppna spr†kfilen: %s",
-/*tr*/   "Dil dosyasinin acilmasinda hata ile karsilasildi: %s",
-} ;
-
-static const char *errcount[] =
-{
-/*en*/   "Incorrect number of messages in language file: %s",
-/*de*/   "Ungültige Anzahl von Meldungen in der sprachspezifischen Datei: %s",
-/*es*/   "Número incorrecto de mensajes en el fichero de lenguaje: %s",
-/*no*/   "Uriktig antall meldinger i språkfil: %s",
-/*pt*/   "numero incorreto de mensagens no arquivo de linguagem: %s",
-/*pl*/   "Niepoprawna liczba komunikat¢w w pliku j©zyka: %s",
-/*sv*/   "Felaktigt antal meddelanden i spr†kfilen: %s",
-/*tr*/   "Dil dosyasindaki iletilerin sayisinda yanlislik var: %s",
-} ;
-
-static const char *errread[] =
-{
-/*en*/   "Unable to read from language file: %s",
-/*de*/   "Kann von der sprachspezifischen Datei nicht lesen: %s",
-/*es*/   "Incapaz de leer el fichero de lenguaje: %s",
-/*no*/   "Ikke i stand til å lese fra språkfil: %s",
-/*pt*/   "nao eh possivel ler o arquivo de linguagem: %s",
-/*pl*/   "Nie mo¾na czyta† z pliku j©zyka: %s",
-/*sv*/   "Kan inte l„sa fr†n spr†kfilen: %s",
-/*tr*/   "Dil dosyasinin okunmasinda hata ile karsilasildi: %s",
-} ;
-
-static const char *errmissing[] =
-{
-/*en*/   "Text missing from language file: %s.mtb",
-/*de*/   "Text fehlt in der sprachspezifischen Datei: %s.mtb",
-/*es*/   "Falta el texto del fichero de lenguaje: %s.mtb",
-/*no*/   "tekst mangler i språkfil: %s.mtb",
-/*pt*/   "falta texto no arquivo de linguagem: %s.mtb",
-/*pl*/   "Brakuje tekstu w pliku j©zyka: %s.mtb",
-/*sv*/   "Text saknas i spr†kfilen: %s.mtb",
-/*tr*/   "Dil dosyasinda eksik metin var: %s.mtb",
-} ;
-
-static const char *errcorrupt[] =
-{
-/*en*/   "Language file: %s.mtb is corrupt",
-/*de*/   "Sprachspezifische Datei %s.mtb ist beschädigt",
-/*es*/   "Fichero de lenguaje: %s.mtb está corrupto",
-/*no*/   "språkfil: %s.mtb er ødelagt",
-/*pt*/   "arquivo de linguagem: %s.mtb estah corrompido",
-/*pl*/   "Plik j©zyka: %s.mtb jest znieksztaˆcony",
-/*sv*/   "Spr†kfilen: %s.mtb „r skadad",
-/*tr*/   "%s.mtb ismindeki dil dosyasinda kirilma hatasi var",
-} ;
+static const char *erropen = "Unable to open language file: %s";
+static const char *errcount = "Incorrect number of messages in language file: %s";
+static const char *errread = "Unable to read from language file: %s";
+static const char *errmissing = "Text missing from language file: %s.mtb";
+static const char *errcorrupt = "Language file: %s.mtb is corrupt";
 
 static const char *get_embedded_text_message( int errorno, int suberrorno );
 
@@ -531,6 +450,72 @@ static int charno_of( cnodeptr node )
       return 0 ;
 }
 
+/*
+ * Returns a 0-terminated string in a streng which will be formatted by a
+ * "string formatter" which argument is arg. not_this will not be returned.
+ */
+static streng *simple_msg( const tsd_t *TSD, const char *fmt,
+                           const char *arg, const streng *not_this )
+{
+   int lf = strlen( fmt );
+   int la = strlen( arg );
+   streng *retval;
+
+   retval = get_buffer( TSD, not_this, lf + la );
+   Str_len( retval ) = sprintf( retval->value, fmt, arg );
+
+   return retval;
+}
+
+static streng *get_text_message( const tsd_t *TSD, FILE *fp,
+                                 unsigned fileoffset, unsigned textlength,
+                                 int errorno, int suberrorno, int *is_fmt,
+                                 const streng *not_this )
+{
+   err_tsd_t *et;
+   streng *retval;
+   const char *errfn;
+
+   et = (err_tsd_t *)TSD->err_tsd;
+
+#if defined(__EPOC32__) || defined(__WINS__)
+   errfn="default";
+#else
+   errfn=errlang[et->native_language];
+#endif
+   if ( fseek( fp, fileoffset, SEEK_SET ) == -1 )
+   {
+      *is_fmt = 0;
+      return simple_msg( TSD, errcorrupt, errfn, not_this );
+   }
+
+   retval = get_buffer( TSD, not_this, textlength + 1 );
+   if ( fread( retval->value, 1, textlength, fp ) != textlength )
+   {
+      *is_fmt = 0;
+      return simple_msg( TSD, errcorrupt, errfn, not_this );
+   }
+   retval->value[textlength] = '\0';
+   Str_len(retval) = textlength;
+
+   return retval;
+}
+
+static const char *get_embedded_text_message( int errorno, int suberrorno )
+{
+   int i;
+
+   for ( i = 0; i < NUMBER_ERROR_MESSAGES; i++ )
+   {
+      if ( errtext[i].errnum == errorno
+      &&   errtext[i].suberrnum == suberrorno )
+      {
+         return errtext[i].text;
+      }
+   }
+   return "";
+}
+
 
 /* only to be used by syntax and runtime errors, and the halt condition
  * FIXME: FGC: This function is used while initializing the runtime system.
@@ -544,11 +529,13 @@ void exiterror( int errorno, int suberrorno, ... )
    int lineno,charno,signtype;
    streng *inputfile;
    streng *suberror_streng=NULL;
-   streng *errmsg;
+   streng *errmsg, *ptr;
    int i,ok,len;
    const streng *fmt, *etext ;
    FILE *fp = stderr ;
    err_tsd_t *et;
+   const char *errfn;
+   int is_fmt=1;
    tsd_t *TSD = __regina_get_tsd(); /* The TSD should be fetched directly. This
                                      * will help if someone corrupted a TSD as
                                      * an argument.
@@ -571,7 +558,7 @@ void exiterror( int errorno, int suberrorno, ... )
        * MEMORY ALLOCATION ROUTINE!
        */
       if ( ( TSD->currlevel != NULL )
-        && get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
+      && get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
          fp = stdout;
 
       fwrite( out, len, 1, fp );
@@ -585,6 +572,11 @@ void exiterror( int errorno, int suberrorno, ... )
       fputc( REGINA_EOL, fp );
       goto not_hookable;
    }
+#if defined(__EPOC32__) || defined(__WINS__)
+   errfn="default";
+#else
+   errfn=errlang[et->native_language];
+#endif
    et->conditions++;
 
    if ( TSD->currentnode )
@@ -610,10 +602,23 @@ void exiterror( int errorno, int suberrorno, ... )
    {
       fmt = errortext( TSD, errorno, suberrorno, 0, 0 );
       len = Str_len( fmt );
-      len += strlen( suberrprefix[et->native_language] );
+      is_fmt = 1;
+      if ( et->native_language == LANGUAGE_ENGLISH )
+      {
+         ptr = simple_msg( TSD, "%s", suberrprefix, fmt );
+      }
+      else
+      {
+         ptr = get_text_message( TSD, et->nls_fp, et->nls_tpi[SUBERRPREFIX_IDX].fileoffset, et->nls_tpi[SUBERRPREFIX_IDX].textlength, errorno, suberrorno, &is_fmt, fmt );
+         if ( !is_fmt )
+         {
+            ptr = simple_msg( TSD, "%s", suberrprefix, fmt );
+         }
+      }
+      len += Str_len( ptr );
       len += 2 * ( ( sizeof(unsigned) * 8 ) / 3 + 2 );
       errmsg = get_buffer( TSD, fmt, len + 3 );
-      len = sprintf( errmsg->value, suberrprefix[et->native_language],
+      len = sprintf( errmsg->value, ptr->value,
                      errorno, suberrorno, Str_len( fmt ), fmt->value );
 
       va_start( argptr, suberrorno );
@@ -698,17 +703,43 @@ void exiterror( int errorno, int suberrorno, ... )
    if ( lineno > 0 )
    {
       traceback( TSD );
+      if ( et->native_language == LANGUAGE_ENGLISH )
+      {
+         ptr = simple_msg( TSD, "%s", err1prefix, fmt );
+      }
+      else
+      {
+         is_fmt = 1;
+         ptr = get_text_message( TSD, et->nls_fp, et->nls_tpi[ERR1PREFIX_IDX].fileoffset, et->nls_tpi[ERR1PREFIX_IDX].textlength, errorno, suberrorno, &is_fmt, fmt );
+         if ( !is_fmt )
+         {
+            ptr = simple_msg( TSD, "%s", err1prefix, fmt );
+         }
+      }
       errmsg = Str_makeTSD( 80 + Str_len( etext ) + Str_len( inputfile ) +
-                            strlen( err1prefix[et->native_language] ) );
-      sprintf( errmsg->value, err1prefix[et->native_language],
+                            Str_len( ptr ) );
+      sprintf( errmsg->value, ptr->value,
                errorno, Str_len( inputfile ), inputfile->value, lineno,
                Str_len( etext ), etext->value );
    }
    else
    {
+      if ( et->native_language == LANGUAGE_ENGLISH )
+      {
+         ptr = simple_msg( TSD, "%s", err2prefix, fmt );
+      }
+      else
+      {
+         is_fmt = 1;
+         ptr = get_text_message( TSD, et->nls_fp, et->nls_tpi[ERR2PREFIX_IDX].fileoffset, et->nls_tpi[ERR2PREFIX_IDX].textlength, errorno, suberrorno, &is_fmt, fmt );
+         if ( !is_fmt )
+         {
+            ptr = simple_msg( TSD, "%s", err2prefix, fmt );
+         }
+      }
       errmsg = Str_makeTSD( 80 + Str_len( etext ) + Str_len( inputfile ) +
-                            strlen( err2prefix[et->native_language] ) );
-      sprintf( errmsg->value, err2prefix[et->native_language],
+                            Str_len( ptr ) );
+      sprintf( errmsg->value, ptr->value,
                errorno, Str_len( inputfile ), inputfile->value,
                Str_len( etext ), etext->value );
    }
@@ -802,26 +833,10 @@ void __reginaerror(char *dummy)
    return ;
 }
 
-/*
- * Returns a 0-terminated string in a streng which will be formatted by a
- * "string formatter" which argument is arg. not_this will not be returned.
- */
-static streng *simple_msg( const tsd_t *TSD, const char *fmt,
-                           const char *arg, const streng *not_this )
-{
-   int lf = strlen( fmt );
-   int la = strlen( arg );
-   streng *retval;
-
-   retval = get_buffer( TSD, not_this, lf + la );
-   Str_len( retval ) = sprintf( retval->value, fmt, arg );
-
-   return retval;
-}
-
 static streng *read_index_header( const tsd_t *TSD, char *errfn,
                                   int native_language, FILE **fp,
                                   int *number_messages, int *file_lang,
+                                  int *number_prefix_messages,
                                   const streng *not_this )
 {
    err_tsd_t *et;
@@ -833,24 +848,31 @@ static streng *read_index_header( const tsd_t *TSD, char *errfn,
    *fp = fopen( errfn, "rb" );
    if ( *fp == NULL )
    {
-      return simple_msg( TSD, erropen[native_language], errfn, not_this );
+      return simple_msg( TSD, erropen, errfn, not_this );
    }
    if ( fread( &et->number_messages, sizeof(unsigned int), 1, *fp ) != 1 )
    {
       fclose( *fp );
-      return simple_msg( TSD, errread[native_language], errfn, not_this );
+      return simple_msg( TSD, errread, errfn, not_this );
    }
    if ( fread( file_lang, sizeof(unsigned int), 1, *fp ) != 1 )
    {
       fclose( *fp );
-      return simple_msg( TSD, errread[native_language], errfn, not_this );
+      return simple_msg( TSD, errread, errfn, not_this );
+   }
+   if ( fread( &et->number_prefix_messages, sizeof(unsigned int), 1, *fp ) != 1 )
+   {
+      fclose( *fp );
+      return simple_msg( TSD, errread, errfn, not_this );
    }
    return NULL;
 }
 
 static streng *read_index_file( const tsd_t *TSD, char *errfn,
                                 int native_language, int language_file,
-                                FILE **fp, struct textindex *tmi,
+                                FILE **fp,
+                                struct textindex *tmi,
+                                struct textindex *tpi,
                                 const streng *not_this )
 {
    err_tsd_t *et;
@@ -861,26 +883,42 @@ static streng *read_index_file( const tsd_t *TSD, char *errfn,
    /*
     * Read the language file header...
     */
-   if ( ( ptr = read_index_header( TSD, errfn, native_language, fp, &et->number_messages, &file_lang, not_this ) ) != NULL )
+   if ( ( ptr = read_index_header( TSD, errfn, native_language, fp, &et->number_messages, &file_lang, &et->number_prefix_messages, not_this ) ) != NULL )
    {
       et->number_messages = 0;
       return ptr;
    }
    /*
     * Eunsure that the number of messages in the file matches the number defined as
-    * NUMBER_ERROR_MESSAGE in rexxmsg.h
+    * NUMBER_ERROR_MESSAGES in rexxmsg.h
     */
    if ( et->number_messages != NUMBER_ERROR_MESSAGES )
    {
       fclose( *fp );
       et->number_messages = 0;
-      return simple_msg( TSD, errcount[native_language], errfn, not_this );
+      return simple_msg( TSD, errcount, errfn, not_this );
    }
    if ( fread( tmi, sizeof(struct textindex), NUMBER_ERROR_MESSAGES, *fp ) != NUMBER_ERROR_MESSAGES )
    {
       fclose( *fp );
       et->number_messages = 0;
-      return simple_msg( TSD, errread[native_language], errfn, not_this );
+      return simple_msg( TSD, errread, errfn, not_this );
+   }
+   /*
+    * Eunsure that the number of prefix messages in the file matches the number defined as
+    * NUMBER_PREFIX_MESSAGES in rexxmsg.h
+    */
+   if ( et->number_prefix_messages != NUMBER_PREFIX_MESSAGES )
+   {
+      fclose( *fp );
+      et->number_prefix_messages = 0;
+      return simple_msg( TSD, errcount, errfn, not_this );
+   }
+   if ( fread( tpi, sizeof(struct textindex), NUMBER_PREFIX_MESSAGES, *fp ) != NUMBER_PREFIX_MESSAGES )
+   {
+      fclose( *fp );
+      et->number_prefix_messages = 0;
+      return simple_msg( TSD, errread, errfn, not_this );
    }
    return NULL;
 }
@@ -899,7 +937,7 @@ static streng *get_message_indexes( const tsd_t *TSD, const streng *not_this )
    char *errpath=NULL;
 #if defined(__EPOC32__) || defined(__WINS__)
    FILE *fp;
-   int number_messages, file_lang;
+   int number_messages, file_lang. number_prefix_messages;
    struct stat buffer ;
 #else
    int i, found=0;
@@ -924,9 +962,9 @@ static streng *get_message_indexes( const tsd_t *TSD, const streng *not_this )
    /*
     * We do have a default.mtb file, so read it to determine the language
     */
-   if ( ( err = read_index_header( TSD, fn, LANGUAGE_ENGLISH, &fp, &number_messages, &file_lang, not_this ) ) != NULL )
+   if ( ( err = read_index_header( TSD, fn, LANGUAGE_ENGLISH, &fp, &number_messages, &file_lang, &number_prefix_messgaes, not_this ) ) != NULL )
    {
-      et->number_messages = 0;
+      et->number_messages = et->number_prefix_messages = 0;
       return err;
    }
    if ( fp )
@@ -988,59 +1026,10 @@ static streng *get_message_indexes( const tsd_t *TSD, const streng *not_this )
 #else
       sprintf( fn, "%s%c%s.mtb", errpath, FILE_SEPARATOR, errlang[et->native_language] );
 #endif
-      if ( ( err = read_index_file( TSD, fn, et->native_language, et->native_language, &et->nls_fp, (struct textindex *)&et->nls_tmi, not_this ) ) != NULL )
+      if ( ( err = read_index_file( TSD, fn, et->native_language, et->native_language, &et->nls_fp, (struct textindex *)&et->nls_tmi,(struct textindex *)&et->nls_tpi, not_this ) ) != NULL )
          return err;
    }
    return NULL;
-}
-
-static streng *get_text_message( const tsd_t *TSD, FILE *fp,
-                                 unsigned fileoffset, unsigned textlength,
-                                 int errorno, int suberrorno, int *is_fmt,
-                                 const streng *not_this )
-{
-   err_tsd_t *et;
-   streng *retval;
-   const char *errfn;
-
-   et = (err_tsd_t *)TSD->err_tsd;
-
-#if defined(__EPOC32__) || defined(__WINS__)
-   errfn="default";
-#else
-   errfn=errlang[et->native_language];
-#endif
-   if ( fseek( fp, fileoffset, SEEK_SET ) == -1 )
-   {
-      *is_fmt = 0;
-      return simple_msg( TSD, errcorrupt[et->native_language], errfn, not_this );
-   }
-
-   retval = get_buffer( TSD, not_this, textlength + 1 );
-   if ( fread( retval->value, 1, textlength, fp ) != textlength )
-   {
-      *is_fmt = 0;
-      return simple_msg( TSD, errcorrupt[et->native_language], errfn, not_this );
-   }
-   retval->value[textlength] = '\0';
-   Str_len(retval) = textlength;
-
-   return retval;
-}
-
-static const char *get_embedded_text_message( int errorno, int suberrorno )
-{
-   int i;
-
-   for ( i = 0; i < NUMBER_ERROR_MESSAGES; i++ )
-   {
-      if ( errtext[i].errnum == errorno
-      &&   errtext[i].suberrnum == suberrorno )
-      {
-         return errtext[i].text;
-      }
-   }
-   return "";
 }
 
 
@@ -1135,7 +1124,7 @@ const streng *errortext( const tsd_t *TSD, int errorno, int suberrorno, int requ
              * We couldn't find our message...
              */
             embedded = get_embedded_text_message( errorno, suberrorno );
-            ptr = simple_msg( TSD, errmissing[et->native_language], errfn, NULL );
+            ptr = simple_msg( TSD, errmissing, errfn, NULL );
             h = get_buffer( TSD, ptr, Str_len( ptr ) + strlen( embedded ) + 6 );
             Str_catstrTSD( h, "(" );
             Str_catTSD( h, ptr );

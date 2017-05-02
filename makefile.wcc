@@ -1,7 +1,7 @@
 #
-# Makefile for Regina REXX Interpreter using OpenWatcom C/C++ 1.0+
+# Makefile for Regina REXX Interpreter using OpenWatcom C/C++ 1.9
 # Target is dos4g
-# Build system is intended to be command.com on Windows
+# Build system is intended to be command.com on DOS
 # Ensure REGINA_SRCDIR is short otherwise msgcmp.exe will fail with a too long command line
 #
 
@@ -17,7 +17,7 @@ IMPFILE=$(DLLBASE).lib
 DLLTEST1=rxtest1.lib
 DLLTEST2=rxtest2.lib
 
-CC              = wcc386
+CC              = *wcc386
 TARGET=dos4g
 MULTI = N
 
@@ -40,15 +40,9 @@ NOFLISTS = /uFLISTS
 NOFLISTS =
 !endif
 
-!ifeq MULTI Y
-THREADING_COMPILE = /bm
-MT_FILE = mt_win32
-THREADING_TARGET = threader.exe
-!else
 THREADING_COMPILE =
 MT_FILE = mt_notmt
 THREADING_TARGET =
-!endif
 
 OFILES =      &
 funcs.obj     &

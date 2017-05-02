@@ -92,7 +92,7 @@ static cvariableptr get_realbox( cvariableptr p, int *exposed )
 
 /*
  * dumpvars dumps the set of valid variables of the current PROCEDURE frame.
- * The destination is stderr of stdout in case of STDOUT_FOR_STDERR.
+ * The destination is stderr or stdout in case of STDOUT_FOR_STDERR.
  */
 void dumpvars( const tsd_t *TSD )
 {

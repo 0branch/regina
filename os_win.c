@@ -107,18 +107,6 @@ static int IsWin9X(void)
       return retval;
    }
 #endif
-   /*
-    Win32/Win64 code to handle inout/output via overlapped I/O is broken.
-    This temporary workaround uses the Windows 95/DOS mechanism of temporary
-    files. It is slower, but it produces the correct results.
-    Works around bugs:
-    3400513, 3170743, 3037156, 1887965
-   */
-   if ( 1 )
-   {
-      retval = 1;
-      return retval;
-   }
 
    osinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
    GetVersionEx( &osinfo );
@@ -795,14 +783,14 @@ static int Win_read(int handle, void *buf, unsigned size, void *async_info)
    else
       retval = -EAGAIN; /* still may change! */
 
-   if (w->maxbuf < 0x1000) /* Buffer not allocated? */
+   if (w->maxbuf < REGINA_BUFFER_SIZE) /* Buffer not allocated? */
    {
       /* Never allocate too much, we want a fast response to do some
        * work!
        */
       if (w->buf) /* THIS IS DEFINITELY A BUG! */
          Free_TSD(ai->TSD, w->buf);
-      w->maxbuf = 0x1000;
+      w->maxbuf = REGINA_BUFFER_SIZE;
       w->rusedbegin = 0;
       w->rused = 0;
       w->reading = 0;
@@ -945,7 +933,7 @@ static int Win_write(int handle, const void *buf, unsigned size, void *async_inf
 
    if (w->buf == NULL)
    {
-      w->maxbuf = 0x10000;
+      w->maxbuf = REGINA_MAX_BUFFER_SIZE;
       w->buf = Malloc_TSD(ai->TSD, w->maxbuf);
    }
 
@@ -975,10 +963,11 @@ static int Win_write(int handle, const void *buf, unsigned size, void *async_inf
    ResetEvent(ol->hEvent);
 
    if (!WriteFile(hdl, w->buf, w->wused, &done, ol))
+//   if (!WriteFile(hdl, w->buf, w->wused, NULL, ol))
    {
       done = (int) GetLastError();
       if (done == ERROR_IO_PENDING)
-         return(retval);
+         return((retval == 0) ? -EAGAIN : retval);
       return(-EPIPE); /* guess */
    }
    /* No errors, thus success. We don't want to redo all the stuff. We
@@ -1173,6 +1162,29 @@ int Win_uname(struct regina_utsname *name)              /* MH 10-06-96 */
                   strcpy( name->sysname, "WIN7" );
                else
                   strcpy( name->sysname, "WIN2008R2" );
+            }
+            else if ( osinfo.dwMinorVersion == 2 )
+            {
+               if ( osinfo.wProductType == VER_NT_WORKSTATION
+               ||   osinfo.wProductType == 0 )
+                  strcpy( name->sysname, "WIN8" );
+               else
+                  strcpy( name->sysname, "WIN2012" );
+            }
+            /*
+             * The following tests for Windows 8.1 won't work as GetVersionEx() has been
+             * deprecated in Windows 8.1 and unless you completley change the way that
+             * version information is determined for Windows, then Windows 8.1 and above will
+             * always return WIN8. I'm not going to waste my time to
+             * change Regina because of the stupid morons who work for Microsoft!!
+             */
+            else if ( osinfo.dwMinorVersion == 3 )
+            {
+               if ( osinfo.wProductType == VER_NT_WORKSTATION
+               ||   osinfo.wProductType == 0 )
+                  strcpy( name->sysname, "WIN8.1" );
+               else
+                  strcpy( name->sysname, "WIN2012R2" );
             }
             else
                strcpy( name->sysname, "UNKNOWN" );

@@ -1740,36 +1740,116 @@ EXPORT_C APIRET APIENTRY RexxSetHalt(LONG dummyProcess,
       set_rexx_halt( TSD );
    }
    return RXARI_OK ;
-}
+                                        }
 
 EXPORT_C APIRET APIENTRY RexxSetTrace(LONG dummyProcess,
                                       LONG threadid )
 {
-   tsd_t *TSD = getGlobalTSD();
+   tsd_t *TSD;
+   int mcrt,i;
+   streng trace;
 
-   if ( TSD == NULL )
-      TSD = GLOBAL_ENTRY_POINT();
-   StartupInterface(TSD);
    /*
-    * Perform sanity check on the parameters; is process id me ?
-    * This is a nop at the moment
-    * Some form of calling tracing.c:set_trace_char() is required
+    * Create our parameter to set_trace() manually. We have problems with memory allocation if
+    * we use any of the Str*() functions
     */
+#ifdef CHECK_MEMORY                     /* FGC: Test                         */
+   trace.value = "?i";
+#else
+   trace.value[0] = '?';
+   trace.value[1] = 'i';
+#endif
+   trace.len = 2;
+   trace.max = 2;
+   /*
+    * Only the current process can trace a running thread.
+    */
+   if ( threadid == 0 )
+   {
+      /*
+       * Trace every thread
+       */
+      mcrt = __regina_get_number_concurrent_regina_threads();
+      for ( i = 0; i < mcrt ; i++ )
+      {
+         TSD = __regina_get_next_tsd( i );
+         if ( TSD != NULL )
+         {
+            if ( !TSD->systeminfo->interactive )
+            {
+               set_trace( TSD, &trace );
+            }
+         }
+      }
+   }
+   else
+   {
+      /*
+       * Only trace the specified thread
+       */
+      TSD = __regina_get_tsd_for_threadid( threadid );
+      if ( TSD == NULL )
+         return RXARI_NOT_FOUND;
+      if ( !TSD->systeminfo->interactive )
+      {
+         set_trace( TSD, &trace );
+      }
+   }
    return RXARI_OK ;
 }
 
 EXPORT_C APIRET APIENTRY RexxResetTrace(LONG dummyProcess,
-                                        LONG dummyThread )
+                                        LONG threadid )
 {
-   tsd_t *TSD = getGlobalTSD();
+   tsd_t *TSD;
+   int mcrt,i;
+   streng trace;
 
-   if ( TSD == NULL )
-      TSD = GLOBAL_ENTRY_POINT();
-   StartupInterface(TSD);
    /*
-    * Perform sanity check on the parameters; is process id me ?
-    * THis is a nop at the moment
+    * Create our parameter to set_trace() manually. We have problems with memory allocation if
+    * we use any of the Str*() functions
     */
+#ifdef CHECK_MEMORY                     /* FGC: Test                         */
+   trace.value = "O";
+#else
+   trace.value[0] = 'O';
+#endif
+   trace.len = 1;
+   trace.max = 1;
+   /*
+    * Only the current process can trace a running thread.
+    */
+   if ( threadid == 0 )
+   {
+      /*
+       * Trace every thread
+       */
+      mcrt = __regina_get_number_concurrent_regina_threads();
+      for ( i = 0; i < mcrt ; i++ )
+      {
+         TSD = __regina_get_next_tsd( i );
+         if ( TSD != NULL )
+         {
+            if ( TSD->systeminfo->interactive )
+            {
+               set_trace( TSD, &trace );
+            }
+         }
+      }
+   }
+   else
+   {
+      /*
+       * Only trace the specified thread
+       */
+      TSD = __regina_get_tsd_for_threadid( threadid );
+      if ( TSD == NULL )
+         return RXARI_NOT_FOUND;
+      if ( TSD->systeminfo->interactive )
+      {
+         set_trace( TSD, &trace );
+      }
+   }
    return RXARI_OK ;
 }
 

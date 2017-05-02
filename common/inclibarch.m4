@@ -22,6 +22,8 @@ AC_ARG_ENABLE(64bit,
 #
 # Now do platform specific tests
 #
+gcc_64bit="-m64"
+gcc_32bit="-m32"
 on_osx="no"
 osis64bit=no
 bitflag=""
@@ -34,6 +36,11 @@ case "$target" in
          bitflag="64"
          osis64bit=yes
       fi
+      #
+      # AIX gcc has its own special bit switches :-(
+      #
+      gcc_64bit="-maix64"
+      gcc_32bit="-maix32"
       ;;
    *dec-osf4*)
       ;;
@@ -73,6 +80,11 @@ case "$target" in
    *beos*)
       ;;
    *cygwin*)
+      mach="`uname -m`"
+      if test "$mach" = "x86_64"; then
+         bitflag="64"
+         osis64bit=yes
+      fi
       ;;
    *apple-darwin*)
       on_osx="yes"
@@ -108,7 +120,7 @@ dnl following variable used to name 32bit binaries on a 64bit system
 dnl allows 32bit and 64bit binaries t co-exist on a 64bit system
 AC_SUBST(binarybitprefix)
 
-dnl --------------- allow --with-osx-universal to specify which architectures to build universal binaries
+dnl --------------- allow --with-arch to specify which architectures to build universal binaries
 dnl
 if test "$on_osx" = "yes"; then
    MH_CHECK_OSX_ARCH()
@@ -116,13 +128,13 @@ else
 dnl
 dnl Now set the correct compiler flags
 dnl
-   if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+   if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
       if test "$bitflag" = "32"; then
-         CFLAGS="${CFLAGS} -m32"
-         LDFLAGS="${LDFLAGS} -m32"
+         CFLAGS="${CFLAGS} $gcc_32bit"
+         LDFLAGS="${LDFLAGS} $gcc_32bit"
       elif test "$bitflag" = "64"; then
-         CFLAGS="${CFLAGS} -m64"
-         LDFLAGS="${LDFLAGS} -m64"
+         CFLAGS="${CFLAGS} $gcc_64bit"
+         LDFLAGS="${LDFLAGS} $gcc_64bit"
       else
          bitflag="32"
       fi
@@ -139,45 +151,57 @@ dnl
    fi
 fi
 
-dnl
-dnl If the user hasn't specified libdir, check for specific lib dirs
-dnl
-if test "${libdir}" = '${exec_prefix}/lib'; then
-dnl
-dnl expand the active $prefix
-dnl
-   myprefix=$prefix
-   AC_DEFINE_DIR(MY_PREFIX,"$myprefix")
-   if test "${myprefix}" = "NONE"; then
-      myprefix="$ac_default_prefix"
-   fi
-dnl
-dnl check for 64bit libdir
-dnl
-   if test -d "${myprefix}/lib/x86_64-linux-gnu"; then
-      libdir64="${myprefix}/lib/x86_64-linux-gnu"
-   elif test -d "${myprefix}/lib64"; then
-      libdir64="${myprefix}/lib64"
+dnl allow --disable-libdir-change to ensure that building a .deb works
+#libdir_change=yes
+AC_ARG_ENABLE(libdir-change,
+   [  --enable-libdir-change  specify --disable-libdir-change if building a .deb],
+   [libdir_change=$enableval],
+   [libdir_change=yes],
+)
+if test "$libdir_change" = yes; then
+   dnl
+   dnl If the user hasn't specified libdir, check for specific lib dirs
+   dnl
+   if test "${libdir}" = '${exec_prefix}/lib'; then
+   dnl
+   dnl expand the active $prefix
+   dnl
+      myprefix=$prefix
+      AC_DEFINE_DIR(MY_PREFIX,"$myprefix")
+      if test "${myprefix}" = "NONE"; then
+         myprefix="$ac_default_prefix"
+      fi
+   dnl
+   dnl check for 64bit libdir
+   dnl
+      if test -d "${myprefix}/lib/x86_64-linux-gnu"; then
+         libdir64="${myprefix}/lib/x86_64-linux-gnu"
+      elif test -d "${myprefix}/lib64"; then
+         libdir64="${myprefix}/lib64"
+      else
+         libdir64="${myprefix}/lib"
+      fi
+   dnl
+   dnl check for 32bit libdir
+   dnl
+      if test -d "${myprefix}/lib/i386-linux-gnu"; then
+         libdir32="${myprefix}/lib/i386-linux-gnu"
+      elif test -d "${myprefix}/lib32"; then
+         libdir32="${myprefix}/lib32"
+      else
+         libdir32="${myprefix}/lib"
+      fi
+   dnl
+   dnl Depending on the build type, set the default libdir
+   dnl
+      if test "$bitflag" = "64"; then
+         libdir="$libdir64"
+      else
+         libdir="$libdir32"
+      fi
    else
-      libdir64="${myprefix}/lib"
-   fi
-dnl
-dnl check for 32bit libdir
-dnl
-   if test -d "${myprefix}/lib/i386-linux-gnu"; then
-      libdir32="${myprefix}/lib/i386-linux-gnu"
-   elif test -d "${myprefix}/lib32"; then
-      libdir32="${myprefix}/lib32"
-   else
-      libdir32="${myprefix}/lib"
-   fi
-dnl
-dnl Depending on the build type, set the default libdir
-dnl
-   if test "$bitflag" = "64"; then
-      libdir="$libdir64"
-   else
-      libdir="$libdir32"
+      libdir64="$libdir"
+      libdir32="$libdir"
    fi
 else
    libdir64="$libdir"

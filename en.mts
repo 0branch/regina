@@ -14,6 +14,7 @@
 # Guidelines for Translators
 # --------------------------
 # - Lines beginning with # are comments
+# - No blank lines
 # - Any word in UPPER CASE should not be translated
 # - On some error message lines, there are tokens following the
 #   | character. Again these should not be translated.
@@ -23,6 +24,7 @@
 # - There are some comments at the end of this file under the heading:
 #   "Extra general phrases requiring translation:"
 #   Please translate these phrases also.
+# - File to be saved as UTF-8
 # - Return the translated error messages in a complete file, the same as this
 #   file, with the name XX.mts where XX is the ISO language abbreviation.
 #   Important: Please zip the file up to ensure that the file arrives in
@@ -152,8 +154,8 @@
  31,  3,Variable symbol must not start with a "."; found "%s"|<token>
  32,  0,[Invalid use of stem]
  33,  0,Invalid expression result
- 33,  1,Value of NUMERIC DIGITS "%d" must exceed value of NUMERIC FUZZ "(%d)"|<value>,<value>
- 33,  2,Value of NUMERIC DIGITS "%d" must not exceed %d|<value>,#Limit_Digits
+ 33,  1,Value of NUMERIC DIGITS ("%d") must exceed value of NUMERIC FUZZ ("%d")|<value>,<value>
+ 33,  2,Value of NUMERIC DIGITS ("%d") must not exceed %d|<value>,#Limit_Digits
  33,  3,Result of expression following NUMERIC FORM must start with "E" or "S"; found "%s"|<value>
  34,  0,Logical value not "0" or "1"
  34,  1,Value of expression following IF keyword must be exactly "0" or "1"; found "%s"|<value>
@@ -307,8 +309,15 @@
 100,  0,[Unknown filesystem error]
 #
 # Extra general phrases requiring translation:
-# The text in () is the corresponding array name in error.c
 #
+P,  0,Error %d running "%.*s", line %d: %.*s
+P,  1,Error %d.%d: %.*s
+P,  2,Error %d running "%.*s": %.*s
+#P,  3,Unable to open language file: %s
+#P,  4,Incorrect number of messages in language file: %s
+#P,  5,Unable to read from language file: %s
+#P,  6,Text missing from language file: %s.mtb
+#P,  7,Language file: %s.mtb is corrupt
 # (err1prefix)   "Error %d running \"%.*s\", line %d: %.*s",
 # (suberrprefix) "Error %d.%d: %.*s",
 # (err2prefix)   "Error %d running \"%.*s\": %.*s",

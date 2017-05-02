@@ -185,6 +185,7 @@ int get_length_from_header( const tsd_t *TSD, const streng *header );
 #define RXSTACK_UNKNOWN             '?'
 #define RXSTACK_UNKNOWN_STR         "?"
 #define RXSTACK_HEADER_SIZE         7
+#define RXSTACK_PEEK_HEADER_SIZE    2
 #define RXSTACK_TIMEOUT_SIZE        6
 
 #ifndef RXSOCKET

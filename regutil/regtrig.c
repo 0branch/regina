@@ -12,7 +12,7 @@
  *
  * The Original Code is regutil.
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regtrig.c,v 1.2 2009/11/01 00:43:43 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regtrig.c,v 1.4 2013/10/11 06:18:16 mark Exp $
  */
 /**************************************************************************
 *
@@ -33,6 +33,7 @@
 *      SysArcSin
 *      SysArcCos
 *      SysArcTan
+*      SysArcTan2
 *
 *  This is file contains the trigonometric functions found in the OOREXX project as
 *  of 14 Jan 2008.
@@ -91,6 +92,7 @@
 #define ARCSINE     0                  /* defines for arc trig       */
 #define ARCCOSINE   1                  /* functions.  Ordering is    */
 #define ARCTANGENT  2                  /* not as important here      */
+#define ARCTANGENT2 3
 
 #define pi  3.14159265358979323846l    /* pi value                   */
 
@@ -101,15 +103,32 @@
 #define DEFAULT_PRECISION  9           /* default precision to use   */
 #define MAX_PRECISION     16           /* maximum available precision*/
 
-
-static void FormatResult(double result, unsigned long precision,
-                          PRXSTRING retstr );
 static long ValidateMath(long numargs, RXSTRING  args[],
                           double   *x, unsigned long *precision );
 static long ValidateTrig(long numargs, RXSTRING  args[],
                           PRXSTRING retstr, int function );
 static long ValidateArcTrig(long numargs, RXSTRING   args[],
                           PRXSTRING  retstr, int function );
+
+/*********************************************************************/
+/* Function FormatResult:  Common routine to format a floating point */
+/* result for the math functions.                                    */
+/*********************************************************************/
+/* formatted result  required precision  return string               */
+static void FormatResult(double res, unsigned long precision, PRXSTRING result )
+{
+  if (res == 0)                     /* zero result?               */
+  {
+    strcpy(result->strptr, "0");       /* make exactly 0             */
+    result->strlength = 1;
+  }
+  else
+                                       /* format the result          */
+    result->strlength = sprintf( result->strptr, "%.*f", precision, res );
+                                       /* end in a period?           */
+  if (result->strptr[result->strlength - 1] == '.')
+    result->strlength--;               /* remove the period          */
+}
 
 
 
@@ -406,29 +425,14 @@ rxfunc(sysarctan)
   return ValidateArcTrig(argc, argv, result, ARCTANGENT);
 }
 
-
-
-
-
-/*********************************************************************/
-/* Function FormatFloat:  Common routine to format a floating point  */
-/* result for the math functions                                     */
-/*********************************************************************/
-/* formatted result  required precision  return string              */
-
-static void FormatResult(double res, unsigned long precision, PRXSTRING result )
+rxfunc(sysarctan2)
 {
-  if (res == 0)                     /* zero result?               */
-    strcpy(result->strptr, "0");       /* make exactly 0             */
-  else
-                                       /* format the result          */
-    gcvt(res, precision, result->strptr);
-                                       /* set the length             */
-  result->strlength = strlen(result->strptr);
-                                       /* end in a period?           */
-  if (result->strptr[result->strlength - 1] == '.')
-    result->strlength--;               /* remove the period          */
+                                       /* call common routine        */
+  return ValidateArcTrig(argc, argv, result, ARCTANGENT2);
 }
+
+
+
 
 
 /*********************************************************************/
@@ -513,7 +517,7 @@ static long ValidateTrig(long argc,/* Number of arguments.       */
       rxstrdup(prec,argv[1]);
       precision = atol(prec);
     }
-    rc = BADGENERAL;              /* this is invalid            */
+    rc = 0;
     precision = min(precision, MAX_PRECISION);
     if (units == DEGREES) {            /* need to convert degrees    */
       nsi = (angle < 0.) ? -1. : 1.;   /* get the direction          */
@@ -606,7 +610,10 @@ static long ValidateArcTrig(long argc,
   double    nco;                       /* convertion factor          */
   ULONG     precision;                 /* returned precision         */
   double    x;                         /* input number               */
+  double    y;                         /* input number               */
   char     *prec;
+  int maxargs,minargs;
+  int precoff, unitoff;
 
   rc = 0;                  /* set default completion     */
   precision = DEFAULT_PRECISION;       /* set max digits count       */
@@ -614,27 +621,44 @@ static long ValidateArcTrig(long argc,
   nsi = 1.;                            /* set default conversion     */
   nco = 1.;                            /* set default conversion     */
 
-  if (argc < 1 ||                   /* no arguments               */
-      argc > 3 ||
+  if ( function == ARCTANGENT2 )
+  {
+     minargs = 2;
+     maxargs = 4;
+     precoff = 2;
+     unitoff = 3;
+  }
+  else
+  {
+     minargs = 1;
+     maxargs = 3;
+     precoff = 1;
+     unitoff = 2;
+  }
+  if (argc < minargs ||                   /* no arguments               */
+      argc > maxargs ||
       !RXVALIDSTRING(argv[0]))         /* first is omitted           */
     rc = BADGENERAL;              /* this is invalid            */
                                        /* convert input number       */
   else if (sscanf(argv[0].strptr, " %lf", &x) != 1)
     rc = BADGENERAL;              /* this is invalid            */
-  else if (argc == 3) {             /* have an option             */
-    if (RXZEROLENSTRING(argv[2]))      /* null string?               */
+  else if (argc == maxargs) {             /* have a unit option             */
+    if (RXZEROLENSTRING(argv[unitoff]))      /* null string?               */
       rc = BADGENERAL;            /* this is invalid            */
     else {                             /* process the options        */
                                        /* get the option character   */
-      units = toupper(argv[2].strptr[0]);
+      units = toupper(argv[unitoff].strptr[0]);
                                        /* was it a good option?      */
       if (units != DEGREES && units != RADIANS && units != GRADES)
         rc = BADGENERAL;          /* bad option is error        */
     }
   }
+  if ( function == ARCTANGENT2
+  && sscanf(argv[1].strptr, " %lf", &y) != 1)
+    rc = BADGENERAL;              /* this is invalid            */
   if (!rc) {                           /* everything went well?      */
-     if (argc >= 2) {                  /* have a precision           */
-        rxstrdup(prec,argv[1]);
+     if (argc > minargs) {                  /* have a precision           */
+        rxstrdup(prec,argv[precoff]);
         precision = atol(prec);
      }
                                        /* truncate to maximum        */
@@ -648,6 +672,9 @@ static long ValidateArcTrig(long argc,
         break;
       case ARCTANGENT:                 /* ArcTangent function        */
         angle = atan(x);
+        break;
+      case ARCTANGENT2:                /* ArcTangent2 function        */
+        angle = atan2(x,y);
         break;
     }
     if (units == DEGREES)              /* have to convert the result?*/

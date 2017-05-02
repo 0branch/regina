@@ -52,7 +52,6 @@
 #
 #
 # TODO
-# 40.43
 # 40.44
 # 40,930
 # 40,980
@@ -165,7 +164,7 @@
  26,  2,El valor de contaje de repetición en la instrucción DO debe ser cero o un número entero positivo; encontrado "%s"|<value>
  26,  3,El valor de la expresión FOR en la instrucción DO debe ser cero o un número entero positivo; encontrado "%s"|<value>
  26,  4,El parámetro posicional de una regla de "parsing" debe ser un número entero; encontrado "%s"|<value>
- 26,  5,El valor de NUMERIC DIGITS debe ser cero o un número entero positivo; encontrado "%s"|<value>
+ 26,  5,El valor de NUMERIC DIGITS debe ser un número entero positivo; encontrado "%s"|<value>
  26,  6,El valor de NUMERIC FUZZ debe ser cero o un número entero positivo; encontrado "%s"|<value>
  26,  7,El número usado en el "TRACE setting" debe ser un número entero; encontrado "%s"|<value>
  26,  8,El operando a la derecha del operador de exponenciación ("**") debe ser un número entero; encontrado "%s"|<value>
@@ -189,8 +188,8 @@
  31,  3,Un símbolo de variable no puede empezar por "."; encontrado "%s"|<token>
  32,  0,[Uso inválido de "stem"]
  33,  0,Resultado de expresión inválido
- 33,  1,El valor de NUMERIC DIGITS "%d" debe exceder el valor de NUMERIC FUZZ "(%d)"|<value>,<value>
- 33,  2,El valor de NUMERIC DIGITS "%d" no debe exceder %d|<value>,#Limit_Digits
+ 33,  1,El valor de NUMERIC DIGITS ("%d") debe exceder el valor de NUMERIC FUZZ ("%d")|<value>,<value>
+ 33,  2,El valor de NUMERIC DIGITS ("%d") no debe exceder %d|<value>,#Limit_Digits
  33,  3,El resultado de la expresión a continuación de NUMERIC FORM debe empezar por "E" o "S"; encontrado "%s"|<value>
  34,  0,El valor lógico no es "0" o "1"
  34,  1,El valor de la expresión que sigue a la palabra clave IF debe ser exactamente "0" o "1"; encontrado "%s"|<value>
@@ -242,7 +241,7 @@
  40, 39,El argumento 3 de %s no es cero ni uno; encontrado "%s"|<bif>,<value>
  40, 41,El argumento de %s número %d debe estar dentro de los límites del fichero; encontrado "%s"|<bif>,<argnumber>,<value>
  40, 42,El argumento 1 de %s; no se puede posicionar en este fichero; encontrado "%s"|<bif>,<value>
- 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 43,%s argumento %d debe ser un solo carácter no alfanumérico o la cadena nula; encontrado "%s"|<bif>,<argnumber>,<value>
  40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[El argumento de %s número %d, debe ser uno de "%s"; encontrado "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: error de bajo nivel de E/S del fichero; %s]|<bif>,<description>
@@ -345,10 +344,6 @@
 #
 # Extra general phrases requiring translation:
 #
-# Error 3 ejecutando "<file>" línea 1:
-# Incapaz de abrir el fichero de lenguaje: %s
-# Número incorrecto de mensajes en el fichero de lenguaje: %s
-# Incapaz de leer el fichero de lenguaje: %s
-# Incapaz de mostrar el texto del error %d.%d; fichero de lenguaje: %s no disponible
-# Incapaz de mostrar el texto del error %d.%d; falta el texto del fichero de lenguaje: %s
-# Incapaz de mostrar el texto del error %d.%d; fichero de lenguaje: %s está corrupto
+P,  0,Error %d ejecutando "%.*s" línea %d: %.*s
+P,  1,Error %d.%d: %.*s
+P,  2,Error %d ejecutando "%.*s": %.*s

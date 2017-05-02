@@ -997,8 +997,7 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
          ampm = (char *)( ( hour > 11 ) ? "pm" : "am" ) ;
          if ((hour=hour%12)==0)
             hour = 12 ;
-         sprintf(answer->value, "%d:%02d%s", hour, tmdata.tm_min, ampm) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%d:%02d%s", hour, tmdata.tm_min, ampm );
          break ;
 
       case 'E':
@@ -1026,37 +1025,29 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
           * in order not to generate any illegal numbers
           */
          if (sec)
-            sprintf(answer->value,"%ld.%06lu", (long)sec, (unsigned long)usec ) ;
+            answer->len = sprintf( answer->value,"%ld.%06lu", (long)sec, (unsigned long)usec );
          else
-            sprintf(answer->value,".%06lu", (unsigned long)usec ) ;
-         answer->len = strlen(answer->value);
+            answer->len = sprintf( answer->value,".%06lu", (unsigned long)usec );
          break ;
 
       case 'H':
-         sprintf(answer->value, "%d", tmdata.tm_hour) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%d", tmdata.tm_hour );
          break ;
 
       case 'J':
-         sprintf(answer->value, "%.06f", cpu_time()) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%.06f", cpu_time() );
          break ;
 
       case 'L':
-         sprintf(answer->value, "%02d:%02d:%02d.%06ld", tmdata.tm_hour,
-                  tmdata.tm_min, tmdata.tm_sec, unow ) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf(answer->value, "%02d:%02d:%02d.%06ld", tmdata.tm_hour, tmdata.tm_min, tmdata.tm_sec, unow );
          break ;
 
       case 'M':
-         sprintf(answer->value, "%d", tmdata.tm_hour*60 + tmdata.tm_min) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf(answer->value, "%d", tmdata.tm_hour*60 + tmdata.tm_min);
          break ;
 
       case 'N':
-         sprintf(answer->value, "%02d:%02d:%02d", tmdata.tm_hour,
-                      tmdata.tm_min, tmdata.tm_sec ) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf(answer->value, "%02d:%02d:%02d", tmdata.tm_hour, tmdata.tm_min, tmdata.tm_sec );
          break ;
 
       case 'O':
@@ -1068,21 +1059,16 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
          if ( tmptr->tm_isdst )
             timediff += 3600;
 #endif
-         sprintf(answer->value, "%ld%s",
-                 timediff,(timediff)?"000000":"");
-         answer->len = strlen(answer->value);
+         answer->len = sprintf( answer->value, "%ld%s", timediff,(timediff)?"000000":"" );
          break ;
 
       case 'S':
-         sprintf(answer->value, "%d", ((tmdata.tm_hour*60)+tmdata.tm_min)
-                    *60 + tmdata.tm_sec) ;
-         answer->len = strlen(answer->value);
+         answer->len = sprintf(answer->value, "%d", (((tmdata.tm_hour*60)+tmdata.tm_min) * 60) + tmdata.tm_sec);
          break ;
 
       case 'T':
          rnow = mktime( &tmdata );
-         sprintf(answer->value, "%ld", rnow );
-         answer->len = strlen(answer->value);
+         answer->len = sprintf(answer->value, "%ld", rnow );
          break ;
 
       default:
@@ -1586,7 +1572,7 @@ streng *std_space( tsd_t *TSD, cparamboxptr parms )
 
 streng *std_arg( tsd_t *TSD, cparamboxptr parms )
 {
-   int number=0, retval=0, tmpval=0 ;
+   rx_64 number=0, retval=0, tmpval=0 ;
    char flag='N' ;
    streng *value=NULL ;
    paramboxptr ptr=NULL ;
@@ -1595,7 +1581,7 @@ streng *std_arg( tsd_t *TSD, cparamboxptr parms )
    if ( ( parms )
    && ( parms->value ) )
    {
-      number = atopos( TSD, parms->value, "ARG", 1 ) ;
+      number = atoposrx64( TSD, parms->value, "ARG", 1 ) ;
       if ( parms->next )
          flag = getoptionchar( TSD, parms->next->value, "ARG", 2, "ENO", "" ) ;
    }
@@ -1607,7 +1593,7 @@ streng *std_arg( tsd_t *TSD, cparamboxptr parms )
          if (ptr->value)
             retval = tmpval ;
 
-      value = int_to_streng( TSD, retval ) ;
+      value = rx64_to_streng( TSD, retval ) ;
    }
 
    else
@@ -1617,11 +1603,11 @@ streng *std_arg( tsd_t *TSD, cparamboxptr parms )
       {
          case 'E':
             retval = ((ptr)&&(ptr->value)) ;
-            value = int_to_streng( TSD, retval ? 1 : 0 ) ;
+            value = rx64_to_streng( TSD, retval ? 1 : 0 ) ;
             break;
          case 'O':
             retval = ((ptr)&&(ptr->value)) ;
-            value = int_to_streng( TSD, retval ? 0 : 1 ) ;
+            value = rx64_to_streng( TSD, retval ? 0 : 1 ) ;
             break;
          case 'N':
             if ((ptr)&&(ptr->value))

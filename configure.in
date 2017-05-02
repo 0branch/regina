@@ -124,7 +124,7 @@ dnl Check for extra required libraries - don't include libfl or libl
 #MH_EXTRA_LIBS=""
 #MH_CHECK_LIB(m nsl nsl_s socket net network)
 dnl -- check for crypt library and function
-#MH_CHECK_CRYPT
+MH_CHECK_CRYPT
 if test "$on_qnx4" = "no"; then
   AC_PROG_LEX
 fi
@@ -144,6 +144,7 @@ AC_CHECK_HEADERS( \
    ctype.h \
    crypt.h \
    dl.h \
+   dlfcn.h \
    errno.h \
    fcntl.h \
    fnmatch.h \
@@ -256,6 +257,15 @@ if test "$REGUTIL_TERM_LIB" = "none required" -o "$REGUTIL_TERM_LIB" = "no"; the
 fi
 LIBS="$save_LIBS"
 
+dnl where are math functions
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS(log10,[m c],REGUTIL_MATH_LIB="$ac_cv_search_log10",REGUTIL_MATH_LIB="")
+if test "$REGUTIL_MATH_LIB" = "none required" -o "$REGUTIL_MATH_LIB" = "no"; then
+  REGUTIL_MATH_LIB=""
+fi
+LIBS="$save_LIBS"
+
+dnl where is crypt
 save_LIBS="$LIBS"
 AC_SEARCH_LIBS(crypt,crypt,REGINA_CRYPT_LIB="$ac_cv_search_crypt",REGINA_CRYPT_LIB="")
 if test "$REGINA_CRYPT_LIB" = "none required" -o "$REGINA_CRYPT_LIB" = "no"; then
@@ -291,6 +301,7 @@ if test "$REGINA_GETHOSTBYNAME_LIB" = "none required" -o "$REGINA_GETHOSTBYNAME_
 fi
 LIBS="$save_LIBS"
 AC_SUBST(REGUTIL_TERM_LIB)
+AC_SUBST(REGUTIL_MATH_LIB)
 
 #MH_CHECK_LIB(m nsl nsl_s socket net network)
 dnl
@@ -443,17 +454,17 @@ dnl libraries for binaries associated with external queues; rxqueue, rxstack
 STACK_BINARY_LIBS="$REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB"
 AC_SUBST(STACK_BINARY_LIBS)
 dnl libraries for rexx
-REXX_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGINA_PTHREAD_LIB"
+REXX_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGUTIL_MATH_LIB $REGINA_PTHREAD_LIB"
 AC_SUBST(REXX_BINARY_LIBS)
 #STATIC_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGINA_PTHREAD_LIB"
 #AC_SUBST(STATIC_BINARY_LIBS)
 if test "$build_static" = "yes"; then
    dnl libraries for adding to regina-config --libs
-   REGINA_CONFIG_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB"
+   REGINA_CONFIG_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGUTIL_MATH_LIB"
    dnl libraries for libregina.lib
    LIBREGINA_BINARY_LIBS=""
    dnl libraries for regina
-   REGINA_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB"
+   REGINA_BINARY_LIBS="$REGINA_CRYPT_LIB $REGINA_PTHREAD_LIB $REGINA_SOCKET_LIB $REGINA_GETHOSTBYNAME_LIB $REGUTIL_TERM_LIB $REGUTIL_MATH_LIB"
    dnl libraries for threader
    THREADER_BINARY_LIBS="-L. -lrexx $REGINA_PTHREAD_LIB"
    dnl libraries for execiser

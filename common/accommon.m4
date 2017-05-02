@@ -29,7 +29,15 @@ dnl MH_GET_KERNEL_NAME
 dnl MH_CHECK_CURSES
 dnl MH_LARGE_FILE_SUPPORT
 dnl MH_CHECK_FUNCS
+dnl MH_GET_DISTRO_NAME
 
+dnl
+dnl include the stdint.h wrapper
+sinclude(common/ax_create_stdint_h.m4)
+dnl
+dnl add our expansion macro for directories
+dnl
+sinclude(common/ac_define_dir.m4)
 dnl ---------------------------------------------------------------------------
 dnl Check REXX library and header files
 dnl ---------------------------------------------------------------------------
@@ -104,13 +112,17 @@ case "$with_rexx" in
       REXX_TARGET="RexxTrans"
       if test "$ac_cv_prog_rexxtrans_config" = yes; then
          REXX_INCLUDES=`rexxtrans-config --cflags`
-         numlines=`rexxtrans-config --libs$bitflag | wc -l`
-         if test $numlines -eq 1; then
-            REXX_LIBS=`rexxtrans-config --libs$bitflag`
-         else
-            REXX_LIBS=`rexxtrans-config --libs`
-         fi
-         REXX_INT="Rexx/Trans (using rexxtrans-config)"
+dnl
+dnl We now link with the static rexxtrans library
+dnl
+#         numlines=`rexxtrans-config --libs$bitflag | wc -l`
+#         if test $numlines -eq 1; then
+#            REXX_LIBS=`rexxtrans-config --libs$bitflag`
+#         else
+#            REXX_LIBS=`rexxtrans-config --libs`
+#         fi
+         REXX_LIBS=`rexxtrans-config --libs-static`
+         REXX_INT="Rexx/Trans - static (using rexxtrans-config)"
          REXX_VER=`rexxtrans-config --version`
       else
          AC_SEARCH_LIBS(dlopen,dl)
@@ -209,6 +221,8 @@ dnl
    ;;
 esac
 AC_SUBST(REXX_TARGET)
+REXX_BUILD=$with_rexx
+AC_SUBST(REXX_BUILD)
 
 dnl look for REXX header and library, exit if not found
 
@@ -679,7 +693,7 @@ AC_DEFUN([MH_PROG_CC],
 [
 mh_sysv_incdir=""
 mh_sysv_libdir=""
-all_words="clang xlc c99 c89 acc gcc cc"
+all_words="clang gcc xlc c99 c89 acc cc"
 ac_dir=""
 AC_MSG_CHECKING(for one of the following C compilers: $all_words)
 AC_CACHE_VAL(ac_cv_prog_CC,[
@@ -1068,7 +1082,7 @@ case "$target" in
       LD_RXTRANSLIB1="$LD_RXLIB1"
       ;;
    *linux*|*kfreebsd*-gnu*)
-      LD_RXLIB1="${CC} -shared  ${LDFLAGS} -Wl,-soname,\$(@)"
+      LD_RXLIB1="${CC} -shared  ${LDFLAGS} -Wl,-soname,\$(SONAME)"
       LD_RXTRANSLIB1="$LD_RXLIB1"
       CAN_USE_ABI="yes"
       if test "$USE_ABI" = "yes"; then
@@ -1667,7 +1681,7 @@ case "$target" in
          mh_pre_curses_h_include=""
 esac
 
-if test "$with_xcurses" = yes; then
+if test "$with_xcurses" = yes -o "$with_xcurses_static" = yes; then
    AC_DEFINE(USE_XCURSES)
    curses_h="xcurses.h"
    CURSES_TARGET="XCurses"
@@ -1819,7 +1833,11 @@ fi
 if test "$ac_cv_prog_xcurses_config" = yes -a "$with_curseslibdir" = no; then
 AC_MSG_CHECKING(for location of $curses_l library file)
    AC_MSG_RESULT(obtained from xcurses-config)
-   MH_CURSES_LIB=`xcurses-config --libs`
+   if test "$with_xcurses_static" = yes; then
+      MH_CURSES_LIB=`xcurses-config --libs-static`
+   else
+      MH_CURSES_LIB=`xcurses-config --libs`
+   fi
    AC_SUBST(MH_CURSES_LIB)
 else
    if test "$ac_cv_prog_ncurses5_config" = yes -a "$with_curseslibdir" = no; then
@@ -1828,56 +1846,63 @@ else
       MH_CURSES_LIB=`ncurses5-config --libs`
       AC_SUBST(MH_CURSES_LIB)
    else
-      if test "$ac_cv_prog_dw_config" = yes -a "$with_curseslibdir" = no; then
+      if test "$ac_cv_prog_ncursesw5_config" = yes -a "$with_curseslibdir" = no; then
       AC_MSG_CHECKING(for location of $curses_l library file)
-         AC_MSG_RESULT(obtained from dw-config)
-         MH_CURSES_LIB=`dw-config --libs`
+         AC_MSG_RESULT(obtained from ncurses5w-config)
+         MH_CURSES_LIB=`ncursesw5-config --libs`
          AC_SUBST(MH_CURSES_LIB)
       else
+         if test "$ac_cv_prog_dw_config" = yes -a "$with_curseslibdir" = no; then
          AC_MSG_CHECKING(for location of $curses_l library file)
-         mh_curses_lib_dir=""
-         mh_lib_dirs="\
-             ${CURSESLIBDIR}           \
-             ${mh_sysv_libdir}         \
-             ${exec_prefix}/lib64      \
-             ${exec_prefix}/lib        \
-             ${HOME}/lib64             \
-             ${HOME}/lib               \
-             /usr/local/lib64          \
-             /usr/local/lib            \
-             /usr/contrib/lib          \
-             /opt/lib                  \
-             /usr/lib64                \
-             /usr/lib                  \
-             /usr/ccs/lib              \
-             /usr/ucblib               \
-             /opt/sfw/lib              \
-             /sw/lib                   \
-             /usr/unsupported/lib      \
-             /boot/home/config/lib"
+            AC_MSG_RESULT(obtained from dw-config)
+            MH_CURSES_LIB=`dw-config --libs`
+            AC_SUBST(MH_CURSES_LIB)
+         else
+            AC_MSG_CHECKING(for location of $curses_l library file)
+            mh_curses_lib_dir=""
+            mh_lib_dirs="\
+                ${CURSESLIBDIR}           \
+                ${mh_sysv_libdir}         \
+                ${exec_prefix}/lib64      \
+                ${exec_prefix}/lib        \
+                ${HOME}/lib64             \
+                ${HOME}/lib               \
+                /usr/local/lib64          \
+                /usr/local/lib            \
+                /usr/contrib/lib          \
+                /opt/lib                  \
+                /usr/lib64                \
+                /usr/lib                  \
+                /usr/ccs/lib              \
+                /usr/ucblib               \
+                /opt/sfw/lib              \
+                /sw/lib                   \
+                /usr/unsupported/lib      \
+                /boot/home/config/lib"
 dnl
 dnl Provide for user supplying directory
 dnl
-         if test "$with_curseslibdir" != no ; then
-            mh_lib_dirs="$with_curseslibdir $mh_lib_dirs"
-         fi
+            if test "$with_curseslibdir" != no ; then
+               mh_lib_dirs="$with_curseslibdir $mh_lib_dirs"
+            fi
 dnl
 dnl Try to determine the directory containing curses library
 dnl
-         for ac_dir in $mh_lib_dirs ; do
-            for mh_ext in lib${curses_l}.a lib${curses_l}.so lib${curses_l}.sl ${curses_l}.lib ${curses_l}3r.lib lib${curses_l}.dylib; do
-              if test -r $ac_dir/$mh_ext; then
-                 mh_curses_lib_dir=$ac_dir
-                 break 2
-              fi
+            for ac_dir in $mh_lib_dirs ; do
+               for mh_ext in lib${curses_l}.a lib${curses_l}.so lib${curses_l}.sl ${curses_l}.lib ${curses_l}3r.lib lib${curses_l}.dylib; do
+                 if test -r $ac_dir/$mh_ext; then
+                    mh_curses_lib_dir=$ac_dir
+                    break 2
+                 fi
+               done
             done
-         done
-         if test "x$mh_curses_lib_dir" != "x" ; then
-            MH_CURSES_LIB="-L$mh_curses_lib_dir -l$curses_l"
-            AC_MSG_RESULT(found in $mh_curses_lib_dir)
-            AC_SUBST(MH_CURSES_LIB)
-         else
-            AC_MSG_ERROR(Cannot find curses library file: $curses_l; cannot configure)
+            if test "x$mh_curses_lib_dir" != "x" ; then
+               MH_CURSES_LIB="-L$mh_curses_lib_dir -l$curses_l"
+               AC_MSG_RESULT(found in $mh_curses_lib_dir)
+               AC_SUBST(MH_CURSES_LIB)
+            else
+               AC_MSG_ERROR(Cannot find curses library file: $curses_l; cannot configure)
+            fi
          fi
       fi
    fi
@@ -1908,3 +1933,42 @@ AC_DEFUN([MH_CHECK_FUNCS],
 dnl check a standard list of functions, then those passed in as args
 AC_CHECK_FUNCS(memcpy memmove strerror getopt strtof $*)
 ])dnl
+
+dnl ---------------------------------------------------------------------------
+dnl Determines the Linux distribution name
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_GET_DISTRO_NAME],
+[
+AC_CHECK_PROG(lsb_release, [lsb_release], yes, no)
+if test "$ac_cv_prog_lsb_release" = yes; then
+   AC_MSG_CHECKING(OS distribution name)
+   MYDISTRO="`lsb_release -i | cut -f 2`-`lsb_release -r | cut -f 2`"
+   MYDISTRO="`echo $MYDISTRO | sed \"s/ /_/g\"`"
+   AC_MSG_RESULT($MYDISTRO)
+else
+   case "$target" in
+      *freebsd* | *openbsd*)
+         MYDISTRO="`echo $target | cut -f3 -d-`"
+      ;;
+      *darwin*)
+         MYDISTRO="`echo $target | cut -f2-3 -d-`"
+      ;;
+      *pc-solaris2*)
+         MYDISTRO="`echo $target | cut -f2- -d-`"
+      ;;
+      *cygwin*)
+         MYDISTRO="`echo $target | cut -f2- -d-`"
+      ;;
+      *nto-qnx*)
+         MYDISTRO="`uname -s`-`uname -r`"
+      ;;
+      *qnx*)
+         MYDISTRO="`uname -s`-`uname -v`"
+      ;;
+      *)
+         MYDISTRO="$target"
+      ;;
+   esac
+fi
+AC_SUBST(MYDISTRO)
+])

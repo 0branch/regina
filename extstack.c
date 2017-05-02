@@ -56,6 +56,7 @@
 # ifdef HAVE_ARPA_INET_H
 #  include <arpa/inet.h>
 # endif
+# define closesocket(x) close(x)
 #endif
 
 #include <stdio.h>
@@ -211,13 +212,13 @@ int connect_to_rxstack( tsd_t *TSD, Queue *q )
          return(q->u.e.socket);
       }
       eno = errno;
-      close(q->u.e.socket);
+      closesocket(q->u.e.socket);
       q->u.e.socket = -1;
       errno = eno;
    }
    /* TSD will be NULL when called from rxqueue or rxstack */
    if ( TSD == NULL )
-      showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, ERR_RXSTACK_CANT_CONNECT_TMPL, q->u.e.name, q->u.e.portno, strerror ( errno ) );
+      showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, ERR_RXSTACK_CANT_CONNECT_TMPL, q->u.e.name->value, q->u.e.portno, strerror ( errno ) );
    else if ( !TSD->called_from_saa )
       exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_CANT_CONNECT, tmpstr_of( TSD, q->u.e.name ), q->u.e.portno, strerror ( errno ) );
 
@@ -233,7 +234,7 @@ int disconnect_from_rxstack( const tsd_t *TSD, Queue *q )
    {
       DEBUGDUMP(printf("Disconnecting from socket %d\n", q->u.e.socket ););
       rc = send_command_to_rxstack( TSD, q->u.e.socket, RXSTACK_EXIT_STR, NULL, 0 );
-      close( q->u.e.socket );
+      closesocket( q->u.e.socket );
    }
    else
       rc = 0; /* success: 0 bytes transfered */

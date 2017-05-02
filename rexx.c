@@ -98,6 +98,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "mygetopt.h"
+
 #ifdef VMS
 # include <stat.h>
 #elif defined(MAC)
@@ -299,8 +301,42 @@ void setup_system( tsd_t *TSD, int isclient )
    TSD->systeminfo->currlevel0 = TSD->currlevel = newlevel( TSD, NULL );
    TSD->systeminfo->trace_override = 0;
    TSD->isclient = isclient;
+   /*
+    * Under DJGPP setmode screws up Parse Pull and entering code
+    * interactively :-(
+    */
+#if defined(__EMX__) || (defined(_MSC_VER) && !defined(__WINS__)) || (defined(__WATCOMC__) && !defined(__QNX__))
+   fflush( stdin );
+   fflush( stdout );
+   fflush( stderr );
+   setmode( fileno( stdin ), O_BINARY );
+   setmode( fileno( stdout ), O_BINARY );
+   setmode( fileno( stderr ), O_BINARY );
+# ifdef _MSC_VER
+   /* set binary mode for pipes as well! */
+   _set_fmode(_O_BINARY);
+# endif
+#endif
 }
 
+static struct my_getopt_option long_options[] =
+{
+   {"help",        no_argument,       0,  'h' },
+   {"debug",       optional_argument, 0,  'D' },
+   {"debug",       optional_argument, 0,  'd' },
+   {"trace",       optional_argument, 0,  't' },
+   {"pause",       no_argument,       0,  'p' },
+   {"version",     no_argument,       0,  'v' },
+   {"yaccdbg",     no_argument,       0,  'y' },
+   {"restricted",  no_argument,       0,  'r' },
+   {"interactive", optional_argument, 0,  'i' },
+   {"args",        no_argument,       0,  'a' },
+   {"compile",     no_argument,       0,  'c' },
+   {"execute",     no_argument,       0,  'e' },
+   {"locale",      required_argument, 0,  'l' },
+   {"options",     required_argument, 0,  'o' },
+   {0,             0,                 0,  0 }
+};
 /*
  * check_args examines the arguments of the program and assigns the values
  * to the various structures.
@@ -312,138 +348,141 @@ static int check_args( tsd_t *TSD, int argc, char **argv,
                        int *compile_to_tokens, int *execute_from_tokens,
                        int *locale_set )
 {
-   int i;
-   char c, *arg;
-
-   for ( i = 1; i < argc; i++ )
+   int c;
+   while (1)
    {
-      arg = argv[i];
-      if ( *arg == '-' )
+      int option_index = 0;
+
+      c = my_getopt_long( argc, argv, "+hi::D::t::pvyrd::acel:o:", long_options, &option_index );
+      if ( c == -1 )
+         break;
+
+      switch(c)
       {
-         arg++;
-         while ( *arg )
-         {
-            c = *arg++;
-            switch ( c )
+         case 'i':
+            starttrace( TSD );
+            set_trace_char( TSD, '?' );
+            if ( optarg )
             {
-               case 'i':
-                  starttrace( TSD );
-                  set_trace_char( TSD, 'A' );
-                  intertrace( TSD );
-                  intertrace( TSD );
-                  break;
-
-               case 'p':
-#if !defined(__WINS__) && !defined(__EPOC32__)
-                  set_pause_at_exit();
-#endif
-                  break;
-
-               case 'v':
-                  fprintf( stderr, "%s\n", PARSE_VERSION_STRING );
-                  /*
-                   * Also display any staticall linked packages
-                   */
-#if defined( DYNAMIC_STATIC )
-                  static_list_packages();
-#endif
-                  return 0;
-
-               case 'y':
-#ifndef NDEBUG
-                  __reginadebug = 1;   /* yacc-debugging */
-#endif
-                  break;
-
-               case 'r': /* safe-rexx */
-                  TSD->restricted = 1;
-                  break;
-
-               case 't':
-                  if ( strlen( arg ) > 1 )
-                  {
-                     usage( argv[0] );
-                     fprintf( stdout, "\n"
-                                      "The passed switch `-t' allows just "
-                                           "one additional character, Regina "
-                                                                 "exits.\n" );
-                     exit( 1 );
-                  }
-                  if ( *arg )
-                     queue_trace_char( TSD, *arg );
-                  else
-                     queue_trace_char( TSD, 'A' );
-                  arg += strlen( arg );
-                  TSD->systeminfo->trace_override = 1;
-                  break;
-
-               case 'd':
-                  if ( *arg == 'm' )
-                     TSD->listleakedmemory = 1;
-                  arg += strlen( arg );
-                  break;
-
-               case 'a': /* multiple args */
-                  TSD->systeminfo->invoked = INVO_SUBROUTINE;
-                  break;
-
-               case 'c': /* compile to tokenised file */
-                  if ( *execute_from_tokens )
-                  {
-                     usage( argv[0] );
-                     fprintf( stdout, "\n"
-                                      "The flags `-c' and `-e' are mutually "
-                                               "exclusive, Regina exits.\n" );
-                     exit( 1 );
-                  }
-                  *compile_to_tokens = 1;
-                  break;
-
-               case 'e': /* execute from tokenised file */
-                  if ( *compile_to_tokens )
-                  {
-                     usage( argv[0] );
-                     fprintf( stdout, "\n"
-                                      "The flags `-c' and `-e' are mutually "
-                                               "exclusive, Regina exits.\n" );
-                     exit( 1 );
-                  }
-                  *execute_from_tokens = 1;
-                  break;
-
-               case 'l': /* set locale information, accept empty string */
-                  *locale_set = 1;
-                  set_locale_info( arg );
-                  arg += strlen( arg );
-                  break;
-
-               case 'o': /* command-line OPTIONS */
+               if ( strlen( optarg ) > 1 )
                {
-                  streng *opts = Str_creTSD( arg );
-                  do_options( TSD, TSD->currlevel, opts, 0 );
-                  arg += strlen( arg );
-                  break;
-               }
-               case 'h': /* usage */
-               case '?': /* usage */
                   usage( argv[0] );
-                  return 0;
-
-               default:
-                  usage( argv[0] );
-                  fprintf( stdout, "\n"
-                                   "The passed switch `-%c' is unknown, "
-                                                        "Regina exits.\n", c );
+                  fprintf( stdout, "\nThe passed switch `-t' allows just one additional character, Regina exits.\n" );
                   exit( 1 );
+               }
+               set_trace_char( TSD, *optarg );
             }
+            else
+               set_trace_char( TSD, 'A' );
+            intertrace( TSD );
+            intertrace( TSD );
+            break;
+/*
+            starttrace( TSD );
+            set_trace_char( TSD, '?' );
+            set_trace_char( TSD, 'A' );
+            intertrace( TSD );
+            intertrace( TSD );
+            break;
+*/
+         case 'p':
+#if !defined(__WINS__) && !defined(__EPOC32__)
+            set_pause_at_exit();
+#endif
+            break;
+
+         case 'v':
+            fprintf( stderr, "%s: %s (%d bit)\n", argv[0], PARSE_VERSION_STRING, REGINA_BITS );
+            /*
+             * Also display any statically linked packages
+             */
+#if defined( DYNAMIC_STATIC )
+            static_list_packages();
+#endif
+            return 0;
+
+         case 'y':
+#ifndef NDEBUG
+            __reginadebug = 1;   /* yacc-debugging */
+#endif
+            break;
+
+         case 'r': /* safe-rexx */
+            TSD->restricted = 1;
+            break;
+
+         case 't':
+            if ( optarg )
+            {
+               if ( strlen( optarg ) > 1 )
+               {
+                  usage( argv[0] );
+                  fprintf( stdout, "\nThe passed switch `-t' allows just one additional character, Regina exits.\n" );
+                  exit( 1 );
+               }
+               queue_trace_char( TSD, *optarg );
+            }
+            else
+               queue_trace_char( TSD, 'A' );
+            TSD->systeminfo->trace_override = 1;
+            break;
+
+         case 'd':
+         case 'D':
+            if ( optarg )
+            {
+               if ( *optarg == 'm' )
+                  TSD->listleakedmemory = 1;
+            }
+            break;
+
+         case 'a': /* multiple args */
+            TSD->systeminfo->invoked = INVO_SUBROUTINE;
+            break;
+
+         case 'c': /* compile to tokenised file */
+            if ( *execute_from_tokens )
+            {
+               usage( argv[0] );
+               fprintf( stdout, "\nThe flags `-c' and `-e' are mutually exclusive, Regina exits.\n" );
+               exit( 1 );
+            }
+            *compile_to_tokens = 1;
+            break;
+
+         case 'e': /* execute from tokenised file */
+            if ( *compile_to_tokens )
+            {
+               usage( argv[0] );
+               fprintf( stdout, "\nThe flags `-c' and `-e' are mutually exclusive, Regina exits.\n" );
+               exit( 1 );
+            }
+            *execute_from_tokens = 1;
+            break;
+
+         case 'l': /* set locale information, accept empty string */
+            *locale_set = 1;
+            set_locale_info( optarg );
+            break;
+
+         case 'o': /* command-line OPTIONS */
+         {
+            streng *opts = Str_creTSD( optarg );
+            do_options( TSD, TSD->currlevel, opts, 0 );
+            break;
          }
-         continue;
+         case 'h': /* usage */
+         case '?': /* usage */
+            usage( argv[0] );
+            return 0;
+
+         default:
+            usage( argv[0] );
+            fprintf( stdout, "\nThe passed switch `-%c' is unknown, Regina exits.\n", c );
+            exit( 1 );
       }
-
-      return i;
    }
-
-   return argc;
+   return optind;
 }
 
 /*
@@ -748,7 +787,9 @@ int main(int argc,char *argv[])
       if ( !TSD->instore_is_errorfree )
       {
          if ( TSD->systeminfo->result )
+         {
             return atoi( TSD->systeminfo->result->value );
+         }
          return -1;
       }
       else
@@ -824,15 +865,6 @@ int main(int argc,char *argv[])
          return 0;
       }
 
-      /*
-       * Under DJGPP setmode screws up Parse Pull and entering code
-       * interactively :-(
-       */
-#if defined(__EMX__) || (defined(_MSC_VER) && !defined(__WINS__)) || (defined(__WATCOMC__) && !defined(__QNX__))
-      setmode( fileno( stdin ), O_BINARY );
-      setmode( fileno( stdout ), O_BINARY );
-      setmode( fileno( stderr ), O_BINARY );
-#endif
 
       assign_args( TSD, argc, processed, argv );
       signal_setup( TSD );
@@ -1123,22 +1155,25 @@ int IfcHaveFunctionExit(const tsd_t *TSD)
 
 static void usage( char *argv0 )
 {
-   fprintf( stdout, "\nRegina %s. All rights reserved.\n", PARSE_VERSION_STRING );
+   fprintf( stdout, "\n%s: %s (%d bit). All rights reserved.\n", argv0, PARSE_VERSION_STRING, REGINA_BITS );
    fprintf( stdout,"Regina is distributed under the terms of the GNU Library Public License \n" );
    fprintf( stdout,"and comes with NO WARRANTY. See the file COPYING-LIB for details.\n" );
    fprintf( stdout,"\nTo run a Rexx program:\n" );
    fprintf( stdout,"%s [switches] [program] [arguments...]\n", argv0 );
    fprintf( stdout,"where switches are:\n\n" );
-   fprintf( stdout,"  -h,-?                  show this message\n" );
-   fprintf( stdout,"  -v                     display Regina version and exit\n" );
-   fprintf( stdout,"  -r                     run Regina in \"safe\" mode\n" );
-   fprintf( stdout,"  -t[trace_char]         set TRACE any valid TRACE character - default A\n" );
-   fprintf( stdout,"  -a                     pass command line to Rexx program as separate arguments\n");
-   fprintf( stdout,"  -p                     pause after execution (Win32 only)\n");
-   fprintf( stdout,"  -l[locale]             use the system's default charset or a supplied one\n");
-   fprintf( stdout,"  -oOPTIONS              specify OPTIONS in same format as OPTIONS instruction\n");
-   fprintf( stdout,"program is the file containing Rexx code to execute\n");
-   fprintf( stdout,"arguments are arguments passed to program\n");
+   fprintf( stdout,"  --help, -h                      show this message\n" );
+   fprintf( stdout,"  --version, -v                   display Regina version and exit\n" );
+   fprintf( stdout,"  --restricted, -r                run Regina in \"safe\" mode\n" );
+   fprintf( stdout,"  --trace[=char], -t[char]        set TRACE to any valid TRACE character - default A\n" );
+   fprintf( stdout,"  --interactive[=char], -i[char]  set TRACE to any valid TRACE character and run interactively - default A\n" );
+   fprintf( stdout,"  --args, -a                      pass command line to Rexx program as separate arguments\n");
+   fprintf( stdout,"  --pause, -p                     pause after execution (Win32 only)\n");
+   fprintf( stdout,"  --locale=locale, -llocale       use the system's default charset or a supplied one\n");
+   fprintf( stdout,"  --options=OPTIONS, -oOPTIONS    specify OPTIONS in same format as OPTIONS instruction\n");
+   fprintf( stdout,"  --compile, -c                   see \"To tokenise a Rexx program:\" below\n");
+   fprintf( stdout,"  --execute, -e                   see \"To execute a tokenised file:\" below\n");
+   fprintf( stdout,"\"program\" is the file containing Rexx code to execute\n");
+   fprintf( stdout,"\"arguments\" are arguments passed to program\n");
    fprintf( stdout,"\nTo tokenise a Rexx program:\n" );
    fprintf( stdout,"%s -c program(input) tokenisedfile(output)\n", argv0 );
    fprintf( stdout,"\nTo execute a tokenised file:\n" );

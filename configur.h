@@ -218,6 +218,8 @@
 # define HAVE_GETPID
 # define HAVE_DIV
 # define HAVE_RAISE
+/* statically link Regutil */
+# define HAVE_REXXUTIL_PACKAGE
 #endif
 
 #if defined(WIN32) && defined(_MSC_VER)

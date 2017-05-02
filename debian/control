@@ -8,7 +8,7 @@ Standards-Version: 3.8.3
 Package: libregina3
 Section: libs
 Architecture: any
-Depends: ${shlibs:Depends}
+Depends: ${shlibs:Depends}, dpkg-dev (>= 1.16.0)
 Conflicts: regina3
 Replaces: regina3
 Description: The Regina REXX interpreter, run-time library

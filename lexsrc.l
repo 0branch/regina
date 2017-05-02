@@ -17,6 +17,18 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * If you change this file the following has to be done:
+ * - regenerate lexsrc.c using boojum: ~/flex-2.5.4/flex and the
+ *   command from "make lexsrc"
+ * - change the value of YY_BUF_SIZE to 101000 in lexsrc.c
+ *   This value MUST be larger than BUFFERSIZE in rexx.h
+ *   It is not set automatically because certain variables
+ *   are defined with this value BEFORE rexx.h is included
+ *   Increasing this value will slow down parsing a bit.
+ *   This value will be blown away if you regenerate lexxsrc.c
+ *   from this file.
+ */
 
 #include "rexx.h"
 #include "yaccsrc.h"
@@ -160,7 +172,7 @@ static int fill_buffer( char *buf, int max_size ) ;
  */
 digit             [0-9]
 special           [,:;)(]
-not               [\\^~]
+not               [\\^~¬]
 extra             [#$@]
 general           [_!?A-Za-z]|{extra}
 dot               [.]

@@ -60,7 +60,7 @@
  * Most Unix systems have dlopen(), so set this as the default and
  * unset it for platforms that don't have it - except for HPUX
  */
-# if defined(__hpux)
+# if defined(__hpux) && !defined(HAVE_DLFCN_H)
 #  define DYNAMIC_HPSHLOAD
 # endif
 

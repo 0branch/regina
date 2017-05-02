@@ -1166,7 +1166,7 @@ endloop: if (s.increment)
             }
             else
             {
-               /* default settiong for TRACE with no arguments is "N" */
+               /* default setting for TRACE with no arguments is "N" */
                streng *tmp = Str_ncre_TSD( TSD, "N", 1 );
                set_trace( TSD, tmp );
                Free_stringTSD( tmp );
@@ -1921,7 +1921,7 @@ endloop: if (s.increment)
 
          cptr = evaluate( TSD, thisptr->p[0], &kill );
          tmp = streng_to_int( TSD, cptr, &error );
-         if ( error || tmp < 0 )
+         if ( error || tmp <= 0 )
          {
              err = tmpstr_of( TSD, cptr );
              if ( kill )
@@ -1932,14 +1932,8 @@ endloop: if (s.increment)
             Free_stringTSD( kill );
          if (TSD->currlevel->numfuzz >= tmp)
              exiterror( ERR_INVALID_RESULT, 1, tmp, TSD->currlevel->numfuzz );
-#if 0
-/*
- * Remove unneccessary limitaion on numeric digits as suggested by
- * Patrick McPhee
- */
-         if (tmp > MAXNUMERIC)
-             exiterror( ERR_INVALID_RESULT, 2, tmp, MAXNUMERIC )  ;
-#endif
+         if (tmp > INT_MAX)
+             exiterror( ERR_INVALID_RESULT, 2, tmp, INT_MAX )  ;
          TSD->currlevel->currnumsize = tmp ;
          break ;
       }

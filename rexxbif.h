@@ -57,6 +57,10 @@
 #include <errno.h>
 #endif
 
+#ifdef HAVE_CTYPE_H
+#include <ctype.h>
+#endif
+
 #ifdef EXTERNAL_TO_REGINA
 typedef struct tsdtype { /* FGC: This will lead to severe troubles. Imagine
                           * some called routines which are compiled with the
@@ -82,6 +86,7 @@ typedef struct tsdtype { /* FGC: This will lead to severe troubles. Imagine
 # define REXX_RIGHT( s,l,p )   Rexx_right( NULL,s,l,p )
 # define REXX_X2D( x,err )     Rexx_x2d( NULL,x,err )
 # define REXX_D2X( x )         Rexx_d2x( NULL,x )
+# define REXX_UPPER( x )       Rexx_upper( NULL,x )
 # ifndef STRENG_TYPEDEFED
 /*
  * typedef a streng type
@@ -105,11 +110,13 @@ typedef struct strengtype {
 # define REXX_RIGHT( s,l,p )   Rexx_right( TSD,s,l,p )
 # define REXX_X2D( x,err )     Rexx_x2d( TSD,x,err )
 # define REXX_D2X( x )         Rexx_d2x( TSD,x )
+# define REXX_UPPER( x )       Rexx_upper( TSD,x )
 #endif
 
 extern streng *Rexx_right( const tsd_t *TSD, streng *str, int length, char padch );
 extern int Rexx_x2d( const tsd_t *TSD, const streng *hex, int *error );
 extern streng *Rexx_d2x( const tsd_t *TSD, int num );
+extern streng *Rexx_upper( const tsd_t *TSD, streng *str );
 
 #ifdef EXTERNAL_TO_REGINA
 extern void DropStreng( streng *str );

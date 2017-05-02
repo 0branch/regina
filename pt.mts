@@ -56,10 +56,10 @@
  14,  3,THEN requer uma instrucao subsquente
  14,  4,ELSE requer uma instrucao subsequente
  15,  0,Linha hexadecimal ou binaria invalida
- 15,  1,Localizacao invalida do espa‡o na posicao %d na linha hexadecimal|<position>
- 15,  2,Localizacao invalida do espa‡o na posicao %d na linha binaria|<position>
- 15,  3,Apenas 0-9, a-f, A-F, e espa‡o sao validos numa linha hexadecimal; encontrado "%c"|<char>
- 15,  4,Apenas 0, 1, e espa‡o sao validos numa linha binaria; encontrado "%c"|<char>
+ 15,  1,Localizacao invalida do espaço na posicao %d na linha hexadecimal|<position>
+ 15,  2,Localizacao invalida do espaço na posicao %d na linha binaria|<position>
+ 15,  3,Apenas 0-9, a-f, A-F, e espaço sao validos numa linha hexadecimal; encontrado "%c"|<char>
+ 15,  4,Apenas 0, 1, e espaço sao validos numa linha binaria; encontrado "%c"|<char>
  16,  0,Rotulo nao encontrado
  16,  1,Rotulo "%s" nao encontrado|<name>
  16,  2,Impossivel aplicar SIGNAL ao rotulo "%s" porque estah dentro de um grupo IF, SELECT ou DO|<name>
@@ -109,7 +109,7 @@
  26,  2,O valor da expressao de contagem de repeticoes na instrucao DO deve ser zero ou um numero inteiro positivo; encontrado "%s"|<value>
  26,  3,O valor da expressao FOR na instrucao DO deve ser zero ou um numero inteiro positivo; encontrado "%s"|<value>
  26,  4,O parametro posicional do modelo de analise deve ser um numero inteiro; encontrado "%s"|<value>
- 26,  5,O valor dos NUMERIC DIGITS deve ser zero ou um numero inteiro positivo; encontrado "%s"|<value>
+ 26,  5,O valor dos NUMERIC DIGITS deve ser um numero inteiro positivo; encontrado "%s"|<value>
  26,  6,O valor NUMERIC FUZZ deve ser zero ou um numero inteiro positivo; encontrado "%s"|<value>
  26,  7,O numero usado na configuracao TRACE deve ser um numero inteiro; encontrado "%s"|<value>
  26,  8,Operand a direita do operador da potencia ("**") deve ser um numero inteiro; encontrado "%s"|<value>
@@ -133,8 +133,8 @@
  31,  3,Simbolo de variavel nao deve iniciar com "."; encontrado "%s"|<token>
  32,  0,[Uso invalido de stem]
  33,  0,Resultado de expressao invalido
- 33,  1,O valor de NUMERIC DIGITS "%d" deve ultrapassar o valor de NUMERIC FUZZ "(%d)"|<value>,<value>
- 33,  2,O valor de NUMERIC DIGITS "%d" nao deve ultrapassar %d|<value>,#Limit_Digits
+ 33,  1,O valor de NUMERIC DIGITS ("%d") deve ultrapassar o valor de NUMERIC FUZZ ("%d")|<value>,<value>
+ 33,  2,O valor de NUMERIC DIGITS ("%d") nao deve ultrapassar %d|<value>,#Limit_Digits
  33,  3,O resultado da expressao subsequente a NUMERIC FORM deve iniciar com "E" ou "S"; encontrado "%s"|<value>
  34,  0,Valor logico nao eh "0" ou "1"
  34,  1,Valor da expressao subsequente a palavra-chave IF deve ser exatamente "0" ou "1"; encontrado "%s"|<value>
@@ -289,6 +289,9 @@
 #
 # frases que precisam ser traduzidas  - Extra geral:
 # O texto entre () eh o nome correspondente da matriz em error.c
+P,  0,Erro %d ao executar "%.*s", linha %d: %.*s
+P,  1,Erro %d.%d: %.*s
+P,  2,Erro %d ao executar "%.*s": %.*s
 #
 # (err1prefix)   "Erro %d em execucao\"%.*s\", linha %d: %.*s",
 # (suberrprefix) "erro %d.%d: %.*s",

@@ -38,10 +38,12 @@ typedef struct { /* tra_tsd: static variables of this module (thread-safe) */
    char buf0[32];
    int  bufptr0;
    char tracefmt[20];
+   int  initialhtmltracing; /* set to 1 after first line of HTML tracing set */
 } tra_tsd_t; /* thread-specific but only needed by this module. see
               * init_tracing
               */
 
+PROTECTION_VAR( trace_setting )
 
 /* init_tracing initializes the module.
  * Currently, we set up the thread specific data.
@@ -108,6 +110,11 @@ static void printout( tsd_t *TSD, const streng *message )
 {
    int rc;
    FILE *fp=stderr;
+   FILE *myfp=NULL;
+   char *rxtrace=NULL;
+   tra_tsd_t *tt;
+
+   tt = (tra_tsd_t *)TSD->tra_tsd;
 
    rc = HOOK_GO_ON;
    if ( TSD->systeminfo->hooks & HOOK_MASK( HOOK_STDERR ) )
@@ -117,8 +124,22 @@ static void printout( tsd_t *TSD, const streng *message )
    {
       if ( get_options_flag( TSD->currlevel, EXT_STDOUT_FOR_STDERR ) )
          fp = stdout;
+      rxtrace = getenv( "RXTRACE" );
+      if ( rxtrace != NULL )
+      {
+         myfp = fopen( rxtrace, "a" );
+         if ( myfp != NULL )
+            fp = myfp;
+      }
       if ( get_options_flag( TSD->currlevel, EXT_TRACE_HTML ) )
+      {
+         if ( tt->initialhtmltracing == 0 )
+         {
+            tt->initialhtmltracing = 1;
+            fwrite( "Content-Type: text/html\n\n", 25, 1, fp );
+         }
          fwrite( "<FONT COLOR=#669933><PRE>", 25, 1, fp );
+      }
       fwrite( message->value, message->len, 1, fp ) ;
       if ( get_options_flag( TSD->currlevel, EXT_TRACE_HTML ) )
          fwrite( "</PRE></FONT>", 13, 1, fp );
@@ -131,6 +152,8 @@ static void printout( tsd_t *TSD, const streng *message )
 #endif
       fputc( REGINA_EOL, fp );
       fflush( fp );
+      if ( myfp )
+         fclose( fp );
    }
 }
 
@@ -171,7 +194,6 @@ void tracecompound( tsd_t *TSD, const streng *stem, int length,
                                            "", stem->value, index->value );
 
    printout( TSD, message );
-
    Free_stringTSD( message );
 }
 
@@ -337,7 +359,7 @@ void tracevalue( tsd_t *TSD, const streng *str, char type )
    char tmpch;
    streng *message;
    tra_tsd_t *tt;
-   int indent;
+   int indent,i;
 
    /*
     * ANSI 8.3.17 requires placeholders in PARSE to be traced with TRACE R
@@ -352,8 +374,18 @@ void tracevalue( tsd_t *TSD, const streng *str, char type )
 
    indent = TSD->systeminfo->cstackcnt + TSD->systeminfo->ctrlcounter;
    message = Str_makeTSD( str->len + 30 + indent );
-   sprintf( tt->tracestr, "       >%%c> %%%ds  \"%%.%ds\"", indent, str->len );
-   message->len = sprintf( message->value, tt->tracestr, type, "", str->value );
+   sprintf( tt->tracestr, "       >%c> %%%ds  \"", type, indent );
+   message->len = sprintf( message->value, tt->tracestr, "" );
+   /* bug #279 if we encounter a nul value in the value to be displayed, show a space instead */
+   for (i=0;i<str->len;i++)
+   {
+      if ( str->value[i] == '\0' )
+         message->value[message->len++] = ' ';
+      else
+         message->value[message->len++] = str->value[i];
+   }
+   message->value[message->len++] = '"';
+
    printout( TSD, message );
    Free_stringTSD( message );
 }
@@ -606,6 +638,8 @@ void set_trace( tsd_t *TSD, const streng *setting )
    int cptr,error;
    tra_tsd_t *tt;
 
+   THREAD_PROTECT( trace_setting )
+
    if ( myisnumber( TSD, setting ) )
    {
       cptr = streng_to_int( TSD, setting, &error );
@@ -651,7 +685,11 @@ void set_trace( tsd_t *TSD, const streng *setting )
           */
          set_trace_char( TSD, setting->value[cptr] );
          if ( rx_isalpha( setting->value[cptr] ) )
-            return;
+            break;
       }
    }
+
+   THREAD_UNPROTECT( trace_setting )
+
+   return;
 }

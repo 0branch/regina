@@ -536,7 +536,7 @@ EXTNAME("RexxStart");
 #define RX_START_OK         0
 #define RX_START_BADP       1  /* Bad parameters */
 #define RX_START_UNIMPL     2  /* Not yet implemented :-) */
-#define RX_START_TOOMANYP   3  /* To many parameters */
+#define RX_START_TOOMANYP   3  /* Too many parameters */
 #define RX_DIDNT_START      4  /* Unable to start interpreter */
 
 APIRET APIENTRY RexxCallBack(

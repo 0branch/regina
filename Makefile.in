@@ -17,14 +17,16 @@ VER=@VERSION_NODOT@
 VERDOT=@VERSION@
 VERDOTUNQUOTED=@VERSION_UNQUOTED@
 VERSUPP=@VER_SUPP@
-REG_DIR=$(PACKAGE)-$(VERDOT)$(VERSUPP)
+#REG_DIR=$(PACKAGE)-$(VERDOT)$(VERSUPP)
+REG_DIR=$(PACKAGE)-$(VERDOT)
 DEBIAN_DIR=$(REG_DIR)/debian
 MYDISTRO=@MYDISTRO@
 MACH_ARCH=@MACH_ARCH@
 
 ABI_MAJOR=3
-ABI_MINOR=7
-ABI=$(ABI_MAJOR).$(ABI_MINOR)$(VERSUPP)
+ABI_MINOR=8
+#ABI=$(ABI_MAJOR).$(ABI_MINOR)$(VERSUPP)
+ABI=$(ABI_MAJOR).$(ABI_MINOR)
 
 datarootdir = @datarootdir@
 srcdir  = @srcdir@
@@ -38,7 +40,7 @@ bindir  = @bindir@
 includedir  = @includedir@
 mandir  = @mandir@
 datadir = @datadir@
-sharedir = $(datadir)/regina
+sharedir = $(datadir)/$(PACKAGE)
 addonsdir = @addonsdir@
 target = @target@
 gcidir = $(srcdir)/gci
@@ -53,7 +55,7 @@ CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 
 RANLIB_DYNAMIC = @RANLIB_DYNAMIC@
-CEXTRA = @CEXTRA@ @DLFCNINCDIR@ -DREGINA_SHARE_DIRECTORY=\"$(sharedir)\" @MH_UNSIGNED_CHAR_SWITCH@ -DREGINA_VERSION_DATE=\"@VER_DATE@\" -DREGINA_VERSION_MAJOR=\"@VER_MAJOR@\" -DREGINA_VERSION_MINOR=\"@VER_MINOR@\" -DREGINA_VERSION_SUPP=\"@VER_SUPP@\"
+CEXTRA = @CEXTRA@ @DLFCNINCDIR@ -DREGINA_SHARE_DIRECTORY=\"$(sharedir)\" @MH_UNSIGNED_CHAR_SWITCH@ -DREGINA_VERSION_DATE=\"@VER_DATE@\" -DREGINA_VERSION_MAJOR=\"@VER_MAJOR@\" -DREGINA_VERSION_MINOR=\"@VER_MINOR@\" -DREGINA_VERSION_SUPP=\"@VER_SUPP@\" -DREGINA_BITS=@bitflag@
 DEBUG = @DEBUG@
 DEBUGGING = @DEBUGGING@
 TRACEMEM = @TRACEMEM@
@@ -89,7 +91,6 @@ SHLPRE = @SHLPRE@
 SHLPST = @SHLPST@
 MODPST = @MODPST@
 BUNDLE = @BUNDLE@
-GETOPT = @GETOPT@
 REXXSOCKET = @REXXSOCKET@
 OBJECTS  = @OBJECTS@
 DYN_COMP = @DYN_COMP@
@@ -133,6 +134,7 @@ RPMTOPDIR = @RPMTOPDIR@
 HAVE_GCI = @HAVE_GCI@
 GCI_CONVERT_HEADER = @GCI_CONVERT_HEADER@
 REGUTIL_TERM_LIB=@REGUTIL_TERM_LIB@
+REGUTIL_MATH_LIB=@REGUTIL_MATH_LIB@
 
 MISCDEFS = -DHAVE_CONFIG_H $(HAVE_GCI) $(TRACEMEM) $(FLISTS) -I. -I$(srcdir) -I$(srcdir)/contrib $(SYS_DEFS) $(REXXSOCKET)
 LARGE_FILE_SUPPORT = @LARGE_FILE_SUPPORT@
@@ -162,9 +164,10 @@ CSRCFILES = $(REG_DIR)/funcs.c $(REG_DIR)/builtin.c $(REG_DIR)/error.c $(REG_DIR
 	$(REG_DIR)/mt_notmt.c $(REG_DIR)/mt_win??.c $(REG_DIR)/mt_posix.c $(REG_DIR)/mt_os2.c $(REG_DIR)/nosaa.c $(REG_DIR)/instore.c \
 	$(REG_DIR)/ntservice/service.c \
 	$(REG_DIR)/contrib/time64.c $(REG_DIR)/contrib/fnmatch.h $(REG_DIR)/contrib/fnmatch.c \
+	$(REG_DIR)/contrib/LibSha1.c $(REG_DIR)/contrib/LibSha1.h \
 	$(REG_DIR)/common/rxpack.c $(REG_DIR)/common/rxpack.h $(REG_DIR)/common/rxdef.h $(REG_DIR)/apphead.h \
 	$(REG_DIR)/common/*.nsh $(REG_DIR)/common/*.ico $(REG_DIR)/common/fixrc.rexx \
-	$(REG_DIR)/common/inc*.m4 \
+	$(REG_DIR)/common/*.m4 \
 	$(REG_DIR)/os2/*.c $(REG_DIR)/os2/*.def \
 	$(REG_DIR)/gci/*.c $(REG_DIR)/gci/*.h $(REG_DIR)/gci/00README \
 	$(REG_DIR)/gci/gci_convert.linux.* $(REG_DIR)/gci/gci_convert.win??.* $(REG_DIR)/gci/gci_convert.unsupported \
@@ -182,9 +185,10 @@ ZIP_CSRCFILES = funcs.c builtin.c error.c variable.c \
 	mt_notmt.c mt_win??.c mt_posix.c mt_os2.c nosaa.c instore.c \
 	ntservice/service.c \
 	contrib/time64.c contrib/fnmatch.h contrib/fnmatch.c \
+	contrib/LibSha1.c contrib/LibSha1.h \
 	common/rxpack.c common/rxpack.h common/rxdef.h apphead.h \
 	common/*.nsh common/*.ico common/fixrc.rexx \
-	common/inc*.m4 \
+	common/*.m4 \
 	os2/*.c os2/*.def \
 	gci/*.c gci/*.h gci/00README \
 	gci/gci_convert.linux.* gci/gci_convert.win??.* gci/gci_convert.unsupported \
@@ -197,7 +201,7 @@ OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ) library.$(OBJ) \
 	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) extstack.$(OBJ) \
 	yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) os_unx.$(OBJ) rexxbif.$(OBJ) \
-	wrappers.$(OBJ) $(ALLOCA) mt_notmt.$(OBJ) instore.$(OBJ) arxfuncs.$(OBJ)
+	wrappers.$(OBJ) $(ALLOCA) mt_notmt.$(OBJ) instore.$(OBJ) arxfuncs.$(OBJ) mygetopt.$(OBJ)
 
 SHOFILES = funcs.so.$(OBJ) builtin.so.$(OBJ) error.so.$(OBJ) variable.so.$(OBJ) \
 	interprt.so.$(OBJ) debug.so.$(OBJ) dbgfuncs.so.$(OBJ) memory.so.$(OBJ) parsing.so.$(OBJ) files.so.$(OBJ) \
@@ -206,7 +210,7 @@ SHOFILES = funcs.so.$(OBJ) builtin.so.$(OBJ) error.so.$(OBJ) variable.so.$(OBJ) 
 	strmath.so.$(OBJ) signals.so.$(OBJ) macros.so.$(OBJ) envir.so.$(OBJ) expr.so.$(OBJ) extstack.so.$(OBJ) \
 	yaccsrc.so.$(OBJ) lexsrc.so.$(OBJ) wrappers.so.$(OBJ) options.so.$(OBJ) os_unx.so.$(OBJ) rexxbif.so.$(OBJ) \
 	drexx.so.$(OBJ) client.so.$(OBJ) rexxsaa.so.$(OBJ) $(ALLOCA_SHO) $(STATICLD_SHO) $(MT_FILE).so.$(OBJ) instore.so.$(OBJ) arxfuncs.so.$(OBJ) \
-	$(GCI_SHO)
+	$(GCI_SHO) mygetopt.so.$(OBJ)
 
 REGUTILOBJ = inifile.$(OBJ) regcrypt.$(OBJ) regfilesys.$(OBJ) regini.$(OBJ) regmacrospace.$(OBJ) regscreenux.$(OBJ) regsemux.$(OBJ) regstem.$(OBJ) regunicode.$(OBJ) regutil.$(OBJ) rxsupport.$(OBJ) regtrig.$(OBJ) $(FNMATCH_SHO)
 
@@ -217,8 +221,8 @@ ZIP_DEMOFILES = $(ZIP_DEMODIR)/*.rexx regutil/*.rexx
 
 TRIPDIR = $(REG_DIR)/trip
 ZIP_TRIPDIR = trip
-TRIPFILES = $(TRIPDIR)/README $(TRIPDIR)/*.rexx $(TRIPDIR)/rc.c $(TRIPDIR)/std.c $(TRIPDIR)/true.c $(TRIPDIR)/vms.test $(TRIPDIR)/testing
-ZIP_TRIPFILES = $(ZIP_TRIPDIR)/README $(ZIP_TRIPDIR)/*.rexx $(ZIP_TRIPDIR)/rc.c $(ZIP_TRIPDIR)/std.c $(ZIP_TRIPDIR)/true.c $(ZIP_TRIPDIR)/vms.test $(ZIP_TRIPDIR)/testing
+TRIPFILES = $(TRIPDIR)/README $(TRIPDIR)/*.rexx $(TRIPDIR)/rc.c $(TRIPDIR)/std.c $(TRIPDIR)/true.c $(TRIPDIR)/filter.c $(TRIPDIR)/vms.test $(TRIPDIR)/testing
+ZIP_TRIPFILES = $(ZIP_TRIPDIR)/README $(ZIP_TRIPDIR)/*.rexx $(ZIP_TRIPDIR)/rc.c $(ZIP_TRIPDIR)/std.c $(ZIP_TRIPDIR)/true,c $(ZIP_TRIPDIR)/filter.c $(ZIP_TRIPDIR)/vms.test $(ZIP_TRIPDIR)/testing
 
 CONTRIBDIR = $(REG_DIR)/contrib
 ZIP_CONTRIBDIR = contrib
@@ -231,12 +235,12 @@ CONFFILES = $(REG_DIR)/configure.in $(REG_DIR)/config.h.in $(REG_DIR)/Makefile.i
 	$(REG_DIR)/install-sh $(REG_DIR)/common/config.guess $(REG_DIR)/common/config.sub $(REG_DIR)/aclocal.m4 \
 	$(REG_DIR)/configure $(REG_DIR)/descrip.mms $(REG_DIR)/build.com $(REG_DIR)/regina-config.in \
 	$(REG_DIR)/Regina.spec $(REG_DIR)/rxstack.init.d.in \
-	$(REG_DIR)/regina_*.ini $(REG_DIR)/regina.nsi.in $(REG_DIR)/regina.nsi.files $(REG_DIR)/regina.ver $(REG_DIR)/regina64.xpm
+	$(REG_DIR)/nsis/regina_*.ini $(REG_DIR)/regina.nsi.in $(REG_DIR)/regina.nsi.files $(REG_DIR)/regina.ver $(REG_DIR)/regina64.xpm
 ZIP_CONFFILES = configure.in config.h.in Makefile.in Makefile.aix.in \
 	install-sh common/config.guess common/config.sub aclocal.m4 \
 	configure descrip.mms build.com regina-config.in \
 	Regina.spec rxstack.init.d.in \
-	regina_*.ini regina.nsi.in regina.nsi.files regina.ver regina64.xpm
+	nsis/regina_*.ini regina.nsi.in regina.nsi.files regina.ver regina64.xpm
 
 EPOC32FILES = $(REG_DIR)/epoc32/bmarm/*.def \
 	$(REG_DIR)/epoc32/*.cpp $(REG_DIR)/epoc32/*.h \
@@ -282,12 +286,12 @@ ZIP_HFILES = rexx.h regina_c.h defs.h extern.h regina_t.h \
 
 CFILES = $(CSRCFILES) $(REG_DIR)/yaccsrc.c $(REG_DIR)/lexsrc.c $(REG_DIR)/execiser.c $(REG_DIR)/threader.c \
 	 $(REG_DIR)/rexxsaa.c $(REG_DIR)/rexx.c $(REG_DIR)/regina.c $(REG_DIR)/client.c \
-	 $(REG_DIR)/test1.c $(REG_DIR)/test2.c $(REG_DIR)/getopt.c \
+	 $(REG_DIR)/test1.c $(REG_DIR)/test2.c $(REG_DIR)/mygetopt.c $(REG_DIR)/mygetopt.h \
 	 $(REG_DIR)/rxqueue.c $(REG_DIR)/rxstack.c $(REG_DIR)/rexxbif.c $(REG_DIR)/extstack.c $(REG_DIR)/mac.c $(REG_DIR)/msgcmp.c \
 	 $(REG_DIR)/regutil/*.c $(REG_DIR)/regutil/*.h $(REG_DIR)/regutil/regutil.def
 ZIP_CFILES = $(ZIP_CSRCFILES) yaccsrc.c lexsrc.c execiser.c threader.c \
 	 rexxsaa.c rexx.c regina.c client.c \
-	 test1.c test2.c getopt.c \
+	 test1.c test2.c mygetopt.c mygetopt.h \
 	 rxqueue.c rxstack.c rexxbif.c extstack.c mac.c msgcmp.c \
 	 regutil/*.c regutil/*.h regutil/regutil.def
 DEBIANFILES = $(DEBIAN_DIR)/rules $(DEBIAN_DIR)/control $(DEBIAN_DIR)/changelog $(DEBIAN_DIR)/md5_sums \
@@ -313,8 +317,8 @@ rexx$(binarybitprefix)$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(STATIC_LDFLAGS) -o $@ $(OBJECTS) rexx.$(OBJ) nosaa.$(OBJ) $(STATIC_BINARY_LIBS) $(REXX_BINARY_LIBS)
 	$(LDEXTRA)
 
-regina$(binarybitprefix)$(EXE) : $(SHL_BASE) regina.$(OBJ) $(SHOFILES)
-	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ regina.$(OBJ) $(LINKREG) $(REGINA_BINARY_LIBS)
+regina$(binarybitprefix)$(EXE) : regina.$(OBJ) $(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ regina.$(OBJ)  $(REGINA_BINARY_LIBS)
 	$(LDEXTRA)
 
 execiser$(binarybitprefix)$(EXE) : execiser.$(OBJ) $(EXECISER_DEP)
@@ -325,12 +329,12 @@ threader$(binarybitprefix)$(EXE) : threader.$(OBJ) $(EXECISER_DEP)
 	$(PURIFY) $(CC) $(TSLINKOPT) $(LDFLAGS) -o $@ threader.$(OBJ) $(LINKSHL) $(THREADER_BINARY_LIBS)
 	$(LDEXTRA)
 
-rxstack$(binarybitprefix)$(EXE) : rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(GETOPT) $(STACK_BINARY_LIBS)
+rxstack$(binarybitprefix)$(EXE) : rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) mygetopt.$(OBJ) LibSha1.$(OBJ)
+	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxstack.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) mygetopt.$(OBJ) LibSha1.$(OBJ) $(STACK_BINARY_LIBS)
 	$(LDEXTRA)
 
-rxqueue$(binarybitprefix)$(EXE) : rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ)
-	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) $(GETOPT) $(STACK_BINARY_LIBS)
+rxqueue$(binarybitprefix)$(EXE) : rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) mygetopt.$(OBJ)
+	$(PURIFY) $(CC) $(LINKOPT) $(LDFLAGS) $(DYNAMIC_LDFLAGS) -o $@ rxqueue.$(OBJ) erexxbif.$(OBJ) eextstack.$(OBJ) mygetopt.$(OBJ) $(STACK_BINARY_LIBS)
 	$(LDEXTRA)
 
 $(LIBPRE)$(LIBFILE)$(LIBPST): $(OFILES) client.$(OBJ) drexx.$(OBJ) rexxsaa.$(OBJ)
@@ -347,7 +351,7 @@ $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI): $(SHOFILES)
 	-rm -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
 	-$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
 	-rm -f $(SHLPRE)$(SHLFILE)$(SHLPST)
-	-$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST)
+	-$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR) $(SHLPRE)$(SHLFILE)$(SHLPST)
 
 
 #
@@ -509,8 +513,8 @@ execiser.$(OBJ) : $(srcdir)/execiser.c $(srcdir)/rexx.h
 threader.$(OBJ) : $(srcdir)/threader.c $(srcdir)/rexxsaa.h
 	$(CC) $(COPTPROG) $(CC2O) -DPOSIX_THREADS -c $(srcdir)/threader.c
 
-getopt.$(OBJ) : $(srcdir)/getopt.c
-	$(CC) $(COPT) $(CC2O) -c $(srcdir)/getopt.c
+mygetopt.$(OBJ) : $(srcdir)/mygetopt.c
+	$(CC) $(COPT) $(CC2O) -c $(srcdir)/mygetopt.c
 
 alloca.$(OBJ) :    $(srcdir)/alloca.c
 	$(CC) $(COPT) $(CC2O) -c $(srcdir)/alloca.c
@@ -550,6 +554,9 @@ erexxbif.$(OBJ) : $(srcdir)/rexxbif.c $(srcdir)/rexxbif.h $(srcdir)/rexx.h
 	$(CC) -DEXTERNAL_TO_REGINA $(COPT) -c $(srcdir)/rexxbif.c
 	-mv rexxbif.$(OBJ) erexxbif.$(OBJ)
 	-mv rexxbif$(OSAVE) rexxbif.$(OBJ)
+
+LibSha1.$(OBJ) : $(srcdir)/contrib/LibSha1.c $(srcdir)/contrib/LibSha1.h
+	$(CC) $(COPT) -c $(srcdir)/contrib/LibSha1.c
 
 #
 # Rules for shared objects
@@ -836,6 +843,12 @@ instore.so.$(OBJ) : $(srcdir)/instore.c $(srcdir)/rexx.h
 	$(O2SHO)
 	$(SAVE2O)
 
+mygetopt.so.$(OBJ) : $(srcdir)/mygetopt.c $(srcdir)/rexx.h
+	$(O2SAVE)
+	$(CC) $(TSCOPT) $(CC2O) $(DYN_COMP) -c $(srcdir)/mygetopt.c
+	$(O2SHO)
+	$(SAVE2O)
+
 #
 # Rules for GCI objects
 #
@@ -930,7 +943,7 @@ regtrig.$(OBJ): $(regutildir)/regtrig.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(regutildir)/regtrig.c
 
 $(SHLPRE)regutil$(MODPST): $(REGUTILOBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(REGUTILEXP)
-	$(LD_RXLIB_UTILA) $(REGUTILEXPORTS) $(REGUTILOBJ) $(LD_RXLIB_UTILB) $(BOTHLIBS) $(REGUTIL_TERM_LIB)
+	$(LD_RXLIB_UTILA) $(REGUTILEXPORTS) $(REGUTILOBJ) $(LD_RXLIB_UTILB) $(BOTHLIBS) $(REGUTIL_TERM_LIB) $(REGUTIL_MATH_LIB)
 	$(RANLIB_DYNAMIC)
 
 
@@ -984,7 +997,13 @@ dist:
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 #	(cd $(srcdir);PWD=`pwd`;cd ..;ln -sf ${PWD} $(REG_DIR))
 	(cd $(srcdir)/..;ln -sf $(abs_srcdir) $(REG_DIR))
-	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > Regina-REXX-$(VERDOT)$(VERSUPP).tar.gz )
+	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > Regina-REXX-$(VERDOT).tar.gz )
+	(cd $(srcdir)/..;rm -f $(REG_DIR))
+
+bzip:
+	(cd $(srcdir)/..;rm -f $(REG_DIR))
+	(cd $(srcdir)/..;ln -sf $(abs_srcdir) $(REG_DIR))
+	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | bzip2 > Regina-REXX-$(VERDOT).tar.bz2 )
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 
 tar:
@@ -1010,14 +1029,11 @@ installbase: all
 	$(INSTALL) -m 755 -d $(DESTDIR)$(includedir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(sharedir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)/man1
-	$(INSTALL) -m 755 -c ./rexx$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
-	$(INSTALL) -m 755 -c ./rxqueue$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
-	$(INSTALL) -m 755 -c ./rxstack$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxstack$(binarybitprefix)$(EXE)
+	$(INSTALL) -s -m 755 -c ./rexx$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
+	$(INSTALL) -s -m 755 -c ./rxqueue$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
+	$(INSTALL) -s -m 755 -c ./rxstack$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxstack$(binarybitprefix)$(EXE)
 	$(INSTALL) -m 755 -c ./regina-config $(DESTDIR)$(bindir)/regina-config
-	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/rc.d/init.d/rxstack
-	@echo "The system startup/shutdown script; rxstack, may have been installed into $(sysconfdir)/rc.d/init.d"
-	@echo "You need to create the appropriate links to this script to start and stop rxstack automatically."
-	-$(INSTALL) -m 755 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
+	-$(INSTALL) -m 644 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	-$(RANLIB) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	$(INSTALL) -m 644 -c $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/regina.1
 	$(INSTALL) -m 644 -c $(srcdir)/regina-config.1 $(DESTDIR)$(mandir)/man1/regina-config.1
@@ -1050,27 +1066,32 @@ installbase: all
 	-chmod 755 $(DESTDIR)$(sharedir)/newstr.rexx
 
 installregina:
-	$(INSTALL) -m 755 -c ./regina$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
+	$(INSTALL) -s -m 755 -c ./regina$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
 	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/demo/dynfunc.rexx  $(DESTDIR)$(sharedir)/dynfunc.rexx
 	-chmod 755 $(DESTDIR)$(sharedir)/dynfunc.rexx
 	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/regutil/regutil.rexx  $(DESTDIR)$(sharedir)/regutil.rexx
 	-chmod 755 $(DESTDIR)$(sharedir)/regutil.rexx
 
 installlib: installregina
-	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
 
 installabilib: installregina
-	-$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
+	-$(INSTALL) -s -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
 	-(cd $(DESTDIR)$(libdir);$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR) )
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
-	-(cd $(DESTDIR)$(libdir);$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST) )
-	$(INSTALL) -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
-	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+	-(cd $(DESTDIR)$(libdir);$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR) $(SHLPRE)$(SHLFILE)$(SHLPST) )
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+
+installrxstack:
+	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/rxstack
+	@echo "The system startup/shutdown script; rxstack, may have been installed into $(sysconfdir)"
+	@echo "You need to create the appropriate links to this script to start and stop rxstack automatically."
 
 uninstall:
 	-rm -f $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
@@ -1090,6 +1111,7 @@ uninstall:
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
 	-rm -fr $(DESTDIR)$(sharedir)
+	-rm -f $(DESTDIR)$(sysconfdir)/rxstack
 
 # Note: beosinstall is not yet 'DESTDIRized'
 #
@@ -1137,13 +1159,12 @@ beosinstall: all
 	-chmod 755 /boot/home/config/bin/regutil.rexx
 
 cygwininstall: installbase installregina installlib
+# Need to create libregina.a
+	dlltool --def $(srcdir)/regina_w32_dll.def --dllname $(SHLPRE)$(SHLFILE)$(SHLPST) --output-lib $(DESTDIR)$(libdir)/libregina.a
 	mv $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
 	mv $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)regutil$(MODPST)
 	mv $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)rxtest1$(MODPST)
 	mv $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)rxtest2$(MODPST)
-#
-# Need to install libregina.a
-	$(INSTALL) -m 755 -c ./$(LIBPRE)$(SHLFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(SHLFILE)$(LIBPST)
 
 clean:
 	rm -f $(JUNK)
@@ -1190,50 +1211,51 @@ atheosbinary: all
 	(cd ./tmpdir; \
 	tar cvf - regina | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
 
-rpm: dist rpmtopdir
+rpm: bzip $(RPMTOPDIR)
 	cp $(srcdir)/regina64.xpm $(RPMTOPDIR)/SOURCES
-	cp $(srcdir)/../Regina-REXX-$(VERDOT)$(VERSUPP).tar.gz $(RPMTOPDIR)/SOURCES
-	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)*.rpm
-	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)*.rpm
-	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)*.rpm
+	cp $(srcdir)/../Regina-REXX-$(VERDOT).tar.bz2 $(RPMTOPDIR)/SOURCES
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)*.rpm
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)*.rpm
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)*.rpm
 	rpmbuild -ba --clean $(srcdir)/Regina.spec
-	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
-	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
-	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)$(VERSUPP)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
 	ls -l $(RPMTOPDIR)/RPMS/*/$(PACKAGE)*rpm
 
-rpmtopdir:
+$(RPMTOPDIR):
 	-mkdir -p $(RPMTOPDIR)/SOURCES
 	-mkdir -p $(RPMTOPDIR)/SRPMS
 	-mkdir -p $(RPMTOPDIR)/RPMS
-	-mkdir -p $(RPMTOPDIR)/RPMS/noarch
-	-mkdir -p $(RPMTOPDIR)/RPMS/i386
-	-mkdir -p $(RPMTOPDIR)/RPMS/i486
-	-mkdir -p $(RPMTOPDIR)/RPMS/i586
-	-mkdir -p $(RPMTOPDIR)/RPMS/i686
-	-mkdir -p $(RPMTOPDIR)/RPMS/athalon
 	-mkdir -p $(RPMTOPDIR)/BUILD
 	-mkdir -p $(RPMTOPDIR)/SPECS
+
+rpminstall: rpminstall-dev
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
+
+rpminstall-dev:
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
 
 #
 # Debian targets
 #
 install-lib: $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
-	$(INSTALL) -m 644 -c $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)/lib/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
-	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)/lib/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
-	$(INSTALL) -m 644 -c $(SHLPRE)regutil$(MODPST) $(prefix)/lib/regina/$(ABI)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -m 644 -c $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
+	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
+	$(INSTALL) -m 644 -c $(SHLPRE)regutil$(MODPST) $(prefix)$(libdir)/regina/$(ABI)/$(SHLPRE)regutil$(MODPST)
 
 install-dev: $(LIBPRE)$(LIBFILE)$(LIBPST)
 # header file
-	$(INSTALL) -c -m 644 $(srcdir)/rexxsaa.h $(prefix)/include/rexxsaa.h
+	$(INSTALL) -c -m 644 $(srcdir)/rexxsaa.h $(prefix)/usr/include/rexxsaa.h
 # libregina.a
-	$(INSTALL) -c -m 644 ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(prefix)/lib/$(LIBPRE)$(LIBFILE)$(LIBPST)
-	-$(RANLIB) $(prefix)/lib/$(LIBPRE)$(LIBFILE)$(LIBPST)
+	$(INSTALL) -c -m 644 ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(prefix)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
+	-$(RANLIB) $(prefix)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 # libregina.so.x -> libregina.so
-	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)/lib/$(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
 # regina-config
-	$(INSTALL) -m 755 -c ./regina-config $(prefix)/bin/regina-config
-	$(INSTALL) -c -m 644 $(srcdir)/regina-config.1 $(prefix)/share/man/man1/regina-config.1
+	$(INSTALL) -m 755 -c ./regina-config $(prefix)/usr/bin/regina-config
+	$(INSTALL) -c -m 644 $(srcdir)/regina-config.1 $(prefix)/usr/share/man/man1/regina-config.1
 
 install-rexx: rexx$(EXE) regina$(EXE)
 	$(INSTALL) -c -m 755 $(srcdir)/rexx $(prefix)/bin/rexx
@@ -1259,18 +1281,28 @@ install-rexx: rexx$(EXE) regina$(EXE)
 	   $(INSTALL) -c -m 644 $$i $(prefix)/share/regina-rexx/`basename $$i` ; \
 	done
 
+#	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOTUNQUOTED)$(VERSUPP).tar.gz; \
+
+
 deb: dist
 	-rm -fr tmp
 	-mkdir tmp
 	(cd tmp; \
-	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOTUNQUOTED)$(VERSUPP).tar.gz; \
+	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOTUNQUOTED).tar.gz; \
 	cd $(REG_DIR); \
 	dpkg-buildpackage -rfakeroot; \
 	cd ..; \
-	mv regina-rexx_$(VERDOTUNQUOTED)$(VERSUPP)*.deb `basename regina-rexx_$(VERDOTUNQUOTED)$(VERSUPP)*.deb .deb`-$(MYDISTRO).deb; \
-	mv libregina3_$(VERDOTUNQUOTED)$(VERSUPP)*.deb `basename libregina3_$(VERDOTUNQUOTED)$(VERSUPP)*.deb .deb`-$(MYDISTRO).deb; \
-	mv libregina3-dev_$(VERDOTUNQUOTED)$(VERSUPP)*.deb `basename libregina3-dev_$(VERDOTUNQUOTED)$(VERSUPP)*.deb .deb`-$(MYDISTRO).deb; \
+	mv regina-rexx_$(VERDOTUNQUOTED)*.deb `basename regina-rexx_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
+	mv libregina3_$(VERDOTUNQUOTED)*.deb `basename libregina3_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
+	mv libregina3-dev_$(VERDOTUNQUOTED)*.deb `basename libregina3-dev_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
 	ls -l )
+
+debinstall: debinstall-dev
+	sudo dpkg -i tmp/regina-rexx_$(VERDOTUNQUOTED)*-$(MYDISTRO).deb
+
+debinstall-dev:
+	sudo dpkg -i tmp/libregina3_$(VERDOTUNQUOTED)*-$(MYDISTRO).deb
+	sudo dpkg -i tmp/libregina3-dev_$(VERDOTUNQUOTED)*-$(MYDISTRO).deb
 
 #
 # dmg target builds the Mac installation package

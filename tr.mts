@@ -36,7 +36,6 @@
 # - And last but by no means least; thanks!
 #
 # TODO
-# 40.43
 # 40.44
 #
   0,  1,%s kaynaginda %s hatasi, satir no %d:|<value>,<source>,<linenumber>
@@ -158,8 +157,8 @@
  31,  3,Degisken sembolu bir nokta (".") ile baslamamalidir; bulunan "%s"|<token>
  32,  0,[Gecersiz dizinli degisken kullanimi]
  33,  0,Gecersiz ifade sonucu
- 33,  1,"%d" seklindeki NUMERIC DIGITS degeri en fazla "(%d)" seklindeki NUMERIC FUZZ degerine sahip olmalidir|<value>,<value>
- 33,  2,"%d" sekindeki NUMERIC DIGITS degeri %d degerine ulasmamalidir|<value>,#Limit_Digits
+ 33,  1,("%d") seklindeki NUMERIC DIGITS degeri en fazla ("%d") seklindeki NUMERIC FUZZ degerine sahip olmalidir|<value>,<value>
+ 33,  2,("%d") sekindeki NUMERIC DIGITS degeri %d degerine ulasmamalidir|<value>,#Limit_Digits
  33,  3,Izleyen NUMERIC FORM ifadesinin sonucu "E" veya "S" ile baslamalidir; bulunan "%s"|<value>
  34,  0,Mantiksal deger "0" veya "1" degildir
  34,  1,Izleyen IF anahtar kelimesi ifadesinin degeri kesinlikle "0" veya "1" olmalidir; bulunan "%s"|<value>
@@ -211,7 +210,7 @@
  40, 39,3. siradaki %s degistirgesi sifir (0) ya da bir (1) degildir; bulunan "%s"|<bif>,<value>
  40, 41,%s degistirgesini iceren %d. siradaki oge, akim (dosya) sinirsal degerleri icerisinde yer almalidir; bulunan "%s"|<bif>,<argnumber>,<value>
  40, 42,1. siradaki %s degistirgesi bu akim (dosya) uzerinde konumlandirilamaz; bulunan "%s"|<bif>,<value>
- 40, 43,%s argument %d must be a single non-alphanumeric character or the null string; found "%s"|<bif>,<argnumber>,<value>
+ 40, 43,%s siradaki %d olmayan tek bir alfanümerik karakter veya bos dize olmalidir; bulunan "%s"|<bif>,<argnumber>,<value>
  40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s degistirgesini iceren %d. siradaki oge, "%s" ogelerinden birisi olmalidir; bulunan "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: dusuk-seviye akim (dosya) G/C hatasi; %s]|<bif>,<description>
@@ -314,6 +313,9 @@
 #
 # Extra general phrases requiring translation:
 # The text in () is the corresponding array name in error.c
+P,  0,%d hatasi "%.*s" calisiyorken %d numarali satirda olustu: %.*s
+P,  1,Hata %d.%d: %.*s
+P,  2,%d hatasi "%.*s" calisiyorken olustu: %.*s
 #
 # (err1prefix)   "%d hatasi \"%.*s\" calisiyorken %d numarali satirda olustu: %.*s",
 # (suberrprefix) "Hata %d.%d: %.*s",

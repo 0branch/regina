@@ -454,6 +454,15 @@ const char *system_type( void )
    return "EPOC32-WINS" ;
 #elif defined(__EPOC32__)
    return "EPOC32-MARM" ;
+#elif defined(__APPLE__) && defined(__MACH__)
+# include <TargetConditionals.h>
+# if TARGET_IPHONE_SIMULATOR == 1
+   return "iOS (Simulator)" ;
+# elif TARGET_OS_IPHONE == 1
+   return "iOS" ;
+# elif TARGET_OS_MAC == 1
+   return "UNIX" ;
+# endif
 #else
    return "UNIX" ;
 #endif

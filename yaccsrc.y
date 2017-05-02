@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.41 2012/08/08 01:18:44 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.42 2013/06/29 07:09:45 mark Exp $";
 #endif
 
 /*
@@ -119,7 +119,7 @@ static void move_labels( nodeptr front, nodeptr end, int level );
 %token ADDRESS ARG CALL DO TO BY FOR WHILE UNTIL EXIT IF THEN ELSE
 %token ITERATE INTERPRET LEAVE NOP NUMERIC PARSE EXTERNAL SOURCE VAR
 %token VALUE WITH PROCEDURE EXPOSE PULL PUSH QUEUE SAY RETURN SELECT
-%token WHEN DROP OTHERWISE SIGNAL ON OFF ERROR SYNTAX HALT NOVALUE
+%token WHEN DROP OTHERWISE SIGNAL ON OFF SYNTAX HALT NOVALUE
 %token TRACE END UPPER ASSIGNMENTVARIABLE STATSEP FOREVER DIGITS FORM
 %token FUZZ SCIENTIFIC ENGINEERING NOT CONCATENATE MODULUS GTE GT LTE
 %token LT DIFFERENT EQUALEQUAL NOTEQUALEQUAL OFFSET SPACE EXP XOR
@@ -941,6 +941,7 @@ signal_name  : asymbol                 { $$ = $1; }
              ;
 
 namespec    : NAME SIMSYMBOL           { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue);}
+            | NAME STRING              { $$ = (nodeptr)Str_cre_TSD(parser_data.TSD,retvalue) ; }
             | NAME error               { exiterror( ERR_STRING_EXPECTED, 3, __reginatext ) ;}
             ;
 

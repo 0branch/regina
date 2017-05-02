@@ -85,6 +85,8 @@ if sysfilesearch( 'sysfilesearch','regutil/regfilesys.c','NOODLE.', 'n' ) = 0 th
       end
 
 say 'SysPi' SysPi()
+say 'SysCos(30)' SysCos(30,5,'D')
+say 'SysSin(30)' SysSin(30)
 say 'SysDropFuncs' SysDropFuncs()
 Return
 

@@ -28,5 +28,6 @@ SRCDIR=$(REGINA_SRCDIR)
 LARCH=w64
 BARCH=W64
 WARCH=win64
-MACH=X64
+MACH=x64
+BITS=64
 !include $(SRCDIR)\makefile.win.vc

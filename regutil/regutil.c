@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regutil.c,v 1.5 2012/08/08 01:24:52 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regutil.c,v 1.6 2013/10/11 06:19:03 mark Exp $
  */
 #ifdef _WIN32
 # include <windows.h>
@@ -143,6 +143,7 @@ struct {
     {"SYSARCSIN", sysarcsin},
     {"SYSARCCOS", sysarccos},
     {"SYSARCTAN", sysarctan},
+    {"SYSARCTAN2",sysarctan2},
     {"SYSLOADFUNCS", sysloadfuncs},
     {"SYSDROPFUNCS", sysdropfuncs}
 };

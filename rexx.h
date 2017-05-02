@@ -21,6 +21,15 @@
 
 #include "wrappers.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+# undef REGINA_BITS
+# if defined(__x86_64__) || defined(__ppc64__)
+#  define REGINA_BITS 64
+# else
+#  define REGINA_BITS 32
+# endif
+#endif
+
 /* Things you might want to change .... (at your own risk!!!) */
 
 /*
@@ -130,11 +139,23 @@
 /* #define STACKSIZE 400 not used ? */           /* Was 256, then 512 (too much)         */
 /*
  * If you increase BUFFERSIZE you MUST ensure that YY_BUF_SIZE in lexsrc.c
- * is made larger that BUFFERSIZE.
+ * is made larger than BUFFERSIZE.
  * Increasing this value will slow down parsing a bit.
  */
 #define BUFFERSIZE 100000 /* Was 512 */ /* Size of input buffer, longest line   */
 #define LOOKAHEAD 256           /* Size of input lookahead              */
+
+/*
+ * Buffer size for reading/writing with ADDRESS SYSTEM ... WITH
+ * REGINA_MAX_BUFFER_SIZE must be larger than REGINA_BUFFER_SIZE.
+ * Keep it on a page size for best performance in unix systems.
+ */
+#if defined(__WINS__) || defined(__EPOC32__)
+# define REGINA_BUFFER_SIZE     128
+#else
+# define REGINA_BUFFER_SIZE  0x1000
+#endif
+#define REGINA_MAX_BUFFER_SIZE REGINA_BUFFER_SIZE * 2
 
 #define SMALLSTR 5              /* For holding small integers           */
 #define NULL_STR_LENGTH 1

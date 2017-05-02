@@ -203,6 +203,21 @@ tsd_t *ReginaInitializeProcess(void)
    return(&__regina_tsd);
 }
 
+int __regina_get_number_concurrent_regina_threads(void)
+{
+   return 1;
+}
+
+tsd_t *__regina_get_tsd_for_threadid( unsigned long threadid )
+{
+   return &__regina_tsd;
+}
+
+tsd_t *__regina_get_next_tsd( int idx )
+{
+   return &__regina_tsd;
+}
+
 
 #ifdef TRACK_TSD_USAGE
 /* We may want to check the counts of calls to __regina_get_tsd() which may do

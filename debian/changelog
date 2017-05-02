@@ -1,3 +1,17 @@
+regina (3.8-1) unstable; urgency=low
+
+  * Fix for Bugs #390, #412, #403, #397, #417, #415, #421, #420, #427, #407, #420, #389, #426
+  * Fix for bug #419 - conversion from TIME('T') and DATE('T') now returns local time as
+    per documentation. Previous versions returned UTC time, so this change may cause breakage!!
+  * Moved all native language error messages into *.mts files. *.mts files now stored as UTF-8
+  * Error messages returned as a result of processing a native language file will be in English
+    as it is not possible to store UTF-8 strings in source code in a portable manner.
+  * Added new logical not operator; ¬ (hex value 'AC'x)
+  * Windows installer now allows 32bit and 64bit versions of Regina to be installed on the one machine.
+  * Consistency with common switches for all executables. Long options also supported.
+
+ -- Mark Hessling <mark@rexx.org>  Thu,  4 Jun 2014 01:50:00 +1000
+
 regina (3.7-1) unstable; urgency=low
 
   * Significant performance improvement with LINES BIF on large files; fixes bug 2663478.

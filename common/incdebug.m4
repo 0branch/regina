@@ -29,11 +29,11 @@ else
    if test "$cflags_O" = "0"; then
       CFLAGS="${CFLAGS} -O"
    fi
-   if test "$cflags_g" != "0"; then
-      CFLAGS="`echo ${CFLAGS} | sed -e s/-g//`"
+   if test "$cflags_g" = "0"; then
+      CFLAGS="${CFLAGS} -g"
    fi
 fi
-if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
    if test "$with_debug" = yes; then
       CFLAGS="${CFLAGS} -Wall"
    else

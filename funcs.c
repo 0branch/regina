@@ -145,8 +145,8 @@ static const struct function_type functions[] = {
 #ifdef HAVE_GCI
   { EXT_REGINA_BIFS,rex_gciprefixchar,     "GCIPREFIXCHAR" },
 #endif
-  { EXT_REGINA_BIFS,unx_getenv,            "GETENV" },
   { EXT_REGINA_BIFS,rex_getcallstack,      "GETCALLSTACK" },
+  { EXT_REGINA_BIFS,unx_getenv,            "GETENV" },
   { EXT_REGINA_BIFS,unx_getpath,           "GETPATH" },
   { EXT_REGINA_BIFS,unx_getpid,            "GETPID" },
   { EXT_AREXX_BIFS, arexx_getspace,        "GETSPACE" },
@@ -976,7 +976,7 @@ int convert_date(tsd_t *TSD, const streng *suppdate, char suppformat, struct tm 
          num64 = streng_to_rx64( TSD, suppdate, &rc );
          if ( rc )
             return 1;
-         tmpTime = gmtime( (time_t *)&num64 );
+         tmpTime = localtime( (time_t *)&num64 );
          *indate = *tmpTime;
          indate->tm_year += 1900;
          /*
@@ -1199,7 +1199,7 @@ int convert_time( const tsd_t *TSD, const streng *supptime, char suppformat, str
          num64 = streng_to_int( TSD, supptime, &rc );
          if ( rc )
             return 1;
-         tmpTime = gmtime( (time_t *)&num64 );
+         tmpTime = localtime( (time_t *)&num64 );
          *intime = *tmpTime;
          *unow = 0;
          break;

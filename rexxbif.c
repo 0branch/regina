@@ -86,3 +86,15 @@ streng *Rexx_d2x( const tsd_t *TSD, int num )
    }
    return out;
 }
+
+streng *Rexx_upper( const tsd_t *TSD, streng *str )
+{
+   int i;
+
+   for ( i = 0; i < PSTRENGLEN( str ); i++ )
+   {
+      if ( islower( str->value[i] ) )
+         str->value[i] = (char)toupper( str->value[i] );
+   }
+   return str;
+}

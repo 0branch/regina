@@ -564,7 +564,7 @@ if test "$ac_cv_header_dlfcn_h" = "yes" -o "$HAVE_DLFCN_H" = "1"; then
    [mh_cv_uscore=no],
    [mh_cv_uscore=no]
    )
-   ])
+   ],[mh_cv_uscore=yes],[mh_cv_uscore=no],mh_cv_uscore=no)
    ])
    AC_MSG_RESULT($mh_cv_uscore)
    if test "x$mh_cv_uscore" = "xyes"; then
@@ -847,7 +847,7 @@ case "$target" in
                 AC_DEFINE(SELECT_IN_TIME_H)
                 ;;
         *hp-hpux*)
-                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                   SYS_DEFS="-D_HPUX_SOURCE"
                 else
                   SYS_DEFS="-D_HPUX_SOURCE +e" # Extended ANSI mode for c89
@@ -861,7 +861,7 @@ case "$target" in
                 DYN_COMP="-DDYNAMIC"
                 ;;
         *dec-osf*)
-                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                         SYS_DEFS="-D_POSIX_SOURCE -D_XOPEN_SOURCE"
                 else
                         SYS_DEFS="-D_POSIX_SOURCE -D_XOPEN_SOURCE -Olimit 800"
@@ -953,6 +953,7 @@ SHL_BASE="${SHLPRE}${SHLFILE}${SHLPST}"
 # by default; ie. no .\$(ABI) suffix. If the regina executable is not built,
 # then there is no shared library. Set OTHER_INSTALLS="installabilib" if you
 # are building a version numbered shared library.
+RXSTACK_INSTALL="installrxstack"
 OTHER_INSTALLS="installlib"
 BASE_INSTALL="installbase"
 BASE_BINARY="binarybase"
@@ -1088,7 +1089,7 @@ case "$target" in
                 SHL_LD="ld -dy -G -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
         *solaris*)
-                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                    LD_RXLIB_A1="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
                    LD_RXLIB_A2="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
                    LD_RXLIB_UTILA="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
@@ -1116,7 +1117,7 @@ case "$target" in
                 SHL_LD="ld -assert pure-text -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 ;;
         *-freebsd* | *openbsd*)
-                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                    LD_RXLIB_A1="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
                    LD_RXLIB_A2="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
                    LD_RXLIB_UTILA="$ac_cv_prog_CC -shared ${LDFLAGS} -o \$(@)"
@@ -1228,14 +1229,14 @@ case "$target" in
                 LIBFILE="rexx"
                 ;;
         *cygwin*)
-                LD_RXLIB_A1="dllwrap --target i386-cygwin32 --def ${srcdir}/test1_w32_dll.def --dllname rxtest1.dll -o \$(@)"
-                LD_RXLIB_A2="dllwrap --target i386-cygwin32 --def ${srcdir}/test2_w32_dll.def --dllname rxtest2.dll -o \$(@)"
-                LD_RXLIB_UTILA="dllwrap --target i386-cygwin32 --def ${srcdir}/regutil/regutil.def --dllname regutil.dll -o \$(@)"
+                LD_RXLIB_A1="${CC} -shared -o \$(@)"
+                LD_RXLIB_A2="${CC} -shared -o \$(@)"
+                LD_RXLIB_UTILA="${CC} -shared -o \$(@)"
                 LD_RXLIB_B1="-L. -lregina"
                 LD_RXLIB_B2="-L. -lregina"
                 LD_RXLIB_UTILB="-L. -lregina"
                 SHLPRE=""
-                SHL_LD="dllwrap --def ${srcdir}/regina_w32_dll.def --output-lib libregina.a --target i386-cygwin32 --dllname regina.dll -o regina.dll \$(SHOFILES)"
+                SHL_LD="${CC} -shared -o \$(@) -o regina.dll \$(SHOFILES)"
                 EEXTRA=""
                 LIBPRE="lib"
                 LIBPST=".a"
@@ -1250,6 +1251,7 @@ case "$target" in
                 REGUTILEXP="${srcdir}/regutil/regutil.def"
                 BASE_INSTALL="cygwininstall"
                 OTHER_INSTALLS=""
+                RXSTACK_INSTALL=""
                 ;;
         *apple-darwin*)
                 # to test on platform other than real Mac OSX use: --build=ppc-apple-darwin10.1 --target=ppc-apple-darwin10.1
@@ -1330,6 +1332,10 @@ else
    OTHER_INSTALLS=""
    AC_MSG_RESULT("no")
 fi
+#
+# Add $RXSTACK_INSTALL
+#
+OTHER_INSTALLS="$OTHER_INSTALLS $RXSTACK_INSTALL"
 
 if test "$AIX_DYN" = "yes"; then
    STATICLIB=""
@@ -1450,7 +1456,7 @@ case "$target" in
 #                STATIC_LDFLAGS="-bnso -bI:/lib/syscalls.exp"
                 ;;
         *dec-osf*)
-                if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
+               if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
                    SYS_DEFS="-D_POSIX_SOURCE -D_XOPEN_SOURCE"
                 else
                    SYS_DEFS="-D_POSIX_SOURCE -D_XOPEN_SOURCE -Olimit 800"
@@ -1815,16 +1821,16 @@ dnl Determines whether compiler supports long long
 dnl ---------------------------------------------------------------------------
 AC_DEFUN([MH_C_LONG_LONG],
 [AC_CACHE_CHECK(for long long int, mh_cv_c_long_long,
-[if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++"; then
-  mh_cv_c_long_long=yes
+ [if test "$ac_cv_prog_CC" = "gcc" -o "$ac_cv_prog_CC" = "g++" -o "$ac_cv_prog_CC" = "clang"; then
+    mh_cv_c_long_long=yes
   else
-        AC_TRY_COMPILE(,[long long int i;],
-   mh_cv_c_long_long=yes,
-   mh_cv_c_long_long=no)
-   fi])
-   if test $mh_cv_c_long_long = yes; then
-     AC_DEFINE(HAVE_LONG_LONG, 1, [compiler understands long long])
-   fi
+    AC_TRY_COMPILE(,[long long int i;],
+      mh_cv_c_long_long=yes,
+      mh_cv_c_long_long=no)
+  fi])
+ if test $mh_cv_c_long_long = yes; then
+   AC_DEFINE(HAVE_LONG_LONG, 1, [compiler understands long long])
+ fi
 ])
 
 dnl ---------------------------------------------------------------------------

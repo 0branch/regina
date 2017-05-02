@@ -31,9 +31,18 @@ struct textindex
  * displayed instead of a real error message.
  */
 #define NUMBER_ERROR_MESSAGES 269
+#define NUMBER_PREFIX_MESSAGES  3
 
 /*
  * Default language index
  */
 #define LANGUAGE_ENGLISH     0
 
+/*
+ * Format of .mtb files:
+ * uint - number of messages (must match NUMBER_ERROR_MESSAGES)
+ * uint - language index (see errlang[] in error.c)
+ **uint - number of prefix lines (must match NUMBER_PREFIX_MESSAGES)
+ * struct textindexs (number messages + number prefix lines)
+ * char * error mesage text and prefix text in one chunk
+ */

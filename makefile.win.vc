@@ -24,7 +24,7 @@ VERDATE = $(VER_DATE)
 CC = cl
 
 !if "$(DEBUG)" == "Y"
-EEXTRA = /DEBUG
+EEXTRA = /DEBUG /MACHINE:$(MACH)
 DEBUGFLAG  = /Zi /Od /J /DDEBUG #/DREGINA_DEBUG_MEMORY /DREGINA_DEBUG_MEMORY1 /DREGINA_DEBUG_MEMORY2 /DREGINA_DEBUG_MEMORY3
 OPTIMIZE =
 ! if "$(TRACEMEM)" == "Y"
@@ -34,7 +34,7 @@ MEMTRACE =
 TRACEMEM = N
 ! endif
 !else
-EEXTRA = /release /PDB:nul /incremental:no
+EEXTRA = /release /PDB:nul /incremental:no /MACHINE:$(MACH)
 DEBUGFLAG  = /DNDEBUG
 OPTIMIZE = /Ox /J #-O2gityb1 -J
 DEBUG = N
@@ -85,7 +85,7 @@ LD_RXLIB2= /DEF:$(SRCDIR)\test2_$(LARCH)_dll.def
 LD_REGUTIL = /PDB:regutil.pdb /DEF:$(REGUTILSRCDIR)\regutil.def $(EEXTRA)
 MV= -ren
 #
-CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\" -D_CRT_SECURE_NO_WARNINGS
+CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\" -D_CRT_SECURE_NO_WARNINGS -DREGINA_BITS=$(BITS)
 
 CC2O=-Fo$@
 #
@@ -130,7 +130,7 @@ OFILES = funcs.obj builtin.obj error.obj variable.obj \
         tracing.obj interp.obj cmath.obj convert.obj strings.obj library.obj \
         strmath.obj signals.obj macros.obj envir.obj expr.obj instore.obj rexxbif.obj \
         yaccsrc.obj lexsrc.obj options.obj os_win.obj wrappers.obj mt_notmt.obj time64.obj \
-        os_other.obj
+        os_other.obj mygetopt.obj
 
 TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj extstack.ts.obj rexxbif.ts.obj \
         interprt.ts.obj debug.ts.obj dbgfuncs.ts.obj memory.ts.obj parsing.ts.obj files.ts.obj \
@@ -139,7 +139,7 @@ TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj extstack.ts.o
         strmath.ts.obj signals.ts.obj macros.ts.obj envir.ts.obj expr.ts.obj instore.ts.obj \
         yaccsrc.ts.obj lexsrc.ts.obj wrappers.ts.obj options.ts.obj os_win.ts.obj \
         rexx.ts.obj client.ts.obj rexxsaa.ts.obj mt_$(WARCH).ts.obj time64.ts.obj \
-        os_other.ts.obj $(GCI_SHO)
+        os_other.ts.obj $(GCI_SHO) mygetopt.ts.obj
 
 STATFILES = funcs.stat.obj builtin.stat.obj error.stat.obj variable.stat.obj extstack.stat.obj rexxbif.stat.obj \
         interprt.stat.obj debug.stat.obj dbgfuncs.stat.obj memory.stat.obj parsing.stat.obj files.stat.obj \
@@ -148,7 +148,7 @@ STATFILES = funcs.stat.obj builtin.stat.obj error.stat.obj variable.stat.obj ext
         strmath.stat.obj signals.stat.obj macros.stat.obj envir.stat.obj expr.stat.obj instore.stat.obj \
         yaccsrc.stat.obj lexsrc.stat.obj wrappers.stat.obj options.stat.obj os_win.stat.obj\
         rexx.stat.obj client.stat.obj rexxsaa.stat.obj mt_$(WARCH).stat.obj time64.stat.obj \
-        os_other.stat.obj $(GCI_SHO)
+        os_other.stat.obj $(GCI_SHO) mygetopt.stat.obj
 
 REGUTILOFILES = regfilesys.obj regini.obj regmacrospace.obj regscreen.obj \
                 regsem.obj regutil.obj rxsupport.obj random.obj regstem.obj regwin.obj \
@@ -213,11 +213,11 @@ regina.exe : regina.dll regina.obj regina$(LARCH)exe.obj
 execiser.exe : execiser.obj regina.dll
          $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:execiser.exe execiser.obj $(LIBLINK)
 
-rxqueue.exe : rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxqueue.exe rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj $(WINSOCK)
+rxqueue.exe : rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj mygetopt.obj
+         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxqueue.exe rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj mygetopt.obj $(WINSOCK)
 
-rxstack.exe : rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxstack.exe rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj $(WINSOCK) $(SERVICELIBS)
+rxstack.exe : rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj LibSha1.obj mygetopt.obj
+         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxstack.exe rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj LibSha1.obj mygetopt.obj $(WINSOCK) $(SERVICELIBS)
 
 threader.exe : threader.obj regina.dll
          $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:threader.exe threader.obj $(LIBLINK)
@@ -388,7 +388,7 @@ rxqueue.obj : $(SRCDIR)/rxqueue.c $(SRCDIR)/rexx.h
         $(CC) -DEXTERNAL_TO_REGINA $(COPT) $(CC2O) -c $(SRCDIR)/rxqueue.c
 
 rxstack.obj : $(SRCDIR)/rxstack.c $(SRCDIR)/rexx.h $(SRCDIR)/ntservice/service.h
-        $(CC) -DEXTERNAL_TO_REGINA -DBUILD_NT_SERVICE -I$(SRCDIR)/ntservice $(TSCOPT) $(CC2O) -c $(SRCDIR)/rxstack.c
+        $(CC) -DEXTERNAL_TO_REGINA -DBUILD_NT_SERVICE -I$(SRCDIR)/ntservice -I$(SRCDIR)/contrib/win $(TSCOPT) $(CC2O) -c $(SRCDIR)/rxstack.c
 
 service.obj : $(SRCDIR)/ntservice/service.c $(SRCDIR)/ntservice/service.h
         $(CC) -I$(SRCDIR)/ntservice $(TSCOPT) $(CC2O) -c $(SRCDIR)/ntservice/service.c
@@ -413,6 +413,12 @@ eextstack_mt.obj : $(SRCDIR)/extstack.c $(SRCDIR)/rexx.h
 
 time64.obj : $(SRCDIR)/contrib/time64.c $(SRCDIR)/rexx.h $(SRCDIR)/contrib/time64.h
         $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/contrib/time64.c
+
+LibSha1.obj : $(SRCDIR)/contrib/LibSha1.c $(SRCDIR)/contrib/LibSha1.h
+        $(CC) $(COPT) $(CC2O) -c -I$(SRCDIR)/contrib/win $(SRCDIR)/contrib/LibSha1.c
+
+mygetopt.obj : $(SRCDIR)/mygetopt.c
+        $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/mygetopt.c
 
 #
 # Rules for thread-safe shared objects
@@ -576,6 +582,9 @@ gci_tree.ts.obj : $(SRCDIR)/gci/gci_tree.c $(GCIHEADERS)
 time64.ts.obj : $(SRCDIR)/contrib/time64.c $(SRCDIR)/rexx.h $(SRCDIR)/contrib/time64.h
         $(CC) $(TSCOPT) $(CC2O) -c $(SRCDIR)/contrib/time64.c
 
+mygetopt.ts.obj : $(SRCDIR)/mygetopt.c
+        $(CC) $(TSCOPT) $(CC2O) -c $(SRCDIR)/mygetopt.c
+
 #
 # Rules for Regutil
 #
@@ -706,15 +715,15 @@ rxtest2.lib: test2.obj
 # Rules for resource files and version details
 # We use the temporary rexx executable; trexx.exe
 #
-.\reginadll.rc: $(SRCDIR)\regina.ver $(SRCDIR)\regina$(LARCH)dll.rc
+.\reginadll.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\regina$(LARCH)dll.rc
    .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\regina$(LARCH)dll.rc $@ $(VERDOT) $(VERDATE)
-.\reginaexe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\regina$(LARCH)exe.rc
+.\reginaexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\regina$(LARCH)exe.rc
    .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\regina$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
-.\rxstackexe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\rxstack$(LARCH)exe.rc
+.\rxstackexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rxstack$(LARCH)exe.rc
    .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxstack$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
-.\rxqueueexe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\rxqueue$(LARCH)exe.rc
+.\rxqueueexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rxqueue$(LARCH)exe.rc
    .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxqueue$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
-.\rexxexe.rc: $(SRCDIR)\regina.ver $(SRCDIR)\rexx$(LARCH)exe.rc
+.\rexxexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rexx$(LARCH)exe.rc
    .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rexx$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
 
 #
@@ -760,12 +769,13 @@ zip:
 # Build NSIS package...
 #
 exe: all
-	copy $(SRCDIR)\regina_ss.ini .
-	copy $(SRCDIR)\regina_fa.ini .
-	copy $(SRCDIR)\regina_mt.ini .
+	copy $(SRCDIR)\nsis\regina_ap.ini .
+	copy $(SRCDIR)\nsis\regina_ss.ini .
+	copy $(SRCDIR)\nsis\regina_fa.ini .
+	copy $(SRCDIR)\nsis\regina_mt.ini .
 	rexx $(COMMONSRCDIR)\generatensi.rexx $(SRCDIR)\regina.nsi.in $(SRCDIR)\regina.nsi.files .\regina.nsi
 	copy $(SRCDIR)\common\uninstall.ico .
-	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DVERSUPP=$(VER_SUPP) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) /DARCH=$(LARCH) regina.nsi
+	makensis /DVERSION=$(VERDOT) /DNODOTVER=$(VER) /DVERSUPP=$(VER_SUPP) /DSRCDIR=$(SRCDIR) /DDOCDIR=$(REGINA_DOCDIR) /DARCH=$(LARCH) /DMACH=$(MACH) regina.nsi
 
 binary: all
 	-mkdir dist
@@ -797,3 +807,8 @@ binary: all
 	-del ..\Regina*$(LARCH).zip
 	zip -r ..\Regina$(VER)$(VER_SUPP)$(LARCH) *
 	cd ..
+#
+# Cleanup
+#
+clean:
+	del *.obj *.exe *.dll *.lib *.exp *.res *.mtb gci_convert.h
