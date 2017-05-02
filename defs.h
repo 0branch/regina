@@ -392,7 +392,8 @@
 #define POOL0_RS              4
 #define POOL0_MN              5
 #define POOL0_LINE            6
-#define POOL0_ENDOFLINE       7
+#define POOL0_FILE            7
+#define POOL0_ENDOFLINE       8
 #define POOL0_CNT             ( POOL0_ENDOFLINE + 1 )
 
 /*

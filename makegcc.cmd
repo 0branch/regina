@@ -2,7 +2,7 @@
 Parse arg ver .
 If ver = '' Then
  Do
-    Say 'Must supply version: eg 20'
+    Say 'Must supply version: eg 382'
     Exit
  End
 SRC = Translate(Value('REGINA_SRCDIR',,'OS2ENVIRONMENT'),'\','/')
@@ -45,5 +45,5 @@ If Translate( here ) \= Translate( src ) Then
 'copy ..\*.mtb nls'
 'mkdir doc'
 'copy ..\..\doc\*.pdf doc'
-'zip -r Regina' || ver || 'os2 *'
+'zip -r Regina' || ver || 'os2.zip *'
 'cd ..\..'

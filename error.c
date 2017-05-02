@@ -29,7 +29,8 @@
 #include <sys/stat.h>
 #include "rexxmsg.h"
 
-#define MAX_ET_BUFFERS 5
+/* MAX_ET_BUFFERS is the maximum number of strings required to be allocated when an error occurs */
+#define MAX_ET_BUFFERS 10
 typedef struct /* err_tsd: static variables of this module (thread-safe) */
 {
    int number_messages;
@@ -419,6 +420,10 @@ static void clear_buffers( const tsd_t *TSD )
       if ( et->buffer[idx] != NULL )
       {
          Free_stringTSD( et->buffer[idx] );
+         /*
+          * Fix for Bug #436. Enable system exit to trap parsing errors
+          */
+         et->buffer[idx] = NULL;
       }
    }
 }

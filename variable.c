@@ -523,6 +523,7 @@ int known_reserved_variable( const char *name, unsigned length )
    RET_IF( RS );
    RET_IF( MN );
    RET_IF( LINE );
+   RET_IF( FILE );
    RET_IF( ENDOFLINE );
 #undef REF_IF
 
@@ -1203,6 +1204,7 @@ int init_vars( tsd_t *TSD )
    vt->pool0nodes[POOL0_RS][0].name     = Str_creTSD( ".RS" );
    vt->pool0nodes[POOL0_MN][0].name     = Str_creTSD( ".MN" );
    vt->pool0nodes[POOL0_LINE][0].name   = Str_creTSD( ".LINE" );
+   vt->pool0nodes[POOL0_FILE][0].name   = Str_creTSD( ".FILE" );
    vt->pool0nodes[POOL0_ENDOFLINE][0].name   = Str_creTSD( ".ENDOFLINE" );
    for ( i = 0; i < POOL0_CNT; i++ )
    {

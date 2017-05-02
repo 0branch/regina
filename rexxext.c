@@ -87,6 +87,40 @@ streng *rex_userid( tsd_t *TSD, cparamboxptr parms )
 #endif
 }
 
+/*
+ * Returns the file name of the specified caller level
+ * - default is immediate parent
+ * RFE #35
+ */
+streng *rex_getcaller( tsd_t *TSD, cparamboxptr parms )
+{
+   long i,level=1;
+   struct systeminfobox *curr;
+
+   checkparam(  parms,  0,  1 , "GETCALLER" ) ;
+
+   if (parms->value)
+   {
+      level = atopos( TSD, parms->value, "GETCALLER", 1 ) ;
+   }
+   for ( curr = TSD->systeminfo, i = 0; i < level; i++, curr = curr->previous)
+   {
+      if ( !curr->previous )
+         return nullstringptr( ) ;
+   }
+   return Str_dupTSD( curr->input_file );
+#if 0
+   }
+   else
+   {
+      if ( TSD->systeminfo->previous )
+         return Str_dupTSD( TSD->systeminfo->previous->input_file );
+      else
+         return nullstringptr( ) ;
+   }
+#endif
+}
+
 streng *rex_getcallstack( tsd_t *TSD, cparamboxptr parms )
 {
    char ch=0 ;

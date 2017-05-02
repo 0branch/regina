@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regutil.c,v 1.6 2013/10/11 06:19:03 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regutil.c,v 1.7 2014/10/19 04:07:12 mark Exp $
  */
 #ifdef _WIN32
 # include <windows.h>
@@ -61,12 +61,14 @@ struct {
     {"SYSQUERYREXXMACRO", sysqueryrexxmacro},
     {"SYSREORDERREXXMACRO", sysreorderrexxmacro},
     {"SYSSAVEREXXMACROSPACE", syssaverexxmacrospace},
+#ifndef NOSCREEN_FUNCS
     {"SYSCLS", syscls},
     {"SYSCURPOS", syscurpos},
     {"SYSCURSTATE", syscurstate},
     {"SYSGETKEY", sysgetkey},
     {"SYSTEXTSCREENREAD", systextscreenread},
     {"SYSTEXTSCREENSIZE", systextscreensize},
+#endif
     {"SYSCLOSEEVENTSEM", syscloseeventsem},
     {"SYSCLOSEMUTEXSEM", sysclosemutexsem},
     {"SYSCREATEEVENTSEM", syscreateeventsem},

@@ -157,15 +157,16 @@ static void printout( tsd_t *TSD, const streng *message )
    }
 }
 
+/*
+ * Only called if return code from command to environment is NOT zero
+ */
 void traceerror( tsd_t *TSD, const treenode *thisptr, int RC )
 {
    streng *message;
-
-   if ( ( TSD->trace_stat == 'N' ) || ( TSD->trace_stat == 'F' ) )
-      traceline( TSD, thisptr, 'C', 0 );
-
-   if ( TSD->trace_stat != 'O' )
+   /* Fix for Bug #434; ANSI 8.3.5 */
+   if ( ( TSD->trace_stat == 'E' ) || ( RC < 0 && ( TSD->trace_stat == 'F' || TSD->trace_stat == 'N' ) ) )
    {
+      traceline( TSD, thisptr, 'C', 0 );
       message = Str_makeTSD( 20 + sizeof( int ) * 3 ) ;
       message->len = sprintf( message->value, "       +++ RC=%d +++", RC );
 

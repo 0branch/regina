@@ -390,47 +390,50 @@
  *               anyway, suid scripts are a _very_ bad idea under Unix,
  *               so this is probably not a problem ... :-)
  */
-#define COMMAND_NONE         0
-#define COMMAND_READ         1
-#define COMMAND_WRITE        2
-#define COMMAND_APPEND       3
-#define COMMAND_UPDATE       4
-#define COMMAND_CREATE       5
-#define COMMAND_CLOSE        6
-#define COMMAND_FLUSH        7
-#define COMMAND_STATUS       8
-#define COMMAND_FSTAT        9
-#define COMMAND_RESET       10
-#define COMMAND_READABLE    11
-#define COMMAND_WRITEABLE   12
-#define COMMAND_EXECUTABLE  13
-#define COMMAND_LIST        14
-#define COMMAND_QUERY_DATETIME 15
-#define COMMAND_QUERY_EXISTS   16
-#define COMMAND_QUERY_HANDLE   17
-#define COMMAND_QUERY_SEEK     18
-#define COMMAND_QUERY_SIZE     19
-#define COMMAND_QUERY_STREAMTYPE 20
-#define COMMAND_QUERY_TIMESTAMP  21
-#define COMMAND_QUERY_POSITION    23
-#define COMMAND_QUERY       24
-#define COMMAND_QUERY_POSITION_READ       25
-#define COMMAND_QUERY_POSITION_WRITE      26
-#define COMMAND_QUERY_POSITION_SYS        27
-#define COMMAND_QUERY_POSITION_READ_CHAR  28
-#define COMMAND_QUERY_POSITION_READ_LINE  29
-#define COMMAND_QUERY_POSITION_WRITE_CHAR 30
-#define COMMAND_QUERY_POSITION_WRITE_LINE 31
-#define COMMAND_OPEN                      32
-#define COMMAND_OPEN_READ                 33
-#define COMMAND_OPEN_WRITE                34
-#define COMMAND_OPEN_BOTH                 35
-#define COMMAND_OPEN_BOTH_APPEND          36
-#define COMMAND_OPEN_BOTH_REPLACE         37
-#define COMMAND_OPEN_WRITE_APPEND         38
-#define COMMAND_OPEN_WRITE_REPLACE        39
-#define COMMAND_SEEK                      40
-#define COMMAND_POSITION                  41
+#define COMMAND_NONE                       0
+#define COMMAND_READ                       1
+#define COMMAND_WRITE                      2
+#define COMMAND_APPEND                     3
+#define COMMAND_UPDATE                     4
+#define COMMAND_CREATE                     5
+#define COMMAND_CLOSE                      6
+#define COMMAND_FLUSH                      7
+#define COMMAND_STATUS                     8
+#define COMMAND_FSTAT                      9
+#define COMMAND_RESET                     10
+#define COMMAND_READABLE                  11
+#define COMMAND_WRITEABLE                 12
+#define COMMAND_EXECUTABLE                13
+#define COMMAND_LIST                      14
+#define COMMAND_QUERY_DATETIME            15
+#define COMMAND_QUERY_EXISTS              16
+#define COMMAND_QUERY_HANDLE              17
+#define COMMAND_QUERY_SEEK                18
+#define COMMAND_QUERY_SIZE                19
+#define COMMAND_QUERY_STREAMTYPE          20
+#define COMMAND_QUERY_TIMESTAMP           21
+#define COMMAND_QUERY_CREATETIME          22
+#define COMMAND_QUERY_MODIFYTIME          23
+#define COMMAND_QUERY_ACCESSTIME          24
+#define COMMAND_QUERY_POSITION            25
+#define COMMAND_QUERY                     26
+#define COMMAND_QUERY_POSITION_READ       27
+#define COMMAND_QUERY_POSITION_WRITE      28
+#define COMMAND_QUERY_POSITION_SYS        29
+#define COMMAND_QUERY_POSITION_READ_CHAR  30
+#define COMMAND_QUERY_POSITION_READ_LINE  31
+#define COMMAND_QUERY_POSITION_WRITE_CHAR 32
+#define COMMAND_QUERY_POSITION_WRITE_LINE 33
+#define COMMAND_OPEN                      34
+#define COMMAND_OPEN_READ                 35
+#define COMMAND_OPEN_WRITE                36
+#define COMMAND_OPEN_BOTH                 37
+#define COMMAND_OPEN_BOTH_APPEND          38
+#define COMMAND_OPEN_BOTH_REPLACE         39
+#define COMMAND_OPEN_WRITE_APPEND         40
+#define COMMAND_OPEN_WRITE_REPLACE        41
+#define COMMAND_SEEK                      42
+#define COMMAND_POSITION                  43
 
 #define STREAMTYPE_UNKNOWN     0
 #define STREAMTYPE_PERSISTENT  1
@@ -836,6 +839,12 @@ static char get_querycommand( const streng *cmd )
       return COMMAND_QUERY_STREAMTYPE ;
    if (cmd->len==9  && !memcmp(cmd->value, "TIMESTAMP", 9))
       return COMMAND_QUERY_TIMESTAMP ;
+   if (cmd->len==10  && !memcmp(cmd->value, "CREATETIME", 10))
+      return COMMAND_QUERY_CREATETIME;
+   if (cmd->len==10  && !memcmp(cmd->value, "MODIFYTIME", 10))
+      return COMMAND_QUERY_MODIFYTIME;
+   if (cmd->len==10  && !memcmp(cmd->value, "ACCESSTIME", 10))
+      return COMMAND_QUERY_ACCESSTIME;
    return COMMAND_NONE ;
 }
 
@@ -4181,6 +4190,60 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand )
 #endif
          }
          break;
+      case COMMAND_QUERY_CREATETIME:
+         if ( streamtype == STREAMTYPE_TRANSIENT )
+         {
+            result = nullstringptr() ;
+         }
+         else
+         {
+            result = Str_makeTSD( 20 ) ;
+#if defined(HAVE_I64U)
+            sprintf( result->value, "%I64u", buffer.st_ctime );
+#else
+            if ( sizeof(off_t) > 4 )
+               sprintf( result->value, "%lld", buffer.st_ctime );
+            else
+               sprintf( result->value, "%ld", buffer.st_ctime);
+#endif
+         }
+         break;
+      case COMMAND_QUERY_MODIFYTIME:
+         if ( streamtype == STREAMTYPE_TRANSIENT )
+         {
+            result = nullstringptr() ;
+         }
+         else
+         {
+            result = Str_makeTSD( 20 ) ;
+#if defined(HAVE_I64U)
+            sprintf( result->value, "%I64u", buffer.st_mtime );
+#else
+            if ( sizeof(off_t) > 4 )
+               sprintf( result->value, "%lld", buffer.st_mtime );
+            else
+               sprintf( result->value, "%ld", buffer.st_mtime);
+#endif
+         }
+         break;
+      case COMMAND_QUERY_ACCESSTIME:
+         if ( streamtype == STREAMTYPE_TRANSIENT )
+         {
+            result = nullstringptr() ;
+         }
+         else
+         {
+            result = Str_makeTSD( 20 ) ;
+#if defined(HAVE_I64U)
+            sprintf( result->value, "%I64u", buffer.st_atime );
+#else
+            if ( sizeof(off_t) > 4 )
+               sprintf( result->value, "%lld", buffer.st_atime );
+            else
+               sprintf( result->value, "%ld", buffer.st_atime);
+#endif
+         }
+         break;
       case COMMAND_QUERY_POSITION_READ_CHAR:
       case COMMAND_QUERY_POSITION_SYS:
          if (pos_read != (-2))
@@ -4378,6 +4441,9 @@ static streng *getquery( tsd_t *TSD, const streng *filename , const streng *subc
    {
       case COMMAND_QUERY_DATETIME :
       case COMMAND_QUERY_TIMESTAMP :
+      case COMMAND_QUERY_CREATETIME :
+      case COMMAND_QUERY_MODIFYTIME :
+      case COMMAND_QUERY_ACCESSTIME :
       case COMMAND_QUERY_EXISTS :
       case COMMAND_QUERY_HANDLE :
       case COMMAND_QUERY_SIZE :
@@ -4440,7 +4506,7 @@ static streng *getquery( tsd_t *TSD, const streng *filename , const streng *subc
          Free_stringTSD(psub);
          break;
       default:
-         exiterror( ERR_STREAM_COMMAND, 1, "QUERY", "DATETIME TIMESTAMP EXISTS HANDLE SIZE STREAMTYPE SEEK POSITION", tmpstr_of( TSD, subcommand ) )  ;
+         exiterror( ERR_STREAM_COMMAND, 1, "QUERY", "DATETIME TIMESTAMP CREATETIME MODIFYTIME ACCESSTIME EXISTS HANDLE SIZE STREAMTYPE SEEK POSITION", tmpstr_of( TSD, subcommand ) )  ;
          break;
    }
 

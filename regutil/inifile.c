@@ -18,13 +18,17 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/inifile.c,v 1.2 2011/10/09 01:13:06 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/inifile.c,v 1.4 2014/10/19 10:25:57 mark Exp $
  */
+#ifndef _WIN32
+# include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include "inifile.h"
 
@@ -148,7 +152,6 @@ static int take_write_lock(inif_t fit)
    else {
       rc = 1;
    }
-
    return rc;
 }
 
@@ -171,7 +174,7 @@ static int read_ini_raw(inif_t fit)
    int nl, vl, cl;
    register int i;
    struct stat st;
-   long oldoff;
+   long oldoff=0;
 
    fstat(fileno(fit->fp), &st);
 
@@ -333,9 +336,10 @@ static sec_t find_section(inif_t fit, const char * secname)
    register sec_t tst;
 
    for (tst = fit->sct; tst; tst=tst->N)
+   {
       if (!strcasecmp(tst->name, secname))
          return tst;
-
+   }
    return NULL;
 }
 
@@ -385,12 +389,15 @@ static void write_sections(inif_t fit, sec_t mst)
 
    fseek(fit->fp, mst->foff, SEEK_SET);
    write_section(fit, mst);
+   /* TODO - should really check for failure in ftruncate() */
    ftruncate(fileno(fit->fp), ftell(fit->fp));
 
    /* set the mod time and size */
    fstat(fileno(fit->fp), &st);
    fit->mt =st.st_mtime;
    fit->len = st.st_size;
+   /* fix bug #433 */
+   fflush(fit->fp);
 }
 
 

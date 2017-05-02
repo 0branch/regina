@@ -320,6 +320,8 @@ streng *execute_external( tsd_t * volatile TSD, const streng *command,
       newsystem->invoked = ctype;
       newsystem->script_exit = jbuf;
       newsystem->input_file = name;
+      /* RFE #36 - set .FILE reserved name */
+      set_reserved_value( TSD, POOL0_FILE, Str_dupTSD( name ), 0, VFLAG_STR );
       newsystem->trace_override = newsystem->previous->trace_override;
       newsystem->ctrlcounter = newsystem->previous->ctrlcounter +
                                                newsystem->previous->cstackcnt;

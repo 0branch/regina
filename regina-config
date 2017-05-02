@@ -35,7 +35,7 @@ usage()
     echo "  --addons       Directory where Regina will look for external function packages"
     echo "                 [${datarootdir}/Regina-REXX/addons]"
     echo "  --version      output version information"
-    echo "                 ["3.8.2"]"
+    echo "                 ["3.9.0"]"
     exit $1
 }
 
@@ -62,7 +62,7 @@ while test $# -gt 0; do
           ;;
 
        --version)
-          echo "3.8.2"
+          echo "3.9.0"
           exit 0
           ;;
 

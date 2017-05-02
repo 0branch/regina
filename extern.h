@@ -559,6 +559,7 @@ extern "C" {
    char *mygetenv( const tsd_t *TSD, const char *name, char *buf, int bufsize ) ;
    void set_pause_at_exit( );
    streng *rex_userid( tsd_t *TSD, cparamboxptr parms ) ;
+   streng *rex_getcaller( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_getcallstack( tsd_t *TSD, cparamboxptr parms ) ;
    streng *rex_rxqueue( tsd_t *TSD, cparamboxptr parms ) ;
 #if defined(WIN32) && !defined(__WINS__) && !defined(__EPOC32__)
@@ -750,6 +751,7 @@ extern "C" {
 #ifdef DYNAMIC_STATIC
    void *static_dlopen( char *name );
    int static_dlsym( void *addr, char *name, void **faddr );
+   void static_list_packages();
 #endif
 
 /*

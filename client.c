@@ -439,6 +439,10 @@ int IfcExecScript( tsd_t * volatile TSD, int NameLen, const char *Name,
       {
          streng *SrcStr = wrapstring( TSD, SourceString, SourceStringLen );
          internal_parser_type ipt;
+         /*
+          * Fix for Bug #436. Enable system exit to trap parsing errors
+          */
+         TSD->systeminfo->hooks = hooks;
 
          ipt = enter_macro( TSD, SrcStr, instore_buf, instore_length ) ;
          if ( ( CallType == RX_TYPE_COMMAND )

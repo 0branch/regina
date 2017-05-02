@@ -62,7 +62,7 @@ HAVE_GCI = -DHAVE_GCI -I$(SRCDIR)\gci -I.
 endif
 
 DYN_CRT =  -Zcrtdll -Zomf
-CEXTRA = -DOS2 -DEMX -funsigned-char $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_RELEASE=\"$(VER_RELEASE)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\"
+CEXTRA = -DOS2 -DEMX -funsigned-char $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_RELEASE=\"$(VER_RELEASE)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\" -DREGINA_BITS=32
 EEXTRA =
 DYN_COMP = -DDYNAMIC -Zdll $(DYN_CRT)
 LIBS = #-ll -lm
@@ -142,7 +142,7 @@ OFILES = funcs.$(OBJ) builtin.$(OBJ) error.$(OBJ) variable.$(OBJ) \
 	tracing.$(OBJ) interp.$(OBJ) cmath.$(OBJ) convert.$(OBJ) strings.$(OBJ) library.$(OBJ) \
 	strmath.$(OBJ) signals.$(OBJ) macros.$(OBJ) envir.$(OBJ) expr.$(OBJ) mt_notmt.$(OBJ) instore.$(OBJ) \
 	yaccsrc.$(OBJ) lexsrc.$(OBJ) options.$(OBJ) os_os2.$(OBJ) wrappers.$(OBJ) \
-	extstack.$(OBJ) rexxbif.$(OBJ) os_other.$(OBJ)
+	extstack.$(OBJ) rexxbif.$(OBJ) os_other.$(OBJ) mygetopt.$(OBJ)
 
 SHOFILES = funcs.obj builtin.obj error.obj variable.obj \
 	interprt.obj debug.obj dbgfuncs.obj memory.obj parsing.obj files.obj \
@@ -151,7 +151,7 @@ SHOFILES = funcs.obj builtin.obj error.obj variable.obj \
 	strmath.obj signals.obj macros.obj envir.obj expr.obj $(THREADING_FILE).obj \
 	yaccsrc.obj lexsrc.obj wrappers.obj options.obj os_os2.obj \
 	drexx.obj client.obj rexxsaa.obj instore.obj \
-	extstack.obj rexxbif.obj os_other.obj \
+	extstack.obj rexxbif.obj os_other.obj mygetopt.obj \
 	$(GCI_SHO)
 REGUTILOFILES = regfilesys.obj regini.obj inifile.obj regmacrospace.obj regscreenos2.obj \
                 regsemos2.obj regutil.obj rxsupport.obj regstem.obj \
@@ -200,8 +200,8 @@ rexx$(EXE) : $(OFILES) rexx.$(OBJ) nosaa.$(OBJ)
 	-$(RC)
 	-$(LXLITE) rexx$(EXE)
 
-regina : $(SHLFILE).$(SHL) regina.obj $(GETOPT)
-	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_LDFLAGS) -o regina $(SRCDIR)\regina_os2.def regina.obj $(LIBS) $(SHLIBS) $(SOCKET)
+regina : $(SHLFILE).$(SHL) regina.obj mygetopt.obj
+	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_LDFLAGS) -o regina $(SRCDIR)\regina_os2.def regina.obj mygetopt.obj $(LIBS) $(SHLIBS) $(SOCKET)
 
 regina$(EXE) : regina
 	-copy $(SRCDIR)\reginaos2.ico
@@ -209,8 +209,8 @@ regina$(EXE) : regina
 	-$(RC)
 	-$(LXLITE) regina$(EXE)
 
-pmregina : $(SHLFILE).$(SHL) regina.obj $(GETOPT)
-	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_LDFLAGS) -o pmregina regina.obj $(LIBS) $(SHLIBS) $(SOCKET) $(SRCDIR)\pmregina.def
+pmregina : $(SHLFILE).$(SHL) regina.obj mygetopt.obj
+	$(CC) $(LINKOPT_DLL) -Zexe $(DYNAMIC_LDFLAGS) -o pmregina regina.obj mygetopt.obj $(LIBS) $(SHLIBS) $(SOCKET) $(SRCDIR)\pmregina.def
 
 pmregina$(EXE) : pmregina
 	-copy $(SRCDIR)\reginaos2.ico
@@ -230,12 +230,12 @@ execiser$(EXE) : execiser
 threader$(EXE) : threader
 	-$(LXLITE) threader$(EXE)
 
-rxqueue$(EXE) : $(OFILES) rxqueue.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ)
-	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxqueue$(EXE) rxqueue.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) $(SOCKET)
+rxqueue$(EXE) : $(OFILES) rxqueue.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) mygetopt.$(OBJ)
+	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxqueue$(EXE) rxqueue.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) mygetopt.$(OBJ) $(SOCKET)
 	-$(LXLITE) rxqueue$(EXE)
 
-rxstack$(EXE) : $(OFILES) rxstack.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ)
-	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxstack$(EXE) rxstack.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) $(SOCKET)
+rxstack$(EXE) : $(OFILES) rxstack.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) mygetopt.$(OBJ) LibSha1.$(OBJ)
+	$(CC) $(LINKOPT) $(STATIC_LDFLAGS) -o rxstack$(EXE) rxstack.$(OBJ) eextstack.$(OBJ) erexxbif.$(OBJ) mygetopt.$(OBJ) LibSha1.$(OBJ) $(SOCKET)
 	-$(LXLITE) rxstack$(EXE)
 
 $(LIBFILE).$(LIBPST): $(OFILES) client.$(OBJ) drexx.$(OBJ) rexxsaa.$(OBJ)
@@ -440,8 +440,11 @@ yaccsrc.$(OBJ) : $(SRCDIR)\yaccsrc.c $(SRCDIR)\defs.h $(SRCDIR)\rexx.h
 execiser.obj : $(SRCDIR)\execiser.c $(SRCDIR)\rexx.h
 	       $(CC) $(COPT_DLL) $(CC2O) $(DYN_CRT) -c $(SRCDIR)\execiser.c
 
-getopt.obj : $(SRCDIR)\getopt.c
-	       $(CC) $(COPT_DLL) $(CC2O) -c $(SRCDIR)\getopt.c
+mygetopt.$(OBJ) : $(SRCDIR)\mygetopt.c
+	       $(CC) $(OTHERCOPT) $(CC2O) -c $(SRCDIR)\mygetopt.c
+
+LibSha1.$(OBJ) : $(SRCDIR)\contrib\LibSha1.c $(SRCDIR)\contrib\LibSha1.h
+	       $(CC) $(OTHERCOPT) $(CC2O) -c $(SRCDIR)\contrib\LibSha1.c
 
 #
 # Rules for shared objects
@@ -694,6 +697,9 @@ yaccsrc.obj : $(SRCDIR)\yaccsrc.c $(SRCDIR)\defs.h $(SRCDIR)\rexx.h
 
 threader.obj : $(SRCDIR)\threader.c $(SRCDIR)\rexx.h
 	       $(CC) $(COPT_DLL) $(CC2O) $(DYN_CRT) -DOS2_THREADS -c $(SRCDIR)\threader.c
+
+mygetopt.obj : $(SRCDIR)\mygetopt.c
+	       $(CC) $(COPT_DLL) $(CC2O) -c $(SRCDIR)\mygetopt.c
 
 #
 # Rules for GCI

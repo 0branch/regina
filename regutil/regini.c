@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regini.c,v 1.16 2012/09/09 05:31:51 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regini.c,v 1.18 2014/10/30 04:51:05 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSMISC
@@ -42,6 +42,9 @@
 # include <errno.h>
 # ifdef HAVE_SYS_STATFS_H
 #  include <sys/statfs.h>
+# endif
+# ifdef HAVE_CTYPE_H
+#  include <ctype.h>
 # endif
 # ifdef HAVE_STATFS
 #  if defined(HAVE_MOUNT_H)
@@ -1062,6 +1065,81 @@ rxfunc(syswaitnamedpipe)
    return 0;
 }
 
+# if defined(__EMX__)
+
+rxfunc(rxmessagebox)
+{
+   char * text, *but = NULL, *ic = NULL;
+   char * title = "Error!";
+   int button = MB_OK;
+   int icon = MB_ICONHAND;
+   register int i;
+   static const struct {
+      char * text;
+      int value;
+   } bs[] = {
+      {"OK", MB_OK},
+      {"OKCANCEL", MB_OKCANCEL},
+      {"ABORTRETRYIGNORE", MB_ABORTRETRYIGNORE},
+      {"YESNOCANCEL", MB_YESNOCANCEL},
+      {"YESNO", MB_YESNO},
+      {"RETRYCANCEL", MB_RETRYCANCEL}
+   }, is[] = {
+      {"HAND", MB_ICONHAND},
+      {"QUESTION", MB_ICONQUESTION},
+      {"EXCLAMATION", MB_ICONEXCLAMATION},
+      {"ASTERISK", MB_ICONASTERISK},
+      {"INFORMATION", MB_INFORMATION},
+      {"STOP", MB_CRITICAL}
+   };
+
+   checkparam(1,4);
+
+   rxstrdup(text, argv[0]);
+   if (argc > 1 && argv[1].strptr) {
+      rxstrdup(title, argv[1]);
+   }
+   if (argc > 2 && argv[2].strptr) {
+      rxstrdup(but, argv[2]);
+   }
+   if (argc > 3 && argv[3].strptr) {
+      rxstrdup(ic, argv[3]);
+   }
+
+   if (ic) {
+      strupr(ic);
+      for (i = 0; i < DIM(is); i++) {
+         if (!strcmp(ic, is[i].text)) {
+            icon = is[i].value;
+            break;
+         }
+      }
+   }
+
+   if (but) {
+      strupr(but);
+      for (i = 0; i < DIM(bs); i++) {
+         if (!strcmp(but, bs[i].text)) {
+            button = bs[i].value;
+            break;
+         }
+      }
+   }
+
+   result->strlength = sprintf( result->strptr, "%d",
+        WinMessageBox(HWND_DESKTOP, HWND_DESKTOP, text, title, 0, icon|button|MB_MOVEABLE) );
+   return 0;
+}
+
+
+rxfunc(rxwinexec)
+{
+   strcpy(result->strptr, notimp);
+   result->strlength = sizeof(notimp)-1;
+   return 0;
+}
+
+# else
 /* tack these in here for now. I want to implement rxmessagebox for Unix,
  * but I probably need a configure script to do it without requiring the
  * X windows headers, so I ignore it for now */
@@ -1079,7 +1157,7 @@ rxfunc(rxwinexec)
    result->strlength = sizeof(notimp)-1;
    return 0;
 }
-
+# endif
 
 #endif
 

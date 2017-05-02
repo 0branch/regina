@@ -397,6 +397,7 @@
 #define restore_variable_state       __regina_restore_variable_state
 #define retlength                    __regina_retlength
 #define retvalue                     __regina_retvalue
+#define rex_getcaller                __regina_rex_getcaller
 #define rex_getcallstack             __regina_rex_getcallstack
 #define rex_gciprefixchar            __regina_rex_gciprefixchar
 #define rex_lower                    __regina_rex_lower

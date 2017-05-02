@@ -111,6 +111,7 @@ static void instore( void )
 
 LONG APIENTRY trace_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
 {
+   char tmp[200];
    RXSIOTRC_PARM *psiotrc;
    iverify( "Exitfunction", ExNum, RXSIO ) ;
    if (Subfun==RXSIOTRC)
@@ -120,7 +121,10 @@ LONG APIENTRY trace_exit( LONG ExNum, LONG Subfun, PEXIT PBlock )
                "     1 *-* trace off" ) ;
    }
    else
-      mycomplain( "Unexpected subfunction\n" ) ;
+   {
+      sprintf( tmp, "Unexpected subfunction, got %ld\n", Subfun ) ;
+      mycomplain( tmp );
+   }
 
    return RXEXIT_HANDLED ;
 }

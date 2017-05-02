@@ -846,7 +846,8 @@ int main(int argc,char *argv[])
             exiterror( ERR_PROG_UNREADABLE, 1, "Cannot run tokenised code "
                                                                "from stdin." );
       }
-
+      /* RFE #36 - set .FILE reserved name */
+      set_reserved_value( TSD, POOL0_FILE, Str_dupTSD( TSD->systeminfo->input_file ), 0, VFLAG_STR );
 
       /*
        * -c switch specified - tokenise the input file before mucking around

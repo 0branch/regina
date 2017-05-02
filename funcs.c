@@ -145,6 +145,7 @@ static const struct function_type functions[] = {
 #ifdef HAVE_GCI
   { EXT_REGINA_BIFS,rex_gciprefixchar,     "GCIPREFIXCHAR" },
 #endif
+  { EXT_REGINA_BIFS,rex_getcaller,         "GETCALLER" },
   { EXT_REGINA_BIFS,rex_getcallstack,      "GETCALLSTACK" },
   { EXT_REGINA_BIFS,unx_getenv,            "GETENV" },
   { EXT_REGINA_BIFS,unx_getpath,           "GETPATH" },
