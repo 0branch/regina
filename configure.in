@@ -18,6 +18,7 @@ AC_SUBST(VERSION_NODOT)
 AC_SUBST(VER_DATE)
 AC_SUBST(VER_MAJOR)
 AC_SUBST(VER_MINOR)
+AC_SUBST(VER_RELEASE)
 AC_SUBST(VER_SUPP)
 cp $srcdir/common/config.guess $srcdir
 cp $srcdir/common/config.sub $srcdir
@@ -530,7 +531,7 @@ dnl --------------- allow --with-addon-dir to specify location of external funct
 AC_ARG_WITH(addon-dir,
    [  --with-addon-dir=dir    location of external function packages (default blank)],
    [addonsdir=$withval],
-   [addonsdir=$datadir/regina/addons],
+   [addonsdir=$datadir/$REGINA_PACKAGE_NAME/addons],
 )
 AC_DEFINE_DIR(HAVE_REGINA_ADDON_DIR,"$addonsdir")
 AC_SUBST(addonsdir)

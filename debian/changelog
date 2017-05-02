@@ -1,3 +1,10 @@
+regina (3.8.2-1) unstable; urgency=low
+
+  * Fix for Bugs #429, #430, #387
+  * Add extra level of versioning to enable quicker releases when minor fixes corrected.
+
+ -- Mark Hessling <mark@rexx.org>  Thu, 22 Jun 2014 01:50:00 +1000
+
 regina (3.8-1) unstable; urgency=low
 
   * Fix for Bugs #390, #412, #403, #397, #417, #415, #421, #420, #427, #407, #420, #389, #426

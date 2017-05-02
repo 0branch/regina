@@ -12,7 +12,7 @@
  *
  * The Original Code is regutil.
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regtrig.c,v 1.4 2013/10/11 06:18:16 mark Exp $
+ * $Header: /media/Extra/cvs/Regina/regutil/regtrig.c,v 1.5 2014/06/22 03:53:33 mark Exp $
  */
 /**************************************************************************
 *
@@ -675,6 +675,10 @@ static long ValidateArcTrig(long argc,
         break;
       case ARCTANGENT2:                /* ArcTangent2 function        */
         angle = atan2(x,y);
+        break;
+      default:
+        /* should not get here */
+        angle = 0.0;
         break;
     }
     if (units == DEGREES)              /* have to convert the result?*/

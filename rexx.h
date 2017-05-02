@@ -302,7 +302,7 @@
 */
 
 #define PARSE_VERSION_STRING    "REXX-Regina_" REGINA_VERSION_MAJOR "." \
-                                REGINA_VERSION_MINOR REGINA_VERSION_SUPP \
+                                REGINA_VERSION_MINOR "." REGINA_VERSION_RELEASE REGINA_VERSION_SUPP \
                                 REGINA_VERSION_THREAD \
                                 " 5.00 " REGINA_VERSION_DATE
 

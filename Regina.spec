@@ -2,7 +2,7 @@
 %define vermajor 3
 %define verminor 8
 Name: Regina-REXX
-Version: 3.8
+Version: 3.8.2
 Release: 1
 Group: Development/Languages/Other
 Source: %{name}-%{version}.tar.bz2
@@ -70,7 +70,7 @@ For more information on Rexx, visit http://www.rexxla.org
 %setup
 
 %build
-./configure --prefix=%{prefix} --mandir=%{_mandir} --sysconfdir=%{_initrddir}
+./configure --prefix=%{prefix} --mandir=%{_mandir} --sysconfdir=%{_initrddir} --with-addons-dir=%{_datadir}/%{name}/addons
 make
 
 %install
@@ -84,14 +84,14 @@ make DESTDIR=%{buildroot} install
 %{_mandir}/man1/rxqueue.1%{_extension}
 %{_initrddir}/rxstack
 %dir %{_datadir}/%{name}
-%{_datadir}/%{name}/rexxcps.rexx
-%{_datadir}/%{name}/animal.rexx
-%{_datadir}/%{name}/block.rexx
-%{_datadir}/%{name}/dateconv.rexx
-%{_datadir}/%{name}/timeconv.rexx
-%{_datadir}/%{name}/newstr.rexx
-%{_datadir}/%{name}/dynfunc.rexx
-%{_datadir}/%{name}/regutil.rexx
+%{_datadir}/%{name}/examples/rexxcps.rexx
+%{_datadir}/%{name}/examples/animal.rexx
+%{_datadir}/%{name}/examples/block.rexx
+%{_datadir}/%{name}/examples/dateconv.rexx
+%{_datadir}/%{name}/examples/timeconv.rexx
+%{_datadir}/%{name}/examples/newstr.rexx
+%{_datadir}/%{name}/examples/dynfunc.rexx
+%{_datadir}/%{name}/examples/regutil.rexx
 %{_datadir}/%{name}/de.mtb
 %{_datadir}/%{name}/en.mtb
 %{_datadir}/%{name}/es.mtb
@@ -104,8 +104,8 @@ make DESTDIR=%{buildroot} install
 %{_bindir}/regina
 %{_bindir}/rxqueue
 %{_bindir}/rxstack
-%{_libdir}/librxtest1.so
-%{_libdir}/librxtest2.so
+%{_datadir}/%{name}/addons/librxtest1.so
+%{_datadir}/%{name}/addons/librxtest2.so
 
 %files devel
 %defattr(-,root,root,-)
@@ -117,9 +117,9 @@ make DESTDIR=%{buildroot} install
 
 %files lib
 %defattr(-,root,root,-)
-%{_libdir}/libregina.so.%{version}
+%{_libdir}/libregina.so.%{vermajor}.%{verminor}
 %{_libdir}/libregina.so.%{vermajor}
-%{_libdir}/libregutil.so
+%{_datadir}/%{name}/addons/libregutil.so
 
 #******************************************************************************
 %post

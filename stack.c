@@ -1148,9 +1148,6 @@ void type_buffer( tsd_t *TSD )
  */
 static int get_socket_details_and_connect( tsd_t *TSD, Queue *q )
 {
-   stk_tsd_t *st;
-
-   st = (stk_tsd_t *)TSD->stk_tsd;
    assert( q->type == QisExternal ) ;
 
    /* Fill in default values. Missing values are rarely used but it may

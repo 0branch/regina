@@ -55,6 +55,8 @@
 # endif
 #endif
 
+extern void getcallstack( tsd_t *TSD, streng *stem );
+
 streng *rex_userid( tsd_t *TSD, cparamboxptr parms )
 {
 #if defined(WIN32)

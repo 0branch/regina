@@ -1,0 +1,105 @@
+#! /bin/sh
+#
+# The idea to this kind of setup info script was stolen from numerous
+# other packages, such as neon, libxml and gnome.
+#
+prefix=/usr/local
+datarootdir=${prefix}/share
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=/usr/local/lib
+libdir64=/usr/local/lib
+libdir32=/usr/local/lib
+
+usage()
+{
+    echo "Usage: regina-config [OPTION]"
+    echo ""
+    echo "Available values for OPTION include:"
+    echo ""
+    echo "  --help         display this help and exit"
+    echo "  --cflags       pre-processor and compiler flags"
+    echo "                 [-I$includedir]"
+    echo "  --multithread  yes; if thread-safe library is available; no otherwise"
+    echo "                 [yes]"
+    echo "  --libs         library linking information"
+    echo "                 [-L$libdir -lregina      ]"
+    echo "  --libs_ts      library linking information for thread-safe library"
+    echo "                 [-L$libdir -lregina    ]"
+    echo "  --libs32       library linking information for specific 32bit build"
+    echo "                 [-L$libdir32 -lregina       ]"
+    echo "  --libs64       library linking information for specific 64bit build"
+    echo "                 [-L$libdir64 -lregina       ]"
+    echo "  --prefix       Regina install prefix"
+    echo "                 [$prefix]"
+    echo "  --addons       Directory where Regina will look for external function packages"
+    echo "                 [${datarootdir}/Regina-REXX/addons]"
+    echo "  --version      output version information"
+    echo "                 ["3.8.2"]"
+    exit $1
+}
+
+if test $# -eq 0; then
+    usage 1
+fi
+
+while test $# -gt 0; do
+    case "$1" in
+    # this deals with options in the style
+    # --option=value and extracts the value part
+    # [not currently used]
+       -*=*) value=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+       *) value= ;;
+    esac
+
+    case "$1" in
+       --prefix)
+          echo $prefix
+          ;;
+
+       --multithread)
+          echo yes
+          ;;
+
+       --version)
+          echo "3.8.2"
+          exit 0
+          ;;
+
+       --help)
+          usage 0
+          ;;
+
+       --cflags)
+          echo -I$includedir
+          ;;
+
+       --libs)
+          echo -L$libdir -lregina      
+          ;;
+
+       --libs_ts)
+          echo -L$libdir -l@TSLFILE@    
+          ;;
+
+       --libs32)
+          echo -L$libdir32 -lregina      
+          ;;
+
+       --libs64)
+          echo -L$libdir64 -lregina      
+          ;;
+
+       --addons)
+          echo ${datarootdir}/Regina-REXX/addons
+          ;;
+
+       *)
+          usage
+          exit 1
+          ;;
+    esac
+    shift
+done
+
+exit 0

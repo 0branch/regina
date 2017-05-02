@@ -12,7 +12,7 @@ THIS  = Makefile
 
 @SET_MAKE@
 
-PACKAGE=Regina-REXX
+PACKAGE=@REGINA_PACKAGE_NAME@
 VER=@VERSION_NODOT@
 VERDOT=@VERSION@
 VERDOTUNQUOTED=@VERSION_UNQUOTED@
@@ -41,6 +41,7 @@ includedir  = @includedir@
 mandir  = @mandir@
 datadir = @datadir@
 sharedir = $(datadir)/$(PACKAGE)
+examplesdir = $(sharedir)/examples
 addonsdir = @addonsdir@
 target = @target@
 gcidir = $(srcdir)/gci
@@ -55,7 +56,7 @@ CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 
 RANLIB_DYNAMIC = @RANLIB_DYNAMIC@
-CEXTRA = @CEXTRA@ @DLFCNINCDIR@ -DREGINA_SHARE_DIRECTORY=\"$(sharedir)\" @MH_UNSIGNED_CHAR_SWITCH@ -DREGINA_VERSION_DATE=\"@VER_DATE@\" -DREGINA_VERSION_MAJOR=\"@VER_MAJOR@\" -DREGINA_VERSION_MINOR=\"@VER_MINOR@\" -DREGINA_VERSION_SUPP=\"@VER_SUPP@\" -DREGINA_BITS=@bitflag@
+CEXTRA = @CEXTRA@ @DLFCNINCDIR@ -DREGINA_SHARE_DIRECTORY=\"$(sharedir)\" @MH_UNSIGNED_CHAR_SWITCH@ -DREGINA_VERSION_DATE=\"@VER_DATE@\" -DREGINA_VERSION_MAJOR=\"@VER_MAJOR@\" -DREGINA_VERSION_MINOR=\"@VER_MINOR@\" -DREGINA_VERSION_RELEASE=\"@VER_RELEASE@\" -DREGINA_VERSION_SUPP=\"@VER_SUPP@\" -DREGINA_BITS=@bitflag@
 DEBUG = @DEBUG@
 DEBUGGING = @DEBUGGING@
 TRACEMEM = @TRACEMEM@
@@ -1028,6 +1029,7 @@ installbase: all
 	$(INSTALL) -m 755 -d $(DESTDIR)$(libdir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(includedir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(sharedir)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(examplesdir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)/man1
 	$(INSTALL) -s -m 755 -c ./rexx$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
 	$(INSTALL) -s -m 755 -c ./rxqueue$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
@@ -1052,31 +1054,31 @@ installbase: all
 	$(INSTALL) -m 644 -c ./pl.mtb $(DESTDIR)$(sharedir)/pl.mtb
 	$(INSTALL) -m 644 -c ./tr.mtb $(DESTDIR)$(sharedir)/tr.mtb
 	$(INSTALL) -m 644 -c ./sv.mtb $(DESTDIR)$(sharedir)/sv.mtb
-	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/rexxcps.rexx  $(DESTDIR)$(sharedir)/rexxcps.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/rexxcps.rexx
-	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/animal.rexx   $(DESTDIR)$(sharedir)/animal.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/animal.rexx
-	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/block.rexx    $(DESTDIR)$(sharedir)/block.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/block.rexx
-	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/dateconv.rexx $(DESTDIR)$(sharedir)/dateconv.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/dateconv.rexx
-	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/timeconv.rexx $(DESTDIR)$(sharedir)/timeconv.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/timeconv.rexx
-	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/newstr.rexx   $(DESTDIR)$(sharedir)/newstr.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/newstr.rexx
+	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/rexxcps.rexx  $(DESTDIR)$(examplesdir)/rexxcps.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/rexxcps.rexx
+	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/animal.rexx   $(DESTDIR)$(examplesdir)/animal.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/animal.rexx
+	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/block.rexx    $(DESTDIR)$(examplesdir)/block.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/block.rexx
+	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/dateconv.rexx $(DESTDIR)$(examplesdir)/dateconv.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/dateconv.rexx
+	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/timeconv.rexx $(DESTDIR)$(examplesdir)/timeconv.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/timeconv.rexx
+	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/newstr.rexx   $(DESTDIR)$(examplesdir)/newstr.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/newstr.rexx
 
 installregina:
 	$(INSTALL) -s -m 755 -c ./regina$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
-	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/demo/dynfunc.rexx  $(DESTDIR)$(sharedir)/dynfunc.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/dynfunc.rexx
-	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/regutil/regutil.rexx  $(DESTDIR)$(sharedir)/regutil.rexx
-	-chmod 755 $(DESTDIR)$(sharedir)/regutil.rexx
+	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/demo/dynfunc.rexx  $(DESTDIR)$(examplesdir)/dynfunc.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/dynfunc.rexx
+	$(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE) $(srcdir)/preinst.rexx $(bindir)/regina$(binarybitprefix)$(EXE) $(srcdir)/regutil/regutil.rexx  $(DESTDIR)$(examplesdir)/regutil.rexx
+	-chmod 755 $(DESTDIR)$(examplesdir)/regutil.rexx
 
 installlib: installregina
 	$(INSTALL) -s -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
-	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
-	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
-	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest2$(MODPST)
 
 installabilib: installregina
 	-$(INSTALL) -s -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
@@ -1084,9 +1086,24 @@ installabilib: installregina
 	-(cd $(DESTDIR)$(libdir);$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR) )
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
 	-(cd $(DESTDIR)$(libdir);$(LN_S) $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR) $(SHLPRE)$(SHLFILE)$(SHLPST) )
-	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
-	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
-	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest2$(MODPST)
+
+installcyglib:
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(addonsdir)/regutil$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(addonsdir)/rxtest1$(MODPST)
+	$(INSTALL) -s -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(addonsdir)/rxtest2$(MODPST)
+
+#
+# Can't strip .dylib on OSX
+#
+installmaclib: installregina
+	$(INSTALL) -m 755 -c ./$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(INSTALL) -m 755 -c ./$(SHLPRE)regutil$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest2$(MODPST)
 
 installrxstack:
 	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/rxstack
@@ -1107,9 +1124,8 @@ uninstall:
 	-rm -f $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)regina$(SHLPST)
 	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)regina$(SHLPST).*
-	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)
-	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)
-	-rm -f $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)
+	-rm -fr $(DESTDIR)$(addonsdir)
+	-rm -fr $(DESTDIR)$(examplesdir)
 	-rm -fr $(DESTDIR)$(sharedir)
 	-rm -f $(DESTDIR)$(sysconfdir)/rxstack
 
@@ -1158,13 +1174,13 @@ beosinstall: all
 	/boot/home/config/bin/rexx $(srcdir)/preinst.rexx /boot/home/config/bin/regina $(srcdir)/regutil/regutil.rexx /boot/home/config/bin/regutil.rexx
 	-chmod 755 /boot/home/config/bin/regutil.rexx
 
-cygwininstall: installbase installregina installlib
+cygwininstall: installbase installregina installcyglib
 # Need to create libregina.a
 	dlltool --def $(srcdir)/regina_w32_dll.def --dllname $(SHLPRE)$(SHLFILE)$(SHLPST) --output-lib $(DESTDIR)$(libdir)/libregina.a
-	mv $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
-	mv $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)regutil$(MODPST)
-	mv $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)rxtest1$(MODPST)
-	mv $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)rxtest2$(MODPST)
+#	mv $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST) $(DESTDIR)$(bindir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
+#	mv $(DESTDIR)$(libdir)/$(SHLPRE)regutil$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)regutil$(MODPST)
+#	mv $(DESTDIR)$(libdir)/$(SHLPRE)rxtest1$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)rxtest1$(MODPST)
+#	mv $(DESTDIR)$(libdir)/$(SHLPRE)rxtest2$(MODPST)    $(DESTDIR)$(bindir)/$(SHLPRE)rxtest2$(MODPST)
 
 clean:
 	rm -f $(JUNK)
@@ -1243,7 +1259,7 @@ rpminstall-dev:
 install-lib: $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
 	$(INSTALL) -m 644 -c $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
 	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
-	$(INSTALL) -m 644 -c $(SHLPRE)regutil$(MODPST) $(prefix)$(libdir)/regina/$(ABI)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -m 644 -c $(SHLPRE)regutil$(MODPST) $(prefix)$(libdir)/regina-rexx/$(VERDOT)/$(SHLPRE)regutil$(MODPST)
 
 install-dev: $(LIBPRE)$(LIBFILE)$(LIBPST)
 # header file
@@ -1258,13 +1274,15 @@ install-dev: $(LIBPRE)$(LIBFILE)$(LIBPST)
 	$(INSTALL) -c -m 644 $(srcdir)/regina-config.1 $(prefix)/usr/share/man/man1/regina-config.1
 
 install-rexx: rexx$(EXE) regina$(EXE)
-	$(INSTALL) -c -m 755 $(srcdir)/rexx $(prefix)/bin/rexx
-	$(INSTALL) -c -m 755 $(srcdir)/regina $(prefix)/bin/regina
-	$(INSTALL) -c -m 755 $(srcdir)/rxqueue $(prefix)/bin/rxqueue
-	$(INSTALL) -c -m 755 $(srcdir)/rxstack $(prefix)/bin/rxstack
-	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(prefix)/share/man/man1/regina.1
-	$(INSTALL) -c -m 644 $(srcdir)/rxstack.1 $(prefix)/share/man/man1/rxstack.1
-	$(INSTALL) -c -m 644 $(srcdir)/rxqueue.1 $(prefix)/share/man/man1/rxqueue.1
+	$(INSTALL) -c -m 755 $(srcdir)/rexx $(prefix)/usr/bin/rexx
+	$(INSTALL) -c -m 755 $(srcdir)/regina $(prefix)/usr/bin/regina
+	$(INSTALL) -c -m 755 $(srcdir)/rxqueue $(prefix)/usr/bin/rxqueue
+	$(INSTALL) -c -m 755 $(srcdir)/rxstack $(prefix)/usr/bin/rxstack
+	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(prefix)/usr/share/man/man1/regina.1
+	$(INSTALL) -c -m 644 $(srcdir)/rxstack.1 $(prefix)/usr/share/man/man1/rxstack.1
+	$(INSTALL) -c -m 644 $(srcdir)/rxqueue.1 $(prefix)/usr/share/man/man1/rxqueue.1
+	$(INSTALL) -m 644 -c $(SHLPRE)rxtest1$(MODPST) $(prefix)$(libdir)/regina-rexx/$(VERDOT)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -m 644 -c $(SHLPRE)rxtest2$(MODPST) $(prefix)$(libdir)/regina-rexx/$(VERDOT)/$(SHLPRE)rxtest2$(MODPST)
 	@echo
 	for i in `ls $(srcdir)/demo/*.rexx`; do \
 	   echo "Installing $$i..." ; \

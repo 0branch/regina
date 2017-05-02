@@ -884,7 +884,7 @@ case "$target" in
                 ;;
         *cygwin*)
                 LIBPRE="lib"
-                SHLPRE=""
+                SHLPRE="cyg"
                 DYN_COMP="-DDYNAMIC"
                 LIBPST=".a"
                 ;;
@@ -960,6 +960,7 @@ BASE_BINARY="binarybase"
 USE_ABI="no"
 BUNDLE=""
 EXTRATARGET=""
+REGINA_PACKAGE_NAME="Regina-REXX"
 case "$target" in
         *hp-hpux*)
                 SHLPRE="lib"
@@ -1232,11 +1233,11 @@ case "$target" in
                 LD_RXLIB_A1="${CC} -shared -o \$(@)"
                 LD_RXLIB_A2="${CC} -shared -o \$(@)"
                 LD_RXLIB_UTILA="${CC} -shared -o \$(@)"
-                LD_RXLIB_B1="-L. -lregina"
-                LD_RXLIB_B2="-L. -lregina"
-                LD_RXLIB_UTILB="-L. -lregina"
-                SHLPRE=""
-                SHL_LD="${CC} -shared -o \$(@) -o regina.dll \$(SHOFILES)"
+                LD_RXLIB_B1="-L. -lcygregina"
+                LD_RXLIB_B2="-L. -lcygregina"
+                LD_RXLIB_UTILB="-L. -lcygregina"
+                SHLPRE="cyg"
+                SHL_LD="${CC} -shared -o \$(@) -o cygregina.dll \$(SHOFILES)"
                 EEXTRA=""
                 LIBPRE="lib"
                 LIBPST=".a"
@@ -1252,6 +1253,7 @@ case "$target" in
                 BASE_INSTALL="cygwininstall"
                 OTHER_INSTALLS=""
                 RXSTACK_INSTALL=""
+                REGINA_PACKAGE_NAME="regina-rexx"
                 ;;
         *apple-darwin*)
                 # to test on platform other than real Mac OSX use: --build=ppc-apple-darwin10.1 --target=ppc-apple-darwin10.1
@@ -1268,12 +1270,10 @@ case "$target" in
                 LD_RXLIB_UTILB="-L. -l${SHLFILE} -lc \$(SHLIBS) $REGUTIL_TERM_LIB"
                 DYN_COMP="-DDYNAMIC -fno-common"
                 SHLPRE="lib"
-# MH                BUNDLE=".so"
                 BUNDLE=".junk"
                 SHL_LD="${CC} ${EEXTRA} -dynamiclib ${LDFLAGS} -headerpad_max_install_names -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 SHL_BASE="${LIBPRE}${SHLFILE}${SHLPST}"
-# MH                EXTRATARGET="libregina$BUNDLE"
-                OTHER_INSTALLS="installlib"
+                OTHER_INSTALLS="installmaclib"
                 ;;
         *)
                 MH_HOWTO_SHARED_LIBRARY()
@@ -1395,6 +1395,7 @@ AC_SUBST(REGUTILEXP)
 AC_SUBST(REGUTILEXPORTS)
 AC_SUBST(USE_ABI)
 AC_SUBST(RANLIB_DYNAMIC)
+AC_SUBST(REGINA_PACKAGE_NAME)
 ])dnl
 
 dnl ---------------------------------------------------------------------------
@@ -1487,7 +1488,7 @@ case "$target" in
                 ;;
         *cygwin*)
                 LIBPRE="lib"
-                SHLPRE=""
+                SHLPRE="cyg"
                 LIBPST=".a"
                 BASE_INSTALL="cygwininstall"
                 BASE_BINARY="cygwinbinary"

@@ -2602,7 +2602,6 @@ int rxstack_process_command( Client *client )
 {
    char pheader[RXSTACK_PEEK_HEADER_SIZE];
    int rc;
-   char rcode[2];
 
    if ( client->deadline.milli != -1 )
    {
@@ -2612,7 +2611,6 @@ int rxstack_process_command( Client *client )
        */
       bad_news_for_waiter( client->default_queue, client ) ;
    }
-   rcode[1] = '\0';
    memset( pheader, 0, sizeof(pheader) );
    DEBUGDUMP(printf("\npeeking from socket %d\n", client->socket););
    rc = recv( client->socket, pheader, RXSTACK_PEEK_HEADER_SIZE, MSG_PEEK );
