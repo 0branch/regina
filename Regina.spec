@@ -2,7 +2,7 @@
 %define vermajor 3
 %define verminor 9
 Name: Regina-REXX
-Version: 3.9.0
+Version: 3.9.1
 Release: 1
 Group: Development/Languages/Other
 Source: %{name}-%{version}.tar.bz2

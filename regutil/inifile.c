@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/inifile.c,v 1.4 2014/10/19 10:25:57 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/inifile.c,v 1.4 2014/10/19 10:25:57 mark Exp $
  */
 #ifndef _WIN32
 # include <unistd.h>

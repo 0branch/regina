@@ -9,7 +9,7 @@
 # portuguese - brian <bcarpent@nucleus.com>
 # russian - Oleg Kulikov <kulikov@xanadu.ru>
 # spanish - Pablo Garcia-Abia <Pablo.Garcia@cern.ch>
-# svenska - Jan-Erik Lärka <jan-erik@os2ug.se>
+# svenska - Jan-Erik Lärka <janerik.larka@gmail.com>
 #
 # Riktlinjer för översättare
 # --------------------------
@@ -31,9 +31,6 @@
 #   Jag behåller din e-postadress för att kunna kontakta dig i framtiden om behov uppstår
 #   av att uppdatera och lägga till enskilda meddelanden, men publicerar endast ditt namn.
 # - Till sist men på inget sätt minst; Tack!
-#
-# TODO
-# 40.44
 #
   0,  1,Fel %s kör %s, rad %d:|<value>,<source>,<linenumber>
   0,  2,Fel %s vid interaktiv sökning:|<value>
@@ -201,14 +198,14 @@
  40, 33,%s argument 1 ("%d") måste vara mindre eller lika med argument 2 ("%d")|<bif>,<value>,<value>
  40, 34,%s argument 1 ("%d") måste vara mindre eller lika med antalet rader i programmet (%d)|<bif>,<value>,<sourceline()>
  40, 35,%s argument 1 kan inte uttryckas som ett heltal; hittade "%s"|<bif>,<value>
- 40, 36,%s argument 1 must be a name of a variable in the pool; found "%s"|<bif>,<value>
- 40, 37,%s argument 3 must be the name of a pool; found "%s"|<bif>,<value>
- 40, 38,%s argument %d is not large enough to format "%s"|<bif>,<argnumber>,<value>
- 40, 39,%s argument 3 is not zero or one; found "%s"|<bif>,<value>
- 40, 41,%s argument %d must be within the bounds of the stream; found "%s"|<bif>,<argnumber>,<value>
+ 40, 36,%s argument 1 måste vara ett namn på en använd variabel; hittade "%s"|<bif>,<value>
+ 40, 37,%s argument 3 måste vara ett benämning på variablerna; hittade "%s"|<bif>,<value>
+ 40, 38,%s argument %d är inte tillräckligt stor för formatet "%s"|<bif>,<argnumber>,<value>
+ 40, 39,%s argument 3 är inte noll eller ett; hittade "%s"|<bif>,<value>
+ 40, 41,%s argument %d måste ligga inom begränsningarna för strömmen; hittade "%s"|<bif>,<argnumber>,<value>
  40, 42,%s argument 1; kan inte placera i denna filström; hittade "%s"|<bif>,<value>
  40, 43,%s argument %d måste vara en icke-alfanumeriskt tecken eller tom sträng; hittade "%s"|<bif>,<argnumber>,<value>
- 40, 44,%s argument %d, "%s", is a format incompatible with the separator specified in argument %d|<bif>,<argnumber>,<value>,<argnumber>
+ 40, 44,%s argument %d, "%s", är på format som inte fungerar med den angivna separatorn som angivits som argument %d|<bif>,<argnumber>,<value>,<argnumber>
  40,914,[%s argument %d, måste vara en av "%s"; hittade "%s"]|<bif>,<argnumber>,<optionslist>,<value>
  40,920,[%s: Låg-nivå I/O-fel på filström; %s]|<bif>,<description>
  40,921,[%s argument %d, pekar på placering "%s" i filström; inkompatibel med filström som är öppen]|<bif>,<argnumber>,<value>
@@ -254,7 +251,7 @@
  47,  1,INTERPRET för data får inte innehålla benämningar; hittade "%s"|<name>
  48,  0,Systemtjänst har slutat fungera
  48,  1,Fel i systemtjänst: %s|<description>
- 48,920, Låg-nivå I/O-fel på filström: %s %s: %s|<description>,<stream>,<description>
+ 48,920, Lågnivå I/O-fel på filström: %s %s: %s|<description>,<stream>,<description>
  49,  0,Tolkningsfel
  49,  1,Tolkningsfel: Fel i %s, rad %d: "%s". Var god rapportera felet!|<module>,<linenumber>,<description>
  50,  0,Okänd reserverad symbol
@@ -282,6 +279,7 @@
  90,  1,[%s är en utökning enl. Regina BIF]|<bif>
  90,  2,[%s är en utökad instruktion enl. Regina]|<token>
  90,  3,[%s argument %d, valet måste börja med ett av "%s" när "OPTIONS STRICT_ANSI" används; hittade "%s"; a Regina extension]|<bif>,<argnumber>,<optionslist>,<value>
+ 90,  4,[%s är en utökad jämförelsen enl. Regina]|<token>
  93,  0,[Ogilitgt anrop till rutin]
  93,  1,[Kommandot STREAM %s måste följas av ett av "%s"; hittade "%s"]|<token>,<value>,<value>
  93,  3,[Kommandot STREAM måste vara ett av "%s"; hittade "%s"]|<value>,<value>

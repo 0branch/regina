@@ -137,6 +137,7 @@ streng *do_instore( tsd_t * volatile TSD, const streng *name, paramboxptr args,
       newsystem->script_exit = jbuf;
       newsystem->invoked = ctype;
       newsystem->input_file = Str_dupstrTSD( name );
+      set_reserved_value( TSD, POOL0_FILE, Str_dupTSD( name ), 0, VFLAG_STR );
       newsystem->trace_override = newsystem->previous->trace_override;
       newsystem->ctrlcounter = newsystem->previous->ctrlcounter +
                                                newsystem->previous->cstackcnt;
@@ -173,6 +174,7 @@ streng *do_instore( tsd_t * volatile TSD, const streng *name, paramboxptr args,
       else
          ptr = NULL;
       TSD->currentnode = savecurrentnode; /* pgb */
+      set_reserved_value( TSD, POOL0_FILE, Str_dupTSD( TSD->systeminfo->previous->input_file ), 0, VFLAG_STR );
    }
 
    if ( doTermHook )
@@ -353,11 +355,13 @@ streng *execute_external( tsd_t * volatile TSD, const streng *command,
 
          ptr = interpret( TSD, TSD->systeminfo->tree.root );
          TSD->currentnode = savecurrentnode; /* pgb */
+         set_reserved_value( TSD, POOL0_FILE, Str_dupTSD( TSD->systeminfo->previous->input_file ), 0, VFLAG_STR );
       }
       else
       {
          TSD->currentnode = savecurrentnode; /* pgb */
          ptr = NULL;
+         set_reserved_value( TSD, POOL0_FILE, Str_dupTSD( TSD->systeminfo->previous->input_file ), 0, VFLAG_STR );
          exiterror( ERR_YACC_SYNTAX, 1, parsing.tline );
       }
    }

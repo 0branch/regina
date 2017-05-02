@@ -59,14 +59,14 @@ case "$target" in
       ;;
    sparc*sunos*)
       ;;
-   *linux*|*kfreebsd*-gnu*)
+   *linux* | *kfreebsd*-gnu*)
       mach="`uname -m`"
       if test "$mach" = "x86_64" -o "$mach" = "ia86" -o "$mach" = "alpha" -o "$mach" = "ppc64" -o "$mach" = "s390x"; then
          bitflag="64"
          osis64bit=yes
       fi
       ;;
-   *-freebsd*)
+   *-freebsd* | *-openbsd*)
       mach="`uname -m`"
       if test "$mach" = "amd64"; then
          bitflag="64"

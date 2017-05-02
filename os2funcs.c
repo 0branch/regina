@@ -160,7 +160,7 @@ streng *os2_directory( tsd_t *TSD, cparamboxptr parms )
    if (ok==HOOK_GO_ON)
    {
       result = Str_makeTSD( REXX_PATH_MAX );
-      my_fullpath( result->value, "." );
+      my_fullpath( TSD, result->value, "." );
       result->len = strlen( result->value );
    }
    return result;

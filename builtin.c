@@ -1876,7 +1876,7 @@ streng *std_compare( tsd_t *TSD, cparamboxptr parms )
 streng *std_errortext( tsd_t *TSD, cparamboxptr parms )
 {
    char opt = 'N';
-   streng *tmp,*tmp1,*tmp2;
+   streng *tmp,*tmp1,*tmp2,*retstr;
    int numdec=0, errnum, suberrnum, pos=0, i;
 #if 0
    const char *err=NULL;
@@ -1922,7 +1922,9 @@ streng *std_errortext( tsd_t *TSD, cparamboxptr parms )
 
    Free_stringTSD( tmp ) ;
 
-   return Str_dupTSD( errortext( TSD, errnum, suberrnum, (opt=='S')?1:0, 1 ) ) ;
+   retstr = Str_dupTSD( errortext( TSD, errnum, suberrnum, (opt=='S')?1:0, 1 ) ) ;
+   clear_errortext_buffers( TSD ); /* fix bug 449 */
+   return retstr;
 }
 
 

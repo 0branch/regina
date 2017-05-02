@@ -1101,6 +1101,7 @@ case "$target" in
          LD_RXLIB1="ld -Bdynamic -Bshareable  ${LDFLAGS}"
          LD_RXTRANSLIB1="$LD_RXLIB1"
       fi
+      STATIC_LDFLAGS="-static"
       ;;
    *pc-sco*)
       LD_RXLIB1="ld -dy -G  ${LDFLAGS}"

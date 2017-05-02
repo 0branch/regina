@@ -316,6 +316,7 @@
  90,  1,[%s es un BIF de la extensión de Regina]|<bif>
  90,  2,[%s es una instrucción de la extensión de Regina]|<token>
  90,  3,[Argumento de %s número %d, opción debe empezar por uno de "%s" con "OPTIONS STRICT_ANSI"; encontrado "%s"; una extension de Regina]|<bif>,<argnumber>,<optionslist>,<value>
+ 90,  4,[%s es una operador de la extensión de Regina]|<token>
  93,  0,[Llamada incorrecta a rutina]
  93,  1,[El comando %s de STREAM debe estar seguido por uno de "%s"; encontrado "%s"]|<token>,<value>,<value>
  93,  3,[El comando de STREAM debe ser uno de "%s"; encontrado "%s"]|<value>,<value>

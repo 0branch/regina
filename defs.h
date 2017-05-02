@@ -152,6 +152,16 @@
 #define X_ADDR_WITH     134
 #define X_S_LOSTDIGITS  135
 #define X_DO_EXPR       136
+#define X_PLUSASSIGN    137
+#define X_MINUSASSIGN   138
+#define X_MULTASSIGN    139
+#define X_DIVASSIGN     140
+#define X_INTDIVASSIGN  141
+#define X_MODULUSASSIGN 142
+#define X_ORASSIGN      143
+#define X_XORASSIGN     144
+#define X_ANDASSIGN     145
+#define X_CONCATASSIGN  146
 
 
 /* The three first two numbers have not errortext attched to them */
@@ -403,3 +413,6 @@
 #define PARSE_UPPER     1
 #define PARSE_LOWER     2
 #define PARSE_CASELESS  4
+
+#define SIDE_LEFT  1
+#define SIDE_RIGHT 2

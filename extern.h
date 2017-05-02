@@ -86,7 +86,7 @@
 #if !defined(HAVE__SPLITPATH2) && !defined(HAVE__SPLITPATH) && !defined(__EMX__) && !defined(DJGPP)
    int my_splitpath2( const char *in, char *out, char **drive, char **dir, char **name, char **ext ) ;
 #endif
-   int my_fullpath( char *dst, const char *src );
+   int my_fullpath( tsd_t *TSD, char *dst, const char *src );
    int my_fullpathstreng( const tsd_t *TSD, char *dst, const streng *src );
    streng *arexx_exists( tsd_t *TSD, cparamboxptr parms ) ;
 
@@ -94,7 +94,7 @@
  * Routines in expr.c
  */
    int isboolean( tsd_t *TSD, nodeptr, int suberror, const char *op ) ;
-   num_descr *calcul( tsd_t *TSD, nodeptr, num_descr** ) ;
+   num_descr *calcul( tsd_t *TSD, nodeptr, num_descr**, int leftorright, int oper ) ;
    int init_expr( tsd_t *TSD ) ;
    streng *evaluate( tsd_t *TSD, nodeptr thisptr, streng **kill ) ;
 
@@ -248,6 +248,7 @@
    void __reginaerror( char *errtext ) ;
    const char *getsym( int numb ) ;
    int lineno_of( cnodeptr ) ;
+   void clear_errortext_buffers( const tsd_t *TSD );
 
 
 /*

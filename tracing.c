@@ -555,6 +555,8 @@ void getcallstack( tsd_t *TSD, streng *stem )
          ptr = ss->callstack[i];
          if ( !ptr )
             continue;
+         if ( !ptr->name )
+            continue;
          tmpptr = ptr->name;
          /* get the value; lineno name */
          value = Str_makeTSD( (tmpptr->len) + 10 ) ; /* should not be more than 999999999 levels in the call stack */

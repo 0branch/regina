@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regsemux.c,v 1.6 2010/01/11 12:50:24 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regsemux.c,v 1.6 2010/01/11 12:50:24 mark Exp $
  */
 #include "regutil.h"
 

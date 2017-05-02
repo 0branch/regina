@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regutil.h,v 1.6 2013/10/11 06:19:05 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regutil.h,v 1.6 2013/10/11 06:19:05 mark Exp $
  */
 
 

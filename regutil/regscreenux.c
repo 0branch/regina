@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regscreenux.c,v 1.9 2012/08/08 01:23:45 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.9 2012/08/08 01:23:45 mark Exp $
  */
 #include "regutil.h"
 #ifdef USE_TERMCAP_DB

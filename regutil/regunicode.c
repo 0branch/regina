@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regunicode.c,v 1.3 2012/08/08 01:26:20 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regunicode.c,v 1.3 2012/08/08 01:26:20 mark Exp $
  */
 #include "rxproto.h"
 

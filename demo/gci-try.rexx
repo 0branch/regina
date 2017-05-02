@@ -100,7 +100,7 @@ say ""
  * After the prelimnaries try to use the GCI.
  */
 if system = "OS/2" then signal useOS2
-
+trace i
 say "Trying to copy string 'hello' to a string 'world' using the C library"
 stem.calltype = cdecl
 stem.0 = 2
@@ -206,6 +206,11 @@ if RESULT \= 0 then do
 if RESULT \= 0 then do
    stem.1.type = float64
    stem.return.type = float64
+   call RxFuncDefine logl, MathLib, "log", stem
+   end
+if RESULT \= 0 then do
+   stem.1.type = float32
+   stem.return.type = float32
    call RxFuncDefine logl, MathLib, "log", stem
    end
 if RESULT \= 0 then do

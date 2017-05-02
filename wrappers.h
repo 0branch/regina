@@ -219,6 +219,7 @@
 #define enter_macro                  __regina_enter_macro
 #define envir_exists                 __regina_envir_exists
 #define errortext                    __regina_errortext
+#define clear_errortext_buffers      __regina_clear_errortext_buffers
 #define external_queues_used         __regina_external_queues_used
 #define ext_pool_value               __regina_ext_pool_value
 #define evaluate                     __regina_evaluate

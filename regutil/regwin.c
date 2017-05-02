@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regwin.c,v 1.1 2009/10/07 07:52:21 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regwin.c,v 1.1 2009/10/07 07:52:21 mark Exp $
  */
 
 #include "rxproto.h"

@@ -1132,6 +1132,7 @@ case "$target" in
                    LD_RXLIB_UTILB="-lc -L. -l${SHLFILE}"
                    SHL_LD="ld -Bdynamic -Bshareable ${LDFLAGS} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 fi
+                STATIC_LDFLAGS="-static"
                 SHLPRE="lib"
                 ;;
         *linux*|*kfreebsd*-gnu*)

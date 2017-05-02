@@ -1,3 +1,10 @@
+regina (3.9.1-1) unstable; urgency=low
+
+  * Fix for Bug #396, #418, #429, #432, #434, #437, #441, #443, #449, #451
+  * Feature request #37
+
+ -- Mark Hessling <mark@rexx.org>  Sun,  5 Apr 2015 01:50:00 +1000
+
 regina (3.9.0-1) unstable; urgency=low
 
   * Fix for Bug #436
@@ -10,6 +17,9 @@ regina (3.8.3-1) unstable; urgency=low
   * Fix for Bug #433
   * Added extra QUERY options; CREATETIME, MODIFYTIME and ACCESSTIME to STREAM BIF
     Returns a time_t value for create, modify and access time of the persistent stream
+    Feature Request #34
+  * Feature Request #35 - GETCALLER BIF to determine who called the program
+  * Feature Request #36 - .FILE reserved variable
 
  -- Mark Hessling <mark@rexx.org>  Thu, 28 Jul 2014 01:50:00 +1000
 

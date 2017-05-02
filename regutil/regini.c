@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regini.c,v 1.18 2014/10/30 04:51:05 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.18 2014/10/30 04:51:05 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSMISC

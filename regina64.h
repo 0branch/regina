@@ -77,20 +77,27 @@
 #  define RX_64UMAX     ULONG_MAX
 # endif
 #endif
-
 /*
  * Large file support
  * Must have #included config.h before #including this file
  */
 #if defined(HAVE__STATI64)
 # define rx_stat_buf  _stati64
-# define rx_stat      _stati64
+# if defined(WIN32)
+#  define rx_stat      rx_w32_stat
+# else
+#  define rx_stat      stati64
+# endif
 # define rx_fstat     _fstati64
 # define rx_fseek     _fseeki64
 # define rx_ftell     _ftelli64
 #else
 # define rx_stat_buf  stat
-# define rx_stat      stat
+# if defined(WIN32)
+#  define rx_stat     rx_w32_stat
+#else
+#  define rx_stat     stat
+#endif
 # define rx_fstat     fstat
 # define rx_fseek     fseek
 # define rx_ftell     ftell

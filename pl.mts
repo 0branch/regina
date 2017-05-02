@@ -282,6 +282,7 @@
  90,  1,[%s jest funkcj¥ BIF rozszerzenia Regina'y]|<bif>
  90,  2,[%s jest instrukcj¥ rozszerzenia Regina'y]|<token>
  90,  3,[Argument %s nr %d, Przy "OPTIONS STRICT_ANSI" opcja musi zaczynaå si© jednym z "%s; znaleziono "%s"; rozszerzenie Regina'y]|<bif>,<argnumber>,<optionslist>,<value>
+ 90,  4,[%s jest operatora rozszerzenia Regina'y]|<token>
  93,  0,[Niepoprawne wywoêanie procedury]
  93,  1,[Po komendzie STREAM %s musi wyst©powaå jedna z "%s"; znaleziono "%s"]|<token>,<value>,<value>
  93,  3,[Komenda STREAM musi byå jedn¥ z "%s"; znaleziono "%s"]|<value>,<value>

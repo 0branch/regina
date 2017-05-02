@@ -285,6 +285,7 @@
  90,  1,[%s ogesi bir Regina uzanti BIF elemanidir]|<bif>
  90,  2,[%s ogesi bir Regina uzanti buyrugudur]|<token>
  90,  3,[%s degistirgesini iceren %d. siradaki ogenin isaret ettigi senecek "OPTIONS_STRICT_ANSI" ile belirtilmis "%s" ogelerinden birisi ile baslamalidir; bulunan "%s"; bir Regina uzantisidir]|<bif>,<argnumber>,<optionslist>,<value>
+ 90,  4,[%s ogesi bir Regina uzanti islecinin]|<token>
  93,  0,[Dogru olmayan yordam cagrimi]
  93,  1,[%s seklindeki STREAM buyrugu "%s" ogelerinin bir tanesi tarafindan takip edilmelidir; bulunan "%s"]|<token>,<value>,<value>
  93,  3,[STREAM buyrugu "%s" ogelerinden bir tanesi olmalidir; bulunan "%s"]|<value>,<value>

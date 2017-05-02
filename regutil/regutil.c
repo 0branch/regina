@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regutil.c,v 1.7 2014/10/19 04:07:12 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regutil.c,v 1.7 2014/10/19 04:07:12 mark Exp $
  */
 #ifdef _WIN32
 # include <windows.h>

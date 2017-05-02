@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regscreenos2.c,v 1.3 2009/11/01 01:26:09 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regscreenos2.c,v 1.3 2009/11/01 01:26:09 mark Exp $
  */
 #define INCL_DOSMEMMGR
 #define INCL_VIO

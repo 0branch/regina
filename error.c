@@ -300,6 +300,7 @@ static const errtext_t errtext[NUMBER_ERROR_MESSAGES] =
    {  90,  1,"[%s is a Regina extension BIF]|<bif>" },
    {  90,  2,"[%s is a Regina extension instruction]|<token>" },
    {  90,  3,"[%s argument %d, option must start with one of \"%s\" with \"OPTIONS STRICT_ANSI\"; found \"%s\"; a Regina extension]|<bif>,<argnumber>,<optionslist>,<value>" },
+   {  90,  4,"[%s is a Regina extension operator]|<token>" },
    {  93,  0,"[Incorrect call to routine]" },
    {  93,  1,"[STREAM command %s must be followed by one of \"%s\"; found \"%s\"]|<token>,<value>,<value>" },
    {  93,  3,"[STREAM command must be one of \"%s\"; found \"%s\"]|<value>,<value>" },
@@ -408,9 +409,9 @@ static streng *get_buffer( const tsd_t *TSD, unsigned minsize )
 }
 
 /*
- * clear_buffers frees up memory used for internal buffers
+ * clear_errortext_buffers frees up memory used for internal buffers
  */
-static void clear_buffers( const tsd_t *TSD )
+void clear_errortext_buffers( const tsd_t *TSD )
 {
    err_tsd_t *et = (err_tsd_t *)TSD->err_tsd;
    int idx=-1;
@@ -795,7 +796,7 @@ void exiterror( int errorno, int suberrorno, ... )
 
    Free_stringTSD( errmsg );
    /* clean up internal buffers */
-   clear_buffers( TSD );
+   clear_errortext_buffers( TSD );
 
 not_hookable:
 
@@ -1368,6 +1369,16 @@ const char *getsym( int numb )
       case X_ADDR_WITH: symb="ADDRESS WITH option list" ; break ;
       case X_S_LOSTDIGITS: symb="LOSTDIGITS option" ; break ;
       case X_DO_EXPR: symb="Upper limit in DO" ; break ;
+      case X_PLUSASSIGN: symb="Plus assignemnt operator" ; break ;
+      case X_MINUSASSIGN: symb="Minus assignemnt operator" ; break ;
+      case X_MULTASSIGN: symb="Multiplication assignemnt operator" ; break ;
+      case X_DIVASSIGN: symb="Division assignemnt operator" ; break ;
+      case X_INTDIVASSIGN: symb="Integer division assignemnt operator" ; break ;
+      case X_MODULUSASSIGN: symb="Modulus assignemnt operator" ; break ;
+      case X_ORASSIGN: symb="Logical OR assignemnt operator" ; break ;
+      case X_XORASSIGN: symb="Logical XOR assignemnt operator" ; break ;
+      case X_ANDASSIGN: symb="Logical AND assignemnt operator" ; break ;
+      case X_CONCATASSIGN: symb="Concatenation assignemnt operator" ; break ;
       default: symb="Unrecognized value" ;
    }
 

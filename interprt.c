@@ -696,7 +696,7 @@ reinterpret:
                      if ( chkill )
                         Free_stringTSD( chkill );
 #else
-                     s.stopval = calcul(TSD,tmpptr,NULL) ;
+                     s.stopval = calcul( TSD, tmpptr, NULL, SIDE_LEFT, X_DO_TO ) ;
 #endif
                      break ;
                   }
@@ -704,7 +704,7 @@ reinterpret:
                      /* DO ... BY x: s.increment is the value of x; x evaluates to any decimal number, s.incrdir is the "direction", +ve or -ve */
                      s.incr_node = thisptr->p[0]->p[i]->p[0] ;
                      tmpptr = thisptr->p[0]->p[i]->p[0] ;
-                     s.increment = calcul(TSD,tmpptr,NULL) ;
+                     s.increment = calcul( TSD, tmpptr, NULL, SIDE_LEFT, X_DO_BY ) ;
                      s.incrdir = descr_sign( s.increment ) ;
 /*
 fprintf(stderr,"%s %d: direction: %d increment %s neg %d exp %d\n",__FILE__,__LINE__, s.incrdir,
@@ -997,7 +997,7 @@ endloop: if (s.increment)
          streng *preferred_str;
          int type;
 
-         ntmp = calcul(TSD,thisptr->p[1],NULL);
+         ntmp = calcul( TSD, thisptr->p[1], NULL, SIDE_LEFT, X_NASSIGN );
          assert( ntmp->size );
 
          type = thisptr->p[1]->type;
@@ -1014,25 +1014,306 @@ endloop: if (s.increment)
          {
             setshortcutnum( TSD, thisptr->p[0], ntmp, preferred_str );
          }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
       }
-      break ;
 
       case X_ASSIGN:
-         {
+      {
 /* This is a CMS-ism; CMS allows the expression in an assignment to
  * be omitted, while TRL does _not_. If a CMS mode is implemented, the
  * code below should be changed to allow p[0] to be null only iff
  * CMS mode is active.
  */
-            streng *value ;
+         streng *value ;
 
-            value = thisptr->p[1] ? evaluate(TSD,thisptr->p[1],NULL) : nullstringptr() ;
-            if (thisptr->p[0]->type==X_HEAD_SYMBOL)
-               fix_compound( TSD, thisptr->p[0], value ) ;
-            else
-               setshortcut( TSD, thisptr->p[0], value ) ;
+         value = thisptr->p[1] ? evaluate(TSD,thisptr->p[1],NULL) : nullstringptr() ;
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+            fix_compound( TSD, thisptr->p[0], value ) ;
+         else
+            setshortcut( TSD, thisptr->p[0], value ) ;
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            tracevalue( TSD, value, '=' );
          }
          break ;
+      }
+
+      case X_PLUSASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "+=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_PLUSASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_MINUSASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "-=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_MINUSASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_MULTASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "*=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_MULTASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_DIVASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "/=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_DIVASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_INTDIVASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "%=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_INTDIVASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_MODULUSASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "//=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_MODULUSASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_ORASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "|=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_ORASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_XORASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "&&=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_XORASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_ANDASSIGN:
+      {
+         num_descr *ntmp;
+
+         if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+            exiterror( ERR_NON_ANSI_FEATURE, 4, "&=" )  ;
+
+         ntmp = calcul( TSD, thisptr, NULL, SIDE_LEFT, X_ANDASSIGN );
+         assert( ntmp->size );
+
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+         {
+            fix_compoundnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         else
+         {
+            setshortcutnum( TSD, thisptr->p[0], ntmp, NULL );
+         }
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            streng *ptr = str_norm( TSD, ntmp, NULL );
+            tracevalue( TSD, ptr, '=' );
+            FreeTSD( ptr );
+         }
+         break ;
+      }
+
+      case X_CONCATASSIGN:
+      {
+         streng *value ;
+
+         value = evaluate( TSD, thisptr, NULL ) ;
+         if (thisptr->p[0]->type==X_HEAD_SYMBOL)
+            fix_compound( TSD, thisptr->p[0], value ) ;
+         else
+            setshortcut( TSD, thisptr->p[0], value ) ;
+         /* trace the result of assignment */
+         if ( TSD->trace_stat == 'R' )
+         {
+            tracevalue( TSD, value, '=' );
+         }
+         break ;
+      }
 
       case X_IPRET:
       {

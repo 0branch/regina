@@ -498,6 +498,59 @@
 
 #include "regina64.h"
 
+#if defined(WIN32)
+/*
+ * Work around for bug in WIN32 stat() function; can't have trailing slash
+ */
+# if defined(HAVE__STATI64)
+static int rx_w32_stat( const char *path, struct _stati64 *buffer )
+{
+   int lastpos;
+   int rc;
+   char tmpstring[REXX_PATH_MAX ];
+
+   rc = _stati64( path, buffer );
+   if ( rc != 0 && errno == ENOENT )
+   {
+      if ( path )
+      {
+         lastpos = strlen( path ) -  1;
+         if ( path[lastpos] == '\\' || path[lastpos] == '/')
+         {
+            memcpy( tmpstring, path, lastpos ) ;
+            tmpstring[lastpos] = '\0';
+            rc = _stati64( tmpstring, buffer );
+         }
+      }
+   }
+   return rc;
+}
+# else
+static int rx_w32_stat( const char *path, struct _stat *buffer )
+{
+   int lastpos;
+   int rc;
+   char tmpstring[REXX_PATH_MAX ];
+
+   rc = stat( path, buffer );
+   if ( rc != 0 && errno == ENOENT )
+   {
+      if ( path )
+      {
+         lastpos = strlen( path ) -  1;
+         if ( path[lastpos] == '\\'|| path[lastpos] == '/')
+         {
+            memcpy( tmpstring, path, lastpos ) ;
+            tmpstring[lastpos+1] = '\0';
+            rc = stat( tmpstring, buffer );
+         }
+      }
+   }
+   return rc;
+}
+# endif
+#endif
+
 /*
  * Here comes another 'sunshine-story' ...  Since SunOS don't have
  * a decent set of include-files in the standard version of the OS,
@@ -2092,7 +2145,7 @@ try_to_open:
    if (ptr->fileptr)
    {
       int fno, rc ;
-      struct rx_stat statbuf ;
+      struct rx_stat_buf statbuf ;
       errno = 0 ;
       fno = fileno(ptr->fileptr) ;
       rc = rx_fstat( fno, &statbuf ) ;
@@ -3587,7 +3640,7 @@ static rx_64 calc_chars_left( tsd_t *TSD, fileboxptr ptr )
 #if 0
       left = ( !(ptr->flag & FLAG_RDEOF)) ;
 #else
-      struct rx_stat finfo;
+      struct rx_stat_buf finfo;
       int fno;
 
       fno = fileno( ptr->fileptr ) ;
@@ -3711,7 +3764,7 @@ static rx_64 countlines( tsd_t *TSD, fileboxptr ptr, int actual, int oper )
          return 0;
       else
       {
-         struct rx_stat buffer ;
+         struct rx_stat_buf buffer ;
          int fno;
          memset( &buffer, 0, sizeof(buffer) );
          fno = fileno( ptr->fileptr ) ;
@@ -3967,7 +4020,7 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand )
    rx_64 pos_read = -2L, pos_write = -2L, line_read = -2L, line_write = -2;
    int streamtype = STREAMTYPE_UNKNOWN;
    streng *result=NULL ;
-   struct rx_stat buffer ;
+   struct rx_stat_buf buffer ;
    struct tm tmdata, *tmptr ;
    char *fn=NULL;
 #if 0
@@ -4039,10 +4092,7 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand )
    {
       if ( fn )
          FreeTSD( fn );
-      checkProperStreamName( TSD,
-                             NULL,
-                             (const char *) tmpstr_of( TSD, filename ),
-                             errno );
+      checkProperStreamName( TSD, NULL, (const char *) tmpstr_of( TSD, filename ), errno );
       return nullstringptr();
    }
    switch ( subcommand )
@@ -4108,7 +4158,7 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand )
          else
          {
             result = Str_makeTSD( REXX_PATH_MAX );
-            my_fullpath( result->value, fn );
+            my_fullpath( TSD, result->value, fn );
             result->len = strlen( result->value );
          }
          break;
@@ -5982,7 +6032,7 @@ streng *arexx_exists( tsd_t *TSD, cparamboxptr parms )
 {
    char *name;
    streng *retval;
-   struct rx_stat st;
+   struct rx_stat_buf st;
 
    checkparam( parms, 1, 1, "EXISTS" ) ;
 
@@ -6011,7 +6061,7 @@ static streng *get_external_routine_file( const tsd_t *TSD,
    if ( *fp == NULL )
       return NULL;
 
-   my_fullpath( buf, inname );
+   my_fullpath( TSD, buf, inname );
 
    return Str_crestrTSD( buf );
 }
@@ -6404,7 +6454,7 @@ streng *ConfigStreamQualified( tsd_t *TSD, const streng *name )
    fn = str_ofTSD(name);
 
    result = Str_makeTSD( REXX_PATH_MAX );
-   if ( my_fullpath( result->value, fn ) == -1 )
+   if ( my_fullpath( TSD, result->value, fn ) == -1 )
    {
       /*
        * my_fullpath failed, so split the supplied file into filename
@@ -6423,11 +6473,12 @@ streng *ConfigStreamQualified( tsd_t *TSD, const streng *name )
  * a path element is missing.
  * The return value is 0 on success, -1 in case of a severe error.
  */
-int my_fullpath( char *dst, const char *src )
+int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 {
-   int rc = 0;
+   char *copy=NULL;
+   int rc = 0, len;
 # if defined(__EMX__)
-   int i, len;
+   int i;
 
    if ( _fullpath( dst, src, REXX_PATH_MAX ) == -1)
       strcpy( dst, src );
@@ -6441,18 +6492,42 @@ int my_fullpath( char *dst, const char *src )
          dst[i] = '\\';
    }
 # else
+   /* attempt to get the full path with the supplied source */
    if ( _fullpath( dst, src, REXX_PATH_MAX ) == NULL )
    {
+#  if defined(WIN32)
+      /* now try by removing trailing slash */
+      /* this code may not actually be needed */
+      len = strlen( src ) -  1;
+      if ( src[len] == '\\' || src[len] == '/')
+      {
+         copy = (char *)MallocTSD( len+2 ) ;
+         strcpy( copy, src );
+         copy[len] = '\0';
+         if ( _fullpath( dst, copy, REXX_PATH_MAX ) == NULL )
+         {
+            strcpy( dst, src );
+            rc = -1;
+         }
+      }
+      else
+      {
+         strcpy( dst, src );
+         rc = -1;
+      }
+      if ( copy )
+         FreeTSD( copy );
+#  else
       strcpy( dst, src );
       rc = -1;
+#  endif
    }
 # endif
-
    return rc;
 }
 #elif defined(HAVE__TRUENAME)
 
-int my_fullpath( char *dst, const char *src )
+int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 {
    _truename( src, dst );
 
@@ -6460,7 +6535,7 @@ int my_fullpath( char *dst, const char *src )
 }
 #elif defined(HAVE_REALPATH)
 
-int my_fullpath( char *dst, const char *src )
+int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 {
    realpath( src, dst );
 
@@ -6471,7 +6546,7 @@ int my_fullpath( char *dst, const char *src )
 #  include <rmsdef.h>
 #  include <descrip.h>
 
-int my_fullpath( char *dst, const char *src )
+int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 {
    char *s;
    int status, context = 0;
@@ -6494,14 +6569,14 @@ int my_fullpath( char *dst, const char *src )
 }
 #else /* neither _FULLPATH, _TRUENAME, REALNAME, VMS */
 
-int my_fullpath( char *dst, const char *src )
+int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 {
    char tmp[REXX_PATH_MAX+1];
    char curr_path[REXX_PATH_MAX+1];
    char path[REXX_PATH_MAX+1];
    char fname[REXX_PATH_MAX+1];
    int i = 0, len = -1, retval;
-   struct rx_stat stat_buf;
+   struct rx_stat_buf stat_buf;
 
    getcwd(curr_path,REXX_PATH_MAX);
    strcpy(tmp,src);
@@ -6513,7 +6588,7 @@ int my_fullpath( char *dst, const char *src )
       if ( tmp[ i ] == '\\' )
          tmp[ i ] = '/';
 # endif
-   if ((stat(tmp,&stat_buf) == 0)
+   if ((rx_stat(tmp,&stat_buf) == 0)
    &&  (stat_buf.st_mode & S_IFMT) == S_IFDIR)
    {
       strcpy(path,tmp);
@@ -6598,7 +6673,7 @@ int my_fullpathstreng( const tsd_t *TSD, char *dst, const streng *src )
    int retval;
 
    copy = str_ofTSD( src );
-   retval = my_fullpath( dst, copy );
+   retval = my_fullpath( TSD, dst, copy );
    FreeTSD( copy );
 
    return retval;

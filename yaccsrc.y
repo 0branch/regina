@@ -1,7 +1,7 @@
 %{
 
 #ifndef lint
-static char *RCSid = "$Id: yaccsrc.y,v 1.42 2013/06/29 07:09:45 mark Exp $";
+static char *RCSid = "$Id: yaccsrc.y,v 1.43 2015/04/02 06:18:55 mark Exp $";
 #endif
 
 /*
@@ -129,6 +129,7 @@ static void move_labels( nodeptr front, nodeptr end, int level );
 %token GTGT LTLT NOTGTGT NOTLTLT GTGTE LTLTE
 %token INPUT OUTPUT ERROR NORMAL APPEND REPLACE STREAM STEM LIFO FIFO
 %token LOWER CASELESS
+%token PLUSASSIGNMENTVARIABLE MINUSASSIGNMENTVARIABLE MULTASSIGNMENTVARIABLE DIVASSIGNMENTVARIABLE MODULUSASSIGNMENTVARIABLE INTDIVASSIGNMENTVARIABLE ORASSIGNMENTVARIABLE XORASSIGNMENTVARIABLE ANDASSIGNMENTVARIABLE CONCATASSIGNMENTVARIABLE
 
 %start start
 
@@ -251,6 +252,16 @@ nclstatement : address_stat
              | signal_stat
              | trace_stat
              | upper_stat
+             | plusassignment
+             | minusassignment
+             | multassignment
+             | divassignment
+             | intdivassignment
+             | modulusassignment
+             | xorassignment
+             | orassignment
+             | andassignment
+             | concatassignment
              | assignment
              ;
 
@@ -1002,6 +1013,116 @@ ass_part    : ASSIGNMENTVARIABLE       { $$ = makenode(X_ASSIGN,0) ;
                                          $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
             ;
 
+plusassignment  : plus_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+plus_ass_part : PLUSASSIGNMENTVARIABLE { $$ = makenode(X_PLUSASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+minusassignment  : minus_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+minus_ass_part : MINUSASSIGNMENTVARIABLE { $$ = makenode(X_MINUSASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+multassignment  : mult_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+mult_ass_part : MULTASSIGNMENTVARIABLE { $$ = makenode(X_MULTASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+divassignment  : div_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+div_ass_part : DIVASSIGNMENTVARIABLE { $$ = makenode(X_DIVASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+intdivassignment  : intdiv_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+intdiv_ass_part : INTDIVASSIGNMENTVARIABLE { $$ = makenode(X_INTDIVASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+modulusassignment  : modulus_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+modulus_ass_part : MODULUSASSIGNMENTVARIABLE { $$ = makenode(X_MODULUSASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+andassignment  : and_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+and_ass_part : ANDASSIGNMENTVARIABLE { $$ = makenode(X_ANDASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+xorassignment  : xor_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+xor_ass_part : XORASSIGNMENTVARIABLE { $$ = makenode(X_XORASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+orassignment  : or_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+or_ass_part : ORASSIGNMENTVARIABLE { $$ = makenode(X_ORASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
+concatassignment  : concat_ass_part nexpr  { $$ = $1 ;
+                                         $$->p[1] = $2 ;
+                                       }
+            ;
+
+concat_ass_part : CONCATASSIGNMENTVARIABLE { $$ = makenode(X_CONCATASSIGN,0) ;
+                                         $$->charnr = parser_data.tstart ;
+                                         $$->lineno = parser_data.tline ;
+                                         $$->p[0] = (nodeptr)create_head( (const char *)retvalue ); }
+            ;
+
 
 expr        : '('                      { /* We have to accept exprs here even
                                           * if we just want to accept
@@ -1614,12 +1735,12 @@ static node_type gettypeof( nodeptr thisptr )
          if (thisptr->u.number)
          {
             fprintf( stderr, "Found an internal spot of investigation of the Regina interpreter.\n"
-                             "Please inform Mark Hessling or Florian Coosmann about the\n"
+                             "Please inform Mark Hessling or Florian Grosse-Coosmann about the\n"
                              "circumstances and this script.\n"
                              "\n"
                              "Many thanks!\n"
                              "email addresses:\n"
-                             "m.hessling@qut.edu.au\n"
+                             "mark@rexx.org\n"
                              "florian@grosse-coosmann.de\n");
             /* FIXME: When does this happen?
              * It doesn't happen if no feedback is send until end of 2005.

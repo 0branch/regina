@@ -3483,14 +3483,14 @@ case "$target" in
       ;;
    sparc*sunos*)
       ;;
-   *linux*|*kfreebsd*-gnu*)
+   *linux* | *kfreebsd*-gnu*)
       mach="`uname -m`"
       if test "$mach" = "x86_64" -o "$mach" = "ia86" -o "$mach" = "alpha" -o "$mach" = "ppc64" -o "$mach" = "s390x"; then
          bitflag="64"
          osis64bit=yes
       fi
       ;;
-   *-freebsd*)
+   *-freebsd* | *-openbsd*)
       mach="`uname -m`"
       if test "$mach" = "amd64"; then
          bitflag="64"
@@ -8694,6 +8694,7 @@ case "$target" in
                    LD_RXLIB_UTILB="-lc -L. -l${SHLFILE}"
                    SHL_LD="ld -Bdynamic -Bshareable ${LDFLAGS} -o ${SHLPRE}${SHLFILE}${SHLPST} "'$('SHOFILES')'
                 fi
+                STATIC_LDFLAGS="-static"
                 SHLPRE="lib"
                 ;;
         *linux*|*kfreebsd*-gnu*)
@@ -8843,7 +8844,7 @@ case "$target" in
 $as_echo_n "checking how to create a shared library... " >&6; }
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8846 "configure"
+#line 8847 "configure"
 int foo()
 {
 return(0);
@@ -8934,7 +8935,7 @@ rm -f conftest*
 
 mh_compile='${CC-cc} -c $DYN_COMP conftest.$ac_ext 1>&5'
 cat > conftest.$ac_ext <<EOF
-#line 8937 "configure"
+#line 8938 "configure"
 int foo()
 {
 return(0);

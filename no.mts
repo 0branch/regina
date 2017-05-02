@@ -252,6 +252,7 @@
  90,  1,[BIF %s er en Regina-utvidelse]|<bif>
  90,  2,[Instruksjon %s er en Regina-utvidelse]|<token>
  90,  3,[%s argument %d, opsjon må starte med en av "%s" med "OPTIONS STRICT_ANSI"; fant "%s"; en Regina-utvidelse]|<bif>,<argnumber>,<optionslist>,<value>
+ 90,  4,[Operator %s er en Regina-utvidelse]|<token>
  93,  0,[Uriktig kall til rutine]
  93,  1,[STREAM-kommando %s må etterfølges av en av "%s"; fant "%s"]|<token>,<value>,<value>
  93,  3,[STREAM-kommando må være en av "%s"; fant "%s"]|<value>,<value>

@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /media/Extra/cvs/Regina/regutil/regfilesys.c,v 1.13 2012/09/14 01:56:22 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regfilesys.c,v 1.16 2015/04/04 08:16:23 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSFILEMGR
@@ -50,6 +50,7 @@
 # include <sys/utime.h>
 # include <io.h>
 # define MAX_USHORT 65535 /* or so they say */
+# define MAXPATHLEN 32767
 # define F_OK 0
 #endif
 
@@ -70,6 +71,59 @@
 #endif
 
 #include "regina64.h"
+
+#if defined(WIN32)
+/*
+ * Work around for bug in WIN32 stat() function; can't have trailing slash
+ */
+# if defined(HAVE__STATI64)
+static int rx_w32_stat( const char *path, struct _stati64 *buffer )
+{
+   int lastpos;
+   int rc;
+   char tmpstring[MAXPATHLEN ];
+
+   rc = _stati64( path, buffer );
+   if ( rc != 0 && errno == ENOENT )
+   {
+      if ( path )
+      {
+         lastpos = strlen( path ) -  1;
+         if ( path[lastpos] == '\\' || path[lastpos] == '/')
+         {
+            memcpy( tmpstring, path, lastpos ) ;
+            tmpstring[lastpos] = '\0';
+            rc = _stati64( tmpstring, buffer );
+         }
+      }
+   }
+   return rc;
+}
+# else
+static int rx_w32_stat( const char *path, struct _stat *buffer )
+{
+   int lastpos;
+   int rc;
+   char tmpstring[REXX_PATH_MAX ];
+
+   rc = stat( path, buffer );
+   if ( rc != 0 && errno == ENOENT )
+   {
+      if ( path )
+      {
+         lastpos = strlen( path ) -  1;
+         if ( path[lastpos] == '\\'|| path[lastpos] == '/')
+         {
+            memcpy( tmpstring, path, lastpos ) ;
+            tmpstring[lastpos+1] = '\0';
+            rc = stat( tmpstring, buffer );
+         }
+      }
+   }
+   return rc;
+}
+# endif
+#endif
 
 /* ******************************************************************** */
 /* ********************* File System Interaction ********************** */
@@ -403,11 +457,12 @@ rxfunc(sysfilesystemtype)
 static void get_matched_files(chararray * ca, const char * dir,
                               int criterion, const char * const pattern,
                               const char * attrs,
-                              rxbool do_subdirs, rxbool name_only, int time_format)
+                              rxbool do_subdirs, rxbool name_only,
+                              int time_format, rxbool huge_files)
 {
     DIR * dirp = opendir(dir);
     struct dirent * thede;
-    struct rx_stat st;
+    struct rx_stat_buf st;
     struct tm * tm = NULL;
     rxbool may_have_subdirs, filename_matches;
     char pth[MAXPATHLEN], buf[MAXPATHLEN+40], *slash = "/";
@@ -570,11 +625,20 @@ static void get_matched_files(chararray * ca, const char * dir,
                   case S_IFSOCK: ftype = 's'; break;
 #endif
                }
-
-               if ( sizeof( off_t ) > 4 )
-                  fmt = "%s %10lld %c%c%c%c%c%c%c%c%c%c %s";
+               if ( huge_files)
+               {
+                  if ( sizeof( off_t ) > 4 )
+                     fmt = "%s %16lld %c%c%c%c%c%c%c%c%c%c %s";
+                  else
+                     fmt = "%s %16ld %c%c%c%c%c%c%c%c%c%c %s";
+               }
                else
-                  fmt = "%s %10ld %c%c%c%c%c%c%c%c%c%c %s";
+               {
+                  if ( sizeof( off_t ) > 4 )
+                     fmt = "%s %10lld %c%c%c%c%c%c%c%c%c%c %s";
+                  else
+                     fmt = "%s %10ld %c%c%c%c%c%c%c%c%c%c %s";
+               }
                l = sprintf(buf, fmt, dbuf, st.st_size, ftype,
                        (S_IRUSR&st.st_mode) ? 'r' : '-', (S_IWUSR&st.st_mode) ? 'w' : '-',
                        (S_IXUSR&st.st_mode) ? 'x' : '-',
@@ -602,10 +666,20 @@ static void get_matched_files(chararray * ca, const char * dir,
                  else
                     strftime(dbuf, sizeof(dbuf), "%c", tm);
 
-                 if ( sizeof( off_t ) > 4 )
-                    fmt = "%s %10lld d%c%c%c%c%c%c%c%c%c %s";
+                 if ( huge_files)
+                 {
+                    if ( sizeof( off_t ) > 4 )
+                       fmt = "%s %16lld d%c%c%c%c%c%c%c%c%c %s";
+                    else
+                       fmt = "%s %16ld d%c%c%c%c%c%c%c%c%c %s";
+                 }
                  else
-                    fmt = "%s %10ld d%c%c%c%c%c%c%c%c%c %s";
+                 {
+                    if ( sizeof( off_t ) > 4 )
+                       fmt = "%s %10lld d%c%c%c%c%c%c%c%c%c %s";
+                    else
+                       fmt = "%s %10ld d%c%c%c%c%c%c%c%c%c %s";
+                 }
                  l = sprintf(buf, fmt, dbuf, st.st_size,
                              (S_IRUSR&st.st_mode) ? 'r' : '-', (S_IWUSR&st.st_mode) ? 'w' : '-',
                              (S_IXUSR&st.st_mode) ? 'x' : '-',
@@ -613,12 +687,11 @@ static void get_matched_files(chararray * ca, const char * dir,
                              (S_IXGRP&st.st_mode) ? 'x' : '-',
                              (S_IROTH&st.st_mode) ? 'r' : '-', (S_IWOTH&st.st_mode) ? 'w' : '-',
                              (S_IXOTH&st.st_mode) ? 'x' : '-', pth);
-
                  cha_addstr(ca, buf, l);
               }
             }
             if (do_subdirs)
-               get_matched_files(ca, pth, criterion, pattern, attrs, do_subdirs, name_only, time_format);
+               get_matched_files(ca, pth, criterion, pattern, attrs, do_subdirs, name_only, time_format, huge_files);
         }
     }
 
@@ -628,7 +701,8 @@ static void get_matched_files(chararray * ca, const char * dir,
 static void get_matched_files(chararray * ca, const char * dir,
                               int criterion, const char * const pattern,
                               const char * attrs,
-                              rxbool do_subdirs, rxbool name_only, int time_format)
+                              rxbool do_subdirs, rxbool name_only,
+                              int time_format, rxbool huge_files)
 {
    WIN32_FIND_DATA fd;
    HANDLE sh;
@@ -638,6 +712,7 @@ static void get_matched_files(chararray * ca, const char * dir,
    BOOL rc = TRUE;
    rxbool really_do_subdirs = false;
    int l, dl, matchattr = 0, skipattr = 0;
+   char *fmt;
 
    if (!strcmp(dir, ".")) {
       _getcwd(tdir, sizeof(tdir));
@@ -714,7 +789,10 @@ static void get_matched_files(chararray * ca, const char * dir,
             FileTimeToSystemTime(&lft, &syst);
 
             if (time_format == TF_SORTABLE)
-            l = sprintf(buf, "%4d/%02d/%02d/%02d/%02d  %10I64d  %c%c%c%c%c %s", syst.wYear,
+            {
+               if ( huge_files) fmt = "%4d/%02d/%02d/%02d/%02d  %16I64d  %c%c%c%c%c %s";
+               else fmt = "%4d/%02d/%02d/%02d/%02d  %10I64d  %c%c%c%c%c %s";
+               l = sprintf(buf, fmt, syst.wYear,
                           syst.wMonth, syst.wDay, syst.wHour, syst.wMinute, fsize,
                           (fd.dwFileAttributes&_A_ARCH) ? 'A' : '-',
                           (fd.dwFileAttributes&_A_SUBDIR) ? 'D' : '-',
@@ -722,8 +800,12 @@ static void get_matched_files(chararray * ca, const char * dir,
                           (fd.dwFileAttributes&_A_RDONLY) ? 'R' : '-',
                           (fd.dwFileAttributes&_A_SYSTEM) ? 'S' : '-',
                           pth);
+            }
             else if (time_format == TF_SENSIBLE)
-            l = sprintf(buf, "%4d-%02d-%02d %02d:%02d:%02d  %10I64d  %c%c%c%c%c %s", syst.wYear,
+            {
+               if ( huge_files) fmt = "%4d-%02d-%02d %02d:%02d:%02d  %16I64d  %c%c%c%c%c %s";
+               else fmt = "%4d-%02d-%02d %02d:%02d:%02d  %10I64d  %c%c%c%c%c %s";
+               l = sprintf(buf, fmt, syst.wYear,
                           syst.wMonth, syst.wDay, syst.wHour, syst.wMinute, syst.wSecond, fsize,
                           (fd.dwFileAttributes&_A_ARCH) ? 'A' : '-',
                           (fd.dwFileAttributes&_A_SUBDIR) ? 'D' : '-',
@@ -731,10 +813,14 @@ static void get_matched_files(chararray * ca, const char * dir,
                           (fd.dwFileAttributes&_A_RDONLY) ? 'R' : '-',
                           (fd.dwFileAttributes&_A_SYSTEM) ? 'S' : '-',
                           pth);
-            else {
-            int hour = syst.wHour%12;
-            if (!hour) hour = 12;
-            l = sprintf(buf, "%2d/%02d/%02d  %2d:%02d%c  %10I64d  %c%c%c%c%c  %s", syst.wMonth,
+            }
+            else
+            {
+               int hour = syst.wHour%12;
+               if (!hour) hour = 12;
+               if ( huge_files) fmt = "%2d/%02d/%02d  %2d:%02d%c  %16I64d  %c%c%c%c%c  %s";
+               else fmt = "%2d/%02d/%02d  %2d:%02d%c  %10I64d  %c%c%c%c%c  %s";
+               l = sprintf(buf, fmt, syst.wMonth,
                           syst.wDay, syst.wYear%100, hour, syst.wMinute, syst.wHour >=12 ? 'p' : 'a',
                           fsize,
                           (fd.dwFileAttributes&_A_ARCH) ? 'A' : '-',
@@ -748,7 +834,7 @@ static void get_matched_files(chararray * ca, const char * dir,
          }
      }
      if (do_subdirs && (fd.dwFileAttributes&_A_SUBDIR))
-        get_matched_files(ca, pth, criterion, pattern, attrs, do_subdirs, name_only, time_format);
+        get_matched_files(ca, pth, criterion, pattern, attrs, do_subdirs, name_only, time_format, huge_files);
 
   }
 
@@ -764,9 +850,9 @@ static void get_matched_files(chararray * ca, const char * dir,
      if (!dirs)
         return;
 
-     get_matched_files(dirs, dir, CR_DIRS, "*", "", true, true, true);
+     get_matched_files(dirs, dir, CR_DIRS, "*", "", true, true, true, huge_files);
      for (i = 0; i < dirs->count; i++) {
-        get_matched_files(ca, dirs->array[i].strptr, criterion, pattern, attrs, false, name_only, time_format);
+        get_matched_files(ca, dirs->array[i].strptr, criterion, pattern, attrs, false, name_only, time_format, huge_files);
      }
      delete_chararray(dirs);
   }
@@ -779,14 +865,17 @@ rxfunc(sysfiletree)
 {
     char * pattern, *dir, *options, *attrs = NULL;
     int criterion = 0;
-    rxbool do_subdirs=false, name_only=false;
+    rxbool do_subdirs=false, name_only=false, huge_files=false;
     int time_format = 0;
     chararray * files;
     int rc = 0;
 # if defined(_WIN32) || defined(__EMX__)
     char * bpattern;
 # else
-    char * cp1, *cp2;
+    char *cp1;
+#  ifndef HAVE_REALPATH
+    char *cp2;
+#  endif
 # endif
 
     checkparam(2, 5);
@@ -804,6 +893,7 @@ rxfunc(sysfiletree)
                 case 'S': do_subdirs = true; break;
                 case 'T': time_format = TF_SORTABLE; break;
                 case 'L': time_format = TF_SENSIBLE; break;
+                case 'H': huge_files = true; break;
                 case 'O': name_only = true;
                 default: /* ignore invalid options */ ;
             }
@@ -935,7 +1025,7 @@ rxfunc(sysfiletree)
 
         /* get a list of all files which match the name and file type */
         if (dir)
-           get_matched_files(files, dir, criterion, pattern, attrs, do_subdirs, name_only, time_format);
+           get_matched_files(files, dir, criterion, pattern, attrs, do_subdirs, name_only, time_format, huge_files);
         setastem(argv+1, files);
         delete_chararray(files);
     }
@@ -1112,7 +1202,7 @@ static int copy(const char * from, const char * to)
    FILE * in, *out;
    char buf[32768];
    int rc, br;
-   struct rx_stat st;
+   struct rx_stat_buf st;
    struct utimbuf utb;
 
    if ((in = fopen(from, "rb")) == NULL) {
@@ -1251,7 +1341,7 @@ rxfunc(syscreateshadow)
 rxfunc(sysgetfiledatetime)
 {
    char * filename, * which;
-   struct rx_stat st;
+   struct rx_stat_buf st;
    struct tm * tm;
 
    checkparam(1,2);
@@ -1293,7 +1383,7 @@ rxfunc(syssetfiledatetime)
 {
    char *filename, *thedate = NULL, *thetime = NULL, buf[10];
    struct utimbuf utb;
-   struct rx_stat st;
+   struct rx_stat_buf st;
    struct tm then;
    rxbool hasdate, hastime;
 
