@@ -37,7 +37,7 @@ typedef struct { /* tra_tsd: static variables of this module (thread-safe) */
    char tracestr[BUFFERSIZE+100];
    char buf0[32];
    int  bufptr0;
-   char tracefmt[20];
+   char tracefmt[50];
    int  initialhtmltracing; /* set to 1 after first line of HTML tracing set */
 } tra_tsd_t; /* thread-specific but only needed by this module. see
               * init_tracing
@@ -62,6 +62,16 @@ int init_tracing( tsd_t *TSD )
    memset( tt, 0, sizeof( tra_tsd_t ) );
    tt->lasttracedline = -1;
    return 1;
+}
+
+int purge_tracing( tsd_t *TSD )
+{
+   if ( TSD->tra_tsd )
+   {
+      FreeTSD( TSD->tra_tsd );
+      TSD->tra_tsd = NULL;
+   }
+   return 0;
 }
 
 int pushcallstack( const tsd_t *TSD, treenode *thisptr )

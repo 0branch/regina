@@ -1472,6 +1472,15 @@ void purge_filetable( tsd_t *TSD )
    {
       enterfileptr( TSD, ft->stdio_ptr[i] ) ;
    }
+
+#if 0
+// can't free this as the next call to RexxStart() expects this memory to be here
+   if ( TSD->fil_tsd )
+   {
+      FreeTSD( TSD->fil_tsd );
+      TSD->fil_tsd = NULL;
+   }
+#endif
 }
 
 /*
@@ -2464,7 +2473,6 @@ static streng *readoneline( tsd_t *TSD, fileboxptr ptr )
 static rx_64 positionfile_SEEK_SET( tsd_t *TSD, const char *bif, int argno, fileboxptr ptr, int oper, rx_64 lineno )
 {
    int ch=0x00;
-   int old_errno=0;
    rx_64 from_line=0, tmp=0 ;
    rx_64 from_char=0L ;
    rx_64 ret;
@@ -2613,7 +2621,6 @@ static rx_64 positionfile_SEEK_SET( tsd_t *TSD, const char *bif, int argno, file
           * It will also happen if we are seeking backwards for the
           * first line.
           */
-         old_errno = errno ;
          errno = 0 ;
          if (rx_fseek(ptr->fileptr,0,SEEK_SET))
          {
@@ -5309,8 +5316,15 @@ streng *std_lineout( tsd_t *TSD, cparamboxptr parms )
           */
          if ( ptr->flag & FLAG_PERSIST )
          {
-            rx_fseek( ptr->fileptr, 0, SEEK_END ) ;
-            ptr->writepos = rx_ftell( ptr->fileptr ) ;
+            /*
+             * When using LINEOUT() to close a file and that file is NOT writeable, ptr->fileptr
+             * gets set to NULL, so guard against this
+             */
+            if ( ptr->fileptr )
+            {
+               rx_fseek( ptr->fileptr, 0, SEEK_END ) ;
+               ptr->writepos = rx_ftell( ptr->fileptr ) ;
+            }
          }
          else
             ptr->writepos = 0;
@@ -5324,9 +5338,13 @@ streng *std_lineout( tsd_t *TSD, cparamboxptr parms )
           * MH 22/06/2004 - after non-conclusive discussions on ANSI mailing list
           */
          if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
+         {
             flush_output( TSD, ptr );
+         }
          else
+         {
             closefile( TSD, file ) ;
+         }
       }
       result = 0;
    }
@@ -6537,7 +6555,33 @@ int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 
 int my_fullpath( tsd_t *TSD, char *dst, const char *src )
 {
-   realpath( src, dst );
+   /* hack for leading ~/ */
+   int len = strlen( src );
+   char *source=NULL;
+   char *copy=NULL;
+   if ( ( len > 1 && strncmp( src, "~/", 2 ) == 0 ) || ( len == 1 && strncmp( src, "~", 1 ) == 0) )
+   {
+      char *env = getenv( "HOME" );
+      if ( env != NULL )
+      {
+         int len2 = strlen( env );
+         copy = (char *)MallocTSD( len+len2+2 ) ;
+         strcpy( copy, env );
+         strcat( copy, src+1 );
+         source = copy;
+      }
+      else
+      {
+         source = src;
+      }
+   }
+   else
+   {
+      source = src;
+   }
+   realpath( source, dst );
+   if ( copy )
+      FreeTSD( copy );
 
    return 0;
 }

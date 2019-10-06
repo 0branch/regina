@@ -547,7 +547,7 @@ dnl --------------- allow --with-addon-dir to specify location of external funct
 AC_ARG_WITH(addon-dir,
    [  --with-addon-dir=dir    location of external function packages (default blank)],
    [addonsdir=$withval],
-   [addonsdir=$datadir/$REGINA_PACKAGE_NAME/addons],
+   [addonsdir=$libdir/regina-rexx/addons],
 )
 AC_DEFINE_DIR(HAVE_REGINA_ADDON_DIR,"$addonsdir")
 AC_SUBST(addonsdir)
@@ -555,6 +555,7 @@ AC_SUBST(addonsdir)
 dnl
 MH_CHECK_RPM
 MH_GET_DISTRO_NAME()
+MH_HAVE_SYSTEMD()
 
 dnl --------------- Force definition of pre-compiler macro UNIX ----------
 AC_DEFINE(UNIX)
@@ -564,7 +565,7 @@ MH_CHECK_UNSIGNED_CHAR_COMPILER_SWITCH()
 
 dnl AC_OUTPUT(Makefile)
 
-AC_OUTPUT($mymakefile regina-config rxstack.init.d)
+AC_OUTPUT($mymakefile regina-config rxstack.init.d libregina.pc)
 chmod 755 regina-config
 echo
 echo "Regina has now been configured with the following options:"
@@ -661,6 +662,7 @@ if test "x$binarybitprefix" = "x32"; then
    echo "   binaries will have '32' appended to them. eg rexx32, regina32"
 fi
 echo "  libraries will be installed in: $libdir"
+echo "     addons will be installed in: $addonsdir"
 echo "                        {prefix}: $prefix"
 echo "                   {exec_prefix}: $exec_prefix"
 echo "                      RPM topdir: $RPMTOPDIR"

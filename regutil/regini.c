@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.18 2014/10/30 04:51:05 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.19 2019/07/03 22:39:25 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSMISC
@@ -45,6 +45,9 @@
 # endif
 # ifdef HAVE_CTYPE_H
 #  include <ctype.h>
+# endif
+# if defined(HAVE_TIME_H)
+#  include <time.h>
 # endif
 # ifdef HAVE_STATFS
 #  if defined(HAVE_MOUNT_H)

@@ -504,12 +504,19 @@ else
       MH_X11_LIBS="Xaw Xmu Xt X11"
    fi
 fi
-MH_X11R6_LIBS="SM ICE Xext"
+MH_X11R6_LIBS="SM ICE Xext Xpm"
 mh_x11r6=no
+
+which dpkg-architecture > /dev/null
+if test $? -eq 0; then
+   multiarch_libdir="/usr/lib/`dpkg-architecture -qDEB_HOST_MULTIARCH`"
+else
+   multiarch_libdir=""
+fi
 dnl
 dnl specify latest release of X directories first
 dnl
-mh_lib_dirs="\
+mh_lib_dirs="$multiarch_libdir \
     $HOME/lib64           \
     $HOME/lib32           \
     $HOME/lib             \
@@ -1682,122 +1689,146 @@ case "$target" in
          mh_pre_curses_h_include=""
 esac
 
-if test "$with_xcurses" = yes -o "$with_xcurses_static" = yes; then
-   AC_DEFINE(USE_XCURSES)
-   curses_h="xcurses.h"
-   CURSES_TARGET="XCurses"
-   AC_CHECK_PROG(xcurses_config, [xcurses-config], yes, no)
-   curses_l="XCurses"
-else
-   if test "$with_pdcurses" = yes; then
+dnl convert old-style curses switches
+if test "$with_xcurses" = yes; then
+   with_curses="xcurses"
+elif test "$with_xcurses_static" = yes; then
+   with_curses="xcurses_static"
+elif test "$with_pdcurses" = yes; then
+   with_curses="pdcurses"
+elif test "$with_ncurses" = yes; then
+   with_curses="ncurses"
+elif test "$with_ncurses6" = yes; then
+   with_curses="ncurses6"
+elif test "$with_extcurses" = yes; then
+   with_curses="extcurses"
+elif test "$with_dwindows" = yes; then
+   with_curses="dwindows"
+fi
+
+MH_CURSES_INC="none"
+MH_CURSES_LIB="none"
+if test "$with_cursesincdir" = no -a "$with_curseslibdir" = no; then
+   if test "$with_curses" = "xcurses" -o "$with_curses" = "xcurses_static"; then
+      AC_DEFINE(USE_XCURSES)
+      curses_h="xcurses.h"
+      curses_l="XCurses"
+      CURSES_TARGET="XCurses"
+      AC_CHECK_PROG(xcurses_config, [xcurses-config], yes, no)
+      if test "$ac_cv_prog_xcurses_config" = yes; then
+         MH_CURSES_INC=`xcurses-config --cflags`
+         if test "$with_curses" = "xcurses_static"; then
+            MH_CURSES_LIB=`xcurses-config --libs-static`
+         else
+            MH_CURSES_LIB=`xcurses-config --libs`
+         fi
+      fi
+   elif test "$with_curses" = "pdcurses"; then
       CURSES_TARGET="pdcurses"
       AC_DEFINE(USE_PDCURSES)
       curses_h="curses.h"
       curses_l="pdcurses"
-   else
-      if test "$with_ncurses" = yes; then
-         curses_h="ncurses.h"
-         AC_DEFINE(USE_NCURSES)
-         if test "$enable_utf8" = yes; then
-            CURSES_TARGET="ncursesw"
-            AC_CHECK_PROG(ncursesw5_config, [ncursesw5-config], yes, no)
-            curses_l="ncursesw"
-         else
-            CURSES_TARGET="ncurses"
-            AC_CHECK_PROG(ncurses5_config, [ncurses5-config], yes, no)
-            curses_l="ncurses"
-         fi
+   elif test "$with_curses" = "ncurses"; then
+      AC_DEFINE(USE_NCURSES)
+      curses_h="ncurses.h"
+      if test "$enable_utf8" = yes; then
+         CURSES_TARGET="ncursesw"
+         curses_l="ncurses"
       else
-         if test "$with_extcurses" = yes; then
-            CURSES_TARGET="extcurses"
-            AC_DEFINE(USE_EXTCURSES)
-            curses_h="cur00.h"
-            curses_l="cur"
+         CURSES_TARGET="ncurses"
+         curses_l="ncursesw"
+      fi
+      AC_CHECK_PROG(pkg_config, [pkg-config], yes, no)
+      if test "$ac_cv_prog_pkg_config" = yes; then
+         # we have pkg_config, do we have ncurses[w]?
+         pkg-config --exists $CURSES_TARGET > /dev/null
+         if test $? -eq 0; then
+            MH_CURSES_INC="`pkg-config --cflags $CURSES_TARGET`"
+            MH_CURSES_LIB="`pkg-config --libs $CURSES_TARGET`"
+         fi
+      fi
+      if test "x$MH_CURSES_INC" = xnone; then
+         if test "$enable_utf8" = yes; then
+            AC_CHECK_PROG(ncursesw5_config, [ncursesw5-config], yes, no)
+            if test "$ac_cv_prog_ncursesw5_config" = yes; then
+               MH_CURSES_INC=`ncursesw5-config --cflags`
+               MH_CURSES_LIB=`ncursesw5-config --libs`
+            fi
          else
-            if test "$with_dwindows" = yes; then
-               CURSES_TARGET="dwindows"
-               AC_DEFINE(USE_DWINDOWS)
-               AC_CHECK_PROG(dw_config, [dw-config], yes, no)
-               curses_h="dw.h"
-               curses_l="dwindows"
-            else
-               CURSES_TARGET="curses"
-               if test "$mh_curses_colr" = yes; then
-                  curses_h="curses.h"
-                  curses_l="cur_colr"
-               else
-                  curses_h="curses.h"
-                  curses_l="curses"
-               fi
+            AC_CHECK_PROG(ncurses5_config, [ncurses5-config], yes, no)
+            if test "$ac_cv_prog_ncurses5_config" = yes; then
+               MH_CURSES_INC=`ncurses5-config --cflags`
+               MH_CURSES_LIB=`ncurses5-config --libs`
             fi
          fi
       fi
+   elif test "$with_curses" = "ncurses6"; then
+      curses_h="ncurses.h"
+      AC_DEFINE(USE_NCURSES)
+      CURSES_TARGET="ncurses"
+      AC_CHECK_PROG(ncurses6_config, [ncurses6-config], yes, no)
+      curses_l="ncurses"
+   elif test "$with_curses" = "extcurses"; then
+      CURSES_TARGET="extcurses"
+      AC_DEFINE(USE_EXTCURSES)
+      curses_h="cur00.h"
+      curses_l="cur"
+   elif test "$with_curses" = "dwindows"; then
+      CURSES_TARGET="dwindows"
+      AC_DEFINE(USE_DWINDOWS)
+      AC_CHECK_PROG(dw_config, [dw-config], yes, no)
+      curses_h="dw.h"
+      curses_l="dwindows"
+   else
+      CURSES_TARGET="curses"
+      if test "$mh_curses_colr" = yes; then
+         curses_h="curses.h"
+         curses_l="cur_colr"
+      else
+         curses_h="curses.h"
+         curses_l="curses"
+      fi
    fi
 fi
-AC_SUBST(CURSES_TARGET)
-
-dnl look for curses header and library, exit if not found
-if test "$ac_cv_prog_xcurses_config" = yes -a "$with_cursesincdir" = no; then
+if test "x$MH_CURSES_INC" = xnone; then
+   # need to check standard locations
    AC_MSG_CHECKING(for location of $curses_h header file)
-   AC_MSG_RESULT(obtained from xcurses-config)
-   MH_CURSES_INC=`xcurses-config --cflags`
-   AC_SUBST(MH_CURSES_INC)
-else
-   if test "$ac_cv_prog_ncurses5_config" = yes -a "$with_cursesincdir" = no; then
-      AC_MSG_CHECKING(for location of $curses_h header file)
-      AC_MSG_RESULT(obtained from ncurses5-config)
-      MH_CURSES_INC=`ncurses5-config --cflags`
-      AC_SUBST(MH_CURSES_INC)
-   else
-      if test "$ac_cv_prog_ncursesw5_config" = yes -a "$with_cursesincdir" = no; then
-         AC_MSG_CHECKING(for location of $curses_h header file)
-         AC_MSG_RESULT(obtained from ncursesw5-config)
-         MH_CURSES_INC=`ncursesw5-config --cflags`
-         AC_SUBST(MH_CURSES_INC)
-      else
-         if test "$ac_cv_prog_dw_config" = yes -a "$with_cursesincdir" = no; then
-            AC_MSG_CHECKING(for location of $curses_h header file)
-            AC_MSG_RESULT(obtained from dw-config)
-            MH_CURSES_INC=`dw-config --cflags`
-            AC_SUBST(MH_CURSES_INC)
-         else
-            AC_MSG_CHECKING(for location of $curses_h header file)
-            mh_curses_inc_dir=""
-            mh_inc_dirs="\
-                ${CURSESINCDIR}           \
-                ${mh_sysv_incdir}         \
-                ${exec_prefix}/include    \
-                ${HOME}/include           \
-                /usr/local/include        \
-                /usr/contrib/include      \
-                /usr/include/curses_colr  \
-                /opt/include              \
-                /usr/include              \
-                /usr/ucbinclude           \
-                /usr/ucbinc               \
-                /opt/sfw/include          \
-                /sw/include               \
-                /usr/unsupported/include  \
-                /boot/home/config/include \
-                /boot/home/config/include/ncurses"
+   mh_curses_inc_dir=""
+   mh_inc_dirs="\
+       ${CURSESINCDIR}           \
+       ${mh_sysv_incdir}         \
+       ${exec_prefix}/include    \
+       ${HOME}/include           \
+       /usr/local/include        \
+       /usr/contrib/include      \
+       /usr/include/curses_colr  \
+       /opt/include              \
+       /usr/include              \
+       /usr/ucbinclude           \
+       /usr/ucbinc               \
+       /opt/sfw/include          \
+       /sw/include               \
+       /usr/unsupported/include  \
+       /boot/home/config/include \
+       /boot/home/config/include/ncurses"
 dnl
 dnl Provide for user supplying directory
 dnl
-            if test "$with_cursesincdir" != no ; then
-               mh_inc_dirs="$with_cursesincdir $mh_inc_dirs"
-            fi
+   if test "$with_cursesincdir" != no ; then
+      mh_inc_dirs="$with_cursesincdir $mh_inc_dirs"
+   fi
 dnl
 dnl Try to determine the directory containing curses header
 dnl
-            for ac_dir in $mh_inc_dirs ; do
-              if test -r $ac_dir/$curses_h; then
-                mh_curses_inc_dir=$ac_dir
-                break
-              fi
-            done
-            if test "x$mh_curses_inc_dir" != "x" ; then
-               AC_MSG_RESULT(found in $mh_curses_inc_dir)
-               MH_CURSES_INC="-I$mh_curses_inc_dir"
+   for ac_dir in $mh_inc_dirs ; do
+     if test -r $ac_dir/$curses_h; then
+       mh_curses_inc_dir=$ac_dir
+       break
+     fi
+   done
+   if test "x$mh_curses_inc_dir" != "x" ; then
+      AC_MSG_RESULT(found in $mh_curses_inc_dir)
+      MH_CURSES_INC="-I$mh_curses_inc_dir"
 dnl
 dnl If the curses header file contains NCURSES_VERSION then we can assume it is
 dnl ncurses, so AC_DEFINE(USE_NCURSES)
@@ -1813,101 +1844,73 @@ dnl ncurses, so AC_DEFINE(USE_NCURSES)
 dnl
 dnl If using gcc under Solaris 2, don't use -I/usr/include
 dnl
-            case "$target" in
-               *solaris*)
-                  if test "$ac_cv_prog_gcc" = yes ; then
-                     if test "x$mh_curses_inc_dir" = "x/usr/include" ; then
-                     MH_CURSES_INC=""
-                     fi
-                  fi
-                  ;;
-            esac
-               AC_SUBST(MH_CURSES_INC)
-            else
-               AC_MSG_ERROR(Cannot find curses header file: $curses_h; cannot configure)
+      case "$target" in
+         *solaris*)
+            if test "$ac_cv_prog_gcc" = yes ; then
+               if test "x$mh_curses_inc_dir" = "x/usr/include" ; then
+               MH_CURSES_INC=""
+               fi
             fi
-         fi
-      fi
+            ;;
+      esac
    fi
 fi
-
-if test "$ac_cv_prog_xcurses_config" = yes -a "$with_curseslibdir" = no; then
-AC_MSG_CHECKING(for location of $curses_l library file)
-   AC_MSG_RESULT(obtained from xcurses-config)
-   if test "$with_xcurses_static" = yes; then
-      MH_CURSES_LIB=`xcurses-config --libs-static`
-   else
-      MH_CURSES_LIB=`xcurses-config --libs`
-   fi
-   AC_SUBST(MH_CURSES_LIB)
-else
-   if test "$ac_cv_prog_ncurses5_config" = yes -a "$with_curseslibdir" = no; then
+if test "x$MH_CURSES_LIB" = xnone; then
+   # need to check standard locations
    AC_MSG_CHECKING(for location of $curses_l library file)
-      AC_MSG_RESULT(obtained from ncurses5-config)
-      MH_CURSES_LIB=`ncurses5-config --libs`
-      AC_SUBST(MH_CURSES_LIB)
-   else
-      if test "$ac_cv_prog_ncursesw5_config" = yes -a "$with_curseslibdir" = no; then
-      AC_MSG_CHECKING(for location of $curses_l library file)
-         AC_MSG_RESULT(obtained from ncurses5w-config)
-         MH_CURSES_LIB=`ncursesw5-config --libs`
-         AC_SUBST(MH_CURSES_LIB)
-      else
-         if test "$ac_cv_prog_dw_config" = yes -a "$with_curseslibdir" = no; then
-         AC_MSG_CHECKING(for location of $curses_l library file)
-            AC_MSG_RESULT(obtained from dw-config)
-            MH_CURSES_LIB=`dw-config --libs`
-            AC_SUBST(MH_CURSES_LIB)
-         else
-            AC_MSG_CHECKING(for location of $curses_l library file)
-            mh_curses_lib_dir=""
-            mh_lib_dirs="\
-                ${CURSESLIBDIR}           \
-                ${mh_sysv_libdir}         \
-                ${exec_prefix}/lib64      \
-                ${exec_prefix}/lib        \
-                ${HOME}/lib64             \
-                ${HOME}/lib               \
-                /usr/local/lib64          \
-                /usr/local/lib            \
-                /usr/contrib/lib          \
-                /opt/lib                  \
-                /usr/lib64                \
-                /usr/lib                  \
-                /usr/ccs/lib              \
-                /usr/ucblib               \
-                /opt/sfw/lib              \
-                /sw/lib                   \
-                /usr/unsupported/lib      \
-                /boot/home/config/lib"
+   mh_curses_lib_dir=""
+   mh_lib_dirs="\
+       ${CURSESLIBDIR}           \
+       ${mh_sysv_libdir}         \
+       ${exec_prefix}/lib64      \
+       ${exec_prefix}/lib        \
+       ${HOME}/lib64             \
+       ${HOME}/lib               \
+       /usr/local/lib64          \
+       /usr/local/lib            \
+       /usr/contrib/lib          \
+       /opt/lib                  \
+       /usr/lib64                \
+       /usr/lib                  \
+       /usr/ccs/lib              \
+       /usr/ucblib               \
+       /opt/sfw/lib              \
+       /sw/lib                   \
+       /usr/unsupported/lib      \
+       /boot/home/config/lib"
 dnl
 dnl Provide for user supplying directory
 dnl
-            if test "$with_curseslibdir" != no ; then
-               mh_lib_dirs="$with_curseslibdir $mh_lib_dirs"
-            fi
+   if test "$with_curseslibdir" != no ; then
+      mh_lib_dirs="$with_curseslibdir $mh_lib_dirs"
+   fi
 dnl
 dnl Try to determine the directory containing curses library
 dnl
-            for ac_dir in $mh_lib_dirs ; do
-               for mh_ext in lib${curses_l}.a lib${curses_l}.so lib${curses_l}.sl ${curses_l}.lib ${curses_l}3r.lib lib${curses_l}.dylib; do
-                 if test -r $ac_dir/$mh_ext; then
-                    mh_curses_lib_dir=$ac_dir
-                    break 2
-                 fi
-               done
-            done
-            if test "x$mh_curses_lib_dir" != "x" ; then
-               MH_CURSES_LIB="-L$mh_curses_lib_dir -l$curses_l"
-               AC_MSG_RESULT(found in $mh_curses_lib_dir)
-               AC_SUBST(MH_CURSES_LIB)
-            else
-               AC_MSG_ERROR(Cannot find curses library file: $curses_l; cannot configure)
-            fi
-         fi
-      fi
+   for ac_dir in $mh_lib_dirs ; do
+      for mh_ext in lib${curses_l}.a lib${curses_l}.so lib${curses_l}.sl ${curses_l}.lib ${curses_l}3r.lib lib${curses_l}.dylib; do
+        if test -r $ac_dir/$mh_ext; then
+           mh_curses_lib_dir=$ac_dir
+           break 2
+        fi
+      done
+   done
+   if test "x$mh_curses_lib_dir" != "x" ; then
+      MH_CURSES_LIB="-L$mh_curses_lib_dir -l$curses_l"
+      AC_MSG_RESULT(found in $mh_curses_lib_dir)
    fi
 fi
+if test "x$MH_CURSES_INC" = xnone; then
+   AC_MSG_ERROR(Cannot find curses header file: $curses_h; cannot configure)
+fi
+if test "x$MH_CURSES_LIB" = xnone; then
+   AC_MSG_ERROR(Cannot find curses library file: $curses_l; cannot configure)
+fi
+
+AC_SUBST(CURSES_TARGET)
+AC_SUBST(MH_CURSES_INC)
+AC_SUBST(MH_CURSES_LIB)
+
 ])dnl
 
 

@@ -1,10 +1,15 @@
 %define debug_package %{nil}
-%define vermajor 3
-%define verminor 9
-Name: Regina-REXX
-Version: 3.9.1
+# uncomment the following %defines for building on OBS
+# note even commented out %define still works, so change to %#define
+#%#define vermajor 3
+#%#define verminor 9
+#%#define initservice installsystemd
+#%#define systemdinstallpath /lib/systemd/system
+%define libname libregina%{vermajor}
+Name: regina-rexx
+Version: 3.9.3
 Release: 1
-Group: Development/Languages/Other
+Group: Development/Languages
 Source: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 Prefix: /usr
@@ -12,17 +17,17 @@ License: LGPL
 Vendor: Mark Hessling
 URL: http://regina-rexx.sourceforge.net
 Summary: Regina Rexx Interpreter binaries, language files and sample programs
-%ifarch x86_64 ia64 ppc64 s390x sparc64
-# Provides: _{name}(64bit)
-#Requires: %{name}-lib(64bit)
-%else
-# Provides: _{name}
-#Requires: %{name}-lib
+Provides: rexx
+Obsoletes: Regina-REXX
+Requires(post): %{_sbindir}/update-alternatives
+Requires(postun): %{_sbindir}/update-alternatives
+BuildRequires: gcc
+%if "%{?initservice}" == "installsystemd"
+# comment out BuildRequires for OBS
+BuildRequires: systemd
+Requires: systemd
 %endif
-# if we don't have _extension define, define it
-# this is because Mandriva defines _extension
-%{!?_extension: %define _extension .gz}
-#PreReq:         %fillup_prereq %insserv_prereq
+Requires: %{libname} = %{version}
 
 %description
 Regina is an implementation of a Rexx interpreter, compliant with
@@ -32,17 +37,15 @@ operating systems.
 For more information on Regina, visit http://regina-rexx.sourceforge.net/
 For more information on Rexx, visit http://www.rexxla.org
 
-%package devel
-%ifarch x86_64 ia64 ppc64 s390x sparc64
-#Provides: _{name}-dev(64bit) libregina.so()(64bit)
-#Requires: %{name}-lib(64bit)
-%else
-#Provides: _{name}-dev libregina.so()
-#Requires: %{name}-lib
-%endif
+%package -n %{libname}-devel
 Group: Development/Languages/Other
+Requires: %{libname} = %{version}
+Obsoletes: Regina-REXX-devel regina-rexx-devel
 Summary: Regina Rexx development libraries and header file
-%description devel
+%description -n %{libname}-devel
+This package contains all necessary include files and libraries needed
+to develop applications and external function packages with Regina.
+
 Regina is an implementation of a Rexx interpreter, compliant with
 the ANSI Standard for Rexx (1996).  It is also available on several other
 operating systems.
@@ -50,15 +53,27 @@ operating systems.
 For more information on Regina, visit http://regina-rexx.sourceforge.net/
 For more information on Rexx, visit http://www.rexxla.org
 
-%package lib
-%ifarch x86_64 ia64 ppc64 s390x sparc64
-#Provides: _{name}-lib(64bit)
-%else
-#Provides: _{name}-lib
-%endif
-Group: Development/Languages/Other
+%package -n %{libname}
+Group: System/Libraries
 Summary: Regina Rexx runtime libraries
-%description lib
+Obsoletes: Regina-REXX-lib
+%description -n %{libname}
+This package contains the Regina Rexx interpreter shared library.
+
+Regina is an implementation of a Rexx interpreter, compliant with
+the ANSI Standard for Rexx (1996).  It is also available on several other
+operating systems.
+
+For more information on Regina, visit http://regina-rexx.sourceforge.net/
+For more information on Rexx, visit http://www.rexxla.org
+
+%package doc
+Summary: Regina Rexx documentation
+Group: Documentation/Other
+
+%description doc
+This package contains the documetation for the Regina Rexx interpreter and regutil.
+
 Regina is an implementation of a Rexx interpreter, compliant with
 the ANSI Standard for Rexx (1996).  It is also available on several other
 operating systems.
@@ -67,22 +82,45 @@ For more information on Regina, visit http://regina-rexx.sourceforge.net/
 For more information on Rexx, visit http://www.rexxla.org
 
 %prep
-%setup
+%setup -q
 
 %build
-./configure --prefix=%{prefix} --mandir=%{_mandir} --sysconfdir=%{_initrddir} --with-addons-dir=%{_datadir}/%{name}/addons
+#./configure --prefix=%{prefix} --mandir=%{_mandir} --sysconfdir=%{_initddir} --with-addon-dir=/%{_lib}/%{name}/addons
+./configure --prefix=%{prefix} --mandir=%{_mandir} --with-addon-dir=%{_libdir}/%{name}/addons --sysconfdir=%{_sysconfdir}
+#./configure --prefix=%{prefix} --mandir=%{_mandir}
 make
 
 %install
 rm -fr %{buildroot}
-make DESTDIR=%{buildroot} install
+make DESTDIR=%{buildroot} install %{initservice}
+
+# adding update-alternatives support
+install -d %{buildroot}%{_sysconfdir}/alternatives
+
+touch %{buildroot}%{_sysconfdir}/alternatives/rexx
+touch %{buildroot}%{_sysconfdir}/alternatives/rexx.1.gz
+touch %{buildroot}%{_sysconfdir}/alternatives/rxqueue
+touch %{buildroot}%{_sysconfdir}/alternatives/rxqueue.1.gz
+
+mv %{buildroot}%{_bindir}/rexx %{buildroot}%{_bindir}/rexx-%{name}
+mv %{buildroot}%{_mandir}/man1/rexx.1.gz %{buildroot}%{_mandir}/man1/rexx-%{name}.1.gz
+mv %{buildroot}%{_bindir}/rxqueue %{buildroot}%{_bindir}/rxqueue-%{name}
+mv %{buildroot}%{_mandir}/man1/rxqueue.1.gz %{buildroot}%{_mandir}/man1/rxqueue-%{name}.1.gz
+
+ln -sf %{_sysconfdir}/alternatives/rexx %{buildroot}%{_bindir}/rexx
+ln -sf %{_sysconfdir}/alternatives/rexx.1.gz %{buildroot}%{_mandir}/man1/rexx.1.gz
+ln -sf %{_sysconfdir}/alternatives/rxqueue %{buildroot}%{_bindir}/rxqueue
+ln -sf %{_sysconfdir}/alternatives/rxqueue.1.gz %{buildroot}%{_mandir}/man1/rxqueue.1.gz
 
 %files
 %defattr(-,root,root,-)
-%{_mandir}/man1/regina.1%{_extension}
-%{_mandir}/man1/rxstack.1%{_extension}
-%{_mandir}/man1/rxqueue.1%{_extension}
-%{_initrddir}/rxstack
+%{_mandir}/man1/regina.1.gz
+%{_mandir}/man1/rxstack.1.gz
+%{_mandir}/man1/rxqueue.1.gz
+%{_mandir}/man1/rxqueue-%{name}.1.gz
+%{_mandir}/man1/rexx.1.gz
+%{_mandir}/man1/rexx-%{name}.1.gz
+#%{_initddir}/rxstack
 %dir %{_datadir}/%{name}
 %{_datadir}/%{name}/examples/rexxcps.rexx
 %{_datadir}/%{name}/examples/animal.rexx
@@ -100,63 +138,107 @@ make DESTDIR=%{buildroot} install
 %{_datadir}/%{name}/pt.mtb
 %{_datadir}/%{name}/sv.mtb
 %{_datadir}/%{name}/tr.mtb
-%{_bindir}/rexx
 %{_bindir}/regina
+%{_bindir}/rexx
+%{_bindir}/rexx-%{name}
 %{_bindir}/rxqueue
+%{_bindir}/rxqueue-%{name}
 %{_bindir}/rxstack
-%{_datadir}/%{name}/addons/librxtest1.so
-%{_datadir}/%{name}/addons/librxtest2.so
+%{_libdir}/%{name}/addons/librxtest1.so
+%{_libdir}/%{name}/addons/librxtest2.so
+%ghost %{_sysconfdir}/alternatives/rexx
+%ghost %{_sysconfdir}/alternatives/rexx.1.gz
+%ghost %{_sysconfdir}/alternatives/rxqueue
+%ghost %{_sysconfdir}/alternatives/rxqueue.1.gz
+#
+# Sort out which startup script to use
+#
+%if "%{?initservice}" == "installsystemd"
+%{systemdinstallpath}/rxstack.service
+%endif
+%if "%{?initservice}" == "installupstart"
+%{_sysconfdir}/init/rxstack.conf
+%endif
+%if "%{?initservice}" == "installinsserv"
+%{_sysconfdir}/init.d/rxstack
+%endif
+%if "%{?initservice}" == "installsysvinit"
+%{_sysconfdir}/init.d/rxstack
+%endif
 
-%files devel
+%files -n %{libname}-devel
 %defattr(-,root,root,-)
 %{_libdir}/libregina.so
 %{_libdir}/libregina.a
+%{_libdir}/pkgconfig/libregina.pc
 %{_includedir}/rexxsaa.h
-%{_mandir}/man1/regina-config.1%{_extension}
+%{_mandir}/man1/regina-config.1.gz
 %{_bindir}/regina-config
 
-%files lib
+%files doc
+%doc doc/regina.pdf doc/regutil.pdf
+
+%files -n %{libname}
 %defattr(-,root,root,-)
 %{_libdir}/libregina.so.%{vermajor}.%{verminor}
 %{_libdir}/libregina.so.%{vermajor}
-%{_datadir}/%{name}/addons/libregutil.so
+%{_libdir}/%{name}/addons/libregutil.so
 
 #******************************************************************************
 %post
 # Add the rxstack service
-%if 0%{?suse_version}
-%fillup_and_insserv rxstack
+%if "%{?initservice}" == "installsystemd"
+systemctl enable rxstack
+echo "Adding and enabling systemd rxstack service" >&2
 %endif
-ldconfig
+%if "%{?initservice}" == "installinsserv"
+insserv -f rxstack
+echo "Adding rxstack service"
+%endif
+%if "%{?initservice}" == "installsysvinit"
+chkconfig --add rxstack
+chkconfig rxstack on
+echo "Adding and enabling rxstack service"
+%endif
+
+%{_sbindir}/update-alternatives --install %{_bindir}/rexx rexx %{_bindir}/rexx-%{name} 15 \
+   --slave %{_bindir}/rxqueue rxqueue %{_bindir}/rxqueue-%{name} \
+   --slave %{_mandir}/man1/rxqueue.1.gz rxqueue.1.gz %{_mandir}/man1/rxqueue-%{name}.1.gz \
+   --slave %{_mandir}/man1/rexx.1.gz rexx.1.gz %{_mandir}/man1/rexx-%{name}.1.gz
 
 #******************************************************************************
 %preun
-%if 0%{?suse_version}
-%stop_on_removal rxstack
+%if "%{?initservice}" == "installsystemd"
+systemctl stop rxstack
+echo "Stopping rxstack service"
+%endif
+%if "%{?initservice}" == "installupstart"
+initctl stop rxstack
+echo "Stopping rxstack service"
+%endif
+%if "%{?initservice}" == "installinsserv"
+/etc/init.d/rxstack stop
+insserv -r -f rxstack
+echo "Stopping and deleting rxstack service"
+%endif
+%if "%{?initservice}" == "installsysvinit"
+/etc/init.d/rxstack stop
+chkconfig --del rxstack
+echo "Stopping and deleting rxstack service"
 %endif
 
 #******************************************************************************
 %postun
-%if 0%{?suse_version}
-%restart_on_update rxstack
-%insserv_cleanup
-%endif
+if [ ! -f %{_bindir}/rexx ] ; then
+   %{_sbindir}/update-alternatives --remove rexx %{_bindir}/rexx-%{name}
+fi
+
+#******************************************************************************
+%post -n %{libname}
 ldconfig
 
 #******************************************************************************
-%post lib
-ldconfig
-
-#******************************************************************************
-%postun lib
-ldconfig
-
-#******************************************************************************
-%post devel
-ldconfig
-
-#******************************************************************************
-%postun devel
+%postun -n %{libname}
 ldconfig
 
 #******************************************************************************

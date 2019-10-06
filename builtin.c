@@ -571,8 +571,6 @@ streng *ext_pool_value( tsd_t *TSD, streng *name, streng *value,
    streng *retval=NULL;
    int ok=HOOK_GO_ON;
 
-   (env = env); /* Make the compiler happy */
-
    /*
     * Get the current value from the exit if we have one, or from the
     * environment directly if not...
@@ -978,11 +976,11 @@ streng *std_time( tsd_t *TSD, cparamboxptr parms )
       if (convert_time(TSD,supptime,suppformat,&tmdata,&unow))
       {
          char *p1, *p2;
-         if (supptime && supptime->value)
+         if (supptime && supptime->len)
             p1 = (char *) tmpstr_of( TSD, supptime ) ;
          else
             p1 = "";
-         if (str_suppformat && str_suppformat->value)
+         if (str_suppformat && str_suppformat->len)
             p2 = (char *) tmpstr_of( TSD, str_suppformat ) ;
          else
             p2 = "N";
@@ -1099,8 +1097,6 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
    struct tm tmdata, *tmptr ;
    time_t now=0, unow=0, rnow=0 ;
    char osep = '?', isep = '?';
-   streng *str_isep=NULL;
-   streng *str_osep=NULL;
 
    if ( get_options_flag( TSD->currlevel, EXT_STRICT_ANSI ) )
       checkparam(  parms,  0,  3 , "DATE" ) ;
@@ -1127,7 +1123,6 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
          {
             if (tmpptr->value)
             {
-               str_osep = tmpptr->value;
                if ( Str_len( tmpptr->value ) == 0 )
                   osep = '\0';
                else
@@ -1140,7 +1135,6 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
             {
                if (tmpptr->value)
                {
-                  str_isep = tmpptr->value;
                   if ( Str_len( tmpptr->value ) == 0 )
                      isep = '\0';
                   else
@@ -1229,11 +1223,11 @@ streng *std_date( tsd_t *TSD, cparamboxptr parms )
       if ( ( rcode = convert_date( TSD, suppdate, suppformat, &tmdata, isep ) ) )
       {
          char *p1, *p2;
-         if (suppdate && suppdate->value)
+         if (suppdate && suppdate->len)
             p1 = (char *) tmpstr_of( TSD, suppdate ) ;
          else
             p1 = "";
-         if (str_suppformat && str_suppformat->value)
+         if (str_suppformat && str_suppformat->len)
             p2 = (char *) tmpstr_of( TSD, str_suppformat ) ;
          else
             p2 = "N";
@@ -2668,7 +2662,7 @@ streng *rex_poolid( tsd_t *TSD, cparamboxptr parms )
 
 streng *rex_lower( tsd_t *TSD, cparamboxptr parms )
 {
-   int rlength=0, length=0, start=1, i=0 ;
+   rx_64 rlength=0, length=0, start=1, i=0 ;
    int changecount;
    char padch=' ' ;
    streng *str=NULL, *ptr=NULL ;
@@ -2686,14 +2680,14 @@ streng *rex_lower( tsd_t *TSD, cparamboxptr parms )
     */
    if ( parms->next != NULL
    &&   parms->next->value )
-      start = atopos( TSD, parms->next->value, "LOWER", 2 ) ;
+      start = atoposrx64( TSD, parms->next->value, "LOWER", 2 ) ;
    /*
     * Get length, if supplied...
     */
    if ( parms->next != NULL
    && ( (bptr = parms->next->next) != NULL )
    && ( parms->next->next->value ) )
-      length = atozpos( TSD, parms->next->next->value, "LOWER", 3 ) ;
+      length = atozposrx64( TSD, parms->next->next->value, "LOWER", 3 ) ;
    else
       length = ( rlength >= start ) ? rlength - start + 1 : 0;
    /*
@@ -2706,7 +2700,7 @@ streng *rex_lower( tsd_t *TSD, cparamboxptr parms )
    /*
     * Create our new starting; duplicate of input string
     */
-   ptr = Str_makeTSD( length );
+   ptr = Str_makeTSD( rlength );
    memcpy( Str_val( ptr ), Str_val( str ), Str_len( str ) );
    /*
     * Determine where to start changing case...
@@ -2719,7 +2713,7 @@ streng *rex_lower( tsd_t *TSD, cparamboxptr parms )
    /*
     * Change them
     */
-   mem_lower( &ptr->value[i], changecount );
+   mem_lowerrx64( &ptr->value[i], changecount );
    /*
     * Append pad characters if required...
     */

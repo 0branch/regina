@@ -234,13 +234,15 @@ GCIHEADERS = $(gcidir)/gci.h $(gcidir)/embedded.h
 
 CONFFILES = $(REG_DIR)/configure.in $(REG_DIR)/config.h.in $(REG_DIR)/Makefile.in $(REG_DIR)/Makefile.aix.in \
 	$(REG_DIR)/install-sh $(REG_DIR)/common/config.guess $(REG_DIR)/common/config.sub $(REG_DIR)/aclocal.m4 \
-	$(REG_DIR)/configure $(REG_DIR)/descrip.mms $(REG_DIR)/build.com $(REG_DIR)/regina-config.in \
-	$(REG_DIR)/Regina.spec $(REG_DIR)/rxstack.init.d.in \
+	$(REG_DIR)/configure $(REG_DIR)/descrip.mms $(REG_DIR)/build.com $(REG_DIR)/regina-config.in  $(REG_DIR)/libregina.pc.in\
+	$(REG_DIR)/Regina.spec $(REG_DIR)/rxstack.init.d.in $(REG_DIR)/rxstack.conf $(REG_DIR)/rxstack.service \
+	$(REG_DIR)/APKBUILD \
 	$(REG_DIR)/nsis/regina_*.ini $(REG_DIR)/regina.nsi.in $(REG_DIR)/regina.nsi.files $(REG_DIR)/regina.ver $(REG_DIR)/regina64.xpm
 ZIP_CONFFILES = configure.in config.h.in Makefile.in Makefile.aix.in \
 	install-sh common/config.guess common/config.sub aclocal.m4 \
-	configure descrip.mms build.com regina-config.in \
-	Regina.spec rxstack.init.d.in \
+	configure descrip.mms build.com regina-config.in libregina.pc.in \
+	Regina.spec rxstack.init.d.in rxstack.conf rxstack.service \
+	APKBUILD \
 	nsis/regina_*.ini regina.nsi.in regina.nsi.files regina.ver regina64.xpm
 
 EPOC32FILES = $(REG_DIR)/epoc32/bmarm/*.def \
@@ -296,9 +298,9 @@ ZIP_CFILES = $(ZIP_CSRCFILES) yaccsrc.c lexsrc.c execiser.c threader.c \
 	 rxqueue.c rxstack.c rexxbif.c extstack.c mac.c msgcmp.c \
 	 regutil/*.c regutil/*.h regutil/regutil.def
 DEBIANFILES = $(DEBIAN_DIR)/rules $(DEBIAN_DIR)/control $(DEBIAN_DIR)/changelog $(DEBIAN_DIR)/md5_sums \
-	$(DEBIAN_DIR)/postinst $(DEBIAN_DIR)/postrm $(DEBIAN_DIR)/postrm-dev $(DEBIAN_DIR)/copyright
+	$(DEBIAN_DIR)/*.postinst $(DEBIAN_DIR)/*.prerm $(DEBIAN_DIR)/*.postrm $(DEBIAN_DIR)/copyright
 ZIP_DEBIANFILES = debian/rules debian/control debian/changelog debian/md5_sums \
-	debian/postinst debian/postrm debian/postrm-dev debian/copyright
+	debian/*.postinst debian/*.prerm debian/*.postrm debian/postrm-dev debian/copyright
 
 JUNK = *.o *.so.$(OBJ) $(STATICLIB) execiser$(binarybitprefix)$(EXE) threader$(binarybitprefix)$(EXE) rxqueue$(binarybitprefix)$(EXE) rxstack$(binarybitprefix)$(EXE) rexx$(binarybitprefix)$(EXE) msgcmp$(binarybitprefix)$(EXE) $(SHL_TARGETS) $(SHLPRE)$(SHLFILE)$(SHLPST)* config.cache config.log gci_convert.h *.mtb $(LIBPRE)$(SHLFILE)$(LIBPST)
 
@@ -370,7 +372,7 @@ yaccsrc:
 	bison -p__regina -o$(srcdir)/yaccsrc.c -d $(srcdir)/yaccsrc.y
 
 lexsrc:
-	flex -P__regina -Scontrib/flex.skl -8 -o$(srcdir)/lexsrc.c $(srcdir)/lexsrc.l
+	flex -P__regina -S$(srcdir)/contrib/flex.skl -8 -o$(srcdir)/lexsrc.c $(srcdir)/lexsrc.l
 
 #
 # Convert .mts to .mtb
@@ -944,7 +946,7 @@ regtrig.$(OBJ): $(regutildir)/regtrig.c
 	$(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(regutildir)/regtrig.c
 
 $(SHLPRE)regutil$(MODPST): $(REGUTILOBJ) $(SHLPRE)$(SHLFILE)$(SHLPST) $(REGUTILEXP)
-	$(LD_RXLIB_UTILA) $(REGUTILEXPORTS) $(REGUTILOBJ) $(LD_RXLIB_UTILB) $(BOTHLIBS) #$(REGUTIL_TERM_LIB) $(REGUTIL_MATH_LIB)
+	$(LD_RXLIB_UTILA) $(REGUTILEXPORTS) $(REGUTILOBJ) $(LD_RXLIB_UTILB) $(BOTHLIBS) $(REGUTIL_TERM_LIB) $(REGUTIL_MATH_LIB)
 	$(RANLIB_DYNAMIC)
 
 
@@ -985,31 +987,31 @@ ARCHIVE_FILES = $(ALLSRC) $(README) $(REG_DIR)/makefile.* \
 	$(CONFFILES) $(REG_DIR)/*.def $(REG_DIR)/*.ico $(REG_DIR)/*.rc  $(REG_DIR)/*.info \
 	$(REG_DIR)/file_id* $(REG_DIR)/*.bat $(REG_DIR)/*.cmd $(YACCLEX_FILES) \
 	$(REG_DIR)/*.rexx $(REG_DIR)/yaccsrc.bound $(REG_DIR)/rexx.make \
-	$(EPOC32FILES) $(TAR_MTSSRC)
+	$(EPOC32FILES) $(TAR_MTSSRC) $(REG_DIR)/doc/regina.pdf $(REG_DIR)/doc/regutil.pdf
 
 ZIP_ARCHIVE_FILES = $(ZIP_ALLSRC) $(ZIP_README) makefile.* \
 	*.rsp $(ZIP_DEMOFILES) $(ZIP_TRIPFILES) $(ZIP_CONTRIBFILES) $(ZIP_DEBIANFILES) \
 	$(ZIP_CONFFILES) *.def *.ico *.rc *.info \
 	file_id* *.bat *.cmd $(ZIP_YACCLEX_FILES) \
 	*.rexx yaccsrc.bound rexx.make \
-	$(ZIP_EPOC32FILES) $(ZIP_MTSSRC)
+	$(ZIP_EPOC32FILES) $(ZIP_MTSSRC) ./doc/regina.pdf ./doc/regutil.pdf
 
 dist:
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 #	(cd $(srcdir);PWD=`pwd`;cd ..;ln -sf ${PWD} $(REG_DIR))
 	(cd $(srcdir)/..;ln -sf $(abs_srcdir) $(REG_DIR))
-	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > Regina-REXX-$(VERDOT).tar.gz )
+	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | gzip > $(PACKAGE)-$(VERDOT).tar.gz )
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 
 bzip:
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 	(cd $(srcdir)/..;ln -sf $(abs_srcdir) $(REG_DIR))
-	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | bzip2 > Regina-REXX-$(VERDOT).tar.bz2 )
+	(cd $(srcdir)/..;tar -cvf - $(ARCHIVE_FILES) | bzip2 > $(PACKAGE)-$(VERDOT).tar.bz2 )
 	(cd $(srcdir)/..;rm -f $(REG_DIR))
 
 tar:
 	(cd $(srcdir)/..; \
-	tar -cvf - $(ARCHIVE_FILES) | compress > Regina-REXX-$(VERDOT).tar.Z )
+	tar -cvf - $(ARCHIVE_FILES) | compress > $(PACKAGE)-$(VERDOT).tar.Z )
 
 zzip:
 	(cd $(srcdir)/..; \
@@ -1035,13 +1037,16 @@ installbase: all
 	$(INSTALL) -s -m 755 -c ./rxqueue$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
 	$(INSTALL) -s -m 755 -c ./rxstack$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxstack$(binarybitprefix)$(EXE)
 	$(INSTALL) -m 755 -c ./regina-config $(DESTDIR)$(bindir)/regina-config
+	$(INSTALL) -m 755 -c ./libregina.pc $(DESTDIR)$(libdir)/pkgconfig/libregina.pc
 	-$(INSTALL) -m 644 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	-$(RANLIB) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	$(INSTALL) -m 644 -c $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/regina.1
+	$(INSTALL) -m 644 -c $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/rexx.1
 	$(INSTALL) -m 644 -c $(srcdir)/regina-config.1 $(DESTDIR)$(mandir)/man1/regina-config.1
 	$(INSTALL) -m 644 -c $(srcdir)/rxstack.1 $(DESTDIR)$(mandir)/man1/rxstack.1
 	$(INSTALL) -m 644 -c $(srcdir)/rxqueue.1 $(DESTDIR)$(mandir)/man1/rxqueue.1
 	gzip -f $(DESTDIR)$(mandir)/man1/regina.1
+	gzip -f $(DESTDIR)$(mandir)/man1/rexx.1
 	gzip -f $(DESTDIR)$(mandir)/man1/regina-config.1
 	gzip -f $(DESTDIR)$(mandir)/man1/rxstack.1
 	gzip -f $(DESTDIR)$(mandir)/man1/rxqueue.1
@@ -1066,6 +1071,10 @@ installbase: all
 	-chmod 755 $(DESTDIR)$(examplesdir)/timeconv.rexx
 	$(DESTDIR)$(bindir)/rexx $(srcdir)/preinst.rexx $(bindir)/rexx $(srcdir)/demo/newstr.rexx   $(DESTDIR)$(examplesdir)/newstr.rexx
 	-chmod 755 $(DESTDIR)$(examplesdir)/newstr.rexx
+
+installdoc:
+	$(INSTALL) -m 644 -c ./doc/regina.pdf $(DESTDIR)/$(PACKAGE)-$(VERDOTUNQUOTED)-doc.pdf
+	$(INSTALL) -m 644 -c ./doc/regutil.pdf $(DESTDIR)/$(PACKAGE)-regutil-$(VERDOTUNQUOTED)-doc.pdf
 
 installregina:
 	$(INSTALL) -s -m 755 -c ./regina$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/regina$(binarybitprefix)$(EXE)
@@ -1105,16 +1114,12 @@ installmaclib: installregina
 	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest1$(MODPST)
 	$(INSTALL) -m 755 -c ./$(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest2$(MODPST)
 
-installrxstack:
-	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/rxstack
-	@echo "The system startup/shutdown script; rxstack, may have been installed into $(sysconfdir)"
-	@echo "You need to create the appropriate links to this script to start and stop rxstack automatically."
-
 uninstall:
 	-rm -f $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
 	-rm -f $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
 	-rm -f $(DESTDIR)$(bindir)/rxstack$(binarybitprefix)$(EXE)
 	-rm -f $(DESTDIR)$(bindir)/regina-config
+	-rm -f $(DESTDIR)$(libdir)/pkgconfig/libregina.pc
 	-rm -f $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 	-rm -f $(DESTDIR)$(mandir)/man1/regina.1.gz
 	-rm -f $(DESTDIR)$(mandir)/man1/regina-config.1.gz
@@ -1201,7 +1206,7 @@ binarybase: all
 	-mkdir -p ./tmpdir/rexx
 	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
-	tar cvf - * | gzip > ../Regina-REXX-$(VERDOT)$(VERSUPP)-$(MACH_ARCH)-$(MYDISTRO).tgz )
+	tar cvf - * | gzip > ../$(PACKAGE)-$(VERDOT)$(VERSUPP)-$(MACH_ARCH)-$(MYDISTRO).tgz )
 
 beosbinary: all
 	-rm -fr ./tmpdir
@@ -1212,7 +1217,7 @@ beosbinary: all
 	-mkdir -p ./tmpdir/doc/regina
 	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
-	zip -r Regina-REXX-$(VERDOT)$(VERSUPP)-$(target).zip * )
+	zip -r $(PACKAGE)-$(VERDOT)$(VERSUPP)-$(target).zip * )
 
 atheosbinary: all
 	-rm -fr ./tmpdir
@@ -1225,19 +1230,24 @@ atheosbinary: all
 	-mkdir -p ./tmpdir/regina/rexx
 	./rexx$(binarybitprefix)$(EXE) $(srcdir)/makebinary.rexx -s$(srcdir) -d./tmpdir/regina -u$(USE_ABI) -a$(ABI_MINOR) -A$(ABI_MAJOR) -p$(SHLPRE) -e$(EXE) -S$(SHLPST) -l$(LIBPRE) -L$(LIBPST) -b$(SHLFILE) -B$(LIBFILE) -P$(binarybitprefix) -t$(target)
 	(cd ./tmpdir; \
-	tar cvf - regina | gzip > ../Regina-REXX-$(VERDOT)-$(target).tgz )
+	tar cvf - regina | gzip > ../$(PACKAGE)-$(VERDOT)-$(target).tgz )
 
+#
+# rpm targets
+#
 rpm: bzip $(RPMTOPDIR)
 	cp $(srcdir)/regina64.xpm $(RPMTOPDIR)/SOURCES
-	cp $(srcdir)/../Regina-REXX-$(VERDOT).tar.bz2 $(RPMTOPDIR)/SOURCES
+	cp $(srcdir)/../$(PACKAGE)-$(VERDOT).tar.bz2 $(RPMTOPDIR)/SOURCES
 	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)*.rpm
-	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)*.rpm
-	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)*.rpm
-	rpmbuild -ba --clean $(srcdir)/Regina.spec
+	rm -f $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-doc-$(VERDOTUNQUOTED)*.rpm
+	rm -f $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-devel-$(VERDOTUNQUOTED)*.rpm
+	rm -f $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-$(VERDOTUNQUOTED)*.rpm
+	rpmbuild -ba --clean --define "initservice @initinstaller@" --define "vermajor @VER_MAJOR@" --define "verminor @VER_MINOR@" --define "systemdinstallpath @systemdinstallpath@" $(srcdir)/Regina.spec
 	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
-	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
-	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
-	ls -l $(RPMTOPDIR)/RPMS/*/$(PACKAGE)*rpm
+	mv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-doc-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-doc-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-doc-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-devel-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	mv $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-$(VERDOTUNQUOTED)-[0-9]*.rpm `dirname $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-$(VERDOTUNQUOTED)-[0-9]*.rpm`/`basename $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-$(VERDOTUNQUOTED)-[0-9]*.rpm .rpm`-$(MYDISTRO).rpm
+	ls -l $(RPMTOPDIR)/RPMS/*/$(PACKAGE)*rpm $(RPMTOPDIR)/RPMS/*/libregina*rpm
 
 $(RPMTOPDIR):
 	-mkdir -p $(RPMTOPDIR)/SOURCES
@@ -1246,77 +1256,109 @@ $(RPMTOPDIR):
 	-mkdir -p $(RPMTOPDIR)/BUILD
 	-mkdir -p $(RPMTOPDIR)/SPECS
 
-rpminstall: rpminstall-dev
-	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
+rpminstall: rpminstall-devel
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-doc-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
 
-rpminstall-dev:
-	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-lib-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
-	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-devel-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
+rpminstall-devel:
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/$(PACKAGE)-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
+	sudo rpm -Uv $(RPMTOPDIR)/RPMS/*/libregina@VER_MAJOR@-devel-$(VERDOTUNQUOTED)-[0-9]*-$(MYDISTRO).rpm
 
 #
 # Debian targets
 #
 install-lib: $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
-	$(INSTALL) -m 644 -c $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
-	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
-	$(INSTALL) -m 644 -c $(SHLPRE)regutil$(MODPST) $(prefix)$(libdir)/regina-rexx/$(VERDOT)/$(SHLPRE)regutil$(MODPST)
+	$(INSTALL) -m 644 -c $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI)
+	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI_MAJOR)
+	$(INSTALL) -m 644 -c $(SHLPRE)regutil$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)regutil$(MODPST)
 
 install-dev: $(LIBPRE)$(LIBFILE)$(LIBPST)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(bindir)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(libdir)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(libdir)/pkgconfig
+	$(INSTALL) -m 755 -d $(DESTDIR)$(includedir)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)
 # header file
-	$(INSTALL) -c -m 644 $(srcdir)/rexxsaa.h $(prefix)/usr/include/rexxsaa.h
+	$(INSTALL) -c -m 644 $(srcdir)/rexxsaa.h $(DESTDIR)$(includedir)/rexxsaa.h
 # libregina.a
-	$(INSTALL) -c -m 644 ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(prefix)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
-	-$(RANLIB) $(prefix)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
+	$(INSTALL) -c -m 644 ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
+	-$(RANLIB) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
 # libregina.so.x -> libregina.so
-	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(prefix)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
+	$(LN_S) -f $(SHLPRE)$(SHLFILE)$(SHLPST).$(ABI) $(DESTDIR)$(libdir)/$(SHLPRE)$(SHLFILE)$(SHLPST)
 # regina-config
-	$(INSTALL) -m 755 -c ./regina-config $(prefix)/usr/bin/regina-config
-	$(INSTALL) -c -m 644 $(srcdir)/regina-config.1 $(prefix)/usr/share/man/man1/regina-config.1
+	$(INSTALL) -m 755 -c ./regina-config $(DESTDIR)$(bindir)/regina-config
+	$(INSTALL) -c -m 644 $(srcdir)/regina-config.1 $(DESTDIR)$(mandir)/man1/regina-config.1
+	$(INSTALL) -m 755 -c ./libregina.pc $(DESTDIR)$(libdir)/pkgconfig/libregina.pc
 
-install-rexx: rexx$(EXE) regina$(EXE)
-	$(INSTALL) -c -m 755 $(srcdir)/rexx $(prefix)/usr/bin/rexx
-	$(INSTALL) -c -m 755 $(srcdir)/regina $(prefix)/usr/bin/regina
-	$(INSTALL) -c -m 755 $(srcdir)/rxqueue $(prefix)/usr/bin/rxqueue
-	$(INSTALL) -c -m 755 $(srcdir)/rxstack $(prefix)/usr/bin/rxstack
-	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(prefix)/usr/share/man/man1/regina.1
-	$(INSTALL) -c -m 644 $(srcdir)/rxstack.1 $(prefix)/usr/share/man/man1/rxstack.1
-	$(INSTALL) -c -m 644 $(srcdir)/rxqueue.1 $(prefix)/usr/share/man/man1/rxqueue.1
-	$(INSTALL) -m 644 -c $(SHLPRE)rxtest1$(MODPST) $(prefix)$(libdir)/regina-rexx/$(VERDOT)/$(SHLPRE)rxtest1$(MODPST)
-	$(INSTALL) -m 644 -c $(SHLPRE)rxtest2$(MODPST) $(prefix)$(libdir)/regina-rexx/$(VERDOT)/$(SHLPRE)rxtest2$(MODPST)
+install-rexx: rexx$(EXE) regina$(EXE) @initinstaller@-deb
+	$(INSTALL) -c -m 755 $(srcdir)/rexx $(DESTDIR)$(bindir)/rexx-$(PACKAGE)
+#	ln -sf $(DESTDIR)/usr/bin/rexx-$(PACKAGE) $(DESTDIR)/usr/bin/rexx
+	$(INSTALL) -c -m 755 $(srcdir)/regina $(DESTDIR)$(bindir)/regina
+	$(INSTALL) -c -m 755 $(srcdir)/rxqueue $(DESTDIR)$(bindir)/rxqueue-$(PACKAGE)
+#	ln -sf $(DESTDIR)/usr/bin/rxqueue-$(PACKAGE) $(DESTDIR)/usr/bin/rxqueue
+	$(INSTALL) -c -m 755 $(srcdir)/rxstack $(DESTDIR)$(bindir)/rxstack
+	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/regina.1
+	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/rexx-$(PACKAGE).1
+	$(INSTALL) -c -m 644 $(srcdir)/rxstack.1 $(DESTDIR)$(mandir)/man1/rxstack.1
+	$(INSTALL) -c -m 644 $(srcdir)/rxqueue.1 $(DESTDIR)$(mandir)/man1/rxqueue-$(PACKAGE).1
+#	ln -sf $(DESTDIR)/usr/share/man/man1/rxqueue-$(PACKAGE).1 $(DESTDIR)/usr/bin/rxqueue.1
+	$(INSTALL) -m 644 -c $(SHLPRE)rxtest1$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest1$(MODPST)
+	$(INSTALL) -m 644 -c $(SHLPRE)rxtest2$(MODPST) $(DESTDIR)$(addonsdir)/$(SHLPRE)rxtest2$(MODPST)
 	@echo
 	for i in `ls $(srcdir)/demo/*.rexx`; do \
 	   echo "Installing $$i..." ; \
-	   $(INSTALL) -c -m 644 $$i $(prefix)/$(rexx_examples)/`basename $$i` ; \
+	   $(INSTALL) -c -m 644 $$i $(DESTDIR)/$(rexx_examples)/`basename $$i` ; \
 	done
 	@echo
 	for i in `ls $(srcdir)/regutil/*.rexx`; do \
 	   echo "Installing $$i..." ; \
-	   $(INSTALL) -c -m 644 $$i $(prefix)/$(rexx_examples)/`basename $$i` ; \
+	   $(INSTALL) -c -m 644 $$i $(DESTDIR)/$(rexx_examples)/`basename $$i` ; \
 	done
 	@echo
 	for i in $(MTBFILES); do \
 	   echo "Installing $$i..." ; \
-	   $(INSTALL) -c -m 644 $$i $(prefix)/share/regina-rexx/`basename $$i` ; \
+	   $(INSTALL) -c -m 644 $$i $(DESTDIR)/share/$(PACKAGE)/`basename $$i` ; \
 	done
 
-#	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOTUNQUOTED)$(VERSUPP).tar.gz; \
+#
+# DEB init scripts
+#
+installsysvinit-deb:
+	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/init.d/rxstack
+installinsserv-deb:
+	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/init.d/rxstack
+installupstart-deb:
+	-$(INSTALL) -m 755 -c ./rxstack.conf $(DESTDIR)$(sysconfdir)/init/rxstack.conf
+installsystemd-deb:
+	-$(INSTALL) -m 755 -c ./rxstack.service $(DESTDIR)@systemdinstallpath@/rxstack.service
 
+#
+# RPM init scripts
+#
+installsysvinit:
+	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/init.d/rxstack
+installinsserv:
+	-$(INSTALL) -m 755 -c ./rxstack.init.d $(DESTDIR)$(sysconfdir)/init.d/rxstack
+installupstart:
+	-$(INSTALL) -m 755 -c ./rxstack.conf $(DESTDIR)$(sysconfdir)/init/rxstack.conf
+installsystemd:
+	-$(INSTALL) -m 755 -c ./rxstack.service $(DESTDIR)@systemdinstallpath@/rxstack.service
 
 deb: dist
 	-rm -fr tmp
 	-mkdir tmp
 	(cd tmp; \
-	tar zxvf ../../$(srcdir)/Regina-REXX-$(VERDOTUNQUOTED).tar.gz; \
+	tar zxvf ../../$(srcdir)/$(PACKAGE)-$(VERDOTUNQUOTED).tar.gz; \
 	cd $(REG_DIR); \
 	dpkg-buildpackage -rfakeroot; \
 	cd ..; \
-	mv regina-rexx_$(VERDOTUNQUOTED)*.deb `basename regina-rexx_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
+	mv $(PACKAGE)_$(VERDOTUNQUOTED)*.deb `basename $(PACKAGE)_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
 	mv libregina3_$(VERDOTUNQUOTED)*.deb `basename libregina3_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
 	mv libregina3-dev_$(VERDOTUNQUOTED)*.deb `basename libregina3-dev_$(VERDOTUNQUOTED)*.deb .deb`-$(MYDISTRO).deb; \
 	ls -l )
 
 debinstall: debinstall-dev
-	sudo dpkg -i tmp/regina-rexx_$(VERDOTUNQUOTED)*-$(MYDISTRO).deb
+	sudo dpkg -i tmp/$(PACKAGE)_$(VERDOTUNQUOTED)*-$(MYDISTRO).deb
 
 debinstall-dev:
 	sudo dpkg -i tmp/libregina3_$(VERDOTUNQUOTED)*-$(MYDISTRO).deb
@@ -1331,9 +1373,21 @@ dmg: binary
 	(cd $(srcdir)/Mac; \
 	make VERSION=$(VERDOT)@VER_SUPP@ )
 
-distclean:
-	rm -f $(JUNK) config.log config.h config.cache config.status Makefile regina-config rxstack.init.d \#*\#
+apk: dist
+	cp $(srcdir)/../$(REG_DIR).tar.gz .
+# we need to copy these files from the alpine directory even though they will be
+# overridden by the scripts in APKBUILD because abuild expects them to be in the
+# source directory as part of the pre-build sanity check
+#	cp $(srcdir)/alpine/$(PACKAGE).post-install .
+#	cp $(srcdir)/alpine/$(PACKAGE).pre-deinstall .
+	abuild checksum
+	abuild
 
+distclean:
+	rm -f $(JUNK) config.log config.h config.cache config.status Makefile regina-config rxstack.init.d libregina.pc \#*\#
+
+check:
+# dummy target for Apline Linux build package; abuild -r
 #
 # End of makefile
 #

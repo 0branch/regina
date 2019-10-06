@@ -124,8 +124,6 @@ int init_external_queue( const tsd_t *TSD )
          exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_NO_WINSOCK, WSAGetLastError() );
       rc = 1;
    }
-#else
-   TSD = TSD; /* keep compiler happy */
 #endif
    return rc;
 }
@@ -496,6 +494,45 @@ int get_number_in_queue_from_rxstack( const tsd_t *TSD, int sock, int *errcode )
                showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting number in queue" );
             else if ( !TSD->called_from_saa )
                exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting number in queue"  );
+            rc = 9; /* RXQUEUE_NOTREG */
+         }
+         DROPSTRENG( header );
+      }
+   }
+   if ( errcode )
+      *errcode = rc;
+   return length;
+}
+
+int get_queues_from_rxstack( const tsd_t *TSD, int sock, int *errcode , streng **result )
+{
+   int rc,length=0;
+   streng *header;
+
+   DEBUGDUMP(printf("before send_command_to_rxstack:\n"););
+   rc = send_command_to_rxstack( TSD, sock, RXSTACK_SHOW_QUEUES_STR, NULL, 0 );
+   if ( rc != -1 )
+   {
+      header = read_result_from_rxstack( TSD, sock, RXSTACK_HEADER_SIZE );
+      if ( header )
+      {
+         rc = header->value[0]-'0';
+         if ( rc == 0 )
+         {
+            /*
+             * now get the length from the header
+             */
+            DEBUGDUMP(printf("before get_length_from_header: %.*s\n", header->len, header->value););
+            length = get_length_from_header( TSD, header );
+            *result = read_result_from_rxstack( TSD, sock, length );
+         }
+         else
+         {
+            /* TSD will be NULL when called from rxqueue or rxstack */
+            if ( TSD == NULL )
+               showerror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, ERR_RXSTACK_INTERNAL_TMPL, rc, "Getting queues" );
+            else if ( !TSD->called_from_saa )
+               exiterror( ERR_EXTERNAL_QUEUE, ERR_RXSTACK_INTERNAL, rc, "Getting queues"  );
             rc = 9; /* RXQUEUE_NOTREG */
          }
          DROPSTRENG( header );

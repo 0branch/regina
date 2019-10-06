@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.9 2012/08/08 01:23:45 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.10 2016/01/20 00:07:46 mark Exp $
  */
 #include "regutil.h"
 #ifdef USE_TERMCAP_DB
@@ -91,7 +91,7 @@ rxfunc(syscls)
 
    if (!*clr) {
       sethandles();
-      clr = tgetstr("cl", &clrbuf);
+      clr = tgetstr("cl", (char **)&clrbuf);
    }
 #else
    /* ansi terminal control for clearing the screen should work with any
@@ -128,7 +128,7 @@ rxfunc(syscurpos)
 #ifdef USE_TERMCAP_DB
    if (!*cpos) {
       sethandles();
-      cpos = tgetstr("cm", &cposbuf);
+      cpos = tgetstr("cm", (char **)&cposbuf);
    }
 #endif
 
@@ -177,10 +177,9 @@ rxfunc(syscurstate)
 
 #ifdef USE_TERMCAP_DB
    if (!*css) {
-      char *pcss = css;
       sethandles();
-      pcsson = tgetstr("ve", &css);
-      pcssoff = tgetstr("vi", &css);
+      pcsson = tgetstr("ve", (char **)&css);
+      pcssoff = tgetstr("vi", (char **)&css);
    }
 #endif
 

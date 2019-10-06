@@ -80,7 +80,6 @@ int init_expr( tsd_t *TSD )
 #ifdef TRACEMEM
    regmarker( TSD, mark_in_expr ) ;
 #endif
-   TSD = TSD; /* keep compiler happy */
    return(1);
 }
 
@@ -88,7 +87,6 @@ int init_expr( tsd_t *TSD )
 static num_descr *copy_num( const tsd_t *TSD, const num_descr *input )
 {
    num_descr *newptr=NULL ;
-
    newptr = (num_descr *)MallocTSD( sizeof( num_descr )) ;
    newptr->negative = input->negative ;
    newptr->size = input->size ;
@@ -97,7 +95,6 @@ static num_descr *copy_num( const tsd_t *TSD, const num_descr *input )
    newptr->num = (char *)MallocTSD( newptr->max ) ;
    newptr->used_digits = input->used_digits;
    memcpy( newptr->num, input->num, newptr->size ) ;
-   TSD = TSD; /* keep compiler happy */
    return newptr ;
 }
 
@@ -406,8 +403,11 @@ do_an_add:
       FreeTSD( numtwo->num ) ;
       FreeTSD( numtwo ) ;
    }
+#if 0
+   // this moved below
    if (kill)
       *kill = numthr ;
+#endif
 
    if (TSD->trace_stat=='I')
       tracenumber( TSD, numthr, 'O' ) ;
@@ -431,6 +431,8 @@ do_an_add:
             numthr->used_digits = strip2;
       }
    }
+   if (kill)
+      *kill = numthr ;
    return numthr ;
 }
 
@@ -725,7 +727,6 @@ streng *evaluate( tsd_t *TSD, nodeptr thisptr, streng **kill )
       case X_SPACE:
       {
          char *cptr ;
-
          strone = evaluate( TSD, thisptr->p[0], &stmp1 ) ;
          if ( thisptr->type == X_CONCATASSIGN )
          {

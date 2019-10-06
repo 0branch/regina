@@ -76,14 +76,6 @@
 # endif
 #endif
 
-streng *unx_getpath( tsd_t *TSD, cparamboxptr dummy )
-{
-   TSD = TSD; /* keep compiler happy */
-   dummy = dummy; /* keep compiler happy */
-   return nullstringptr() ;
-}
-
-
 streng *unx_popen( tsd_t *TSD, cparamboxptr parms )
 {
    streng *string=NULL, *result=NULL ;
@@ -389,7 +381,6 @@ streng *unx_crypt( tsd_t *TSD, cparamboxptr parms )
 #else
    retval = Str_dup( parms->value );
 #endif
-   TSD = TSD; /* keep compiler happy */
    return retval ;
 }
 

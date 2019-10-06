@@ -108,7 +108,7 @@ LIBDIR = $(TOPDIR)/lib
 
 COPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) -DREGINA_SINGLE_THREADED
 TSCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) $(THREADING)
-LINKOPT = $(EEXTRA) /NOLOGO /VERSION:$(VERDOT)
+LINKOPT = $(EEXTRA) /NOLOGO /VERSION:$(VER_MAJOR).$(VER_MINOR) /MANIFEST
 OTHERCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) -DREGINA_SINGLE_THREADED
 OTHERTSCOPT = $(OPTIMIZE) $(DEBUGFLAG) $(CEXTRA) -I$(SRCDIR) $(MEMTRACE) $(NOFLISTS) $(THREADING)
 REGUTILCOPT = $(COPT) -DNOT_LIKE_IBM -DMAPVIEWOFFILE $(DEBUGFLAG)
@@ -202,34 +202,41 @@ $(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRC
 # trexx.exe is a temporary Rexx interpreter used to update version
 # information in .rc files
 trexx.exe : $(OFILES) rexx.obj nosaa.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(STATIC_LDFLAGS) /OUT:trexx.exe $(OFILES) rexx.obj nosaa.obj $(LIBS) $(WINSOCK)
+   $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(STATIC_LDFLAGS) /OUT:trexx.exe $(OFILES) rexx.obj nosaa.obj $(LIBS) $(WINSOCK)
 
-rexx.exe : $(OFILES) rexx.obj rexx$(LARCH)exe.obj nosaa.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(STATIC_LDFLAGS) /OUT:rexx.exe $(OFILES) rexx.obj rexx$(LARCH)exe.obj nosaa.obj $(LIBS) $(WINSOCK)
+rexx.exe : $(OFILES) rexx.obj rexx$(LARCH)exe.obj nosaa.obj rexx.exe.mf
+   $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(STATIC_LDFLAGS) /OUT:rexx.exe $(OFILES) rexx.obj rexx$(LARCH)exe.obj nosaa.obj $(LIBS) $(WINSOCK)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;1
 
-regina.exe : regina.dll regina.obj regina$(LARCH)exe.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(DYNAMIC_LDFLAGS) /OUT:regina.exe regina.obj regina$(LARCH)exe.obj $(LIBS) $(LIBLINK) $(WINSOCK)
+regina.exe : regina.dll regina.obj regina$(LARCH)exe.obj regina.exe.mf
+   $(LD) /PDB:$*.pdb $(LINKOPT) /STACK:0x10000000 $(DYNAMIC_LDFLAGS) /OUT:regina.exe regina.obj regina$(LARCH)exe.obj $(LIBS) $(LIBLINK) $(WINSOCK)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;1
 
-execiser.exe : execiser.obj regina.dll
-         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:execiser.exe execiser.obj $(LIBLINK)
+execiser.exe : execiser.obj regina.dll execiser.exe.mf
+   $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:execiser.exe execiser.obj $(LIBLINK)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;1
 
-rxqueue.exe : rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj mygetopt.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxqueue.exe rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj mygetopt.obj $(WINSOCK)
+rxqueue.exe : rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj mygetopt.obj rxqueue.exe.mf
+   $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxqueue.exe rxqueue.obj erexxbif.obj eextstack.obj rxqueue$(LARCH)exe.obj mygetopt.obj $(WINSOCK)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;1
 
-rxstack.exe : rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj LibSha1.obj mygetopt.obj
-         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxstack.exe rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj LibSha1.obj mygetopt.obj $(WINSOCK) $(SERVICELIBS)
+rxstack.exe : rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj LibSha1.obj mygetopt.obj rxstack.exe.mf
+   $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:rxstack.exe rxstack.obj erexxbif_mt.obj eextstack_mt.obj service.obj rxstack$(LARCH)exe.obj LibSha1.obj mygetopt.obj $(WINSOCK) $(SERVICELIBS)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;1
 
-threader.exe : threader.obj regina.dll
-         $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:threader.exe threader.obj $(LIBLINK)
+threader.exe : threader.obj regina.dll threader.exe.mf
+   $(LD) /PDB:$*.pdb $(LINKOPT) /OUT:threader.exe threader.obj $(LIBLINK)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;1
 
 rexx.lib: $(OFILES) client.obj drexx.obj rexxsaa.obj
-        lib $(LIBFLAGS) $(OFILES) client.obj drexx.obj rexxsaa.obj
+   lib $(LIBFLAGS) $(OFILES) client.obj drexx.obj rexxsaa.obj
 
-regina.dll: $(TSFILES) regina$(LARCH)dll.obj
-        $(LD) /PDB:$*_dll.pdb $(LINKOPT) /DLL /BASE:0x6B000000 /OUT:regina.dll /MAP:regina_dd.map /IMPLIB:regina.lib /DEF:$(SRCDIR)\regina_$(LARCH)_dll.def regina$(LARCH)dll.obj *.ts.obj $(LIBS) $(WINSOCK)
+regina.dll: $(TSFILES) regina$(LARCH)dll.obj regina.dll.mf
+   $(LD) /PDB:$*_dll.pdb $(LINKOPT) /DLL /BASE:0x6B000000 /OUT:regina.dll /MAP:regina_dd.map /IMPLIB:regina.lib /DEF:$(SRCDIR)\regina_$(LARCH)_dll.def regina$(LARCH)dll.obj *.ts.obj $(LIBS) $(WINSOCK)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;2
 
 sregina.exe: $(STATFILES)
-        $(LD) /PDB:$*.pdb ?? /OUT:sregina.exe $(STATFILES) $(STATICFUNCTIONLIBS)
+   $(LD) /PDB:$*.pdb ?? /OUT:sregina.exe $(STATFILES) $(STATICFUNCTIONLIBS)
 
 #
 # Convert .mts to .mtb
@@ -589,8 +596,9 @@ mygetopt.ts.obj : $(SRCDIR)/mygetopt.c
 # Rules for Regutil
 #
 # ole32.lib oleaut32.lib uuid.lib
-regutil.dll: $(REGUTILOFILES)
-   $(LD_RXLIBPRE) $(LD_REGUTIL) $(REGUTILOFILES) $(LINKSHL) kernel32.lib advapi32.lib user32.lib
+regutil.dll: $(REGUTILOFILES) regutil.dll.mf
+   $(LD_RXLIBPRE) $(LINKOPT) $(LD_REGUTIL) $(REGUTILOFILES) $(LINKSHL) kernel32.lib advapi32.lib user32.lib
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;2
    del regutil.lib
 
 regfilesys.obj : $(REGUTILSRCDIR)/regfilesys.c $(REGUTILSRCDIR)/regutil.h $(REGUTILSRCDIR)/rxproto.h
@@ -686,30 +694,32 @@ regtrig.stat.obj : $(REGUTILSRCDIR)/regtrig.c $(REGUTILSRCDIR)/regutil.h $(REGUT
 # Rules for sample programs
 #
 test1.dll.obj: $(SRCDIR)/test1.c
-        $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/test1.c
+   $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/test1.c
 
-rxtest1.dll: test1.dll.obj regina.dll
-        $(LD_RXLIBPRE) $(LD_RXLIB1) test1.dll.obj $(LINKSHL)
-        del rxtest1.lib
+rxtest1.dll: test1.dll.obj regina.dll rxtest1.dll.mf
+   $(LD_RXLIBPRE) $(LINKOPT) $(LD_RXLIB1) test1.dll.obj $(LINKSHL)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;2
+   del rxtest1.lib
 
 test1.obj: $(SRCDIR)/test1.c
-        $(CC) -c $(COPT) $(CC2O) /DDYNAMIC_STATIC $(SRCDIR)/test1.c
+   $(CC) -c $(COPT) $(CC2O) /DDYNAMIC_STATIC $(SRCDIR)/test1.c
 
 rxtest1.lib: test1.obj
-        lib /OUT:rxtest1.lib test1.obj
+   lib /OUT:rxtest1.lib test1.obj
 
 test2.dll.obj: $(SRCDIR)/test2.c
-        $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/test2.c
+   $(CC) -c $(COPT) $(CC2O) $(DYN_COMP) $(SRCDIR)/test2.c
 
-rxtest2.dll: test2.dll.obj regina.dll
-        $(LD_RXLIBPRE) $(LD_RXLIB2) test2.dll.obj $(LINKSHL)
-        del rxtest2.lib
+rxtest2.dll: test2.dll.obj regina.dll rxtest2.dll.mf
+   $(LD_RXLIBPRE) $(LINKOPT) $(LD_RXLIB2) test2.dll.obj $(LINKSHL)
+   mt.exe /manifest $@.manifest $@.mf /outputresource:$@;2
+   del rxtest2.lib
 
 test2.obj: $(SRCDIR)/test2.c
-        $(CC) -c $(COPT) $(CC2O) /DDYNAMIC_STATIC $(SRCDIR)/test2.c
+   $(CC) -c $(COPT) $(CC2O) /DDYNAMIC_STATIC $(SRCDIR)/test2.c
 
 rxtest2.lib: test2.obj
-        lib /OUT:rxtest2.lib test2.obj
+   lib /OUT:rxtest2.lib test2.obj
 
 #
 # Rules for resource files and version details
@@ -755,6 +765,30 @@ rxqueue$(LARCH)exe.obj rxqueue$(LARCH)exe.res: .\rxqueueexe.rc
    rc /r /forxqueue$(LARCH)exe.res /i$(SRCDIR)\ .\rxqueueexe.rc
    cvtres /MACHINE:$(MACH) /NOLOGO /OUT:rxqueue$(LARCH)exe.obj rxqueue$(LARCH)exe.res
 #
+
+#
+# Rules for manifest files
+#
+rexx.exe.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ rexx $(VERDOT) $(MMACH) "Rexx Launcher"
+regina.exe.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ regina $(VERDOT) $(MMACH) "Regina Launcher"
+execiser.exe.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ execiser $(VERDOT) $(MMACH) "Execiser Test"
+rxqueue.exe.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ rxqueue $(VERDOT) $(MMACH) "Regina External Queue Interface"
+rxstack.exe.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ rxstack $(VERDOT) $(MMACH) "Regina External Queue Manager"
+threader.exe.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ threader $(VERDOT) $(MMACH) "Threader Test"
+regina.dll.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ regina $(VERDOT) $(MMACH) "Regina Library"
+regutil.dll.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ regutil $(VERDOT) $(MMACH) "Regina Utility Library"
+rxtest1.dll.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ rxtest1 $(VERDOT) $(MMACH) "Test1 Library"
+rxtest2.dll.mf: $(SRCDIR)\makemanifest.rexx
+   .\trexx $(SRCDIR)\makemanifest.rexx $@ rxtest2 $(VERDOT) $(MMACH) "Test2 Library"
 
 ARCHIVE_FILES = $(ALLSRC) $(README) $(SRCDIR)/makefile.* \
         $(SRCDIR)/*.rsp $(DEMOFILES) $(TRIPFILES) \
@@ -812,3 +846,4 @@ binary: all
 #
 clean:
 	del *.obj *.exe *.dll *.lib *.exp *.res *.mtb gci_convert.h
+

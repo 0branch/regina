@@ -123,9 +123,6 @@ streng *rex_getcaller( tsd_t *TSD, cparamboxptr parms )
 
 streng *rex_getcallstack( tsd_t *TSD, cparamboxptr parms )
 {
-   char ch=0 ;
-   int i=0 ;
-
    checkparam(  parms,  1,  1 , "GETCALLSTACK" ) ;
    if (parms->value)
       getcallstack( TSD, parms->value );

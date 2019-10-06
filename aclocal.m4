@@ -28,6 +28,7 @@ dnl MH_CHECK_F_MNTFROMNAME
 dnl MH_LARGE_FILE_SUPPORT
 dnl MH_CHECK_OSX_ARCH
 dnl MH_GET_DISTRO_NAME
+dnl MH_HAVE_SYSTEMD
 dnl
 dnl ---------------------------------------------------------------------------
 dnl Determine if C compiler handles ANSI prototypes
@@ -953,14 +954,15 @@ SHL_BASE="${SHLPRE}${SHLFILE}${SHLPST}"
 # by default; ie. no .\$(ABI) suffix. If the regina executable is not built,
 # then there is no shared library. Set OTHER_INSTALLS="installabilib" if you
 # are building a version numbered shared library.
-RXSTACK_INSTALL="installrxstack"
+#RXSTACK_INSTALL="installrxstack"
+RXSTACK_INSTALL=""
 OTHER_INSTALLS="installlib"
 BASE_INSTALL="installbase"
 BASE_BINARY="binarybase"
 USE_ABI="no"
 BUNDLE=""
 EXTRATARGET=""
-REGINA_PACKAGE_NAME="Regina-REXX"
+REGINA_PACKAGE_NAME="regina-rexx"
 case "$target" in
         *hp-hpux*)
                 SHLPRE="lib"
@@ -1976,6 +1978,31 @@ else
    esac
 fi
 AC_SUBST(MYDISTRO)
+])
+
+dnl ---------------------------------------------------------------------------
+dnl Determines if the current system uses systemd
+dnl ---------------------------------------------------------------------------
+AC_DEFUN([MH_HAVE_SYSTEMD],
+[
+AC_MSG_CHECKING(for service manager)
+if test [ -f /usr/bin/systemctl -o -f /bin/systemctl ]; then
+   initinstaller="installsystemd"
+   systemdinstallpath=`pkg-config systemd --variable=systemdsystemunitdir`
+   AC_MSG_RESULT(systemd)
+elif test [ -f /sbin/initctl ]; then
+   initinstaller="installupstart"
+   AC_MSG_RESULT(upstart)
+elif test [ -f /sbin/insserv ]; then
+# SuSE sysvinit
+   initinstaller="installinsserv"
+   AC_MSG_RESULT(insserv)
+else
+   initinstaller="installsysvinit"
+   AC_MSG_RESULT(sysvinit)
+fi
+AC_SUBST(initinstaller)
+AC_SUBST(systemdinstallpath)
 ])
 
 dnl

@@ -301,6 +301,7 @@
  94,109,[Queue \"%s\" not found]|<queuename>
  94,110,[%s invalid for external queues]|<bif>
  94,111,[RXQUEUE function %s invalid for internal queues]|<functionname>
+ 94,112,[Unable to %s SESSION queue]|<action>
  95,  0,[Restricted feature used in "safe" mode]
  95,  1,[%s invalid in "safe" mode]|<token>
  95,  2,[%s argument %d invalid in "safe" mode]|<bif>,<argnumber>

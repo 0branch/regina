@@ -91,6 +91,7 @@ typedef struct {
    unsigned int iserror:1;
    unsigned int awt:3; /* overlay with AddressWithType */
    unsigned int ant:2; /* overlay with AddressNameType */
+   unsigned int noeol:1; /* for INPUT NOEOL */
 } outputflags; /* used by ADDRESS WITH resourceo */
 
 typedef enum {

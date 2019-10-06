@@ -1000,21 +1000,30 @@ static streng *fetch_food( tsd_t *TSD, environment *env )
 
    if ( env->input.type != STREAM )
    {
-   /* Append a newline to the end of the line before returning */
+      if ( env->input.flags.noeol )
+      {
+         /* ADDRESS SYSTEM ... WITH INPUT NOEOL ... */
+         assert( delflag ) ;
+         retval = (streng *) c ; /* will be destroyed */
+      }
+      else
+      {
+         /* Append a newline to the end of the line before returning */
 #if defined(DOS) || defined(OS2) || defined(WIN32)
-      retval = Str_makeTSD( c->len + 2 ) ;
-      memcpy(retval->value, c->value, c->len);
-      retval->value[c->len] = REGINA_CR;
-      retval->value[c->len + 1] = REGINA_EOL;
-      retval->len = c->len + 2;
+         retval = Str_makeTSD( c->len + 2 ) ;
+         memcpy(retval->value, c->value, c->len);
+         retval->value[c->len] = REGINA_CR;
+         retval->value[c->len + 1] = REGINA_EOL;
+         retval->len = c->len + 2;
 #else
-      retval = Str_makeTSD( c->len + 1 ) ;
-      memcpy(retval->value, c->value, c->len);
-      retval->value[c->len] = REGINA_EOL;
-      retval->len = c->len + 1;
+         retval = Str_makeTSD( c->len + 1 ) ;
+         memcpy(retval->value, c->value, c->len);
+         retval->value[c->len] = REGINA_EOL;
+         retval->len = c->len + 1;
 #endif
-      if (delflag)
-         Free_stringTSD( (streng *) c ) ;
+         if (delflag)
+            Free_stringTSD( (streng *) c ) ;
+      }
    }
    else
    {

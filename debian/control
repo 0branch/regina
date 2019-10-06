@@ -2,7 +2,7 @@ Source: regina
 Section: libs
 Priority: optional
 Maintainer: Alen Zekulic <alen@nms.hr>
-Build-Depends: binutils
+Build-Depends: binutils, pkg-config
 Standards-Version: 3.8.3
 
 Package: libregina3

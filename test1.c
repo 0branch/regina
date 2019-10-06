@@ -224,7 +224,7 @@ static int InitTestRexx(PSZ progname)
    for (func = RexxTestFunctions; func->function_name; func++)
       rc = RexxRegisterFunctionDll(func->function_name,DLLNAME,func->function_name);
 
-   return 0;
+   return rc;
 }
 
 APIRET APIENTRY LOADFUNCS(PCSZ name,ULONG argc,PRXSTRING argv,PCSZ stck,PRXSTRING retstr)

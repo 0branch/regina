@@ -257,8 +257,6 @@ void free_orphaned_libs( tsd_t *TSD )
    lib_tsd_t *lt = (lib_tsd_t *)TSD->lib_tsd;
 
    unlink_orphaned_libs( TSD, lt, 0 );
-#else
-   (TSD = TSD);
 #endif
 }
 

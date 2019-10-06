@@ -1189,6 +1189,10 @@ int Win_uname(struct regina_utsname *name)              /* MH 10-06-96 */
             else
                strcpy( name->sysname, "UNKNOWN" );
          }
+         else if ( osinfo.dwMajorVersion == 10 )
+         {
+            strcpy( name->sysname, "WIN10" );
+         }
          else
             strcpy( name->sysname, "UNKNOWN" );
          break;

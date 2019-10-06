@@ -38,10 +38,6 @@
 # include <string.h>
 #endif
 
-#ifndef PATH_MAX
-# define PATH_MAX 1024
-#endif
-
 void DestroyInstore( char *strptr )
 {
 #if defined(REXXFREEMEMORY)
@@ -228,13 +224,13 @@ int main( int argc, char *argv[])
    }
    else
    {
-      /* 
+      /*
        * Build an argument string, if any.
        */
       if ( argc > 2 )
       {
          int len=0;
-   
+
          ArgCount = argc - 2;
          for ( i = 2; i < argc; i++ )
          {
