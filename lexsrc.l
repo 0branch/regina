@@ -172,7 +172,7 @@ static int fill_buffer( char *buf, int max_size ) ;
  */
 digit             [0-9]
 special           [,:;)(]
-not               [\\^~¬]
+not               [\\^~\xAC\xAA]
 extra             [#$@]
 general           [_!?A-Za-z]|{extra}
 dot               [.]
