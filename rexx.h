@@ -23,7 +23,7 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 # undef REGINA_BITS
-# if defined(__x86_64__) || defined(__ppc64__)
+# if defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
 #  define REGINA_BITS 64
 # else
 #  define REGINA_BITS 32
