@@ -702,7 +702,7 @@ static int loadrxhook( const tsd_t *TSD, struct library *lptr,
 }
 
 /*
- * unloadrxhook removes a registered function entry point.
+ * unloadrxfunc removes a registered function entry point.
  *
  * rxname is the name that can be used by a REXX script.
  *

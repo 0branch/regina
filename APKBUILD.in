@@ -1,18 +1,18 @@
 # Contributor: Mark Hessling <mark@rexx.org>
 # Maintainer: Mark Hessling <mark@rexx.org>
-pkgname="regina-rexx"
-pkgver="3.9.4"
+pkgname="@REGINA_PACKAGE_NAME@"
+pkgver="@VERSION_UNQUOTED@"
 pkgrel=1
 pkgdesc="Regina Rexx interpreter"
 url="http://www.rexx.org"
-arch="x86_64"
+arch="@MACH_ARCH@"
 license="GPL-2.0-or-later"
 depends=""
 makedepends=""
 #install="$pkgname.pre-install $pkgname.post-install"
 subpackages="$pkgname-dev $pkgname-doc"
 options="!check"
-source="regina-rexx-3.9.4.tar.gz"
+source="regina-rexx-@VERSION_UNQUOTED@.tar.gz"
 builddir="$srcdir/"
 
 build() {

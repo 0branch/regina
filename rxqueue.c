@@ -82,7 +82,9 @@
 #endif
 
 #include "extstack.h"
-#include "mygetopt.h"
+#ifndef HAVE_GETOPT_LONG
+# include "mygetopt.h"
+#endif
 
 #define SUCCESS(a) ((a)&&(a)->value[0] == '0')
 
@@ -275,7 +277,7 @@ void junk_return_from_rxstack( int sock, streng *header )
 static int usage( const char *argv0 )
 {
    fprintf( stdout, "\n%s: %s (%d bit). All rights reserved.\n", argv0, PARSE_VERSION_STRING, REGINA_BITS );
-   fprintf( stdout,"Regina is distributed under the terms of the GNU Library Public License \n" );
+   fprintf( stdout,"Regina is distributed under the terms of the GNU Library General Public License \n" );
    fprintf( stdout,"and comes with NO WARRANTY. See the file COPYING-LIB for details.\n" );
    fprintf( stdout,"\n%s [switches] [queue] [command]\n", argv0 );
    fprintf( stdout,"where switches are:\n\n" );

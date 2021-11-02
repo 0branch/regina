@@ -353,7 +353,7 @@
  *               might become an important function if the automatic
  *               flushing after write is removed (e.g. to improve speed).
  *
- *  STATUS     - Returns status information assiciated with the file as
+ *  STATUS     - Returns status information associated with the file as
  *               a human readable string. The information returned is the
  *               internal information that Rexx stores in the Rexx file
  *               table entry for that file. Use FSTAT to get information
@@ -835,16 +835,10 @@ static char get_command( streng *cmd )
 {
    Str_upper(cmd);
 
-   if (cmd->len==4 && !memcmp(cmd->value, "READ", 4))
-      return COMMAND_READ ;
-   if (cmd->len==5 && !memcmp(cmd->value, "WRITE", 5))
-      return COMMAND_WRITE ;
-   if (cmd->len==6 && !memcmp(cmd->value, "APPEND", 6))
-      return COMMAND_APPEND ;
-   if (cmd->len==6 && !memcmp(cmd->value, "UPDATE", 6))
-      return COMMAND_UPDATE ;
-   if (cmd->len==6 && !memcmp(cmd->value, "CREATE", 6))
-      return COMMAND_CREATE ;
+   if (cmd->len>=5 && !memcmp(cmd->value,  "QUERY", 5))
+      return COMMAND_QUERY ;
+   if (cmd->len>=4 && !memcmp(cmd->value,  "OPEN", 4))
+      return COMMAND_OPEN ;
    if (cmd->len==5 && !memcmp(cmd->value, "CLOSE", 5))
       return COMMAND_CLOSE ;
    if (cmd->len==5 && !memcmp(cmd->value, "FLUSH", 5))
@@ -859,35 +853,41 @@ static char get_command( streng *cmd )
       return COMMAND_READABLE ;
    if (cmd->len==8 && !memcmp(cmd->value, "WRITABLE", 8))
       return COMMAND_WRITEABLE ;
+   if (cmd->len==8 && !memcmp(cmd->value, "WRITEABLE", 9))
+      return COMMAND_WRITEABLE ;
    if (cmd->len==10 && !memcmp(cmd->value, "EXECUTABLE", 10))
       return COMMAND_EXECUTABLE ;
-   if (cmd->len==4 && !memcmp(cmd->value,  "LIST", 4))
-      return COMMAND_LIST ;
-   if (cmd->len>=4 && !memcmp(cmd->value,  "OPEN", 4))
-      return COMMAND_OPEN ;
-   if (cmd->len>=5 && !memcmp(cmd->value,  "QUERY", 5))
-      return COMMAND_QUERY ;
-   if (cmd->len>=4 && !memcmp(cmd->value,  "SEEK", 4))
+   if (cmd->len>=4 && !memcmp(cmd->value, "SEEK", 4))
       return COMMAND_SEEK ;
-   if (cmd->len>=8 && !memcmp(cmd->value,  "POSITION", 8))
+   if (cmd->len>=8 && !memcmp(cmd->value, "POSITION", 8))
       return COMMAND_POSITION ;
+   if (cmd->len==4 && !memcmp(cmd->value, "READ", 4))
+      return COMMAND_READ ;
+   if (cmd->len==5 && !memcmp(cmd->value, "WRITE", 5))
+      return COMMAND_WRITE ;
+   if (cmd->len==6 && !memcmp(cmd->value, "APPEND", 6))
+      return COMMAND_APPEND ;
+   if (cmd->len==6 && !memcmp(cmd->value, "UPDATE", 6))
+      return COMMAND_UPDATE ;
+   if (cmd->len==6 && !memcmp(cmd->value, "CREATE", 6))
+      return COMMAND_CREATE ;
+   if (cmd->len==4 && !memcmp(cmd->value, "LIST", 4)) /* not implemented */
+      return COMMAND_LIST ;
    return COMMAND_NONE ;
 }
 
 static char get_querycommand( const streng *cmd )
 {
-   if (cmd->len==8 && !memcmp(cmd->value,  "DATETIME", 8))
-      return COMMAND_QUERY_DATETIME ;
    if (cmd->len==6 && !memcmp(cmd->value,  "EXISTS", 6))
       return COMMAND_QUERY_EXISTS ;
-   if (cmd->len==6 && !memcmp(cmd->value,  "HANDLE", 6))
-      return COMMAND_QUERY_HANDLE ;
+   if (cmd->len==4  && !memcmp(cmd->value, "SIZE", 4))
+      return COMMAND_QUERY_SIZE ;
+   if (cmd->len==8 && !memcmp(cmd->value,  "DATETIME", 8))
+      return COMMAND_QUERY_DATETIME ;
    if (cmd->len>=4 && !memcmp(cmd->value,  "SEEK", 4))
       return COMMAND_QUERY_SEEK ;
    if (cmd->len>=8 && !memcmp(cmd->value,  "POSITION", 8))
       return COMMAND_QUERY_POSITION ;
-   if (cmd->len==4  && !memcmp(cmd->value, "SIZE", 4))
-      return COMMAND_QUERY_SIZE ;
    if (cmd->len==10 && !memcmp(cmd->value, "STREAMTYPE", 10))
       return COMMAND_QUERY_STREAMTYPE ;
    if (cmd->len==9  && !memcmp(cmd->value, "TIMESTAMP", 9))
@@ -898,6 +898,8 @@ static char get_querycommand( const streng *cmd )
       return COMMAND_QUERY_MODIFYTIME;
    if (cmd->len==10  && !memcmp(cmd->value, "ACCESSTIME", 10))
       return COMMAND_QUERY_ACCESSTIME;
+   if (cmd->len==6 && !memcmp(cmd->value,  "HANDLE", 6))
+      return COMMAND_QUERY_HANDLE ;
    return COMMAND_NONE ;
 }
 
@@ -4104,7 +4106,7 @@ static streng *getstatus( tsd_t *TSD, const streng *filename , int subcommand )
    }
    switch ( subcommand )
    {
-      case COMMAND_FSTAT:
+      case COMMAND_FSTAT: /* return information about symbolic link if a symbolic link */
 #ifdef HAVE_LSTAT
          /*
           * If we have lstat(), use it to gather details, this is the only
@@ -5516,23 +5518,23 @@ streng* std_stream( tsd_t *TSD, cparamboxptr parms )
          oper = get_command( command ) ;
          switch(oper)
          {
-            case COMMAND_READ:
+            case COMMAND_READ: /* Regina only - use OPEN READ */
                closefile( TSD, filename ) ;
                ptr = openfile( TSD, filename, ACCESS_READ ) ;
                break;
-            case COMMAND_WRITE:
+            case COMMAND_WRITE:  /* Regina only - use OPEN WRITE */
                closefile( TSD, filename ) ;
                ptr = openfile( TSD, filename, ACCESS_WRITE ) ;
                break;
-            case COMMAND_APPEND:
+            case COMMAND_APPEND: /* Regina only - use OPEN WRITE APPEND */
                closefile( TSD, filename ) ;
                ptr = openfile( TSD, filename, ACCESS_APPEND ) ;
                break;
-            case COMMAND_UPDATE:
+            case COMMAND_UPDATE: /* Regina only - use OPEN BOTH */
                closefile( TSD, filename ) ;
                ptr = openfile( TSD, filename, ACCESS_UPDATE ) ;
                break;
-            case COMMAND_CREATE:
+            case COMMAND_CREATE: /* Regina only - use OPEN WRITE REPLACE */
                closefile( TSD, filename ) ;
                ptr = openfile( TSD, filename, ACCESS_CREATE ) ;
                break;
@@ -5617,7 +5619,7 @@ streng* std_stream( tsd_t *TSD, cparamboxptr parms )
                Free_stringTSD(psub);
                break;
             default:
-               exiterror( ERR_STREAM_COMMAND, 3, "CLOSE FLUSH OPEN POSITION QUERY SEEK", tmpstr_of( TSD, command ) )  ;
+               exiterror( ERR_STREAM_COMMAND, 3, "CLOSE FLUSH OPEN POSITION QUERY RESET SEEK STATUS EXECUTABLE FSTAT READABLE WRITABLE", tmpstr_of( TSD, command ) )  ;
                break;
          }
          break ;

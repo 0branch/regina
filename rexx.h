@@ -253,7 +253,7 @@
 # include <mem.h>
 #endif
 
-#include "strings.h"            /* definitions of REXX strings */
+#include "strengs.h"            /* definitions of REXX strings */
 
 #if defined(_MSC_VER) && !defined(__WINS__)
 # include "contrib/time64.h"
@@ -271,6 +271,12 @@
 #  undef EXIT_SUCCESS
 # endif
 # define EXIT_SUCCESS 1
+#endif
+
+#ifdef HAVE_GETOPT_LONG
+# include <getopt.h>
+# define my_getopt_long getopt_long
+# define my_getopt_option option
 #endif
 
 /* For some mysterious reason, this macro is very difficult for some vendors */

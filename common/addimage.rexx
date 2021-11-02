@@ -8,7 +8,7 @@
  *    rexx addimage.rexx doc/index.html doc/title.html 1.0 rexxeec Rexx/EEC
  */
 Parse Arg fn titlefn ver shortname longname
-init_year = 2008
+init_year = Left( Date('S'), 4 )
 If Left(Date('S'),4) = init_year Then copydate = init_year
 Else copydate = init_year'-'Left(Date('S'),4)
 idx = 0

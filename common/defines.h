@@ -77,6 +77,9 @@
 # define TIME_WITH_SYS_TIME   1
 # define HAVE_FCNTL_H         1
 # define SIZEOF_LONG          4
+# define HAVE_STDINT_H        1
+# define HAVE_INTTYPES_H      1
+# define DYNAMIC_OS2          1
 #endif
 
 #if (defined(OS2) || defined(__OS2__)) && defined(__IBMC__)
@@ -100,6 +103,7 @@
 # define HAVE__FULLPATH       1
 # define TIME_WITH_SYS_TIME   1
 # define SIZEOF_LONG          4
+# define DYNAMIC_OS2          1
 #endif
 
 #if (defined(OS2) || defined(__OS2__)) && defined(__WATCOMC__)
@@ -122,6 +126,7 @@
 # define HAVE__FULLPATH       1
 # define HAVE_FCNTL_H         1
 # define SIZEOF_LONG          4
+# define DYNAMIC_OS2          1
 #endif
 
 #if defined(WIN32) && defined(__WATCOMC__)
@@ -143,7 +148,10 @@
 # define HAVE__SPLITPATH2     1
 /* # define HAVE_FTRUNCATE      1*/
 # define HAVE_FCNTL_H         1
+# define HAVE_STRTOF          1
 # define SIZEOF_LONG          4
+# define DYNAMIC_WIN32        1
+# define HAVE__STATI64        1
 #endif
 
 #if defined(WIN32) && defined(_MSC_VER)
@@ -169,6 +177,10 @@
 # define HAVE__SPLITPATH      1
 # define HAVE_FCNTL_H         1
 # define SIZEOF_LONG          4
+# define HAVE_STDINT_H        1
+# define HAVE_INTTYPES_H      1
+# define DYNAMIC_WIN32        1
+# define HAVE__STATI64        1
 #endif
 
 #if defined(WIN32) && defined(__CYGWIN32__)
@@ -196,7 +208,41 @@
 # define HAVE_VFPRINTF        1
 # define TIME_WITH_SYS_TIME   1
 /* # define HAVE_FULLPATH        1 */
+# define HAVE_STRTOF          1
 # define SIZEOF_LONG          4
+# define HAVE_STDINT_H        1
+# define HAVE_INTTYPES_H      1
+# define DYNAMIC_WIN32        1
+# define HAVE__STATI64        1
+#endif
+
+#if defined(WIN64) && defined(_MSC_VER)
+# define HAVE_ASSERT_H        1
+# define HAVE_CTYPE_H         1
+# define HAVE_ERRNO_H         1
+# define HAVE_FTIME           1
+# define HAVE_FTRUNCATE       1
+# define HAVE_IO_H            1
+# define HAVE_LIMITS_H        1
+# define HAVE_MALLOC_H        1
+# define HAVE_MEMCPY          1
+# define HAVE_MEMMOVE         1
+# define HAVE_SETJMP_H        1
+# define HAVE_SIGNAL_H        1
+# define HAVE_STDARG_H        1
+# define HAVE_STDLIB_H        1
+# define HAVE_STRERROR        1
+# define HAVE_STRING_H        1
+# define HAVE_SYS_STAT_H      1
+# define HAVE_VFPRINTF        1
+# define HAVE__FULLPATH       1
+# define HAVE__SPLITPATH      1
+# define HAVE_FCNTL_H         1
+# define SIZEOF_LONG          4
+# define HAVE_STDINT_H        1
+# define HAVE_INTTYPES_H      1
+# define DYNAMIC_WIN32        1
+# define HAVE__STATI64        1
 #endif
 
 #if defined(WIN32) && defined(__MINGW32__)
@@ -223,7 +269,10 @@
 /* # define HAVE_FULLPATH        1 */
 /* # define HAVE_GETTIMEOFDAY    1 */
 # define HAVE_FCNTL_H         1
+# define HAVE_STRTOF          1
 # define SIZEOF_LONG          4
+# define DYNAMIC_WIN32        1
+# define HAVE__STATI64        1
 #endif
 
 #if defined(WIN32) && defined(__LCC__)
@@ -251,6 +300,8 @@
 /* # define HAVE_GETTIMEOFDAY    1 */
 # define HAVE_FCNTL_H         1
 # define SIZEOF_LONG          4
+# define DYNAMIC_WIN32        1
+# define HAVE__STATI64        1
 #endif
 
 #if (defined(DOS) || defined(MSDOS)) && defined(DJGPP)

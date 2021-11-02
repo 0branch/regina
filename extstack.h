@@ -208,7 +208,7 @@ int get_length_from_header( const tsd_t *TSD, const streng *header );
 #define ERR_RXSTACK_TOO_MANY_QUEUES    106
 #define ERR_RXSTACK_TOO_MANY_QUEUES_TMPL "Maximum number of external queues exceeded: %d"
 #define ERR_RXSTACK_READING_SOCKET     107
-#define ERR_RXSTACK_READING_SOCKET_TMPL  "Error occured reading socket: %s"
+#define ERR_RXSTACK_READING_SOCKET_TMPL  "Error occurred reading socket: %s"
 #define ERR_RXSTACK_INVALID_SWITCH     108
 #define ERR_RXSTACK_INVALID_SWITCH_TMPL  "Invalid switch passed. Must be one of \"%s\""
 #define ERR_RXSTACK_ACTION_SESSION     112

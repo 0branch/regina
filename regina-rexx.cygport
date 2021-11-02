@@ -1,12 +1,11 @@
 PKG_NAMES="regina-rexx libregina libregina-devel"
 PKG_HINTS="regina-rexx libregina libregina-devel"
 NAME="regina-rexx"
-ORIG_PN="Regina-REXX"
-VERSION=3.9
-RELEASE=3
-SRC_URI="mirror://sourceforge/regina-rexx/${ORIG_PN}-${VERSION}.tar.gz"
-HOMEPAGE="http://regina-rexx.sourceforge.net"
-DOCS="COPYING-LIB TODO README.393"
+VERSION=3.9.4
+RELEASE=1
+SRC_URI="mirror://sourceforge/regina-rexx/${NAME}-${VERSION}.tar.gz"
+HOMEPAGE="https://regina-rexx.sourceforge.io"
+DOCS="COPYING-LIB TODO README.394 doc/regina.pdf doc/regutil.pdf"
 
 regina_rexx_CATEGORY="Interpreters"
 regina_rexx_SUMMARY="An ANSI compliant Rexx Interpreter. Binaries and demo programs."
@@ -14,8 +13,8 @@ regina_rexx_DESCRIPTION="Rexx is a procedural language that allows programs and 
 written in a clear and structured way.
 It is also designed to be used as a macro language by application programs.
 This package contains binaries and demo programs."
-regina_rexx_CONTENTS="--exclude=cygregina.dll usr/bin/ usr/share/man/man1/ usr/share/regina-rexx/ usr/share/doc/"
-#regina_rexx_REQUIRES="libregina"
+regina_rexx_CONTENTS="--exclude=cygregina.dll --exclude=usr/lib/regina-rexx/addons/regutil.dll --exclude=usr/bin/regina-config --exclude=usr/share/man/man1/regina-config.1.gz usr/bin/ usr/share/man/man1/ usr/share/regina-rexx/*.mtb usr/share/regina-rexx/examples/ usr/lib/regina-rexx/addons/rx*dll usr/share/doc/"
+regina_rexx_REQUIRES="libregina"
 
 libregina_CATEGORY="Interpreters"
 libregina_SUMMARY="An ANSI compliant Rexx Interpreter. Runtime libraries."
@@ -23,7 +22,7 @@ libregina_DESCRIPTION="Rexx is a procedural language that allows programs and al
 written in a clear and structured way.
 It is also designed to be used as a macro language by application programs.
 This package contains runtime libraries."
-libregina_CONTENTS="usr/bin/cygregina.dll"
+libregina_CONTENTS="usr/bin/cygregina.dll usr/lib/regina-rexx/addons/regutil.dll"
 
 libregina_devel_CATEGORY="Interpreters"
 libregina_devel_SUMMARY="An ANSI compliant Rexx Interpreter. Development libraries and headers."
@@ -31,7 +30,7 @@ libregina_devel_DESCRIPTION="Rexx is a procedural language that allows programs 
 written in a clear and structured way.
 It is also designed to be used as a macro language by application programs.
 This package contains development libraries and headers."
-libregina_devel_CONTENTS="usr/include/ usr/lib/"
+libregina_devel_CONTENTS="usr/include/ usr/lib/libregina.a usr/lib/librexx.a usr/lib/pkgconfig/ usr/bin/regina-config usr/share/man/man1/regina-config.1.gz"
 libregina_devel_REQUIRES="libregina"
 
 src_compile() {

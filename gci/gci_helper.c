@@ -294,7 +294,7 @@ void GCI_describe( GCI_str *description,
       case GCI_IllegalName:          ptr = "The name or part of the name is illegal for the interpreter";                     break;
       case GCI_RexxError:            ptr = "A problem raises when communicating with the interpreter";                        break;
       case GCI_NoBaseType:           ptr = "The type won't fit the requirements for basic types (arguments/return value)";    break;
-      case GCI_InternalError:        ptr = "An unknown internal GCI error occured";                                           break;
+      case GCI_InternalError:        ptr = "An unknown internal GCI error occurred";                                          break;
       case GCI_FunctionAlreadyKnown: ptr = "New REXX function already registered to the interpreter";                         break;
       case GCI_LibraryNotFound:      ptr = "The external library was not found or can't be loaded";                           break;
       case GCI_NoLibraryFunction:    ptr = "The external function can't be found in the external library";                    break;

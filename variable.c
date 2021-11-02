@@ -925,7 +925,7 @@ int valid_var_symbol( const streng *name )
    }
 
    /*
-    * We have to check for a const_symbol. If a sign has occured until now
+    * We have to check for a const_symbol. If a sign has occurred until now
     * we have a bad symbol.
     * ch is loaded with the current character.
     */
@@ -2539,7 +2539,7 @@ const streng *getvalue( tsd_t *TSD, const streng *name, int pool )
    /*
     * getvalue_stem is equivalent to getvalue_simple
     */
-   if ( i >= len - 1 )
+   if ( i == 0 || i >= len - 1 )
       return getvalue_simple( TSD, vars, name );
 
    return getvalue_compound( TSD, vars, name );

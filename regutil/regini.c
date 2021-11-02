@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.19 2019/07/03 22:39:25 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regini.c,v 1.20 2021/07/11 05:11:41 mark Exp $
  */
 #ifdef __EMX__
 # define INCL_DOSMISC
@@ -950,6 +950,20 @@ rxfunc(syssystemdirectory)
 #else
    memcpy(result->strptr, "/etc", 4);
    result->strlength = 4;
+#endif
+
+   return 0;
+}
+
+/* syshomedirectory() */
+rxfunc(syshomedirectory)
+{
+#ifdef _WIN32
+   strcpy(result->strptr, getenv("USERPROFILE") );
+   result->strlength = strlen(result->strptr);
+#else
+   strcpy(result->strptr, getenv("HOME"));
+   result->strlength = strlen(result->strptr);
 #endif
 
    return 0;

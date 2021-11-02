@@ -85,7 +85,7 @@ LD_RXLIB2= /DEF:$(SRCDIR)\test2_$(LARCH)_dll.def
 LD_REGUTIL = /PDB:regutil.pdb /DEF:$(REGUTILSRCDIR)\regutil.def $(EEXTRA)
 MV= -ren
 #
-CEXTRA = /DWIN32 /nologo /W4 $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_RELEASE=\"$(VER_RELEASE)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\" -D_CRT_SECURE_NO_WARNINGS -DREGINA_BITS=$(BITS)
+CEXTRA = -DWIN32 -nologo -W4 -DHAVE_PROTO $(REXXSOCKET) $(HAVE_GCI) -DREGINA_VERSION_DATE=\"$(VER_DATE)\" -DREGINA_VERSION_MAJOR=\"$(VER_MAJOR)\" -DREGINA_VERSION_MINOR=\"$(VER_MINOR)\" -DREGINA_VERSION_RELEASE=\"$(VER_RELEASE)\" -DREGINA_VERSION_SUPP=\"$(VER_SUPP)\" -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -DREGINA_BITS=$(BITS)
 
 CC2O=-Fo$@
 #
@@ -118,7 +118,7 @@ README = $(SRCDIR)/README.??? $(SRCDIR)/COPYING-LIB $(SRCDIR)/BUGS $(SRCDIR)/yac
 CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/variable.c \
         $(SRCDIR)/interprt.c $(SRCDIR)/debug.c $(SRCDIR)/dbgfuncs.c $(SRCDIR)/memory.c $(SRCDIR)/parsing.c $(SRCDIR)/files.c \
         $(SRCDIR)/misc.c $(SRCDIR)/unxfuncs.c $(SRCDIR)/arxfuncs.c $(SRCDIR)/cmsfuncs.c $(SRCDIR)/os2funcs.c $(SRCDIR)/shell.c $(SRCDIR)/rexxext.c $(SRCDIR)/stack.c \
-        $(SRCDIR)/tracing.c $(SRCDIR)/interp.c $(SRCDIR)/cmath.c $(SRCDIR)/convert.c $(SRCDIR)/strings.c $(SRCDIR)/library.c \
+        $(SRCDIR)/tracing.c $(SRCDIR)/interp.c $(SRCDIR)/cmath.c $(SRCDIR)/convert.c $(SRCDIR)/strengs.c $(SRCDIR)/library.c \
         $(SRCDIR)/strmath.c $(SRCDIR)/signals.c $(SRCDIR)/macros.c $(SRCDIR)/envir.c $(SRCDIR)/expr.c $(SRCDIR)/rexxbif.c \
         $(SRCDIR)/wrappers.c $(SRCDIR)/options.c $(SRCDIR)/os_win.c $(SRCDIR)/extstack.c \
         $(SRCDIR)/mt_notmt.c $(SRCDIR)/mt_$(WARCH).c $(SRCDIR)/mt_posix.c $(SRCDIR)/nosaa.c \
@@ -127,7 +127,7 @@ CSRCFILES = $(SRCDIR)/funcs.c $(SRCDIR)/builtin.c $(SRCDIR)/error.c $(SRCDIR)/va
 OFILES = funcs.obj builtin.obj error.obj variable.obj \
         interprt.obj debug.obj dbgfuncs.obj memory.obj parsing.obj files.obj \
         misc.obj unxfuncs.obj arxfuncs.obj cmsfuncs.obj os2funcs.obj shell.obj rexxext.obj stack.obj extstack.obj \
-        tracing.obj interp.obj cmath.obj convert.obj strings.obj library.obj \
+        tracing.obj interp.obj cmath.obj convert.obj strengs.obj library.obj \
         strmath.obj signals.obj macros.obj envir.obj expr.obj instore.obj rexxbif.obj \
         yaccsrc.obj lexsrc.obj options.obj os_win.obj wrappers.obj mt_notmt.obj time64.obj \
         os_other.obj mygetopt.obj
@@ -135,7 +135,7 @@ OFILES = funcs.obj builtin.obj error.obj variable.obj \
 TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj extstack.ts.obj rexxbif.ts.obj \
         interprt.ts.obj debug.ts.obj dbgfuncs.ts.obj memory.ts.obj parsing.ts.obj files.ts.obj \
         misc.ts.obj unxfuncs.ts.obj arxfuncs.ts.obj cmsfuncs.ts.obj os2funcs.ts.obj shell.ts.obj rexxext.ts.obj stack.ts.obj \
-        tracing.ts.obj interp.ts.obj cmath.ts.obj convert.ts.obj strings.ts.obj library.ts.obj \
+        tracing.ts.obj interp.ts.obj cmath.ts.obj convert.ts.obj strengs.ts.obj library.ts.obj \
         strmath.ts.obj signals.ts.obj macros.ts.obj envir.ts.obj expr.ts.obj instore.ts.obj \
         yaccsrc.ts.obj lexsrc.ts.obj wrappers.ts.obj options.ts.obj os_win.ts.obj \
         rexx.ts.obj client.ts.obj rexxsaa.ts.obj mt_$(WARCH).ts.obj time64.ts.obj \
@@ -144,7 +144,7 @@ TSFILES = funcs.ts.obj builtin.ts.obj error.ts.obj variable.ts.obj extstack.ts.o
 STATFILES = funcs.stat.obj builtin.stat.obj error.stat.obj variable.stat.obj extstack.stat.obj rexxbif.stat.obj \
         interprt.stat.obj debug.stat.obj dbgfuncs.stat.obj memory.stat.obj parsing.stat.obj files.stat.obj \
         misc.stat.obj unxfuncs.stat.obj arxfuncs.stat.obj cmsfuncs.stat.obj os2funcs.stat.obj shell.stat.obj rexxext.stat.obj stack.stat.obj \
-        tracing.stat.obj interp.stat.obj cmath.stat.obj convert.stat.obj strings.stat.obj library.stat.obj \
+        tracing.stat.obj interp.stat.obj cmath.stat.obj convert.stat.obj strengs.stat.obj library.stat.obj \
         strmath.stat.obj signals.stat.obj macros.stat.obj envir.stat.obj expr.stat.obj instore.stat.obj \
         yaccsrc.stat.obj lexsrc.stat.obj wrappers.stat.obj options.stat.obj os_win.stat.obj\
         rexx.stat.obj client.stat.obj rexxsaa.stat.obj mt_$(WARCH).stat.obj time64.stat.obj \
@@ -169,7 +169,7 @@ UNIXFILES = $(SRCDIR)/*.in $(SRCDIR)/configure $(SRCDIR)/config.sub \
 ALLSRC = $(CFILES) $(HFILES)
 
 HFILES = $(SRCDIR)/rexx.h $(SRCDIR)/defs.h $(SRCDIR)/extern.h $(SRCDIR)/regina_t.h \
-                $(SRCDIR)/strings.h $(SRCDIR)/configur.h $(SRCDIR)/yaccsrc.h \
+                $(SRCDIR)/strengs.h $(SRCDIR)/configur.h $(SRCDIR)/yaccsrc.h \
                 $(SRCDIR)/rxiface.h $(SRCDIR)/rexxsaa.h $(SRCDIR)/utsname.h \
                 $(SRCDIR)/mt.h $(SRCDIR)/mt_notmt.h $(SRCDIR)/mt_$(WARCH).h $(SRCDIR)/mt_posix.h \
                 $(SRCDIR)/ntservice/service.h
@@ -196,7 +196,7 @@ how:
 
 $(CSRCFILES) $(CFILES) : $(SRCDIR)/rexx.h
 
-$(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strings.h $(SRCDIR)/defs.h $(SRCDIR)/regina_t.h $(SRCDIR)/mt.h
+$(SRCDIR)/rexx.h : $(SRCDIR)/extern.h $(SRCDIR)/strengs.h $(SRCDIR)/defs.h $(SRCDIR)/regina_t.h $(SRCDIR)/mt.h
 
 #
 # trexx.exe is a temporary Rexx interpreter used to update version
@@ -319,8 +319,8 @@ cmath.obj :   $(SRCDIR)/cmath.c
 convert.obj : $(SRCDIR)/convert.c
         $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/convert.c
 
-strings.obj : $(SRCDIR)/strings.c
-        $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/strings.c
+strengs.obj : $(SRCDIR)/strengs.c
+        $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/strengs.c
 
 library.obj : $(SRCDIR)/library.c
         $(CC) $(COPT) $(CC2O) -c $(SRCDIR)/library.c
@@ -499,8 +499,8 @@ cmath.ts.obj :   $(SRCDIR)/cmath.c
 convert.ts.obj : $(SRCDIR)/convert.c
         $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/convert.c
 
-strings.ts.obj : $(SRCDIR)/strings.c
-        $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/strings.c
+strengs.ts.obj : $(SRCDIR)/strengs.c
+        $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/strengs.c
 
 library.ts.obj : $(SRCDIR)/library.c
         $(CC) $(TSCOPT) $(CC2O) $(TSDYN_COMP) -c $(SRCDIR)/library.c
@@ -725,16 +725,16 @@ rxtest2.lib: test2.obj
 # Rules for resource files and version details
 # We use the temporary rexx executable; trexx.exe
 #
-.\reginadll.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\regina$(LARCH)dll.rc
-   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\regina$(LARCH)dll.rc $@ $(VERDOT) $(VERDATE)
-.\reginaexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\regina$(LARCH)exe.rc
-   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\regina$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
-.\rxstackexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rxstack$(LARCH)exe.rc
-   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxstack$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
-.\rxqueueexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rxqueue$(LARCH)exe.rc
-   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxqueue$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
-.\rexxexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rexx$(LARCH)exe.rc
-   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rexx$(LARCH)exe.rc $@ $(VERDOT) $(VERDATE)
+.\reginadll.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\reginawindll.rc
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\reginawindll.rc $@ $(VERDOT) $(BITS) regina $(VERDATE)
+.\reginaexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\reginawinexe.rc
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\reginawinexe.rc $@ $(VERDOT) $(BITS) regina $(VERDATE)
+.\rxstackexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rxstackwinexe.rc
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxstackwinexe.rc $@ $(VERDOT) $(BITS) regina $(VERDATE)
+.\rxqueueexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rxqueuewinexe.rc
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rxqueuewinexe.rc $@ $(VERDOT) $(BITS) regina $(VERDATE)
+.\rexxexe.rc: trexx.exe $(SRCDIR)\regina.ver $(SRCDIR)\rexxwinexe.rc
+   .\trexx $(COMMONSRCDIR)\fixrc.rexx $(SRCDIR)\rexxwinexe.rc $@ $(VERDOT) $(BITS) regina $(VERDATE)
 
 #
 # Rules for resources

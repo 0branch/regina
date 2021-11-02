@@ -196,6 +196,11 @@
 # define HAVE_I64U
 # define HAVE__STATI64
 # define HAVE__ATOI64
+/*
+ * Following for contrib/LibSha1
+ */
+# define HAVE_STDINT_H
+# define HAVE_INTTYPES_H
 #endif
 
 #if defined(DOS) && defined(__WATCOMC__)
@@ -252,6 +257,11 @@
 # define HAVE_I64U
 # define HAVE__STATI64
 # define HAVE__ATOI64
+/*
+ * Following for contrib/LibSha1
+ */
+# define HAVE_STDINT_H
+# define HAVE_INTTYPES_H
 #endif
 
 #if defined(WIN32) && defined(__BORLANDC__)

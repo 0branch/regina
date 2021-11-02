@@ -18,7 +18,7 @@
  *
  * Contributors:
  *
- * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.10 2016/01/20 00:07:46 mark Exp $
+ * $Header: /opt/cvs/Regina/regutil/regscreenux.c,v 1.11 2021/07/11 05:09:22 mark Exp $
  */
 #include "regutil.h"
 #ifdef USE_TERMCAP_DB
@@ -54,6 +54,13 @@
 
 #ifdef HAVE_SYS_SELECT_H
 # include <sys/select.h>
+#endif
+
+#ifdef HAVE_READLINE_READLINE_H
+# include <readline/readline.h>
+#endif
+#ifdef HAVE_READLINE_HISTORY_H
+# include <readline/history.h>
 #endif
 
 /* Grr BEOS has fd_set and socket() in socket.h */
@@ -207,9 +214,7 @@ rxfunc(sysgetkey)
    struct timeval select_tv;
    struct timeval *pselect_tv = NULL;
    char *echo;
-
    checkparam(0,2);
-
 
    /*
     * opt can be "N", "NO", or "NOECHO", "ECHO"
@@ -218,9 +223,9 @@ rxfunc(sysgetkey)
    if (argc > 0 && argv[0].strptr) {
       rxstrdup(echo, argv[0]);
       strupr(echo);
-      if (strcmp(echo,"N") != 0 || strcmp(echo,"NO") != 0 || strcmp(echo,"NOECHO") != 0 )
+      if (strcmp(echo,"N") == 0 || strcmp(echo,"NO") == 0 || strcmp(echo,"NOECHO") == 0 )
          doecho = false;
-      else if (strcmp(echo,"ECHO") != 0 )
+      else if (strcmp(echo,"ECHO") == 0 )
          doecho = true;
       else
          return BADARGS;
@@ -270,6 +275,101 @@ rxfunc(sysgetkey)
       result->strlength = 0;
    tcsetattr(0, TCSANOW, &oterm);                       /* restore mode */
 
+   return 0;
+}
+
+rxfunc(sysgetline)
+{
+#ifdef HAVE_READLINE_HISTORY_H
+   char *prompt = NULL;
+   char *expansion;
+   char *line;
+   int rc;
+
+   if (argc > 0 && argv[0].strptr)
+   {
+      prompt = argv[0].strptr;
+   }
+   line = readline( prompt );
+   if ( line && line[0] )
+   {
+      rc = history_expand(line, &expansion);
+      if (rc)
+         fprintf (stderr, "%s\n", expansion);
+
+      if (rc < 0 || rc == 2)
+      {
+         free (expansion);
+      }
+      else
+      {
+         add_history(expansion);
+         strncpy(result->strptr, expansion, strlen(expansion));
+         result->strlength = strlen( result->strptr );
+         free(expansion);
+      }
+   }
+   else
+   {
+      strcpy(result->strptr, "");
+      result->strlength = 0;
+   }
+#else
+   what();
+#endif
+   return 0;
+}
+
+rxfunc(sysgetlinehistory)
+{
+#ifdef HAVE_READLINE_HISTORY_H
+   char *action;
+   char *filename = NULL;
+   register rxbool readhistory=false, inithistory=false;
+   int rc=0;
+
+   checkparam(2,2);
+
+   if (argv[0].strptr)
+   {
+      filename = argv[0].strptr;
+   }
+   else
+      return BADARGS;
+   if ( argv[1].strptr )
+   {
+      rxstrdup(action, argv[1]);
+      strupr(action);
+      if (strcmp(action,"R") == 0 || strcmp(action,"READ") == 0 )
+         readhistory = true;
+      else if (strcmp(action,"W") == 0 || strcmp(action,"WRITE") == 0 )
+         readhistory = false;
+      else if (strcmp(action,"I") == 0 || strcmp(action,"INIT") == 0 )
+         inithistory = true;
+      else
+         return BADARGS;
+   }
+   else
+      return BADARGS;
+   if ( inithistory )
+   {
+      using_history();
+   }
+   else if ( readhistory )
+   {
+      rc = read_history( filename );
+   }
+   else
+   {
+      rc = write_history( filename );
+   }
+   if (rc)
+      result_one();
+   else
+      result_zero();
+#else
+   what();
+#endif
    return 0;
 }
 

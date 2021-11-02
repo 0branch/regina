@@ -1,21 +1,18 @@
 %define debug_package %{nil}
 # uncomment the following %defines for building on OBS
-# note even commented out %define still works, so change to %#define
-#%#define vermajor 3
-#%#define verminor 9
+# note even commented out <percent>define still works, so change to %#define
 #%#define initservice installsystemd
 #%#define systemdinstallpath /lib/systemd/system
-%define libname libregina%{vermajor}
+%define libname libregina3
 Name: regina-rexx
-Version: 3.9.3
-Release: 1
+Version: 3.9.4
+Release: 211027.1120
 Group: Development/Languages
 Source: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
-Prefix: /usr
 License: LGPL
 Vendor: Mark Hessling
-URL: http://regina-rexx.sourceforge.net
+URL: https://regina-rexx.sourceforge.io
 Summary: Regina Rexx Interpreter binaries, language files and sample programs
 Provides: rexx
 Obsoletes: Regina-REXX
@@ -34,7 +31,7 @@ Regina is an implementation of a Rexx interpreter, compliant with
 the ANSI Standard for Rexx (1996).  It is also available on several other
 operating systems.
 
-For more information on Regina, visit http://regina-rexx.sourceforge.net/
+For more information on Regina, visit https://regina-rexx.sourceforge.io/
 For more information on Rexx, visit http://www.rexxla.org
 
 %package -n %{libname}-devel
@@ -50,7 +47,7 @@ Regina is an implementation of a Rexx interpreter, compliant with
 the ANSI Standard for Rexx (1996).  It is also available on several other
 operating systems.
 
-For more information on Regina, visit http://regina-rexx.sourceforge.net/
+For more information on Regina, visit https://regina-rexx.sourceforge.io/
 For more information on Rexx, visit http://www.rexxla.org
 
 %package -n %{libname}
@@ -64,7 +61,7 @@ Regina is an implementation of a Rexx interpreter, compliant with
 the ANSI Standard for Rexx (1996).  It is also available on several other
 operating systems.
 
-For more information on Regina, visit http://regina-rexx.sourceforge.net/
+For more information on Regina, visit https://regina-rexx.sourceforge.io/
 For more information on Rexx, visit http://www.rexxla.org
 
 %package doc
@@ -78,7 +75,7 @@ Regina is an implementation of a Rexx interpreter, compliant with
 the ANSI Standard for Rexx (1996).  It is also available on several other
 operating systems.
 
-For more information on Regina, visit http://regina-rexx.sourceforge.net/
+For more information on Regina, visit https://regina-rexx.sourceforge.io/
 For more information on Rexx, visit http://www.rexxla.org
 
 %prep
@@ -86,7 +83,7 @@ For more information on Rexx, visit http://www.rexxla.org
 
 %build
 #./configure --prefix=%{prefix} --mandir=%{_mandir} --sysconfdir=%{_initddir} --with-addon-dir=/%{_lib}/%{name}/addons
-./configure --prefix=%{prefix} --mandir=%{_mandir} --with-addon-dir=%{_libdir}/%{name}/addons --sysconfdir=%{_sysconfdir}
+./configure --prefix=%{_prefix} --mandir=%{_mandir} --with-addon-dir=%{_libdir}/%{name}/addons --sysconfdir=%{_sysconfdir}
 #./configure --prefix=%{prefix} --mandir=%{_mandir}
 make
 
@@ -120,7 +117,6 @@ ln -sf %{_sysconfdir}/alternatives/rxqueue.1.gz %{buildroot}%{_mandir}/man1/rxqu
 %{_mandir}/man1/rxqueue-%{name}.1.gz
 %{_mandir}/man1/rexx.1.gz
 %{_mandir}/man1/rexx-%{name}.1.gz
-#%{_initddir}/rxstack
 %dir %{_datadir}/%{name}
 %{_datadir}/%{name}/examples/rexxcps.rexx
 %{_datadir}/%{name}/examples/animal.rexx
@@ -180,8 +176,8 @@ ln -sf %{_sysconfdir}/alternatives/rxqueue.1.gz %{buildroot}%{_mandir}/man1/rxqu
 
 %files -n %{libname}
 %defattr(-,root,root,-)
-%{_libdir}/libregina.so.%{vermajor}.%{verminor}
-%{_libdir}/libregina.so.%{vermajor}
+%{_libdir}/libregina.so.3.9
+%{_libdir}/libregina.so.3
 %{_libdir}/%{name}/addons/libregutil.so
 
 #******************************************************************************

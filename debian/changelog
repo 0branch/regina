@@ -1,3 +1,19 @@
+regina (3.9.4-1) unstable; urgency=low
+
+  * Fix for bug #543
+  * Added "CALLER" as valid environment for VALUE BIF.
+  * Enabled GETCALLSTACK to display to stderr if no stem argument specified
+  * Rearranged build process. Package builds now self-contained
+  * Add syshomedirectory() in regutil to get user's home directory
+  * Add sysgetline() and sysgetlinehistory() in regutil to provide an interface to readline.
+    This provides the ability to obtain keyboard line entry with editing and history.
+    Requires readline development package installed.
+  * When calling UNAME('S') under Windows 11, it will return "WIN10" as the system version.
+    This is Microsoft's idea of version control!  To distinguish between Windows 10 and 11
+    check that UNAME('R') is 21996 or greater.
+
+ -- Mark Hessling <mark@rexx.org>  Tue, 25 Oct 2021 01:50:00 +1000
+
 regina (3.9.3-1) unstable; urgency=low
 
   * Fix for Bug #311, #312, #392, #394, #422, #454, #500, #501, #508, #511, #512, #524, #525, #528, #529
@@ -119,6 +135,7 @@ regina (3.7RC1-1) unstable; urgency=low
 regina (3.6-1) unstable; urgency=low
 
   * Updated to Regina 3.6
+  * Added GETCALLSTACK BIF
 
  -- Mark Hessling <mark@rexx.org>  Sat, 31 Dec 2011 08:35:38 +1000
 

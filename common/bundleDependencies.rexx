@@ -4,7 +4,7 @@
  * machine; usually /usr/local/lib into the application's bundle directory.
  * It then adjusts the executable and its dependent dylibs to use those dylibs.
  */
-Parse Arg app binary libfile
+Parse Arg app binary libfile interpreter
 location = '@executable_path/../Libraries'
 dylibs = ''
 srcs =   ''
@@ -22,18 +22,34 @@ End
 Say Copies( '-', 50 )
 Address System 'otool -L' app'.app/Contents/MacOS/'binary
 Do i = 1 To Words( dylibs )
-   Call DoADylib app, Word( dylibs, i ), Word( srcs, i ), Strip( dylibs ), Strip( srcs ), location
+   Call DoADylib app, Word( dylibs, i ), Word( srcs, i ), Strip( dylibs ), Strip( srcs ), location, interpreter
 End
+Say 'Signing' app'...'
+Address System 'codesign --deep --force --verify --verbose --sign "Developer ID Application: Mark Hessling"' app'.app'
 Return
 
 DoADylib: Procedure
-Parse Arg app, me, src, dests, srcs, location
+Parse Arg app, me, src, dests, srcs, location, interpreter
 Say Copies( '-', 50 )
 Say me
 tab = '09'x
 dest = app'.app/Contents/Libraries'
 If Stream( dest, 'C', 'QUERY EXISTS' ) = '' Then Address System 'mkdir -p' dest
-Address System 'cp /usr/local/lib/'src dest'/'me
+If interpreter = 'regina' Then
+   Do
+      addons = 'regina'('-va')
+      lib = addons'/'src
+      If Stream( lib, 'C', 'QUERY EXISTS' ) = '' Then
+         Do
+            lib = '/usr/local/lib/'src
+         End
+   End
+If Stream( lib, 'C', 'QUERY EXISTS' ) = '' Then
+   Do
+      Say 'Source library:' src 'not found .Aborting!'
+      Exit 1
+   End
+Address System 'cp' lib dest'/'me
 Address System 'otool -L' dest'/'me With Output FIFO ''
 Do Queued()
    Parse Pull line

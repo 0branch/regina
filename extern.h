@@ -440,8 +440,8 @@ extern "C" {
    nodeptr treadit( cnodeptr ) ;
    void setup_system( tsd_t *TSD, int isclient );
    sysinfobox *creat_sysinfo( const tsd_t *TSD, streng *envir );
-   void setGlobalTSD( tsd_t *TSD);
-   tsd_t *getGlobalTSD( void );
+   void setGlobalTSD( const tsd_t *TSD);
+   const tsd_t *getGlobalTSD( void );
 
 
 /*
@@ -758,7 +758,7 @@ extern "C" {
 #endif
 
 /*
- * Routines in strings.c
+ * Routines in strengs.c
  * string and streng routines are ugly but we need the speedup of passing the
  * TSD to take profit from flists in the multi-threading environment.
  */

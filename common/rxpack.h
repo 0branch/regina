@@ -86,6 +86,16 @@
 #ifdef HAVE_FCNTL_H
 # include <fcntl.h>
 #endif
+/*
+ * The includes for stdint.h and inttypes.h are deliberately included in quotes
+ * so that the Windows replacement files can be found in the "win" directory
+ */
+#ifdef HAVE_STDINT_H
+# include "stdint.h"
+#endif
+#ifdef HAVE_INTTYPES_H
+# include "inttypes.h"
+#endif
 
 /*
  * All things that this application may require out of os2.h must be
@@ -128,6 +138,8 @@
 #include "apphead.h"
 
 #include "rxdef.h"
+
+#include "rxmt.h"
 
 #define RETBUFLEN 250
 
@@ -181,10 +193,16 @@
 # endif
 #endif
 
+typedef int8_t RX_INT8;
+typedef uint8_t RX_UINT8;
+typedef short RX_SHORT;
 typedef int RX_INT;
 typedef unsigned int RX_UINT;
+typedef uint16_t RX_UINT16;
 typedef long RX_LONG;
 typedef unsigned long RX_ULONG;
+typedef unsigned long RX_BOOL;
+typedef unsigned int RX_INTBOOL;
 
 /*
  * Typedef a common "long long"
@@ -193,6 +211,9 @@ typedef unsigned long RX_ULONG;
    /* MS VC++ or LCC on Win32 */
    typedef signed __int64 rx_long_long;
 #  define RX_LL_FORMAT "%I64d"
+#elif defined(__QNX__)
+   typedef long rx_long_long;
+#  define RX_LL_FORMAT "%ld"
 #elif (defined(__WATCOMC__) && !defined(__QNX__)) || (defined(__GNUC__) && defined(WIN32))
    /* Watcom C++ on WIn32 or OS/2 or Cygwin on Win32 */
    typedef long long rx_long_long;
@@ -207,13 +228,36 @@ typedef unsigned long RX_ULONG;
 #  define RX_LL_FORMAT "%ld"
 #endif
 
+#if defined(HAVE__STATI64)
+# define rx_stat_buf  _stati64
+# if defined(WIN32) || defined(WIN64)
+#  define rx_stat      rx_w32_stat
+# else
+#  define rx_stat      stati64
+# endif
+# define rx_fstat     _fstati64
+# define rx_fseek     _fseeki64
+# define rx_ftell     _ftelli64
+#else
+# define rx_stat_buf  stat
+# if defined(WIN32) || defined(WIN64)
+#  define rx_stat     rx_w32_stat
+#else
+#  define rx_stat     stat
+#endif
+# define rx_fstat     fstat
+# define rx_fseek     fseek
+# define rx_ftell     ftell
+#endif
+
 #ifdef USE_REXX6000
 typedef USHORT RexxFunctionHandler(PSZ, ULONG, PRXSTRING, PSZ, PRXSTRING) ;
 #endif
 /*
  * Standard REXX API function - idea borrowed from Patrick McPhee's Regutil
  */
-#define rxfunc(x) APIRET APIENTRY x( RFH_ARG0_TYPE name, RFH_ARG1_TYPE argc, RFH_ARG2_TYPE argv, RFH_ARG3_TYPE stck, RFH_ARG4_TYPE retstr )
+#define rxfunc(x) RFH_RETURN x( RFH_ARG0_TYPE name, RFH_ARG1_TYPE argc, RFH_ARG2_TYPE argv, RFH_ARG3_TYPE stck, RFH_ARG4_TYPE retstr )
+/*#define rxfunc(x) APIRET APIENTRY x( RFH_ARG0_TYPE name, RFH_ARG1_TYPE argc, RFH_ARG2_TYPE argv, RFH_ARG3_TYPE stck, RFH_ARG4_TYPE retstr )*/
 
 /*-----------------------------------------------------------------------------
  * Definition of an external function
@@ -225,22 +269,6 @@ typedef struct {
    int                 DllLoad;
 } RexxFunction;
 
-/*
- * The following structure contains all "global" data common to all
- * external function packages.  A similar structure should exists
- * for package-specific data.
- */
-typedef struct
-{
-   int RxRunFlags;                    /* debug/verbose flags */
-   char FName[100];                   /* current function name */
-   char PreviousConstantPrefix[11];   /* previous constant variables prefix */
-   char ConstantPrefix[11];           /* constant variables prefix */
-   FILE *RxTraceFilePointer;          /* file pointer for all output */
-   char RxTraceFileName[MAX_PATH];    /* filename of output file */
-   int deallocate;                    /* indicates if rxpack should deallocate this structure */
-   int terminated;                    /* indicates if rxpack has called RxTermPackage() for this structure */
-} RxPackageGlobalDataDef;
 
 /*
  * The following structure contains details of a package's constants
@@ -264,29 +292,126 @@ typedef int PackageTerminator( RxPackageGlobalDataDef * );
 # define Args(a) ()
 #endif
 
-RxPackageGlobalDataDef *FunctionPrologue Args(( RxPackageGlobalDataDef *, PackageInitialiser *, char *, ULONG, RFH_ARG2_TYPE ));
-void FunctionTrace Args(( RxPackageGlobalDataDef *, char *, ... ));
+/*
+ * The following #defines are intended to prevent a problem with duplicate function names
+ * when code is statically linked with the non-thread-safe version of this code. ie Rexx/SQL
+ * static library linked with Rexx/ISAM static library
+ */
+#define FunctionPrologue        RxpFunctionPrologue
+#define FunctionTrace           RxpFunctionTrace
+#define FunctionEpilogue        RxpFunctionEpilogue
+#define InternalTrace           RxpInternalTrace
+#define RxDisplayError          RxpRxDisplayError
+#define InitRxPackage           RxpInitRxPackage
+#define TermRxPackage           RxpTermRxPackage
+#define RegisterRxFunctions     RxpRegisterRxFunctions
+#define RegisterRxSubcom        RxpRegisterRxSubcom
+#define RegisterRxInit          RxpRegisterRxInit
+#define QueryRxFunction         RxpQueryRxFunction
+#define DeregisterRxFunctions   RxpDeregisterRxFunctions
+#define SetPackageConstants     RxpSetPackageConstants
+#define make_upper              Rxpmake_upper
+#define make_upper_with_length  Rxpmake_upper_with_length
+#define make_lower              Rxpmake_lower
+#define AllocString             RxpAllocString
+#define MkAsciz                 RxpMkAsciz
+#define SetRexxVariable         RxpSetRexxVariable
+#define GetRexxVariable         RxpGetRexxVariable
+#define GetRexxVariableInteger  RxpGetRexxVariableInteger
+#define DropRexxVariable        RxpDropRexxVariable
+#define RxSetTraceFile          RxpRxSetTraceFile
+#define RxGetTraceFile          RxpRxGetTraceFile
+#define RxSetConstantPrefix     RxpRxSetConstantPrefix
+#define RxGetConstantPrefix     RxpRxGetConstantPrefix
+#define RxSetRunFlags           RxpRxSetRunFlags
+#define RxGetRunFlags           RxpRxGetRunFlags
+#define RxReturn                RxpRxReturn
+#define RxReturnHex             RxpRxReturnHex
+#define RxReturnString          RxpRxReturnString
+#define RxReturnStringAndFree   RxpRxReturnStringAndFree
+#define RxReturnDataAndFree     RxpRxReturnDataAndFree
+/* the following 3 should be deprecated */
+#define RxReturnNumber          RxpRxReturnNumber
+#define RxReturnLongLong        RxpRxReturnLongLong
+#define RxReturnUnsignedNumber  RxpRxReturnUnsignedNumber
+#define RxReturnINT8            RxpRxReturnINT8
+#define RxReturnUINT8           RxpRxReturnUINT8
+#define RxReturnINT16           RxpRxReturnINT16
+#define RxReturnUINT16          RxpRxReturnUINT16
+#define RxReturnINT32           RxpRxReturnINT32
+#define RxReturnUINT32          RxpRxReturnUINT32
+#define RxReturnINT64           RxpRxReturnINT64
+#define RxReturnUINT64          RxpRxReturnUINT64
+#define RxReturnDouble          RxpRxReturnDouble
+#define RxReturnFloat           RxpRxReturnFloat
+#define RxReturnPointer         RxpRxReturnPointer
+#define memcmpi                 Rxpmemcmpi
+#define rxstrcmpi               Rxprxstrcmpi
+#define my_checkparam           Rxpmy_checkparam
+#define RxStrToBool             RxpRxStrToBool
+#define RxStrToIntBool          RxpRxStrToIntBool
+/* the following 5 should be deprecated */
+#define RxStrToShort            RxpRxStrToShort
+#define RxStrToInt              RxpRxStrToInt
+#define RxStrToUInt             RxpRxStrToUInt
+#define RxStrToLong             RxpRxStrToLong
+#define RxStrToULong            RxpRxStrToULong
+#define RxStrToLongLong         RxpRxStrToLongLong
+#define RxStrToINT8             RxpRxStrToINT8
+#define RxStrToUINT8            RxpRxStrToUINT8
+#define RxStrToINT16            RxpRxStrToINT16
+#define RxStrToUINT16           RxpRxStrToUINT16
+#define RxStrToINT32            RxpRxStrToINT32
+#define RxStrToUINT32           RxpRxStrToUINT32
+#define RxStrToINT64            RxpRxStrToINT64
+#define RxStrToUINT64           RxpRxStrToUINT64
+#define RxStrToDouble           RxpRxStrToDouble
+#define RxStrToFloat            RxpRxStrToFloat
+#define RxStrToPointer          RxpRxStrToPointer
+#define RxStemToCharArray       RxpRxStemToCharArray
+#define RxFreeCharArray         RxpRxFreeCharArray
+#define RxStemToIntArray        RxpRxStemToIntArray
+#define RxFreeIntArray          RxpRxFreeIntArray
+#define RxStemToUIntArray       RxpRxStemToUIntArray
+#define RxFreeUIntArray         RxpRxFreeUIntArray
+#define RxStemToUINT16Array     RxpRxStemToUINT16Array
+#define RxFreeUINT16Array       RxpRxFreeUINT16Array
+#define RxStemToLongArray       RxpRxStemToLongArray
+#define RxFreeLongArray         RxpRxFreeLongArray
+#define RxStemToULongArray      RxpRxStemToULongArray
+#define RxFreeULongArray        RxpRxFreeULongArray
+#define RxNumberToVariable      RxpRxNumberToVariable
+#define RxGetRexxInterpreterVersion  RxpRxGetRexxInterpreterVersion
+
+RxPackageGlobalDataDef *FunctionPrologue Args(( RxPackageGlobalDataDef *, PackageInitialiser *, char *, char *, ULONG, RFH_ARG2_TYPE ));
 long FunctionEpilogue Args(( RxPackageGlobalDataDef *, char *, long ));
-void InternalTrace Args(( RxPackageGlobalDataDef *, char *, ... ));
-void RxDisplayError Args(( RxPackageGlobalDataDef *, RFH_ARG0_TYPE, ... ));
-RxPackageGlobalDataDef *InitRxPackage Args(( RxPackageGlobalDataDef *, PackageInitialiser *, int * ));
-int TermRxPackage Args(( RxPackageGlobalDataDef **, PackageTerminator *, RexxFunction *, char *, int ));
+#ifdef HAVE_PROTO
+void FunctionTrace( RxPackageGlobalDataDef *, char *, ... );
+void InternalTrace( RxPackageGlobalDataDef *, char *, ... );
+void RxDisplayError( RxPackageGlobalDataDef *, RFH_ARG0_TYPE, ... );
+#else
+void RxDisplayError( );
+void FunctionTrace();
+void InternalTrace();
+#endif
+
+RxPackageGlobalDataDef *InitRxPackage Args(( RxPackageGlobalDataDef *, PackageInitialiser *, char *, int * ));
+int TermRxPackage Args(( RxPackageGlobalDataDef *, PackageTerminator *, RexxFunction *, char *, int ));
 int RegisterRxFunctions Args(( RxPackageGlobalDataDef *, RexxFunction *, char * ));
 int RegisterRxSubcom Args(( RxPackageGlobalDataDef *, RexxSubcomHandler ));
 int RegisterRxInit Args(( RxPackageGlobalDataDef *, RexxExitHandler, char *));
 int QueryRxFunction Args(( RxPackageGlobalDataDef *, char * ));
 int DeregisterRxFunctions Args(( RxPackageGlobalDataDef *, RexxFunction *, int ));
-int SetPackageConstants Args(( RxPackageGlobalDataDef *, RxPackageConstantDef *, char *, int ));
-char *make_upper Args(( char * ));
-char *AllocString Args(( char *, int ));
-char *MkAsciz Args(( char *, int, char *, int ));
-int SetRexxVariable Args(( RxPackageGlobalDataDef *,char *, int, char *, int ));
+int SetPackageConstants Args(( RxPackageGlobalDataDef *, RxPackageConstantDef *, int ));
+char *make_upper Args(( RxPackageGlobalDataDef *,char * ));
+char *make_upper_with_length Args(( RxPackageGlobalDataDef *,char *, int ));
+char *make_lower Args(( RxPackageGlobalDataDef *,char * ));
+char *AllocString Args(( RxPackageGlobalDataDef *, char *, int ));
+char *MkAsciz Args(( RxPackageGlobalDataDef *,char *, int, char *, int ));
+int SetRexxVariable Args(( RxPackageGlobalDataDef *,char *, ULONG, char *, ULONG ));
 RXSTRING *GetRexxVariable Args(( RxPackageGlobalDataDef *, char *, RXSTRING *, int ));
 int *GetRexxVariableInteger Args(( RxPackageGlobalDataDef *, char *, int *, int ));
 int DropRexxVariable Args(( RxPackageGlobalDataDef *,char *, int ));
-int StrToInt Args(( RXSTRING *, ULONG * ));
-int StrToNumber Args(( RXSTRING *, LONG * ));
-int StrToBool Args(( RXSTRING *, ULONG * ));
 int RxSetTraceFile Args(( RxPackageGlobalDataDef *, char * ));
 char *RxGetTraceFile Args(( RxPackageGlobalDataDef * ));
 int RxSetConstantPrefix Args(( RxPackageGlobalDataDef *, char * ));
@@ -294,31 +419,68 @@ char *RxGetConstantPrefix Args(( RxPackageGlobalDataDef * ));
 void RxSetRunFlags Args(( RxPackageGlobalDataDef *, int ));
 int RxGetRunFlags Args(( RxPackageGlobalDataDef * ));
 int RxReturn Args(( RxPackageGlobalDataDef *, RXSTRING * ));
+int RxReturnHex Args(( RxPackageGlobalDataDef *, RXSTRING * ));
 int RxReturnString Args(( RxPackageGlobalDataDef *, RXSTRING *, char * ));
 int RxReturnStringAndFree Args(( RxPackageGlobalDataDef *, RXSTRING *, char *, int ));
 int RxReturnDataAndFree Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *retstr, void *str, long len, int freeit ));
 int RxReturnNumber Args(( RxPackageGlobalDataDef *, RXSTRING *, long ));
+int RxReturnLongLong Args(( RxPackageGlobalDataDef *, RXSTRING *, rx_long_long num ));
 int RxReturnUnsignedNumber Args(( RxPackageGlobalDataDef *, RXSTRING *, ULONG ));
+int RxReturnINT8 Args(( RxPackageGlobalDataDef *, RXSTRING *, int8_t));
+int RxReturnUINT8 Args(( RxPackageGlobalDataDef *, RXSTRING *, uint8_t));
+int RxReturnINT16 Args(( RxPackageGlobalDataDef *, RXSTRING *, int16_t));
+int RxReturnUINT16 Args(( RxPackageGlobalDataDef *, RXSTRING *, uint16_t));
+int RxReturnINT32 Args(( RxPackageGlobalDataDef *, RXSTRING *, int32_t));
+int RxReturnUINT32 Args(( RxPackageGlobalDataDef *, RXSTRING *, uint32_t));
+int RxReturnINT64 Args(( RxPackageGlobalDataDef *, RXSTRING *, int64_t));
+int RxReturnUINT64 Args(( RxPackageGlobalDataDef *, RXSTRING *, uint64_t));
 int RxReturnDouble Args(( RxPackageGlobalDataDef *, RXSTRING *, double ));
+int RxReturnFloat Args(( RxPackageGlobalDataDef *, RXSTRING *, float ));
 int RxReturnPointer Args(( RxPackageGlobalDataDef *, RXSTRING *, void * ));
-int memcmpi Args(( char *, char *, int ));
+int memcmpi Args(( RxPackageGlobalDataDef *,char *, char *, int ));
+int rxstrcmpi Args(( RxPackageGlobalDataDef *, char *, char * ));
 int my_checkparam Args(( RxPackageGlobalDataDef *, RFH_ARG0_TYPE, int, int, int ));
+int RxStrToBool Args(( RxPackageGlobalDataDef *,RXSTRING *, ULONG * ));
+int RxStrToIntBool Args(( RxPackageGlobalDataDef *, RXSTRING *, unsigned int * ));
 int RxStrToInt Args(( RxPackageGlobalDataDef *, RXSTRING *, int * ));
+int RxStrToShort Args(( RxPackageGlobalDataDef *, RXSTRING *, short * ));
 int RxStrToUInt Args(( RxPackageGlobalDataDef *, RXSTRING *, unsigned int * ));
 int RxStrToLong Args(( RxPackageGlobalDataDef *, RXSTRING *, long * ));
 int RxStrToULong Args(( RxPackageGlobalDataDef *, RXSTRING *, unsigned long * ));
+int RxStrToLongLong Args(( RxPackageGlobalDataDef *, RXSTRING *, rx_long_long * ));
+int RxStrToINT8 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, int8_t *result ));
+int RxStrToUINT8 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, uint8_t *result ));
+int RxStrToINT16 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, int16_t *result ));
+int RxStrToUINT16 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, uint16_t *result ));
+int RxStrToINT32 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, int32_t *result ));
+int RxStrToUINT32 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, uint32_t *result ));
+int RxStrToINT64 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, int64_t *result ));
+int RxStrToUINT64 Args(( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, uint64_t *result ));
 int RxStrToDouble Args(( RxPackageGlobalDataDef *, RXSTRING *, double * ));
+int RxStrToFloat Args(( RxPackageGlobalDataDef *, RXSTRING *, float * ));
+int RxStrToPointer Args(( RxPackageGlobalDataDef *, RXSTRING *, void ** ));
 int RxStemToCharArray Args(( RxPackageGlobalDataDef *, RXSTRING *, char *** ));
-void RxFreeCharArray Args(( char **, int ));
+void RxFreeCharArray Args(( RxPackageGlobalDataDef *,char **, int ));
 int RxStemToIntArray Args(( RxPackageGlobalDataDef *, RXSTRING *, int ** ));
-void RxFreeIntArray Args(( int * ));
+void RxFreeIntArray Args(( RxPackageGlobalDataDef *,int * ));
 int RxStemToUIntArray Args(( RxPackageGlobalDataDef *, RXSTRING *, unsigned int ** ));
-void RxFreeUIntArray Args(( unsigned int * ));
+void RxFreeUIntArray Args(( RxPackageGlobalDataDef *,unsigned int * ));
+int RxStemToUINT16Array Args(( RxPackageGlobalDataDef *, RXSTRING *, uint16_t ** ));
+void RxFreeUINT16Array Args(( RxPackageGlobalDataDef *,uint16_t * ));
 int RxStemToLongArray Args(( RxPackageGlobalDataDef *, RXSTRING *, long ** ));
-void RxFreeLongArray Args(( long * ));
+void RxFreeLongArray Args(( RxPackageGlobalDataDef *,long * ));
 int RxStemToULongArray Args(( RxPackageGlobalDataDef *, RXSTRING *, unsigned long ** ));
-void RxFreeULongArray Args(( unsigned long * ));
+void RxFreeULongArray Args(( RxPackageGlobalDataDef *,unsigned long * ));
 int RxNumberToVariable Args(( RxPackageGlobalDataDef *, RXSTRING *, ULONG ));
+int RxBinaryStringToUINT8 Args(( RxPackageGlobalDataDef *, RXSTRING *, uint8_t * ));
+char *RxGetRexxInterpreterVersion Args(( char *buf ));
+#if defined(WIN32) || defined(WIN64)
+# if defined(HAVE__STATI64)
+int rx_w32_stat( const char *path, struct _stati64 *buffer );
+# else
+int rx_w32_stat( const char *path, struct _stat *buffer );
+# endif
+#endif
 
 #ifdef DEBUG
 # define DEBUGDUMP(x) {x;}
@@ -352,6 +514,16 @@ int RxNumberToVariable Args(( RxPackageGlobalDataDef *, RXSTRING *, ULONG ));
 # define FILE_SEPARATOR_STR "/"
 # define PATH_SEPARATOR     ':'
 # define PATH_SEPARATOR_STR ":"
+#endif
+
+#define MALLOC_TSD( TSD, bytes ) (TSD)->RxMTMalloc( TSD, bytes )
+#define FREE_TSD( TSD, ptr ) (TSD)->RxMTFree( TSD, ptr )
+
+/* special test for va_copy() availability */
+#if defined(_MSC_VER)
+# if _MSC_VER < 1800
+#  define va_copy(dest,src) (dest = src)
+# endif
 #endif
 
 #endif /* !_RXPACK_H */

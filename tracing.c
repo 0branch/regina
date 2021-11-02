@@ -538,6 +538,10 @@ void traceback( tsd_t *TSD )
    Free_stringTSD( message );
 }
 
+/*
+ * Get or show call stack
+ * If stem is NULL, display to stderr
+ */
 void getcallstack( tsd_t *TSD, streng *stem )
 {
    sysinfo ss;
@@ -548,15 +552,18 @@ void getcallstack( tsd_t *TSD, streng *stem )
    char *eptr=NULL ;
    streng *tmpptr=NULL ;
 
-   varname = Str_makeTSD( (stemlen=stem->len) + 8 ) ;
-   memcpy( varname->value, stem->value, stemlen ) ;
-   mem_upper( varname->value, stemlen );
-   eptr = varname->value + stemlen ;
-
-   if (*(eptr-1)!='.')
+   if ( stem )
    {
-      *((eptr++)-1) = '.' ;
-      stemlen++ ;
+      varname = Str_makeTSD( (stemlen=stem->len) + 8 ) ;
+      memcpy( varname->value, stem->value, stemlen ) ;
+      mem_upper( varname->value, stemlen );
+      eptr = varname->value + stemlen ;
+
+      if (*(eptr-1)!='.')
+      {
+         *((eptr++)-1) = '.' ;
+         stemlen++ ;
+      }
    }
    for ( ss = TSD->systeminfo; ss; ss = ss->previous )
    {
@@ -569,24 +576,34 @@ void getcallstack( tsd_t *TSD, streng *stem )
             continue;
          tmpptr = ptr->name;
          /* get the value; lineno name */
-         value = Str_makeTSD( (tmpptr->len) + 10 ) ; /* should not be more than 999999999 levels in the call stack */
          lineno = int_to_streng( TSD, ptr->lineno );
-         memcpy( value->value, lineno->value, lineno->len ) ;
-         value->len = lineno->len;
-         Str_catstr_TSD( TSD, value, " " );
-         Str_cat_TSD( TSD, value, tmpptr );
-         Free_stringTSD( lineno );
-         /* set the tail value */
-         sprintf(eptr, "%d", ++j ) ;
-         varname->len = strlen( varname->value ) ;
-         setvalue( TSD, varname, value, -1 ) ;
+         if ( stem )
+         {
+            value = Str_makeTSD( (tmpptr->len) + 10 ) ; /* should not be more than 999999999 levels in the call stack */
+            memcpy( value->value, lineno->value, lineno->len ) ;
+            value->len = lineno->len;
+            Str_catstr_TSD( TSD, value, " " );
+            Str_cat_TSD( TSD, value, tmpptr );
+            Free_stringTSD( lineno );
+            /* set the tail value */
+            sprintf(eptr, "%d", ++j ) ;
+            varname->len = strlen( varname->value ) ;
+            setvalue( TSD, varname, value, -1 ) ;
+         }
+         else
+         {
+            fprintf( stderr, "%.*s %.*s\n", lineno->len, lineno->value, tmpptr->len, tmpptr->value );
+         }
       }
    }
-   *eptr = '0' ;
-   varname->len = stemlen+1 ;
-   tmpptr = int_to_streng( TSD, j ) ;
-   setvalue( TSD, varname, tmpptr, -1 ) ;
-   Free_stringTSD( varname );
+   if ( stem )
+   {
+      *eptr = '0' ;
+      varname->len = stemlen+1 ;
+      tmpptr = int_to_streng( TSD, j ) ;
+      setvalue( TSD, varname, tmpptr, -1 ) ;
+      Free_stringTSD( varname );
+   }
 }
 
 void queue_trace_char( const tsd_t *TSD, char ch2 )

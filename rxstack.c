@@ -130,7 +130,6 @@
 
 #define NO_CTYPE_REPLACEMENT
 #include "rexx.h"
-
 #if defined(WIN32) || defined(__LCC__)
 # if defined(_MSC_VER)
 #  if _MSC_VER >= 1100
@@ -215,7 +214,9 @@
 #endif
 
 #include "extstack.h"
-#include "mygetopt.h"
+#ifndef HAVE_GETOPT_LONG
+# include "mygetopt.h"
+#endif
 #include "contrib/LibSha1.h"
 
 #ifdef BUILD_NT_SERVICE
@@ -407,6 +408,7 @@ typedef struct _Client
     * if queue_timeout is set, the client expects an error code after
     * this time instead of waiting until world's end.
     * The value is in milliseconds.
+    * These values have internal meaning; in the call to rxqueue('T',0) the zero is converted to -1
     * A value of zero means no timeout; return immediately if no data
     * A value of -1 means wait forever
     */
@@ -1604,7 +1606,7 @@ int rxstack_get_queues( Client *client, streng **result )
    char eol[3];
    streng *seol,*tmp1=NULL,*tmp2=NULL;
 
-   DEBUGDUMP(printf("Getting queues; rc %d\n", rc ););
+   DEBUGDUMP(printf("Getting queues...\n" ););
    /* get the length of all queues and the nul terminator and EOL delimiter */
    for ( q = queues; q != NULL; )
    {
@@ -1953,7 +1955,7 @@ int decode_ws_payload( unsigned char *src, size_t srclength, unsigned char *targ
    unsigned char *frame, *mask, *payload, save_char;
    int masked = 0;
    int i = 0, framecount = 0;
-   size_t remaining;
+   size_t remaining = 0;
    unsigned int target_offset = 0, hdr_length = 0, payload_length = 0, decoded_length;
 
    *left = srclength;
@@ -2577,8 +2579,9 @@ int rxstack_process_traditional_command( Client * client )
    streng *header;
    streng *buffer = NULL ;
    int rc,length;
+   now = get_now();
    memset( cheader, 0, sizeof(cheader) );
-   DEBUGDUMP(printf("\nreading from socket %d\n", client->socket););
+   DEBUGDUMP(printf("\nreading from socket %d at %ld,%03d\n", client->socket, now.seconds, now.milli););
    rc = recv( client->socket, cheader, RXSTACK_HEADER_SIZE, 0 );
    if ( rc < 0 )
    {
@@ -2670,7 +2673,11 @@ int rxstack_process_traditional_command( Client * client )
       else
          buffer->len = length ;
    }
+   now = get_now();
+   DEBUGDUMP(printf("\nbefore send_response_to_client from socket %d at %ld,%03d\n", client->socket, now.seconds, now.milli););
    send_response_to_client( client, cheader[0], buffer );
+   now = get_now();
+   DEBUGDUMP(printf("\nafter send_response_to_client from socket %d at %ld,%03d\n", client->socket, now.seconds, now.milli););
    return 1;
 }
 
@@ -2692,7 +2699,8 @@ int rxstack_process_command( Client *client )
       bad_news_for_waiter( client->default_queue, client ) ;
    }
    memset( pheader, 0, sizeof(pheader) );
-   DEBUGDUMP(printf("\npeeking from socket %d\n", client->socket););
+   now = get_now();
+   DEBUGDUMP(printf("\npeeking from socket %d at %ld,%03d\n", client->socket, now.seconds, now.milli););
    rc = recv( client->socket, pheader, RXSTACK_PEEK_HEADER_SIZE, MSG_PEEK );
    if ( rc < 0 )
    {
@@ -3154,7 +3162,7 @@ notrunning:
 int usage( const char *argv0 )
 {
    fprintf( stdout, "\n%s: %s (%d bit). All rights reserved.\n", argv0, PARSE_VERSION_STRING, REGINA_BITS );
-   fprintf( stdout,"Regina is distributed under the terms of the GNU Library Public License \n" );
+   fprintf( stdout,"Regina is distributed under the terms of the GNU General Library Public License \n" );
    fprintf( stdout,"and comes with NO WARRANTY. See the file COPYING-LIB for details.\n" );
    fprintf( stdout,"\n%s [switches]\n", argv0 );
    fprintf( stdout,"where switches are:\n\n" );

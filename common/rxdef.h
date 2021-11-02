@@ -92,7 +92,7 @@ typedef CHAR *PCH;
 # endif
 #endif
 
-#if defined(WIN32)
+#if defined(WIN32) || defined(WIN64)
 # if defined(USE_REGINA)
 #  include <rexxsaa.h>
 # endif
@@ -154,6 +154,7 @@ typedef CHAR *PCH;
  */
 
 #if defined(USE_REXX6000)
+# define REXX_BUILD "rexx6000"
 # define RXSTRING_STRPTR_TYPE PUCHAR  /* PRXFUNC - RexxFunctionHandler */
 # define RFH_RETURN           USHORT
 # define RFH_RETURN_TYPE      USHORT
@@ -198,9 +199,10 @@ typedef CHAR *PCH;
 # define RS_ARG8_TYPE         PRXSTRING
 
 #elif defined(USE_OS2REXX)
+# define REXX_BUILD "os2rexx"
 # if defined(__EMX__)
 #  define RXSTRING_STRPTR_TYPE PCH
-#  define RFH_RETURN           ULONG
+#  define RFH_RETURN           APIENTRY LONG
 #  define RFH_RETURN_TYPE      ULONG
 #  define RFH_ARG0_TYPE        PCSZ
 #  define RFH_ARG1_TYPE        ULONG
@@ -309,6 +311,7 @@ typedef CHAR *PCH;
 # endif
 
 #elif defined(USE_REGINA)
+# define REXX_BUILD "regina"
 /*
  * REGINAVERSION introduced in 2.0, at the same time that
  * PCSZ was introduced.
@@ -329,7 +332,11 @@ typedef CHAR *PCH;
 # define RFH_ARG3_TYPE        PCSZ
 # define RFH_ARG4_TYPE        PRXSTRING
 # define RRFE_ARG0_TYPE       PCSZ
-# define RRFE_ARG1_TYPE       PFN
+# ifdef RX_WEAKTYPING
+#  define RRFE_ARG1_TYPE      PFN
+#else
+#  define RRFE_ARG1_TYPE      RexxFunctionHandler *
+#endif
 # define RRFD_ARG0_TYPE       PCSZ
 # define RRFD_ARG1_TYPE       PCSZ
 # define RRFD_ARG2_TYPE       PCSZ
@@ -341,7 +348,11 @@ typedef CHAR *PCH;
 # define REH_ARG1_TYPE        LONG
 # define REH_ARG2_TYPE        PEXIT
 # define RREE_ARG0_TYPE       PCSZ
-# define RREE_ARG1_TYPE       PFN
+# ifdef RX_WEAKTYPING
+#  define RREE_ARG1_TYPE      PFN
+#else
+#  define RREE_ARG1_TYPE      RexxExitHandler *
+#endif
 # define RREE_ARG2_TYPE       PUCHAR
 # define RRED_ARG0_TYPE       PCSZ
 # define RRED_ARG1_TYPE       PCSZ
@@ -380,6 +391,7 @@ typedef CHAR *PCH;
 # define RS_ARG8_TYPE         PRXSTRING
 
 #elif defined(USE_REXXIMC)
+# define REXX_BUILD "rexximc"
 # define RXSTRING_STRPTR_TYPE char *
 # define RFH_RETURN           ULONG
 # define RFH_RETURN_TYPE      ULONG
@@ -422,6 +434,10 @@ typedef CHAR *PCH;
 # define RRSD_ARG4_TYPE       not_supported
 # define RDE_ARG0_TYPE        PSZ
 # define RDE_ARG1_TYPE        PSZ
+# define RQE_ARG0_TYPE        PSZ
+# define RQE_ARG1_TYPE        PSZ
+# define RQE_ARG2_TYPE        PUSHORT
+# define RQE_ARG3_TYPE        PUCHAR
 # define RDS_ARG0_TYPE        PSZ
 # define RDS_ARG1_TYPE        PSZ
 # define RS_ARG0_TYPE         long
@@ -438,16 +454,25 @@ typedef CHAR *PCH;
  * The following #defines are for the broken ooRexx 4.x legacy API
  */
 #elif defined(OOREXX_40) && defined(USE_OOREXX)
+# define REXX_BUILD "oorexx"
 #ifndef APIRET
 # define APIRET               size_t
 #endif
 #ifndef APIENTRY
 # define APIENTRY             REXXENTRY
 #endif
+#ifndef CHAR_TYPEDEFED
 typedef char CHAR;
+#endif
+#ifndef SHORT_TYPEDEFED
 typedef short int SHORT;
+#endif
+#ifndef ULONG_TYPEDEFED
 typedef unsigned long ULONG;
+#endif
+#ifndef LONG_TYPEDEFED
 typedef long LONG;
+#endif
 # define RXSTRING_STRPTR_TYPE  char *
 # define RFH_RETURN            size_t REXXENTRY
 # define RFH_RETURN_TYPE       size_t
@@ -490,6 +515,10 @@ typedef long LONG;
 # define RRSD_ARG4_TYPE        size_t
 # define RDE_ARG0_TYPE         CONSTANT_STRING
 # define RDE_ARG1_TYPE         CONSTANT_STRING
+# define RQE_ARG0_TYPE         CONSTANT_STRING
+# define RQE_ARG1_TYPE         CONSTANT_STRING
+# define RQE_ARG2_TYPE         unsigned short *
+# define RQE_ARG3_TYPE         char *
 # define RDS_ARG0_TYPE         CONSTANT_STRING
 # define RDS_ARG1_TYPE         CONSTANT_STRING
 # define RS_ARG0_TYPE          size_t
@@ -508,6 +537,7 @@ typedef long LONG;
 # define REXXFREEMEMORY        RexxFreeMemory
 
 #elif defined(USE_OREXX) || defined(USE_OOREXX)
+# define REXX_BUILD "oorexx"
 # define RXSTRING_STRPTR_TYPE PCH
 # define RFH_RETURN           ULONG APIENTRY
 # define RFH_RETURN_TYPE      ULONG
@@ -550,6 +580,10 @@ typedef long LONG;
 # define RRSD_ARG4_TYPE       ULONG
 # define RDE_ARG0_TYPE        PSZ
 # define RDE_ARG1_TYPE        PSZ
+# define RQE_ARG0_TYPE        PSZ
+# define RQE_ARG1_TYPE        PSZ
+# define RQE_ARG2_TYPE        unsigned short *
+# define RQE_ARG3_TYPE        char *
 # define RDS_ARG0_TYPE        PSZ
 # define RDS_ARG1_TYPE        PSZ
 # define RS_ARG0_TYPE         LONG
@@ -563,6 +597,7 @@ typedef long LONG;
 # define RS_ARG8_TYPE         PRXSTRING
 
 #elif defined(USE_QUERCUS)
+# define REXX_BUILD "quercus"
 # define RXSTRING_STRPTR_TYPE LPBYTE
 # define RFH_RETURN           DWORD APIENTRY
 # define RFH_RETURN_TYPE      DWORD
@@ -618,6 +653,7 @@ typedef long LONG;
 # define RS_ARG8_TYPE         PRXSTRING
 
 #elif defined(USE_WINREXX)
+# define REXX_BUILD "winrexx"
 # define RXSTRING_STRPTR_TYPE LPBYTE
 # define RFH_RETURN           int APIENTRY
 # define RFH_RETURN_TYPE      int
@@ -673,6 +709,7 @@ typedef long LONG;
 # define RS_ARG8_TYPE         PRXSTRING
 
 #elif defined(USE_UNIREXX)
+# define REXX_BUILD "unirexx"
 # define RXSTRING_STRPTR_TYPE PCH
 #ifdef WIN32
 #  define RFH_RETURN          ULONG ORXXCDecl ORXXLoadDS
@@ -743,6 +780,7 @@ typedef long LONG;
 # define RS_ARG8_TYPE         PRXSTRING
 
 #elif defined(USE_REXXTRANS)
+# define REXX_BUILD "rexxtrans"
 # define RXSTRING_STRPTR_TYPE char *
 # define RFH_RETURN           APIRET APIENTRY
 # define RFH_RETURN_TYPE      APIRET
@@ -785,6 +823,10 @@ typedef long LONG;
 # define RRSD_ARG4_TYPE       ULONG
 # define RDE_ARG0_TYPE        PSZ
 # define RDE_ARG1_TYPE        PSZ
+# define RQE_ARG0_TYPE        PSZ
+# define RQE_ARG1_TYPE        PSZ
+# define RQE_ARG2_TYPE        PUSHORT
+# define RQE_ARG3_TYPE        PUCHAR
 # define RDS_ARG0_TYPE        PSZ
 # define RDS_ARG1_TYPE        PSZ
 # define RS_ARG0_TYPE         LONG

@@ -1,3 +1,4 @@
+#!/usr/bin/env regina
 /*
  * This is an example for using GCI. Enjoy, copy and paste!
  * We have three different execution paths for Unix, Win32 and OS/2.
@@ -213,15 +214,15 @@ if RESULT \= 0 then do
       say "Error, code" RESULT || ":" RxFuncErrMsg()
    else
       say "Error, code" RESULT || ":" GCI_RC
-   return 1
    end
+else do
+   say "some logarithms"
+   do i = 1 to 5
+      say "log("i")="logl(i)
+      end
 
-say "some logarithms"
-do i = 1 to 5
-   say "log("i")="logl(i)
-   end
-
-call funcDrop logl
+   call funcDrop logl
+end
 say ""
 /*******************************/
 say "Using a structure and checking the file system's size."
