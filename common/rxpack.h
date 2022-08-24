@@ -152,6 +152,12 @@
 # define FALSE  0
 #endif
 
+/* values returned from GetRexxVariable...() indicating status of the retrieved Rexx variable */
+#define RXPACK_INVALID  (-1)
+#define RXPACK_OK       0
+#define RXPACK_MISSING  1
+
+#define RXPACK_NOTAIL (-1)
 /*
  * Run time modes
  */
@@ -318,6 +324,7 @@ typedef int PackageTerminator( RxPackageGlobalDataDef * );
 #define SetRexxVariable         RxpSetRexxVariable
 #define GetRexxVariable         RxpGetRexxVariable
 #define GetRexxVariableInteger  RxpGetRexxVariableInteger
+#define GetRexxVariableULong    RxpGetRexxVariableULong
 #define DropRexxVariable        RxpDropRexxVariable
 #define RxSetTraceFile          RxpRxSetTraceFile
 #define RxGetTraceFile          RxpRxGetTraceFile
@@ -411,6 +418,7 @@ char *MkAsciz Args(( RxPackageGlobalDataDef *,char *, int, char *, int ));
 int SetRexxVariable Args(( RxPackageGlobalDataDef *,char *, ULONG, char *, ULONG ));
 RXSTRING *GetRexxVariable Args(( RxPackageGlobalDataDef *, char *, RXSTRING *, int ));
 int *GetRexxVariableInteger Args(( RxPackageGlobalDataDef *, char *, int *, int ));
+int GetRexxVariableULong Args(( RxPackageGlobalDataDef *, char *, unsigned long *, int ));
 int DropRexxVariable Args(( RxPackageGlobalDataDef *,char *, int ));
 int RxSetTraceFile Args(( RxPackageGlobalDataDef *, char * ));
 char *RxGetTraceFile Args(( RxPackageGlobalDataDef * ));

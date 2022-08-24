@@ -29,7 +29,7 @@ export DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 #libdir=$(destprefix)/lib/$(DEB_HOST_MULTIARCH)
 malibdir=lib/$(DEB_HOST_MULTIARCH)
 
-confflags=--prefix=/$(destprefix) --with-addon-dir=/$(destprefix)/$(malibdir)/regina-rexx/addons --libdir=/$(destprefix)/$(malibdir)
+confflags=--prefix=/$(destprefix) --with-addon-dir=/$(destprefix)/$(malibdir)/regina-rexx/addons --libdir=/$(destprefix)/$(malibdir) --sysconfdir=/etc
 # Enable Regina GCI only on supported platforms.
 # Let configure work it out!
 #ifneq ($(filter alpha amd64 i386,$(DEB_HOST_ARCH)), )

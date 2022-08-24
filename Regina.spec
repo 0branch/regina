@@ -6,7 +6,7 @@
 %define libname libregina3
 Name: regina-rexx
 Version: 3.9.4
-Release: 211027.1120
+Release: 220112.1809
 Group: Development/Languages
 Source: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
@@ -183,6 +183,7 @@ ln -sf %{_sysconfdir}/alternatives/rxqueue.1.gz %{buildroot}%{_mandir}/man1/rxqu
 #******************************************************************************
 %post
 # Add the rxstack service
+useradd --system --user-group --no-create-home --shell /bin/nologin rxstack
 %if "%{?initservice}" == "installsystemd"
 systemctl enable rxstack
 echo "Adding and enabling systemd rxstack service" >&2

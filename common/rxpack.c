@@ -16,8 +16,6 @@
  * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-static char RCSid[] = "$Id: rxpack.c,v 1.97 2021/05/29 22:09:20 mark Exp $";
-
 #if defined(OS2) || defined(__OS2__)
 # define INCL_DOSMISC
 #endif
@@ -358,7 +356,7 @@ RXSTRING *GetRexxVariable( RxPackageGlobalDataDef *RxPackageGlobalData, char *na
     * This calls the RexxVariablePool() function for each value. This is
     * not the most efficient way of doing this.
     */
-   if ( suffix == -1)
+   if ( suffix == RXPACK_NOTAIL)
       strcpy( variable_name, name );
    else
       sprintf( variable_name, "%s%-d", name, suffix );
@@ -429,7 +427,7 @@ int *GetRexxVariableInteger( RxPackageGlobalDataDef *RxPackageGlobalData, char *
     * This calls the RexxVariablePool() function for each value. This is
     * not the most efficient way of doing this.
     */
-   if ( suffix == -1)
+   if ( suffix == RXPACK_NOTAIL)
       strcpy( variable_name, name );
    else
       sprintf( variable_name, "%s%-d", name, suffix );
@@ -449,7 +447,7 @@ int *GetRexxVariableInteger( RxPackageGlobalDataDef *RxPackageGlobalData, char *
    rc = RexxVariablePool( &shv );              /* Get the REXX variable */
    if ( rc == RXSHV_OK )
    {
-      if ( RxStrToInt( RxPackageGlobalData, &shv.shvvalue, value ) == -1 )
+      if ( RxStrToInt( RxPackageGlobalData, &shv.shvvalue, value ) == RXPACK_INVALID )
          value = NULL;
 #if defined(REXXFREEMEMORY)
       RexxFreeMemory( shv.shvvalue.strptr );
@@ -475,6 +473,78 @@ int *GetRexxVariableInteger( RxPackageGlobalDataDef *RxPackageGlobalData, char *
       fflush( RxPackageGlobalData->RxTraceFilePointer );
    }
    return( value );
+}
+
+/*-----------------------------------------------------------------------------
+ * This function gets a REXX variable as a long number and returns it
+ * Returns NULL if the variable is not set; an invalid number returns 0
+ *----------------------------------------------------------------------------*/
+int GetRexxVariableULong( RxPackageGlobalDataDef *RxPackageGlobalData, char *name, unsigned long *value, int suffix )
+{
+   static SHVBLOCK shv;
+   char variable_name[350];
+   int rc = RXPACK_OK;
+
+   InternalTrace( RxPackageGlobalData, "GetRexxVariableULong", "%s,%x,%d", name, value, suffix );
+
+   shv.shvnext=NULL;                                /* only one block */
+   shv.shvcode = RXSHV_FETCH;
+   /*
+    * This calls the RexxVariablePool() function for each value. This is
+    * not the most efficient way of doing this.
+    */
+   if ( suffix == RXPACK_NOTAIL)
+      strcpy( variable_name, name );
+   else
+      sprintf( variable_name, "%s%-d", name, suffix );
+   ( void )make_upper( RxPackageGlobalData, variable_name );
+   /*
+    * Now (attempt to) get the REXX variable
+    * Set shv.shvvalue to NULL to force interpreter to allocate memory.
+    */
+   MAKERXSTRING( shv.shvname, variable_name, (ULONG)strlen( variable_name ) );
+   shv.shvvalue.strptr = NULL;
+   shv.shvvalue.strlength = 0;
+   /*
+    * One or both of these is needed, too <sigh>
+    */
+   shv.shvnamelen = (ULONG)strlen( variable_name );
+   shv.shvvaluelen = 0;
+   rc = RexxVariablePool( &shv );              /* Get the REXX variable */
+   if ( rc == RXSHV_OK )
+   {
+      if ( RxStrToULong( RxPackageGlobalData, &shv.shvvalue, value ) == RXPACK_INVALID )
+      {
+         rc = RXPACK_INVALID;
+         value = NULL;
+      }
+#if defined(REXXFREEMEMORY)
+      RexxFreeMemory( shv.shvvalue.strptr );
+#elif defined(WIN32) && (defined(USE_OREXX) || defined(USE_WINREXX) || defined(USE_QUERCUS) || defined(USE_OOREXX))
+      GlobalFree( shv.shvvalue.strptr );
+#elif defined(WIN64) && (defined(USE_OREXX) || defined(USE_OOREXX))
+      GlobalFree( shv.shvvalue.strptr );
+#elif defined(USE_OS2REXX)
+      DosFreeMem( shv.shvvalue.strptr );
+#else
+      free( shv.shvvalue.strptr );
+#endif
+   }
+   else
+   {
+      rc = RXPACK_MISSING;
+      value = NULL;
+   }
+   if ( RxPackageGlobalData
+   &&   RxPackageGlobalData->RxRunFlags & MODE_VERBOSE )
+   {
+      if ( value )
+         (void)fprintf( RxPackageGlobalData->RxTraceFilePointer, ">>>> Exit GetRexxVariableULong with rc: %d: value \"%lu\"\n", rc, *value );
+      else
+         (void)fprintf( RxPackageGlobalData->RxTraceFilePointer, ">>>> Exit GetRexxVariableULong with rc: %d: value (null)\n", rc );
+      fflush( RxPackageGlobalData->RxTraceFilePointer );
+   }
+   return( rc );
 }
 
 /*-----------------------------------------------------------------------------
@@ -564,7 +634,7 @@ int RxStrToBool( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, ULO
       return(0);
    }
    RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"bool\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-   return (-1);
+   return (RXPACK_INVALID);
 }
 
 /*-----------------------------------------------------------------------------
@@ -598,7 +668,7 @@ int RxStrToIntBool( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, 
       return(0);
    }
    RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"bool\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-   return (-1);
+   return (RXPACK_INVALID);
 }
 
 /*-----------------------------------------------------------------------------
@@ -624,7 +694,7 @@ int RxStrToInt( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, int 
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"int\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -662,7 +732,7 @@ int RxStrToShort( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, sh
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"short\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -694,7 +764,7 @@ int RxStrToUInt( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, uns
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"unsigned int\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc= -1;
+         rc= RXPACK_INVALID;
          break;
       }
    }
@@ -727,7 +797,7 @@ int RxStrToLong( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, lon
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"long\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -759,7 +829,7 @@ int RxStrToULong( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, un
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"unsigned long\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
    }
@@ -793,7 +863,7 @@ int RxStrToLongLong( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr,
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"long long\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -833,7 +903,7 @@ int RxStrToINT8( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, int
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"int8\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -873,7 +943,7 @@ int RxStrToUINT8( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, ui
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"uint8\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -913,7 +983,7 @@ int RxStrToINT16( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, in
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"int16\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -953,7 +1023,7 @@ int RxStrToUINT16( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, u
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"uint16\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -993,7 +1063,7 @@ int RxStrToINT32( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, in
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"int32\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -1033,7 +1103,7 @@ int RxStrToUINT32( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, u
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"uint32\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -1073,7 +1143,7 @@ int RxStrToINT64( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, in
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"int64\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -1113,7 +1183,7 @@ int RxStrToUINT64( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, u
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"uint64\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;
@@ -1145,7 +1215,7 @@ int RxStrToDouble( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, d
    &&   errno != 0 )
    {
       RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"double\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-      return -1;
+      return RXPACK_INVALID;
    }
    if ( sum == 0
    &&   (char *)endptr == p )
@@ -1177,7 +1247,7 @@ int RxStrToFloat( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, fl
    &&   errno != 0 )
    {
       RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"float\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-      return -1;
+      return RXPACK_INVALID;
    }
    if ( sum == 0
    &&   (char *)endptr == p )
@@ -1207,7 +1277,7 @@ int RxStrToPointer( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr, 
       else
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid \"pointer\" value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
    }
@@ -1239,20 +1309,20 @@ int RxStemToCharArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *pt
    if ( ptr->strptr[len-1] != '.' )
    {
       RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid stem value of \"%s\" in call to \"%s\".\n", ptr, RxPackageGlobalData->FName);
-      return -1;
+      return RXPACK_INVALID;
    }
    /*
     * Get the number of items in the array
     */
    if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, &num_items, 0 ) == NULL )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Allocate num_items char *
     */
    if ( num_items )
    {
       if ( ( ret = tmp = (char **)MALLOC_TSD( RxPackageGlobalData, num_items * sizeof(char *) ) ) == NULL )
-         return -1;
+         return RXPACK_INVALID;
       /*
        * Get each stem value, and set the equivalent entry in the allocated
        * char **
@@ -1260,7 +1330,7 @@ int RxStemToCharArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *pt
       for ( i = 0; i < num_items; i++, tmp++ )
       {
          if ( GetRexxVariable( RxPackageGlobalData, ptr->strptr, &value, i+1 ) == NULL )
-            return -1;
+            return RXPACK_INVALID;
          *tmp = value.strptr;
       }
       *retval = ret;
@@ -1321,19 +1391,19 @@ int RxStemToULongArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *p
     * Validate that 'ptr' is a stem name.
     */
    if ( ptr->strptr[len-1] != '.' )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Get the number of items in the array
     */
    if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, &num_items, 0 ) == NULL )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Allocate num_items unsigned longs
     */
    if ( num_items )
    {
       if ( ( ret = tmp = (unsigned long *)MALLOC_TSD( RxPackageGlobalData, num_items * sizeof(unsigned long) ) ) == NULL )
-         return -1;
+         return RXPACK_INVALID;
       /*
        * Get each stem value, and set the equivalent entry in the allocated
        * ULONG *
@@ -1341,7 +1411,7 @@ int RxStemToULongArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *p
       for ( i = 0; i < num_items; i++, tmp++ )
       {
          if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, (int *)&value, i+1 ) == NULL )
-            return -1;
+            return RXPACK_INVALID;
          *tmp = (unsigned long)value;
       }
       *retval = ret;
@@ -1387,19 +1457,19 @@ int RxStemToLongArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *pt
     * Validate that 'ptr' is a stem name.
     */
    if ( ptr->strptr[len-1] != '.' )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Get the number of items in the array
     */
    if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, &num_items, 0 ) == NULL )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Allocate num_items unsigned longs
     */
    if ( num_items )
    {
       if ( ( ret = tmp = (long *)MALLOC_TSD( RxPackageGlobalData, num_items * sizeof(long) ) ) == NULL )
-         return -1;
+         return RXPACK_INVALID;
       /*
        * Get each stem value, and set the equivalent entry in the allocated
        * LONG *
@@ -1407,7 +1477,7 @@ int RxStemToLongArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *pt
       for ( i = 0; i < num_items; i++, tmp++ )
       {
          if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, (int *)&value, i+1 ) == NULL )
-            return -1;
+            return RXPACK_INVALID;
          *tmp = (long)value;
       }
       *retval = ret;
@@ -1453,19 +1523,19 @@ int RxStemToIntArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr
     * Validate that 'ptr' is a stem name.
     */
    if ( ptr->strptr[len-1] != '.' )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Get the number of items in the array
     */
    if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, &num_items, 0 ) == NULL )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Allocate num_items unsigned longs
     */
    if ( num_items )
    {
       if ( ( ret = tmp = (int *)MALLOC_TSD( RxPackageGlobalData, num_items * sizeof(int) ) ) == NULL )
-         return -1;
+         return RXPACK_INVALID;
       /*
        * Get each stem value, and set the equivalent entry in the allocated
        * INT *
@@ -1473,7 +1543,7 @@ int RxStemToIntArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *ptr
       for ( i = 0; i < num_items; i++, tmp++ )
       {
          if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, (int *)&value, i+1 ) == NULL )
-            return -1;
+            return RXPACK_INVALID;
          *tmp = (int)value;
       }
       *retval = ret;
@@ -1519,19 +1589,19 @@ int RxStemToUIntArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *pt
     * Validate that 'ptr' is a stem name.
     */
    if ( ptr->strptr[len-1] != '.' )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Get the number of items in the array
     */
    if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, &num_items, 0 ) == NULL )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Allocate num_items unsigned longs
     */
    if ( num_items )
    {
       if ( ( ret = tmp = (unsigned int *)MALLOC_TSD( RxPackageGlobalData, num_items * sizeof(unsigned int) ) ) == NULL )
-         return -1;
+         return RXPACK_INVALID;
       /*
        * Get each stem value, and set the equivalent entry in the allocated
        * UNSIGNED INT *
@@ -1539,7 +1609,7 @@ int RxStemToUIntArray( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *pt
       for ( i = 0; i < num_items; i++, tmp++ )
       {
          if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, (int *)&value, i+1 ) == NULL )
-            return -1;
+            return RXPACK_INVALID;
          *tmp = (unsigned int)value;
       }
       *retval = ret;
@@ -1585,19 +1655,19 @@ int RxStemToUINT16Array( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *
     * Validate that 'ptr' is a stem name.
     */
    if ( ptr->strptr[len-1] != '.' )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Get the number of items in the array
     */
    if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, &num_items, 0 ) == NULL )
-      return -1;
+      return RXPACK_INVALID;
    /*
     * Allocate num_items unsigned longs
     */
    if ( num_items )
    {
       if ( ( ret = tmp = (uint16_t *)MALLOC_TSD( RxPackageGlobalData, num_items * sizeof(uint16_t) ) ) == NULL )
-         return -1;
+         return RXPACK_INVALID;
       /*
        * Get each stem value, and set the equivalent entry in the allocated
        * UNSIGNED INT *
@@ -1605,7 +1675,7 @@ int RxStemToUINT16Array( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *
       for ( i = 0; i < num_items; i++, tmp++ )
       {
          if ( GetRexxVariableInteger( RxPackageGlobalData, ptr->strptr, (int *)&value, i+1 ) == NULL )
-            return -1;
+            return RXPACK_INVALID;
          *tmp = (uint16_t)value;
       }
       *retval = ret;
@@ -1654,7 +1724,7 @@ int RxNumberToVariable( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING *p
    &&   ptr->strptr )
    {
       if ( SetRexxVariable( RxPackageGlobalData, ptr->strptr, ptr->strlength, buf, len ) == 1 )
-         return -1;
+         return RXPACK_INVALID;
    }
    return 0;
 }
@@ -1677,7 +1747,7 @@ int RxBinaryStringToUINT8( RxPackageGlobalDataDef *RxPackageGlobalData, RXSTRING
       else if ( *p != '0' )
       {
          RxDisplayError( RxPackageGlobalData, (RFH_ARG0_TYPE)RxPackageGlobalData->FName, "*ERROR* Invalid binary value of \"%s\" in call to \"%s\".\n", p, RxPackageGlobalData->FName);
-         rc = -1;
+         rc = RXPACK_INVALID;
          break;
       }
       p++;

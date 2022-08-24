@@ -8,7 +8,7 @@ HOMEPAGE="https://regina-rexx.sourceforge.io"
 DOCS="COPYING-LIB TODO README.394 doc/regina.pdf doc/regutil.pdf"
 
 regina_rexx_CATEGORY="Interpreters"
-regina_rexx_SUMMARY="An ANSI compliant Rexx Interpreter. Binaries and demo programs."
+regina_rexx_SUMMARY="An ANSI compliant Rexx Interpreter. Binaries and demo programs"
 regina_rexx_DESCRIPTION="Rexx is a procedural language that allows programs and algorithms to be
 written in a clear and structured way.
 It is also designed to be used as a macro language by application programs.
@@ -17,7 +17,7 @@ regina_rexx_CONTENTS="--exclude=cygregina.dll --exclude=usr/lib/regina-rexx/addo
 regina_rexx_REQUIRES="libregina"
 
 libregina_CATEGORY="Interpreters"
-libregina_SUMMARY="An ANSI compliant Rexx Interpreter. Runtime libraries."
+libregina_SUMMARY="An ANSI compliant Rexx Interpreter. Runtime libraries"
 libregina_DESCRIPTION="Rexx is a procedural language that allows programs and algorithms to be
 written in a clear and structured way.
 It is also designed to be used as a macro language by application programs.
@@ -25,7 +25,7 @@ This package contains runtime libraries."
 libregina_CONTENTS="usr/bin/cygregina.dll usr/lib/regina-rexx/addons/regutil.dll"
 
 libregina_devel_CATEGORY="Interpreters"
-libregina_devel_SUMMARY="An ANSI compliant Rexx Interpreter. Development libraries and headers."
+libregina_devel_SUMMARY="An ANSI compliant Rexx Interpreter. Development libraries and headers"
 libregina_devel_DESCRIPTION="Rexx is a procedural language that allows programs and algorithms to be
 written in a clear and structured way.
 It is also designed to be used as a macro language by application programs.

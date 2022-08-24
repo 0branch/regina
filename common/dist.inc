@@ -14,5 +14,5 @@ ZIPCOMMONFILES = ./common/getopt.c ./common/loader.c ./common/rxpack.c \
                  ./common/rxmt.h ./common/rxmt_*.c ./common/rxmt_*.h \
                  ./common/*.rexx ./common/*.nsh ./common/*.m4 \
                  ./common/*.bmp ./common/*.png ./common/*.ico \
-                 ./common/dist.inc ./common/filterexports.rexx ./common/fixrc.rexx \
+                 ./common/dist.inc \
                  ./common/config.sub ./common/config.guess
