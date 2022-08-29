@@ -4,6 +4,7 @@
 #
 [Unit]
 Description=Regina Rexx stack service
+Documentation=man:rxstack(1) man:regina(1) https://regina-rexx.sourceforge.io/doc/index.html
 After=network.target
 
 [Service]

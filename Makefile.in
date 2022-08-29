@@ -1051,11 +1051,12 @@ installbase: all
 	$(INSTALL) -m 755 -d $(DESTDIR)$(includedir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(sharedir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(examplesdir)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(sysconfdir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)/man1
 	$(INSTALL) -s -m 755 -c ./rexx$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rexx$(binarybitprefix)$(EXE)
 	$(INSTALL) -s -m 755 -c ./rxqueue$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxqueue$(binarybitprefix)$(EXE)
 	$(INSTALL) -s -m 755 -c ./rxstack$(binarybitprefix)$(EXE) $(DESTDIR)$(bindir)/rxstack$(binarybitprefix)$(EXE)
-	$(INSTALL) -m 644 -c ./rxstack.conf.etc $(DESTDIR)$(sysconfdir)/rxstack.conf
+	$(INSTALL) -m 644 -c $(srcdir)/rxstack.conf.etc $(DESTDIR)$(sysconfdir)/rxstack.conf
 	$(INSTALL) -m 755 -c ./regina-config $(DESTDIR)$(bindir)/regina-config
 	$(INSTALL) -m 755 -c ./libregina.pc $(DESTDIR)$(libdir)/pkgconfig/libregina.pc
 	-$(INSTALL) -m 644 -c ./$(LIBPRE)$(LIBFILE)$(LIBPST) $(DESTDIR)$(libdir)/$(LIBPRE)$(LIBFILE)$(LIBPST)
@@ -1419,13 +1420,14 @@ install-dev: $(LIBPRE)$(LIBFILE)$(LIBPST)
 install-rexx: rexx$(EXE) regina$(EXE) @initinstaller@-deb
 	$(INSTALL) -m 755 -d $(DESTDIR)$(libdir)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(addonsdir)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(sysconfdir)
 	$(INSTALL) -c -m 755 $(srcdir)/rexx $(DESTDIR)$(bindir)/rexx-$(PACKAGE)
 #	ln -sf $(DESTDIR)/usr/bin/rexx-$(PACKAGE) $(DESTDIR)/usr/bin/rexx
 	$(INSTALL) -c -m 755 $(srcdir)/regina $(DESTDIR)$(bindir)/regina
 	$(INSTALL) -c -m 755 $(srcdir)/rxqueue $(DESTDIR)$(bindir)/rxqueue-$(PACKAGE)
 #	ln -sf $(DESTDIR)/usr/bin/rxqueue-$(PACKAGE) $(DESTDIR)/usr/bin/rxqueue
 	$(INSTALL) -c -m 755 $(srcdir)/rxstack $(DESTDIR)$(bindir)/rxstack
-	$(INSTALL) -m 644 -c ./rxstack.conf.etc $(DESTDIR)$(sysconfdir)/rxstack.conf
+	$(INSTALL) -m 644 -c $(srcdir)/rxstack.conf.etc $(DESTDIR)$(sysconfdir)/rxstack.conf
 	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/regina.1
 	$(INSTALL) -c -m 644 $(srcdir)/regina.1 $(DESTDIR)$(mandir)/man1/rexx-$(PACKAGE).1
 	$(INSTALL) -c -m 644 $(srcdir)/rxstack.1 $(DESTDIR)$(mandir)/man1/rxstack.1
